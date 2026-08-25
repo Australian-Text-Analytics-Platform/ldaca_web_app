@@ -47,8 +47,8 @@ function StatusChip({ installed }: { installed: boolean }) {
     <span
       className={
         installed
-          ? 'text-xs font-medium whitespace-nowrap text-green-600 dark:text-green-400'
-          : 'text-xs font-medium whitespace-nowrap text-muted-foreground'
+          ? 'text-label-secondary font-medium whitespace-nowrap text-[var(--vscode-charts-green)]'
+          : 'text-label-secondary font-medium whitespace-nowrap text-description'
       }
     >
       {installed ? '✓ Imported' : '○ Remote'}
@@ -121,9 +121,9 @@ function ReadmeViewer({ path, collectionName, onClose }: ReadmeViewerProps) {
               <Skeleton className="h-4 w-2/3" />
             </div>
           )}
-          {isError && <p className="text-sm text-destructive py-2">Could not load README.</p>}
+          {isError && <p className="text-body text-error py-2">Could not load README.</p>}
           {!isLoading && !isError && content && (
-            <div className="prose prose-sm prose-slate dark:prose-invert max-w-none">
+            <div className="prose prose-sm prose-slate max-w-none">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
             </div>
           )}
@@ -272,7 +272,7 @@ export function SampleDataPanel() {
                         />
                         <label
                           htmlFor={`sdc-${col.id}`}
-                          className="flex-1 text-sm font-medium leading-none cursor-pointer select-none"
+                          className="flex-1 text-body font-medium leading-none cursor-pointer select-none"
                         >
                           {col.name}
                         </label>
@@ -280,7 +280,7 @@ export function SampleDataPanel() {
                           <Button
                             size="icon"
                             variant="ghost"
-                            className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground"
+                            className="h-6 w-6 shrink-0 text-description hover:text-foreground"
                             aria-label={`View README for ${col.name}`}
                             title="View README"
                             onClick={() => {
@@ -290,7 +290,7 @@ export function SampleDataPanel() {
                             <Quote className="h-3.5 w-3.5" />
                           </Button>
                         )}
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-label-secondary text-description">
                           {formatBytes(col.total_size_bytes)}
                         </span>
                         <StatusChip installed={col.installed ?? false} />
@@ -298,7 +298,7 @@ export function SampleDataPanel() {
                       {(col.recommended_for?.length ?? 0) > 0 && (
                         <div className="flex flex-wrap gap-1 pl-6">
                           {(col.recommended_for ?? []).map((tool) => (
-                            <Badge key={tool} variant="secondary" className="text-xs">
+                            <Badge key={tool} variant="secondary" className="text-label-secondary">
                               {TOOL_LABELS[tool] ?? tool}
                             </Badge>
                           ))}
@@ -311,7 +311,7 @@ export function SampleDataPanel() {
             )}
 
             {!isLoading && isError && (
-              <p className="text-sm text-destructive">Could not load the sample catalogue.</p>
+              <p className="text-body text-error">Could not load the sample catalogue.</p>
             )}
 
             <div className="flex justify-end">

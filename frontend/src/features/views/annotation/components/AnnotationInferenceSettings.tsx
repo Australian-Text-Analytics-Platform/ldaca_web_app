@@ -70,13 +70,13 @@ export function AnnotationInferenceSettings({
             onTemperatureCommit(Math.min(2, Math.max(0, safe)));
           }}
         />
-        <p className="text-xs text-muted-foreground">
+        <p className="text-label-secondary text-description">
           0 is deterministic; higher values add randomness (max 2).
         </p>
       </div>
 
       <fieldset className="space-y-1.5">
-        <legend className="text-sm font-medium">Run All processing</legend>
+        <legend className="text-body font-medium">Run All processing</legend>
         <div className="flex flex-wrap gap-x-6 gap-y-2">
           <Label className="flex cursor-pointer items-center gap-2 font-normal">
             <input
@@ -107,7 +107,7 @@ export function AnnotationInferenceSettings({
             Fill missing only
           </Label>
         </div>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-label-secondary text-description">
           Reprocess replaces the annotation column; fill missing preserves existing labels.
         </p>
       </fieldset>
@@ -130,7 +130,7 @@ export function AnnotationInferenceSettings({
             onBatchSizeCommit(Math.min(100, Math.max(1, safe)));
           }}
         />
-        <p className="text-xs text-muted-foreground">
+        <p className="text-label-secondary text-description">
           Rows sent in each Run All LLM request (default 20, max 100).
         </p>
       </div>
@@ -153,7 +153,7 @@ export function AnnotationInferenceSettings({
             onMaxRetriesPerBatchCommit(Math.min(10, Math.max(0, safe)));
           }}
         />
-        <p className="text-xs text-muted-foreground">
+        <p className="text-label-secondary text-description">
           Retry each failed LLM batch up to this many times (default 2; 3 tries total). 0 disables
           retries.
         </p>
@@ -162,7 +162,7 @@ export function AnnotationInferenceSettings({
       <div className="flex items-center justify-between gap-3">
         <div className="space-y-0.5">
           <Label htmlFor="annotation-ai-reasoning">Reasoning</Label>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-label-secondary text-description">
             Let the model think before answering (reasoning models only).
           </p>
         </div>

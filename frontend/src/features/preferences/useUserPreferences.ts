@@ -15,6 +15,7 @@ const DEFAULT_PREFERENCES: Required<UserPreferences> = {
   favorite_workspaces: [],
   analysis_multi_tab_enabled: false,
   contextual_hints_enabled: true,
+  color_theme: 'light-2026',
 };
 
 export function useUserPreferences() {

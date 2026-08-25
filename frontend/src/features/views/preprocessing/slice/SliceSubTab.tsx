@@ -105,7 +105,7 @@ function SliceSubTabContent(props: SliceSubTabComponentProps) {
                     }}
                     disabled={!hasSelection}
                   />
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-label-secondary text-description">
                     Zero-based index of the first row to include.
                   </p>
                 </div>
@@ -126,7 +126,7 @@ function SliceSubTabContent(props: SliceSubTabComponentProps) {
                     disabled={!hasSelection}
                     placeholder="Number of rows to include"
                   />
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-label-secondary text-description">
                     Number of rows to include from the offset.
                   </p>
                 </div>
@@ -150,12 +150,12 @@ function SliceSubTabContent(props: SliceSubTabComponentProps) {
                     disabled={!hasSelection}
                     placeholder="e.g. 0.4 for 40% or 100 for 100 rows"
                   />
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-label-secondary text-description">
                     Fraction (0–1) for proportional sampling, or an integer ≥ 1 for an absolute row
                     count.
                   </p>
                   {form.sampleSizeHint && (
-                    <p className="text-xs text-destructive">{form.sampleSizeHint}</p>
+                    <p className="text-label-secondary text-error">{form.sampleSizeHint}</p>
                   )}
                 </div>
                 <div className="space-y-2">
@@ -184,12 +184,12 @@ function SliceSubTabContent(props: SliceSubTabComponentProps) {
                     />
                     <Label
                       htmlFor="no-random-seed"
-                      className="text-sm font-normal text-muted-foreground whitespace-nowrap"
+                      className="text-body font-normal text-description whitespace-nowrap"
                     >
                       No Random Seed
                     </Label>
                   </div>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-label-secondary text-description">
                     Use a seed to reproduce the same sampled rows.
                   </p>
                 </div>
@@ -197,7 +197,7 @@ function SliceSubTabContent(props: SliceSubTabComponentProps) {
             </TabsContent>
           </Tabs>
         </CardContent>
-        <CardFooter className="flex items-center gap-3 border-t border-border bg-muted/20 py-4">
+        <CardFooter className="flex items-center gap-3 border-t border-surface-border bg-panel/20 py-4">
           <div className="flex flex-1 items-center gap-2">
             <Label htmlFor="slice-new-node-name" className="shrink-0">
               New data block name
@@ -223,7 +223,7 @@ function SliceSubTabContent(props: SliceSubTabComponentProps) {
             />
           </div>
           {inlineError && (
-            <div className="flex items-center gap-2 text-sm text-destructive">
+            <div className="flex items-center gap-2 text-body text-error">
               <AlertCircle className="h-4 w-4" />
               <span>{inlineError}</span>
             </div>

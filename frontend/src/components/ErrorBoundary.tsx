@@ -1,5 +1,6 @@
 import { Component, type ReactNode, type ComponentType } from 'react';
 import { captureException } from '@/lib/sentry';
+import { Button } from '@/components/ui/button';
 
 interface ErrorBoundaryState {
   hasError: boolean;
@@ -63,38 +64,35 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
  */
 function DefaultErrorFallback({ error, resetError }: { error?: Error; resetError: () => void }) {
   return (
-    <div className="flex flex-col items-center justify-center min-h-[400px] p-8 bg-red-50 border border-red-200 rounded-lg">
-      <div className="text-red-600 text-xl font-semibold mb-4">Something went wrong</div>
+    <div className="flex flex-col items-center justify-center min-h-[400px] p-8 bg-error-background border border-error rounded-lg">
+      <div className="text-error text-heading-2 font-semibold mb-4">Something went wrong</div>
 
-      <div className="text-red-700 text-sm mb-6 max-w-md text-center">
+      <div className="text-error text-body mb-6 max-w-md text-center">
         {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- fall back to generic copy when message is an empty string, not only null/undefined */}
         {error?.message || 'An unexpected error occurred. Please try again.'}
       </div>
 
       <div className="space-x-4">
-        <button
-          onClick={resetError}
-          className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
-        >
+        <Button variant="destructive" onClick={resetError}>
           Try Again
-        </button>
+        </Button>
 
-        <button
+        <Button
+          variant="secondary"
           onClick={() => {
             window.location.reload();
           }}
-          className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
         >
           Reload Page
-        </button>
+        </Button>
       </div>
 
       {import.meta.env.DEV && error?.stack && (
         <details className="mt-6 w-full max-w-2xl">
-          <summary className="cursor-pointer text-sm text-gray-600 hover:text-gray-800">
+          <summary className="cursor-pointer text-body text-description hover:text-foreground">
             Show Error Details
           </summary>
-          <pre className="mt-2 p-4 bg-gray-100 rounded text-xs text-gray-800 overflow-auto">
+          <pre className="mt-2 p-4 bg-panel rounded-sm text-label-secondary text-foreground overflow-auto">
             {error.stack}
           </pre>
         </details>

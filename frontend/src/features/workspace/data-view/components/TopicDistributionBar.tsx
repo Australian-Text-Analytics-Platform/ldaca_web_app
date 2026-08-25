@@ -50,7 +50,7 @@ export function TopicDistributionBar({ value }: Props) {
   const entries = parseEntries(value).sort((a, b) => b.proportion - a.proportion);
 
   if (entries.length === 0) {
-    return <span className="text-xs text-muted-foreground">—</span>;
+    return <span className="text-label-secondary text-description">—</span>;
   }
 
   const total = entries.reduce((sum, e) => sum + e.proportion, 0) || 1;
@@ -82,7 +82,7 @@ export function TopicDistributionBar({ value }: Props) {
           return (
             <span
               key={`${String(entry.topic_id)}-${String(i)}`}
-              className="inline-flex items-center gap-1 text-[10px] leading-none text-muted-foreground"
+              className="inline-flex items-center gap-1 text-badge leading-none text-description"
             >
               <span
                 className="inline-block h-2 w-2 rounded-[2px]"
@@ -93,9 +93,7 @@ export function TopicDistributionBar({ value }: Props) {
           );
         })}
         {entries.length > 4 ? (
-          <span className="text-[10px] leading-none text-muted-foreground">
-            +{entries.length - 4}
-          </span>
+          <span className="text-badge leading-none text-description">+{entries.length - 4}</span>
         ) : null}
       </div>
     </div>

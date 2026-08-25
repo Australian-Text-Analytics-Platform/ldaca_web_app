@@ -290,21 +290,21 @@ function FileTreeContent({
         handleDirectoryDragLeave(`file:${file.path}`, event);
       }}
       onDrop={(event) => void handleDirectoryDrop(parentDirectoryPath, event)}
-      className={`group flex items-start gap-2 rounded-md px-2 py-1.5 hover:bg-accent/50 ${
-        selectedFile === file.path ? 'bg-muted/50' : ''
+      className={`group flex items-start gap-2 rounded-md px-2 py-1.5 hover:bg-list-hover/50 ${
+        selectedFile === file.path ? 'bg-panel/50' : ''
       } ${
         isFileMoveTargetActive(`file:${file.path}`, parentDirectoryPath)
-          ? 'bg-primary/10 ring-1 ring-primary/30'
+          ? 'bg-button/10 ring-1 ring-focus/30'
           : ''
       }`}
     >
-      <FileIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+      <FileIcon className="h-4 w-4 shrink-0 text-description" />
       <div className="@container/file-row flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
         <div className="min-w-0 flex-[1_1_14rem]">
           <div className="flex items-center gap-1.5">
-            <span className="truncate text-sm font-medium text-foreground">{file.name}</span>
+            <span className="truncate text-body font-medium text-foreground">{file.name}</span>
           </div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2 text-label-secondary text-description">
             <span>{formatBytes(file.size)}</span>
           </div>
         </div>
@@ -357,7 +357,7 @@ function FileTreeContent({
           <Button
             size="sm"
             variant="ghost"
-            className="h-7 px-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
+            className="h-7 px-2 text-error hover:bg-error/10 hover:text-error"
             aria-label={`Delete ${file.name}`}
             title={`Delete ${file.name}`}
             onClick={() => {
@@ -396,9 +396,9 @@ function FileTreeContent({
         }}
       >
         <div
-          className={`flex flex-wrap items-center gap-1 rounded-md pr-1 hover:bg-accent/50 ${
+          className={`flex flex-wrap items-center gap-1 rounded-md pr-1 hover:bg-list-hover/50 ${
             isFileMoveTargetActive(`folder:${node.path}`, node.path)
-              ? 'bg-primary/10 ring-1 ring-primary/30'
+              ? 'bg-button/10 ring-1 ring-focus/30'
               : ''
           }`}
           data-folder-path={node.path}
@@ -419,7 +419,7 @@ function FileTreeContent({
               <Button
                 variant="ghost"
                 size="sm"
-                className="group h-8 min-w-0 justify-start gap-1 px-2 transition-none hover:bg-transparent hover:text-accent-foreground"
+                className="group h-8 min-w-0 justify-start gap-1 px-2 transition-none hover:bg-transparent hover:text-foreground"
               >
                 <ChevronRightIcon className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-90" />
                 <FolderIcon className="h-4 w-4 shrink-0" />
@@ -430,7 +430,7 @@ function FileTreeContent({
               <Button
                 size="icon"
                 variant="ghost"
-                className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
+                className="h-7 w-7 shrink-0 text-description hover:text-foreground"
                 aria-label={`View citation for ${node.name}`}
                 title="View citation"
                 onClick={() => {
@@ -444,7 +444,7 @@ function FileTreeContent({
           <Button
             size="icon"
             variant="ghost"
-            className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
+            className="h-7 w-7 shrink-0 text-description hover:text-foreground"
             aria-label={`Add folder inside ${node.name}`}
             title={`Add folder inside ${node.name}`}
             onClick={() => {
@@ -456,7 +456,7 @@ function FileTreeContent({
           <Button
             size="icon"
             variant="ghost"
-            className="h-7 w-7 shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
+            className="h-7 w-7 shrink-0 text-error hover:bg-error/10 hover:text-error"
             aria-label={`Delete folder ${node.name}`}
             title={`Delete folder ${node.name}`}
             onClick={() => {
@@ -466,12 +466,12 @@ function FileTreeContent({
           >
             <Trash2 className="h-3.5 w-3.5" />
           </Button>
-          <Badge variant="secondary" className="text-[10px]">
+          <Badge variant="secondary" className="text-badge">
             {fileCount}
           </Badge>
         </div>
         <CollapsibleContent className="ml-3 sm:ml-5">
-          <div className="flex flex-col gap-0.5 border-l border-border/40 pl-2">
+          <div className="flex flex-col gap-0.5 border-l border-surface-border/40 pl-2">
             {visibleChildren.map((child) => renderNode(child))}
           </div>
         </CollapsibleContent>
@@ -503,7 +503,7 @@ function FileTreeContent({
           <AlertDialogFooter>
             <AlertDialogCancel disabled={loadingFiles}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-error text-button-foreground hover:bg-error/90"
               disabled={loadingFiles}
               onClick={() => {
                 if (!deleteTarget) return;

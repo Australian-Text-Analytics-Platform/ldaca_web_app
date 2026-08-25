@@ -153,7 +153,7 @@ export function ColumnComparisonHeader({
               <Badge
                 asChild
                 variant="outline"
-                className="h-7 px-2.5 text-sm font-medium tabular-nums"
+                className="h-7 px-2.5 text-body font-medium tabular-nums"
               >
                 <button type="button" aria-label={scoreDescription}>
                   {score}
@@ -171,21 +171,21 @@ export function ColumnComparisonHeader({
                 <div className="grid grid-cols-[auto_auto] grid-rows-[auto_auto] gap-x-2 gap-y-1">
                   <div
                     aria-label={`${comparisonColumn} column axis`}
-                    className="col-start-2 row-start-1 flex items-center justify-center gap-1 border-b border-primary-foreground/25 pb-1 font-medium"
+                    className="col-start-2 row-start-1 flex items-center justify-center gap-1 border-b border-button-foreground/25 pb-1 font-medium"
                   >
                     <span>{comparisonColumn}</span>
                     <ArrowRight aria-hidden="true" className="size-3" />
                   </div>
                   <div
                     aria-label={`${referenceColumn} row axis`}
-                    className="col-start-1 row-start-2 flex flex-col items-center justify-center gap-1 border-r border-primary-foreground/25 pr-1.5 font-medium"
+                    className="col-start-1 row-start-2 flex flex-col items-center justify-center gap-1 border-r border-button-foreground/25 pr-1.5 font-medium"
                   >
                     <span className="rotate-180 [writing-mode:vertical-rl]">{referenceColumn}</span>
                     <ArrowDown aria-hidden="true" className="size-3" />
                   </div>
                   <table
                     aria-label={`${referenceColumn} versus ${comparisonColumn} confusion matrix`}
-                    className="col-start-2 row-start-2 border-separate border-spacing-x-2 border-spacing-y-1 text-xs tabular-nums"
+                    className="col-start-2 row-start-2 border-separate border-spacing-x-2 border-spacing-y-1 text-label-secondary tabular-nums"
                   >
                     <caption className="sr-only">
                       Rows are {referenceColumn}; columns are {comparisonColumn}.
@@ -198,7 +198,7 @@ export function ColumnComparisonHeader({
                         {labels.map((comparisonLabel) => (
                           <th
                             key={comparisonLabel}
-                            className="px-1 text-center text-primary-foreground/80"
+                            className="px-1 text-center text-button-foreground/80"
                             scope="col"
                           >
                             {displayLabel(comparisonLabel)}
@@ -209,7 +209,7 @@ export function ColumnComparisonHeader({
                     <tbody>
                       {labels.map((referenceLabel) => (
                         <tr key={referenceLabel}>
-                          <th className="pr-2 text-right text-primary-foreground/80" scope="row">
+                          <th className="pr-2 text-right text-button-foreground/80" scope="row">
                             {displayLabel(referenceLabel)}
                           </th>
                           {labels.map((comparisonLabel) => (

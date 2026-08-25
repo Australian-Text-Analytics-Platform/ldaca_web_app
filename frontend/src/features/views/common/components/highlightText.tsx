@@ -80,7 +80,7 @@ export const highlightMatchInText = (
     children.push(
       <mark
         key={`mark-${String(range.start)}-${String(range.end)}`}
-        className="bg-yellow-200 text-gray-900 rounded px-1"
+        className="bg-[var(--vscode-editor-findMatchHighlightBackground)] text-foreground rounded-sm px-1"
       >
         {textValue.slice(range.start, range.end)}
       </mark>,

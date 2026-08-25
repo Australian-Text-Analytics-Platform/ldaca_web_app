@@ -154,7 +154,7 @@ export function SequentialAnalysisParameterPanel({
           {derivedColumnType === 'datetime' ? (
             <div className={frequency === 'custom' ? 'md:col-span-2' : 'md:col-span-1'}>
               <div className="mb-1 flex items-center gap-2">
-                <label className="block text-sm font-medium text-gray-700">Frequency</label>
+                <label className="block text-body font-medium text-foreground">Frequency</label>
                 <HelpIcon
                   targetKey="analysis.sequential-analysis.frequency"
                   label="Frequency selector"
@@ -181,7 +181,7 @@ export function SequentialAnalysisParameterPanel({
                 </Select>
                 {frequency === 'custom' && (
                   <div className="flex flex-1 items-center gap-2">
-                    <span className="text-sm text-muted-foreground">Every</span>
+                    <span className="text-body text-description">Every</span>
                     <Input
                       type="number"
                       min="1"
@@ -216,7 +216,7 @@ export function SequentialAnalysisParameterPanel({
                 )}
               </div>
               {frequency === 'custom' && (
-                <p className="mt-1 text-xs text-muted-foreground">
+                <p className="mt-1 text-label-secondary text-description">
                   Bucket records by a fixed interval. Enter a positive whole number.
                 </p>
               )}
@@ -224,7 +224,7 @@ export function SequentialAnalysisParameterPanel({
           ) : (
             <>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-body font-medium text-foreground">
                   Numeric Origin
                 </label>
                 <Input
@@ -236,12 +236,12 @@ export function SequentialAnalysisParameterPanel({
                   placeholder="Auto-detect"
                   disabled={inputsDisabled}
                 />
-                <p className="mt-1 text-xs text-muted-foreground">
+                <p className="mt-1 text-label-secondary text-description">
                   Optional. Leave blank to auto-detect from the minimum value.
                 </p>
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-body font-medium text-foreground">
                   Numeric Interval *
                 </label>
                 <Input
@@ -255,7 +255,7 @@ export function SequentialAnalysisParameterPanel({
                   placeholder="e.g. 10"
                   disabled={inputsDisabled}
                 />
-                <p className="mt-1 text-xs text-muted-foreground">
+                <p className="mt-1 text-label-secondary text-description">
                   Required. Values are bucketed using this interval width.
                 </p>
               </div>
@@ -265,7 +265,7 @@ export function SequentialAnalysisParameterPanel({
 
         <div>
           <div className="flex justify-between items-center mb-2">
-            <label className="block text-sm font-medium text-gray-700">
+            <label className="block text-body font-medium text-foreground">
               Group By Columns (Optional, max 3)
             </label>
             <Button
@@ -335,7 +335,7 @@ export function SequentialAnalysisParameterPanel({
               />
               <label
                 htmlFor="case-sensitive"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                className="text-body font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
               >
                 Case sensitive
               </label>

@@ -21,7 +21,7 @@ export function PaginatedTableProcessingRow({
         <span
           role="status"
           aria-label={label}
-          className="inline-flex items-center justify-center text-muted-foreground"
+          className="inline-flex items-center justify-center text-description"
         >
           <Loader2 aria-hidden="true" className="size-5 animate-spin" />
         </span>

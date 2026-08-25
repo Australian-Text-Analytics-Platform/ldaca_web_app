@@ -57,11 +57,11 @@ function PointerFollower({
     <div
       role="status"
       aria-label={`Carrying ${String(requests.length)} Data Block${requests.length === 1 ? '' : 's'}`}
-      className="pointer-events-none fixed z-[100] w-64 overflow-hidden rounded-xl border border-primary/35 bg-background/95 text-sm shadow-xl backdrop-blur-sm"
+      className="pointer-events-none fixed z-[100] w-64 overflow-hidden rounded-lg border border-button/35 bg-editor/95 text-body"
       style={{ left: position.x + POINTER_OFFSET, top: position.y + POINTER_OFFSET }}
     >
-      <div className="flex items-center gap-2 border-b border-border/70 px-3 py-2">
-        <MousePointer2 className="size-4 shrink-0 text-primary" aria-hidden="true" />
+      <div className="flex items-center gap-2 border-b border-surface-border/70 px-3 py-2">
+        <MousePointer2 className="size-4 shrink-0 text-link" aria-hidden="true" />
         <span className="font-medium text-foreground">
           Carrying {requests.length} Data Block{requests.length === 1 ? '' : 's'}
         </span>
@@ -72,21 +72,21 @@ function PointerFollower({
           return (
             <div
               key={request.id}
-              className={`flex min-w-0 items-center gap-2 rounded-md border border-border bg-card px-2.5 py-1.5 shadow-sm ${index > 0 ? '-mt-1' : ''}`}
+              className={`flex min-w-0 items-center gap-2 rounded-md border border-surface-border bg-surface px-2.5 py-1.5 ${index > 0 ? '-mt-1' : ''}`}
             >
               <Layers3
-                className={isTop ? 'size-3.5 text-primary' : 'size-3.5 text-muted-foreground'}
+                className={isTop ? 'size-3.5 text-link' : 'size-3.5 text-description'}
                 aria-hidden="true"
               />
               <span className="min-w-0 flex-1 truncate font-medium text-foreground">
                 {request.name}
               </span>
-              {isTop ? <span className="text-[10px] font-medium text-primary">Next</span> : null}
+              {isTop ? <span className="text-badge font-medium text-link">Next</span> : null}
             </div>
           );
         })}
       </div>
-      <div className="border-t border-border/70 px-3 py-1.5 text-[10px] text-muted-foreground">
+      <div className="border-t border-surface-border/70 px-3 py-1.5 text-badge text-description">
         Click a selector to place next · Right-click discards next · Esc clears all
       </div>
     </div>,

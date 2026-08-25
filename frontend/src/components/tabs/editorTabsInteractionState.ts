@@ -1,21 +1,21 @@
-interface ChromeTabsDragRenderState {
+interface EditorTabsDragRenderState {
   order: string[] | null;
   tabId: string | null;
   deltaX: number;
   homeLeft: number;
 }
 
-interface ChromeTabsRenameState {
+interface EditorTabsRenameState {
   id: string | null;
   draftTitle: string;
 }
 
-export interface ChromeTabsInteractionState {
-  drag: ChromeTabsDragRenderState;
-  rename: ChromeTabsRenameState;
+export interface EditorTabsInteractionState {
+  drag: EditorTabsDragRenderState;
+  rename: EditorTabsRenameState;
 }
 
-export type ChromeTabsInteractionAction =
+export type EditorTabsInteractionAction =
   | { type: 'dragStarted'; tabId: string; order: string[]; homeLeft: number }
   | { type: 'dragMoved'; deltaX: number; order: string[] }
   | { type: 'dragCleared' }
@@ -23,39 +23,29 @@ export type ChromeTabsInteractionAction =
   | { type: 'renameDraftChanged'; title: string }
   | { type: 'renameCancelled' };
 
-const idleDragState: ChromeTabsDragRenderState = {
+const idleDragState: EditorTabsDragRenderState = {
   order: null,
   tabId: null,
   deltaX: 0,
   homeLeft: 0,
 };
 
-const idleRenameState: ChromeTabsRenameState = {
+const idleRenameState: EditorTabsRenameState = {
   id: null,
   draftTitle: '',
 };
 
-/**
- * Creates the reducer-owned interaction state for the reusable Chrome tab strip.
- * Used by: ChromeTabs component.
- * Why: because drag preview and inline rename are coupled tab-strip modes, not
- * independent state cells.
- */
-export const createChromeTabsInteractionState = (): ChromeTabsInteractionState => ({
+/** Creates the reducer-owned drag and rename state for ``EditorTabs``. */
+export const createEditorTabsInteractionState = (): EditorTabsInteractionState => ({
   drag: idleDragState,
   rename: idleRenameState,
 });
 
-/**
- * Reduces tab-strip interaction state without knowing about DOM pointer events.
- * Used by: ChromeTabs component and reducer tests.
- * Flow: drag actions own the render-time preview order/offsets, while rename
- * actions own the active tab id and editable title draft.
- */
-export const chromeTabsInteractionReducer = (
-  state: ChromeTabsInteractionState,
-  action: ChromeTabsInteractionAction,
-): ChromeTabsInteractionState => {
+/** Reduces transient tab-strip interaction state independently of the DOM. */
+export const editorTabsInteractionReducer = (
+  state: EditorTabsInteractionState,
+  action: EditorTabsInteractionAction,
+): EditorTabsInteractionState => {
   switch (action.type) {
     case 'dragStarted':
       return {

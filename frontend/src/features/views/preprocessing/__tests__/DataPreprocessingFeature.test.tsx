@@ -1,8 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Field, Int64, Utf8 } from 'apache-arrow';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as SdkGen from '@/api';
 
 import DataPreprocessingFeature from '../DataPreprocessingFeature';
@@ -264,21 +264,18 @@ describe('DataPreprocessingFeature replace tab', () => {
     });
   });
 
-  it('keeps preprocessing tabs on one row with a persistent horizontal scrollbar', () => {
+  it('uses the shared editor-tab strip with one-row horizontal overflow', () => {
     renderPreprocessingFeature();
 
-    const scrollArea = screen.getByTestId('preprocessing-tabs-scroll-area');
-    expect(scrollArea).toHaveClass('h-12', 'w-full');
-    // Radix scrollbars do not expose a semantic role to query through Testing Library.
-    // eslint-disable-next-line testing-library/no-node-access
-    const horizontalScrollbar = scrollArea.querySelector(
-      '[data-slot="scroll-area-scrollbar"][data-orientation="horizontal"]',
-    );
-    expect(horizontalScrollbar).toHaveAttribute('data-state', 'visible');
-
     const tabList = screen.getByRole('tablist', { name: 'Data preprocessing sub-views' });
-    expect(tabList).toHaveClass('w-max', 'flex-nowrap', 'justify-start');
-    expect(tabList).not.toHaveClass('flex-wrap');
+    expect(tabList).toHaveClass('overflow-x-auto', 'overflow-y-hidden', 'px-[8px]', 'pt-[8px]');
+    expect(screen.getAllByTestId('editor-tab-fill')[0]).toHaveClass(
+      'bg-editor-tab-active-background',
+    );
+    expect(screen.getByRole('tab', { name: 'Filter' })).toHaveAttribute(
+      'data-guidance',
+      'preprocessing-operation-filter',
+    );
   });
 
   it('builds a regex replace expression from the Find tab', async () => {

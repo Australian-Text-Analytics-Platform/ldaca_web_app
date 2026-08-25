@@ -17,8 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { DataBlockRenameDialog } from '@/features/workspace/common/components/DataBlockRenameDialog';
 import type { NodeInputPointerPosition } from '@/stores/nodeInputRequestsStore';
 
 /** Minimal node shape the row toolbar needs. */
@@ -38,7 +37,7 @@ export interface NodeActionsToolbarProps {
 }
 
 const iconButtonClass =
-  'inline-flex h-6 w-6 items-center justify-center rounded-full border border-border bg-white text-gray-600 shadow-sm transition-colors hover:bg-muted hover:text-gray-900';
+  'inline-flex h-6 w-6 items-center justify-center rounded-sm border border-surface-border bg-surface text-description transition-colors hover:bg-panel hover:text-foreground';
 
 interface NodePinButtonProps {
   node: NodeActionsToolbarNode;
@@ -49,7 +48,7 @@ interface NodePinButtonProps {
 /**
  * Single pin action shared by the full row toolbar and the pinned row's resting
  * affordance.
- * Rendered by: NodeActionsToolbar for hovered rows and WorkspaceListView for
+ * Rendered by: NodeActionsToolbar for hovered rows and WorkspaceNodeList for
  * pinned rows at rest because only the pin icon should remain visible when the
  * full toolbar is hidden.
  */
@@ -62,8 +61,7 @@ export function NodePinButton({ node, isPinned, onTogglePin }: NodePinButtonProp
       }}
       className={cn(
         iconButtonClass,
-        isPinned &&
-          'border-primary/70 bg-primary/10 text-primary shadow-md hover:bg-primary/15 hover:text-primary',
+        isPinned && 'border-button/70 bg-button/10 text-link hover:bg-button/15 hover:text-link',
       )}
       title={isPinned ? 'Unpin data block' : 'Pin data block'}
       aria-label={`${isPinned ? 'Unpin' : 'Pin'} ${node.name}`}
@@ -81,18 +79,18 @@ export function NodePinButton({ node, isPinned, onTogglePin }: NodePinButtonProp
 }
 
 /**
- * Compact per-node action toolbar rendered at the end of each row in the
- * right-panel Workspace List View. Mirrors the graph node's hover toolbar
+ * Compact per-Data-Block action toolbar rendered at the end of each row in the
+ * sidebar Data Blocks list. Mirrors the graph card's hover toolbar
  * (settings menu with Rename / Clone / Undo / Redo / Delete, and an add-to-inputs
  * button) with hover action overlay.
  *
- * Rendered by: WorkspaceListView via WorkspaceNodeList's ``renderRowActions``
+ * Rendered by: Sidebar via WorkspaceNodeList's ``renderRowActions``
  * slot. Wired to the same workspace actions the graph uses (delete/rename/clone/
  * undo/redo) plus the node-input add request.
  *
- * Flow: render icon buttons; the settings menu and the inline rename/delete
- * dialogs own their open state locally and call back into the workspace actions
- * passed by the list view.
+ * Flow: render icon buttons; the settings menu opens the shared Data Block
+ * rename dialog or the local delete confirmation, then calls the workspace
+ * actions passed by the list view.
  */
 export function NodeActionsToolbar({
   node,
@@ -111,13 +109,6 @@ export function NodeActionsToolbar({
   const openRename = () => {
     setRenameValue(node.name);
     setRenameOpen(true);
-  };
-
-  /** Commits the rename when the trimmed value is non-empty and changed. */
-  const commitRename = () => {
-    const trimmed = renameValue.trim();
-    if (trimmed && trimmed !== node.name) onRename(node.id, trimmed);
-    setRenameOpen(false);
   };
 
   return (
@@ -145,7 +136,7 @@ export function NodeActionsToolbar({
             Clone
           </DropdownMenuItem>
           <DropdownMenuItem
-            className="text-red-600 focus:text-red-700"
+            className="text-error focus:text-error"
             onSelect={() => {
               setDeleteOpen(true);
             }}
@@ -170,36 +161,16 @@ export function NodeActionsToolbar({
         <Plus className="h-3.5 w-3.5" />
       </button>
 
-      <AlertDialog open={renameOpen} onOpenChange={setRenameOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Rename data block</AlertDialogTitle>
-            <AlertDialogDescription>
-              Enter a new name for &ldquo;{node.name}&rdquo;.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <Input
-            value={renameValue}
-            onChange={(event) => {
-              setRenameValue(event.target.value);
-            }}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                event.preventDefault();
-                commitRename();
-              }
-            }}
-            aria-label="New data block name"
-            autoFocus
-          />
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <Button onClick={commitRename} disabled={!renameValue.trim()}>
-              Rename
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DataBlockRenameDialog
+        open={renameOpen}
+        onOpenChange={setRenameOpen}
+        currentName={node.name}
+        value={renameValue}
+        onValueChange={setRenameValue}
+        onRename={(name) => {
+          onRename(node.id, name);
+        }}
+      />
 
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
@@ -213,7 +184,7 @@ export function NodeActionsToolbar({
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-destructive text-white hover:bg-destructive/90"
+              className="bg-error text-button-foreground hover:bg-error/90"
               onClick={() => {
                 onDelete(node.id);
               }}

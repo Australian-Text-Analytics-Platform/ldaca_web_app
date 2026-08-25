@@ -1,53 +1,41 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  TAB_GAP,
-  TAB_MAX_WIDTH,
-  TAB_MIN_WIDTH,
   closestIndex,
   computeContentTabWidths,
   computeTabPositions,
   computeTotalWidth,
   moveInOrder,
-} from '../chromeTabsLayout';
+  TAB_MAX_WIDTH,
+  TAB_MIN_WIDTH,
+} from '../editorTabsLayout';
 
-describe('chromeTabsLayout', () => {
+describe('editorTabsLayout', () => {
   describe('computeContentTabWidths', () => {
     it('returns no widths for an empty strip', () => {
-      expect(computeContentTabWidths([], 400)).toEqual([]);
+      expect(computeContentTabWidths([])).toEqual([]);
     });
 
-    it('hugs each title when there is ample room', () => {
-      const widths = computeContentTabWidths([80, 120], 2000);
-      expect(widths).toEqual([80, 120]);
+    it('hugs each title at its intrinsic width', () => {
+      expect(computeContentTabWidths([80, 120])).toEqual([80, 120]);
     });
 
     it('caps an over-long title at the maximum width', () => {
-      const widths = computeContentTabWidths([400, 70], 2000);
-      expect(widths).toEqual([TAB_MAX_WIDTH, 70]);
+      expect(computeContentTabWidths([400, 70])).toEqual([TAB_MAX_WIDTH, 70]);
     });
 
     it('floors short titles at the minimum width', () => {
-      const widths = computeContentTabWidths([20, 30], 2000);
-      expect(widths).toEqual([TAB_MIN_WIDTH, TAB_MIN_WIDTH]);
+      expect(computeContentTabWidths([20, 30])).toEqual([TAB_MIN_WIDTH, TAB_MIN_WIDTH]);
     });
 
-    it('shrinks tabs uniformly toward the equal share when the strip is crowded', () => {
-      // Three wide titles in a narrow strip: each is capped to the equal share.
-      const widths = computeContentTabWidths([180, 180, 180], 300);
-      const totalGap = TAB_GAP * 2;
-      const expected = Math.floor((300 - totalGap) / 3);
-      expect(widths).toEqual([expected, expected, expected]);
+    it('preserves readable widths when the strip must scroll', () => {
+      expect(computeContentTabWidths([180, 180, 180])).toEqual([180, 180, 180]);
     });
   });
 
   describe('computeTabPositions', () => {
-    it('accumulates left offsets with a gap between tabs', () => {
-      expect(computeTabPositions([100, 80, 60])).toEqual([
-        0,
-        100 + TAB_GAP,
-        100 + TAB_GAP + 80 + TAB_GAP,
-      ]);
+    it('accumulates contiguous left offsets', () => {
+      expect(computeTabPositions([100, 80, 60])).toEqual([0, 100, 180]);
     });
   });
 
@@ -56,14 +44,14 @@ describe('chromeTabsLayout', () => {
       expect(computeTotalWidth([])).toBe(0);
     });
 
-    it('sums widths plus the gaps between them', () => {
-      expect(computeTotalWidth([100, 80])).toBe(100 + 80 + TAB_GAP);
+    it('sums the contiguous tab widths', () => {
+      expect(computeTotalWidth([100, 80])).toBe(180);
     });
   });
 
   describe('closestIndex', () => {
     it('finds the slot nearest the dragged tab edge', () => {
-      const positions = [0, 104, 208];
+      const positions = [0, 100, 200];
       expect(closestIndex(0, positions)).toBe(0);
       expect(closestIndex(110, positions)).toBe(1);
       expect(closestIndex(260, positions)).toBe(2);

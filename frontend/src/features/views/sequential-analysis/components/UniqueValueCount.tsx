@@ -39,7 +39,7 @@ export function UniqueValueCount({ workspaceId, nodeId, columnName }: UniqueValu
   });
 
   if (isLoading) {
-    return <span className="text-xs text-gray-500 px-2">Loading...</span>;
+    return <span className="text-label-secondary text-description px-2">Loading...</span>;
   }
 
   // Pill is a nice-to-have hint, not load-bearing. Render nothing on
@@ -51,7 +51,7 @@ export function UniqueValueCount({ workspaceId, nodeId, columnName }: UniqueValu
   }
 
   return (
-    <span className="text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded">
+    <span className="text-label-secondary text-description bg-panel px-2 py-1 rounded-sm">
       {data.unique_count} unique{data.has_null ? ' + null' : ''}
     </span>
   );

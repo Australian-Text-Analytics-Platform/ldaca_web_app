@@ -164,7 +164,7 @@ export function ConcordanceParameterPanel({
             <div className="grid gap-4 lg:grid-cols-2">
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <label className="block text-sm font-medium text-foreground">
+                  <label className="block text-body font-medium text-foreground">
                     Search word or phrase
                   </label>
                   <HelpIcon
@@ -183,12 +183,12 @@ export function ConcordanceParameterPanel({
                       ? 'One or more tokens, separated by space, comma, or |'
                       : 'Enter word or phrase to search for'
                   }
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
+                  className="w-full rounded-md border border-input-border bg-editor px-3 py-2 text-body focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-not-allowed disabled:opacity-60"
                 />
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-foreground">
+                  <label className="block text-body font-medium text-foreground">
                     Left context (tokens)
                   </label>
                   <input
@@ -199,11 +199,11 @@ export function ConcordanceParameterPanel({
                     }}
                     min="0"
                     max="50"
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
+                    className="w-full rounded-md border border-input-border bg-editor px-3 py-2 text-body focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-not-allowed disabled:opacity-60"
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-foreground">
+                  <label className="block text-body font-medium text-foreground">
                     Right context (tokens)
                   </label>
                   <input
@@ -214,19 +214,19 @@ export function ConcordanceParameterPanel({
                     }}
                     min="0"
                     max="50"
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
+                    className="w-full rounded-md border border-input-border bg-editor px-3 py-2 text-body focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-not-allowed disabled:opacity-60"
                   />
                 </div>
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-4 text-sm">
+            <div className="flex flex-wrap items-center gap-4 text-body">
               {/* Search mode picker. Text is the default; Tokens becomes selectable
               after every selected Data Block has a source column, then exposes the
               required tokenizer selectors. The regex / whole-word / case
               checkboxes apply only to Text mode. */}
               <div className="flex items-center gap-1">
-                <span className="text-sm font-medium text-foreground">Search mode:</span>
+                <span className="text-body font-medium text-foreground">Search mode:</span>
                 <Tabs
                   value={searchMode}
                   onValueChange={(next) => {
@@ -235,7 +235,7 @@ export function ConcordanceParameterPanel({
                   }}
                 >
                   <TabsList className="h-8">
-                    <TabsTrigger value="regex" className="text-xs">
+                    <TabsTrigger value="regex" className="text-label-secondary">
                       Text
                     </TabsTrigger>
                     <DisabledReasonTooltip
@@ -248,7 +248,7 @@ export function ConcordanceParameterPanel({
                       <TabsTrigger
                         value="tokens"
                         disabled={!tokensModeAvailable}
-                        className="text-xs"
+                        className="text-label-secondary"
                       >
                         Tokens
                       </TabsTrigger>
@@ -274,7 +274,7 @@ export function ConcordanceParameterPanel({
                         disabled={regex}
                         className="h-4 w-4"
                       />
-                      <span className="text-sm text-foreground">Whole word</span>
+                      <span className="text-body text-foreground">Whole word</span>
                     </label>
                   </div>
                   <div className="flex items-center gap-2">
@@ -291,7 +291,7 @@ export function ConcordanceParameterPanel({
                         }}
                         className="h-4 w-4"
                       />
-                      <span className="text-sm text-foreground">Use regular expression</span>
+                      <span className="text-body text-foreground">Use regular expression</span>
                     </label>
                     <HelpIcon
                       targetKey="analysis.concordance.regex-toggle"
@@ -307,7 +307,7 @@ export function ConcordanceParameterPanel({
                       }}
                       className="h-4 w-4"
                     />
-                    <span className="text-sm text-foreground">Case sensitive</span>
+                    <span className="text-body text-foreground">Case sensitive</span>
                   </label>
                   <label className="flex items-center gap-2">
                     <input
@@ -318,7 +318,7 @@ export function ConcordanceParameterPanel({
                       }}
                       className="h-4 w-4"
                     />
-                    <span className="text-sm text-foreground">Ignore punctuation</span>
+                    <span className="text-body text-foreground">Ignore punctuation</span>
                   </label>
                 </>
               )}

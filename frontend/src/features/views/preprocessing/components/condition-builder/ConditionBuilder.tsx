@@ -82,8 +82,8 @@ export function ConditionBuilder<Condition extends ConditionBuilderItem>(
     <div className="space-y-4">
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div>
-          <p className="text-base font-semibold text-foreground">{title}</p>
-          <p className="text-sm text-muted-foreground">{description}</p>
+          <p className="text-body font-semibold text-foreground">{title}</p>
+          <p className="text-body text-description">{description}</p>
         </div>
         <div className="flex items-center gap-2">
           {conditions.length > 1 && (
@@ -120,11 +120,11 @@ export function ConditionBuilder<Condition extends ConditionBuilderItem>(
       </div>
 
       {!hasSelection ? (
-        <div className="rounded-md border border-dashed border-muted-foreground/40 bg-muted/40 p-4 text-sm text-muted-foreground">
+        <div className="rounded-md border border-dashed border-surface-border-foreground/40 bg-panel/40 p-4 text-body text-description">
           {noSelectionMessage}
         </div>
       ) : !availableColumns.length ? (
-        <div className="rounded-md border border-dashed border-amber-400/60 bg-amber-100/70 p-4 text-sm text-amber-900">
+        <div className="rounded-md border border-dashed border-warning bg-warning-background/70 p-4 text-body text-warning">
           {noSchemaMessage}
         </div>
       ) : (
@@ -137,12 +137,12 @@ export function ConditionBuilder<Condition extends ConditionBuilderItem>(
             return (
               <div
                 key={condition.id}
-                className="flex flex-col gap-2 rounded-lg border border-border bg-muted/40 p-3 md:flex-row md:items-center md:gap-3"
+                className="flex flex-col gap-2 rounded-lg border border-surface-border bg-panel/40 p-3 md:flex-row md:items-center md:gap-3"
               >
                 <div className="flex flex-1 flex-col gap-2">
                   <div className="flex items-center gap-2">
                     {index > 0 && (
-                      <span className="w-20 text-center text-xs font-semibold uppercase text-muted-foreground">
+                      <span className="w-20 text-center text-label-secondary font-semibold uppercase text-description">
                         {logic.toUpperCase()}
                       </span>
                     )}

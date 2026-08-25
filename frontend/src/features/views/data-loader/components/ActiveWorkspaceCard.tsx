@@ -150,14 +150,14 @@ function ActiveWorkspaceControls({
 
   return (
     <>
-      <div className="rounded-md border border-border/60 bg-muted/30 px-4 py-3 text-sm">
-        <div className="flex flex-wrap items-center gap-2 text-base font-semibold text-foreground">
+      <div className="rounded-md border border-surface-border/60 bg-panel/30 px-4 py-3 text-body">
+        <div className="flex flex-wrap items-center gap-2 text-body font-semibold text-foreground">
           {currentWorkspace.name}
           <Badge>
             {nodeCount} data block{nodeCount === 1 ? '' : 's'}
           </Badge>
         </div>
-        <div className="mt-1 text-xs text-muted-foreground">
+        <div className="mt-1 text-label-secondary text-description">
           Updated {formatTimestamp(currentWorkspace.modified_at)} | Created{' '}
           {formatTimestamp(currentWorkspace.created_at)}
         </div>

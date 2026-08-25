@@ -47,7 +47,7 @@ function CodeHint({ context }: { context: string }) {
       'Use typed items for the grouping key and aggregations.\nExample aggregation: {"expression":{"op":"sum","operand":{"op":"column","name":"sales"}},"alias":"total"}',
   };
   return (
-    <p className="rounded border border-border/40 bg-muted/50 p-2 font-mono text-[11px] text-muted-foreground whitespace-pre-wrap">
+    <p className="rounded-sm border border-surface-border/40 bg-panel/50 p-2 font-mono text-[11px] text-description whitespace-pre-wrap">
       {hints[context] ?? ''}
     </p>
   );
@@ -284,7 +284,7 @@ export function TypedExpressionSubTab(props: TypedExpressionSubTabComponentProps
                   <div className="flex flex-col items-center gap-1 pt-2">
                     <Label
                       htmlFor={`sort-desc-${item.id}`}
-                      className="text-xs text-muted-foreground"
+                      className="text-label-secondary text-description"
                     >
                       Desc
                     </Label>
@@ -327,7 +327,7 @@ export function TypedExpressionSubTab(props: TypedExpressionSubTabComponentProps
             <TabsContent value="group_by_agg" className="space-y-3">
               <CodeHint context="group_by_agg" />
               <div className="space-y-1">
-                <Label className="text-xs font-medium">Grouping key expression</Label>
+                <Label className="text-label-secondary font-medium">Grouping key expression</Label>
                 <TypedExpressionEditor
                   value={groupByState.keySource}
                   onChange={(val) => {
@@ -341,7 +341,7 @@ export function TypedExpressionSubTab(props: TypedExpressionSubTabComponentProps
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs font-medium">Aggregation expressions</Label>
+                <Label className="text-label-secondary font-medium">Aggregation expressions</Label>
                 <ExpressionListEditor
                   items={groupByState.aggExpressions}
                   placeholder='{"expression":{"op":"sum","operand":{"op":"column","name":"value"}},"alias":"total"}'
@@ -376,14 +376,14 @@ export function TypedExpressionSubTab(props: TypedExpressionSubTabComponentProps
               Preview
             </Button>
             {serializedRequest && !evalError && (
-              <span className="text-xs text-green-700">
+              <span className="text-label-secondary text-[var(--vscode-charts-green)]">
                 ✓ {serializedRequest.expressions.length} expression(s) ready
               </span>
             )}
           </div>
 
           {evalError && (
-            <div className="rounded border border-red-200 bg-red-50 p-3 font-mono text-xs text-red-800 whitespace-pre-wrap">
+            <div className="rounded-sm border border-error bg-error-background p-3 font-mono text-label-secondary text-error whitespace-pre-wrap">
               {evalError}
             </div>
           )}

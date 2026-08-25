@@ -185,8 +185,8 @@ function QuotationNodeBlockContent({
 
   return (
     <section className="space-y-4">
-      <div className="border-b border-border/60 pb-4">
-        <p className="text-sm text-muted-foreground">
+      <div className="border-b border-surface-border/60 pb-4">
+        <p className="text-body text-description">
           Text column: {textCol || 'Select a text column to view highlighted quotations.'}
         </p>
       </div>
@@ -211,14 +211,14 @@ function QuotationNodeBlockContent({
           </ServerPaginationFooter>
         }
       >
-        <Table className="min-w-full text-sm" disableContainer>
-          <TableHeader className="bg-muted sticky top-0 z-10">
+        <Table className="min-w-full text-body" disableContainer>
+          <TableHeader className="bg-panel sticky top-0 z-10">
             {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id} className="border-b border-border/60">
+              <TableRow key={headerGroup.id} className="border-b border-surface-border/60">
                 {headerGroup.headers.map((header) => (
                   <TableHead
                     key={header.id}
-                    className="h-10 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground/90 select-none whitespace-nowrap cursor-pointer"
+                    className="h-10 px-4 py-2 text-label-secondary font-semibold uppercase tracking-wide text-description/90 select-none whitespace-nowrap cursor-pointer"
                   >
                     {header.isPlaceholder
                       ? null
@@ -233,10 +233,7 @@ function QuotationNodeBlockContent({
               <PaginatedTableProcessingRow columnCount={cols.length} />
             ) : rows.length === 0 ? (
               <TableRow>
-                <TableCell
-                  className="h-24 text-center text-muted-foreground"
-                  colSpan={cols.length || 1}
-                >
+                <TableCell className="h-24 text-center text-description" colSpan={cols.length || 1}>
                   No quotations found on this page. Source rows without quotations are omitted.
                 </TableCell>
               </TableRow>
@@ -244,7 +241,7 @@ function QuotationNodeBlockContent({
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
-                  className="border-b border-border/60 last:border-b-0 hover:bg-muted/40 cursor-pointer"
+                  className="border-b border-surface-border/60 last:border-b-0 hover:bg-panel/40 cursor-pointer"
                   onClick={() => {
                     onRowClick(row.original);
                   }}
@@ -252,7 +249,7 @@ function QuotationNodeBlockContent({
                   {row.getVisibleCells().map((cell) => (
                     <TableCell
                       key={cell.id}
-                      className="px-4 py-3 align-top text-sm leading-relaxed"
+                      className="px-4 py-3 align-top text-body leading-relaxed"
                     >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>

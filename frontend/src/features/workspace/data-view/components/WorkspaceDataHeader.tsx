@@ -52,7 +52,7 @@ function HeaderNodeLabel({ label }: { label: string }) {
       <span
         ref={textRef}
         dir="ltr"
-        className="block w-max whitespace-nowrap text-sm font-semibold text-gray-800"
+        className="block w-max whitespace-nowrap text-body font-semibold text-foreground"
       >
         {label}
       </span>
@@ -115,20 +115,20 @@ export const WorkspaceDataHeader = ({
   };
 
   return (
-    <div className="shrink-0 border-b border-border bg-muted p-2">
+    <div className="shrink-0 border-b border-surface-border bg-panel p-2">
       <div className="flex min-w-0 items-center gap-2">
-        <h3 className="shrink-0 text-sm font-medium text-gray-700">Data View</h3>
+        <h3 className="shrink-0 text-body font-medium text-foreground">Data View</h3>
         <HelpIcon
           targetKey="ui.data-viewer"
           label="Data Viewer"
-          className="h-5 w-5 shrink-0 text-muted-foreground"
+          className="h-5 w-5 shrink-0 text-description"
         />
-        <span className="shrink-0 text-gray-300">|</span>
+        <span className="shrink-0 text-description">|</span>
         <div className="flex min-w-0 flex-1 items-center gap-2">
           {isRenaming ? (
             <input
               ref={inputRef}
-              className="min-w-0 flex-1 rounded border px-2 py-0.5 text-sm font-semibold text-gray-800"
+              className="min-w-0 flex-1 rounded-sm border px-2 py-0.5 text-body font-semibold text-foreground"
               value={renameDraft.value}
               onChange={(e) => {
                 setRenameDraft({ baseLabel: info.nodeLabel, value: e.target.value });
@@ -145,7 +145,7 @@ export const WorkspaceDataHeader = ({
           )}
           {onRename && !isRenaming && (
             <button
-              className="inline-flex shrink-0 items-center gap-1 rounded border px-1.5 py-0.5 text-xs text-gray-600 hover:text-gray-800"
+              className="inline-flex shrink-0 items-center gap-1 rounded-sm border px-1.5 py-0.5 text-label-secondary text-description hover:text-foreground"
               onClick={startRename}
               title="Rename"
               aria-label="Rename node"
@@ -155,7 +155,10 @@ export const WorkspaceDataHeader = ({
             </button>
           )}
           {info.isEmptyTable && (
-            <span className="shrink-0 text-xs italic text-gray-500" aria-live="polite">
+            <span
+              className="shrink-0 text-label-secondary italic text-description"
+              aria-live="polite"
+            >
               (empty table)
             </span>
           )}
@@ -164,7 +167,7 @@ export const WorkspaceDataHeader = ({
         <div className="ml-auto flex shrink-0 items-center gap-1.5">
           <button
             type="button"
-            className="inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-xs text-gray-600 enabled:hover:text-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 text-label-secondary text-description enabled:hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
             onClick={onUndo}
             disabled={!info.canUndo}
             aria-label="Undo Data Block edit"
@@ -175,7 +178,7 @@ export const WorkspaceDataHeader = ({
           </button>
           <button
             type="button"
-            className="inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-xs text-gray-600 enabled:hover:text-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 text-label-secondary text-description enabled:hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
             onClick={onRedo}
             disabled={!info.canRedo}
             aria-label="Redo Data Block edit"

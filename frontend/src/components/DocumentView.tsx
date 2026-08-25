@@ -278,17 +278,17 @@ function DocumentView({
   };
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-slate-50 to-blue-50">
-      <header className="bg-card border-b border-border px-6 py-4 pr-12">
+    <div className="min-h-screen bg-editor">
+      <header className="bg-surface border-b border-surface-border px-6 py-4 pr-12">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <img src={logo} alt="LDaCA Logo" className="h-8 w-auto object-contain" />
-            <h1 className="text-xl font-bold text-gray-800">{config.title}</h1>
+            <h1 className="text-heading-2 font-semibold text-foreground">{config.title}</h1>
           </div>
           <div className="flex flex-wrap items-center gap-3 sm:justify-end">
             <button
               type="button"
-              className="text-sm text-blue-600 hover:text-blue-700 whitespace-nowrap"
+              className="text-body text-link hover:text-link whitespace-nowrap"
               onClick={() => {
                 if (onClose) {
                   onClose();
@@ -303,7 +303,7 @@ function DocumentView({
               <button
                 type="button"
                 onClick={zoomOut}
-                className="px-2 py-1 rounded border border-input text-foreground hover:bg-muted/60"
+                className="px-2 py-1 rounded-sm border border-input-border text-foreground hover:bg-panel/60"
                 aria-label="Zoom out"
                 title="Zoom out (Ctrl/Cmd -)"
               >
@@ -312,7 +312,7 @@ function DocumentView({
               <button
                 type="button"
                 onClick={zoomReset}
-                className="px-2 py-1 rounded border border-input text-foreground hover:bg-muted/60 min-w-16"
+                className="px-2 py-1 rounded-sm border border-input-border text-foreground hover:bg-panel/60 min-w-16"
                 aria-label="Reset zoom"
                 title="Reset zoom (Ctrl/Cmd 0)"
               >
@@ -321,7 +321,7 @@ function DocumentView({
               <button
                 type="button"
                 onClick={zoomIn}
-                className="px-2 py-1 rounded border border-input text-foreground hover:bg-muted/60"
+                className="px-2 py-1 rounded-sm border border-input-border text-foreground hover:bg-panel/60"
                 aria-label="Zoom in"
                 title="Zoom in (Ctrl/Cmd +)"
               >
@@ -331,7 +331,7 @@ function DocumentView({
           </div>
         </div>
       </header>
-      <main className="max-w-4xl mx-auto bg-card shadow-sm rounded-lg border border-border mt-6 mb-10 p-6">
+      <main className="max-w-4xl mx-auto bg-surface rounded-lg border border-surface-border mt-6 mb-10 p-6">
         <div
           className="prose prose-slate prose-img:mx-auto mx-auto"
           style={{
@@ -339,8 +339,8 @@ function DocumentView({
             transformOrigin: 'top center',
           }}
         >
-          {loading && <div className="text-center text-gray-600">Loading…</div>}
-          {error && <div className="text-red-600">{error}</div>}
+          {loading && <div className="text-center text-description">Loading…</div>}
+          {error && <div className="text-error">{error}</div>}
           {!loading && !error && (
             <ReactMarkdown
               remarkPlugins={[remarkGfm, remarkMath]}

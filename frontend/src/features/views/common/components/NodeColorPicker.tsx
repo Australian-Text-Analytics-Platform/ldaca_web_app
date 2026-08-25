@@ -56,7 +56,7 @@ export function NodeColorPicker({
 
   return (
     <div className="space-y-1">
-      <span className="block text-xs font-medium text-muted-foreground">Color</span>
+      <span className="block text-label-secondary font-medium text-description">Color</span>
       <Popover
         open={open}
         onOpenChange={(nextOpen) => {
@@ -98,8 +98,8 @@ export function NodeColorPicker({
                   aria-label={`Use ${presetColor} for ${nodeName}`}
                   title={presetColor}
                   className={cn(
-                    'size-7 rounded-md border border-border transition-shadow focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring',
-                    selected && 'ring-2 ring-ring ring-offset-1 ring-offset-background',
+                    'size-7 rounded-md border border-surface-border transition-shadow focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-focus',
+                    selected && 'ring-2 ring-focus ring-offset-1 ring-offset-background',
                   )}
                   style={{ backgroundColor: presetColor }}
                   onClick={() => {
@@ -131,7 +131,7 @@ export function NodeColorPicker({
                   type="color"
                   value={normalizedColor}
                   aria-label={`Custom color for ${nodeName}`}
-                  className="h-8 w-10 rounded-md border border-input bg-background p-1"
+                  className="h-8 w-10 rounded-md border border-input-border bg-editor p-1"
                   onChange={(event) => {
                     setCustomText(event.target.value);
                     onChange(event.target.value);
@@ -140,7 +140,7 @@ export function NodeColorPicker({
                 <Input
                   value={customText}
                   aria-label={`Hex color for ${nodeName}`}
-                  className="h-8 font-mono text-xs"
+                  className="h-8 font-mono text-label-secondary"
                   onChange={(event) => {
                     setCustomText(event.target.value);
                   }}

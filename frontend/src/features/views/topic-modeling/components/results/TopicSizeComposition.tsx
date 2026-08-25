@@ -42,11 +42,11 @@ export function TopicSizeComposition({
       <span className="inline-flex items-center gap-1">
         <span
           style={{ background: colorA, color: getReadableTextColor(colorA) }}
-          className="rounded px-1.5 py-0.5 text-[10px] font-medium"
+          className="rounded-sm px-1.5 py-0.5 text-badge font-medium"
         >
           {sizes[0]}
         </span>
-        <span className="text-[10px] text-muted-foreground">= {total}</span>
+        <span className="text-badge text-description">= {total}</span>
       </span>
     );
   }
@@ -54,18 +54,18 @@ export function TopicSizeComposition({
     <span className="inline-flex flex-wrap items-center gap-1">
       <span
         style={{ background: colorA, color: getReadableTextColor(colorA) }}
-        className="rounded px-1.5 py-0.5 text-[10px] font-medium"
+        className="rounded-sm px-1.5 py-0.5 text-badge font-medium"
       >
         {sizes[0]}
       </span>
-      <span className="text-[10px] text-muted-foreground">+</span>
+      <span className="text-badge text-description">+</span>
       <span
         style={{ background: colorB, color: getReadableTextColor(colorB) }}
-        className="rounded px-1.5 py-0.5 text-[10px] font-medium"
+        className="rounded-sm px-1.5 py-0.5 text-badge font-medium"
       >
         {sizes[1]}
       </span>
-      <span className="text-[10px] text-muted-foreground">= {total}</span>
+      <span className="text-badge text-description">= {total}</span>
     </span>
   );
 }

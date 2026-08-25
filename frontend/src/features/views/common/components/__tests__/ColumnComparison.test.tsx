@@ -83,7 +83,7 @@ describe('ColumnComparison', () => {
     });
     expect(screen.getByText('review')).toBeVisible();
     expect(score).toBeVisible();
-    expect(score).toHaveClass('h-7', 'px-2.5', 'text-sm');
+    expect(score).toHaveClass('h-7', 'px-2.5', 'text-body');
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
 
     await user.hover(score);

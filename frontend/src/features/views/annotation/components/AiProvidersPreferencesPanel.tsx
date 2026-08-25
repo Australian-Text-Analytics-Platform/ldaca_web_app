@@ -62,13 +62,13 @@ export function AiProvidersPreferencesPanel() {
     <div className="space-y-5">
       <section className="space-y-3">
         <div>
-          <h3 className="text-sm font-semibold">Annotation providers</h3>
-          <p className="text-sm text-muted-foreground">
+          <h3 className="text-body font-semibold">Annotation providers</h3>
+          <p className="text-body text-description">
             {credentials.storage === 'browser'
               ? 'Configurations stay in this browser for the current account. Secrets are sent only with provider requests.'
               : 'Configurations are stored by the local backend. Saved secrets are never returned to the browser.'}
           </p>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-1 text-label-secondary text-description">
             Names and saved keys can be edited. Provider type and Custom Base URL stay fixed.
           </p>
         </div>
@@ -76,7 +76,7 @@ export function AiProvidersPreferencesPanel() {
         {credentials.isLoading ? (
           <div
             role="status"
-            className="flex items-center gap-2 rounded-md border px-3 py-4 text-sm text-muted-foreground"
+            className="flex items-center gap-2 rounded-md border px-3 py-4 text-body text-description"
           >
             <Loader2 className="size-4 animate-spin" aria-hidden="true" />
             Loading Annotation providers…
@@ -84,7 +84,7 @@ export function AiProvidersPreferencesPanel() {
         ) : credentials.error ? (
           <div
             role="alert"
-            className="space-y-3 rounded-md border border-destructive/40 px-3 py-4 text-sm"
+            className="space-y-3 rounded-md border border-error/40 px-3 py-4 text-body"
           >
             <p>Could not load Annotation providers.</p>
             <Button
@@ -97,17 +97,20 @@ export function AiProvidersPreferencesPanel() {
             </Button>
           </div>
         ) : credentials.annotationProviders.length === 0 ? (
-          <p className="rounded-md border border-dashed px-3 py-4 text-sm text-muted-foreground">
+          <p className="rounded-md border border-dashed px-3 py-4 text-body text-description">
             No Annotation providers configured.
           </p>
         ) : (
           <div className="space-y-2">
             {credentials.annotationProviders.map((configuration) => (
-              <div key={configuration.id} className="rounded-md border border-border/70 px-3 py-3">
+              <div
+                key={configuration.id}
+                className="rounded-md border border-surface-border/70 px-3 py-3"
+              >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{configuration.name}</p>
-                    <p className="truncate text-xs text-muted-foreground">
+                    <p className="truncate text-body font-medium">{configuration.name}</p>
+                    <p className="truncate text-label-secondary text-description">
                       {providerConfigurationSecondaryText(configuration)}
                     </p>
                   </div>

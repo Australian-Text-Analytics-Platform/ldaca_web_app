@@ -152,7 +152,7 @@ function ExportFeature() {
             className="flex flex-wrap items-end justify-between gap-4 border-t pt-4"
           >
             <div className="w-full max-w-xs space-y-2">
-              <label htmlFor="data-block-export-format" className="text-sm font-medium">
+              <label htmlFor="data-block-export-format" className="text-body font-medium">
                 Format
               </label>
               <Select
@@ -190,7 +190,7 @@ function ExportFeature() {
                   ? 'Exporting…'
                   : `Export ${String(selectedIds.length)} Data Block${selectedIds.length === 1 ? '' : 's'}`}
               </Button>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-label-secondary text-description">
                 {selectedIds.length > 1
                   ? 'Multiple files will be packaged into one ZIP.'
                   : 'A single Data Block downloads directly.'}
@@ -205,7 +205,7 @@ function ExportFeature() {
           <CardTitle>Export Workspace</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <p className="text-sm text-muted-foreground">
+          <p className="text-body text-description">
             Export the complete workspace as a self-contained ZIP archive. Import the archive later
             to relocate the workspace.
           </p>

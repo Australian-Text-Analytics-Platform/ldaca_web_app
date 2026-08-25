@@ -372,7 +372,7 @@ export const useFilterSubTabSections = (
    * render loading/error/search metadata beside the condition.
    */
   const renderConditionMetadata = (condition: FilterConditionWithId, rowDisabled: boolean) => (
-    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+    <div className="flex items-center gap-2 text-label-secondary text-description">
       <label className="flex items-center gap-1.5">
         <Checkbox
           id={`negate-${condition.id}`}

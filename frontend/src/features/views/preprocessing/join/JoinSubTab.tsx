@@ -145,7 +145,7 @@ export function JoinSubTab(props: JoinSubTabComponentProps) {
 
       <div className="space-y-3">
         {joinType === 'cross' && preview.ready && (
-          <div className="rounded-md border border-amber-500/50 bg-amber-100/60 p-3 text-xs text-amber-900">
+          <div className="rounded-md border border-warning/50 bg-warning-background/60 p-3 text-label-secondary text-warning">
             Cross joins can create very large outputs. The preview only displays {preview.pageSize}{' '}
             rows at a time.
           </div>

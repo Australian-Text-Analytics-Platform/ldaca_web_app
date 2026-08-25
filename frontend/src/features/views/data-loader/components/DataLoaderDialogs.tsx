@@ -126,7 +126,7 @@ export function DataLoaderDialogs({
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={deleteWorkspace.onConfirm}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-error text-button-foreground hover:bg-error/90"
               disabled={deleteWorkspace.deleting}
             >
               {deleteWorkspace.deleting ? 'Deleting…' : 'Delete workspace'}
@@ -194,15 +194,15 @@ export function DataLoaderDialogs({
             </DialogDescription>
           </DialogHeader>
           {citation.loading ? (
-            <div className="text-muted-foreground flex items-center gap-2 text-sm">
+            <div className="text-description flex items-center gap-2 text-body">
               <Loader2 className="h-4 w-4 animate-spin" /> Loading citation…
             </div>
           ) : citation.content ? (
-            <div className="prose prose-sm dark:prose-invert max-w-none">
+            <div className="prose prose-sm max-w-none">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>{citation.content}</ReactMarkdown>
             </div>
           ) : (
-            <p className="text-muted-foreground text-sm">No citation available for this folder.</p>
+            <p className="text-description text-body">No citation available for this folder.</p>
           )}
         </DialogContent>
       </Dialog>
@@ -221,7 +221,7 @@ export function DataLoaderDialogs({
             </DialogDescription>
           </DialogHeader>
           <div className="max-h-64 overflow-y-auto rounded-md border p-3" tabIndex={0}>
-            <ul className="space-y-1 text-sm">
+            <ul className="space-y-1 text-body">
               {uploadConflicts.paths.map((path) => (
                 <li key={path}>
                   <code className="break-all">{path}</code>

@@ -54,9 +54,9 @@ export function DocsEolBanner() {
 
   return (
     <div className="pointer-events-none fixed left-1/2 top-4 z-50 flex -translate-x-1/2 flex-col gap-2">
-      <div className="pointer-events-auto flex max-w-xl flex-wrap items-center gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-900 shadow-lg">
+      <div className="pointer-events-auto flex max-w-xl flex-wrap items-center gap-3 rounded-lg border border-warning bg-warning-background px-4 py-2 text-body text-warning">
         <span className="font-medium">Docs version retired</span>
-        <span className="text-xs text-amber-900/80">
+        <span className="text-label-secondary text-warning/80">
           {version
             ? `Documentation for v${version} is no longer maintained.`
             : 'This documentation version is no longer maintained.'}{' '}
@@ -65,7 +65,7 @@ export function DocsEolBanner() {
         <button
           type="button"
           onClick={dismiss}
-          className="rounded-full border border-amber-400 px-3 py-1 text-xs font-medium hover:bg-amber-100"
+          className="rounded-full border border-warning px-3 py-1 text-label-secondary font-medium hover:bg-warning-background"
         >
           Dismiss
         </button>

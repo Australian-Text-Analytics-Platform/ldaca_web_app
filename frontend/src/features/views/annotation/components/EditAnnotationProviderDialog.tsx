@@ -92,14 +92,14 @@ export function EditAnnotationProviderDialog({
 
         {configuration ? (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3 rounded-md border bg-muted/30 p-3 text-sm">
+            <div className="grid grid-cols-2 gap-3 rounded-md border bg-panel/30 p-3 text-body">
               <div>
-                <p className="text-xs text-muted-foreground">Provider</p>
+                <p className="text-label-secondary text-description">Provider</p>
                 <p className="font-medium">{getProviderDefinition(configuration.provider).label}</p>
               </div>
               {configuration.provider === 'custom' ? (
                 <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground">Base URL</p>
+                  <p className="text-label-secondary text-description">Base URL</p>
                   <p className="truncate font-medium" title={configuration.base_url ?? undefined}>
                     {configuration.base_url}
                   </p>
@@ -132,7 +132,7 @@ export function EditAnnotationProviderDialog({
                   updateDraft({ apiKey: event.target.value, removeKey: false, error: null });
                 }}
               />
-              <p className="text-xs text-muted-foreground">
+              <p className="text-label-secondary text-description">
                 Saved keys are write-only and cannot be displayed here.
               </p>
             </div>
@@ -151,10 +151,10 @@ export function EditAnnotationProviderDialog({
             ) : null}
 
             {draft.removeKey ? (
-              <p className="text-sm text-destructive">The saved API key will be removed.</p>
+              <p className="text-body text-error">The saved API key will be removed.</p>
             ) : null}
             {draft.error ? (
-              <p role="alert" className="text-sm text-destructive">
+              <p role="alert" className="text-body text-error">
                 {draft.error}
               </p>
             ) : null}

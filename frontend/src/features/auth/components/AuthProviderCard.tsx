@@ -15,13 +15,15 @@ export function AuthProviderCard({ isLoading, error, children }: AuthProviderCar
   return (
     <div className="space-y-4">
       {error && (
-        <div className="p-3 bg-red-100 border border-red-400 text-red-700 rounded">{error}</div>
+        <div className="rounded-sm border border-error bg-error-background p-3 text-error">
+          {error}
+        </div>
       )}
       {children}
       {isLoading && (
         <div className="flex items-center justify-center">
-          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
-          <span className="text-sm text-gray-600">Signing in...</span>
+          <div className="mr-2 size-4 animate-spin rounded-full border-2 border-surface-border border-t-primary" />
+          <span className="text-body text-description">Signing in...</span>
         </div>
       )}
     </div>

@@ -138,19 +138,19 @@ export function ServerPaginationFooter<TData>({
     return (
       <div
         className={cn(
-          'flex flex-col gap-1.5 border-t border-border bg-muted/40 px-3 py-1.5 sm:flex-row sm:items-center sm:justify-between',
+          'flex flex-col gap-1.5 border-t border-surface-border bg-panel/40 px-3 py-1.5 sm:flex-row sm:items-center sm:justify-between',
           className,
         )}
       >
         {showPageSize ? (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2 text-label-secondary text-description">
             <span>{pageSizeLabel}</span>
             <select
               value={pageSize}
               onChange={(e) => {
                 table.setPageSize(Number(e.target.value));
               }}
-              className="h-7 rounded-md border border-input bg-background px-2 py-0.5 text-xs text-foreground shadow-sm focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
+              className="h-7 rounded-md border border-input-border bg-editor px-2 py-0.5 text-label-secondary text-foreground focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-focus"
             >
               {normalizedOptions.map((size) => (
                 <option key={size} value={size}>
@@ -224,7 +224,7 @@ export function ServerPaginationFooter<TData>({
   return (
     <div
       className={cn(
-        'flex flex-wrap items-center gap-3 border-t border-border bg-muted/40 px-4 py-3',
+        'flex flex-wrap items-center gap-3 border-t border-surface-border bg-panel/40 px-4 py-3',
         className,
       )}
     >
@@ -234,7 +234,7 @@ export function ServerPaginationFooter<TData>({
           <>
             <Label
               htmlFor="server-rows-per-page"
-              className="whitespace-nowrap text-sm text-muted-foreground"
+              className="whitespace-nowrap text-body text-description"
             >
               {pageSizeLabel}
             </Label>
@@ -260,7 +260,7 @@ export function ServerPaginationFooter<TData>({
           </>
         )}
         {pageSizeSummary ? (
-          <span className="text-sm text-muted-foreground">{pageSizeSummary}</span>
+          <span className="text-body text-description">{pageSizeSummary}</span>
         ) : null}
       </div>
 
@@ -317,7 +317,7 @@ export function ServerPaginationFooter<TData>({
 
           {loading && (
             <PaginationItem>
-              <div className="ml-1 h-4 w-4 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
+              <div className="ml-1 h-4 w-4 animate-spin rounded-full border-2 border-surface-border-foreground border-t-transparent" />
             </PaginationItem>
           )}
         </PaginationContent>

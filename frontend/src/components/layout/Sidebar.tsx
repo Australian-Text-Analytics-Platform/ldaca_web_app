@@ -231,7 +231,7 @@ function Sidebar() {
   return (
     <SidebarRoot
       data-testid="sidebar-container"
-      className="@container/sidebar pr-0! [&_[data-slot=sidebar-inner]]:overflow-hidden [&_[data-slot=sidebar-inner]]:rounded-xl [&_[data-slot=sidebar-inner]]:border [&_[data-slot=sidebar-inner]]:border-border/60 [&_[data-slot=sidebar-inner]]:bg-white [&_[data-slot=sidebar-inner]]:shadow-sm"
+      className="@container/sidebar pr-0! [&_[data-slot=sidebar-inner]]:overflow-hidden [&_[data-slot=sidebar-inner]]:rounded-lg [&_[data-slot=sidebar-inner]]:border [&_[data-slot=sidebar-inner]]:border-sidebar-border [&_[data-slot=sidebar-inner]]:bg-sidebar"
     >
       <div className="flex h-full min-h-0 w-full flex-col">
         <SidebarHeader data-testid="sidebar-title" className="shrink-0 overflow-hidden px-3 py-2">
@@ -241,16 +241,16 @@ function Sidebar() {
               <img src={logo} alt="LDaCA Logo" className="w-full h-auto object-contain" />
             </div>
             <div className="flex items-center w-full">
-              <p className="text-xl font-semibold flex-1">Wordflow</p>
+              <p className="text-heading-2 font-semibold flex-1">Wordflow</p>
               <InfoIcon
                 targetKey="general.overview"
                 label="About Wordflow"
-                className="h-5 w-5 text-blue-500"
+                className="h-5 w-5 text-link"
               />
               <ReferenceIcon
                 targetKey="general.platform"
                 label="Cite LDaCA Wordflow"
-                className="h-5 w-5 text-emerald-600"
+                className="h-5 w-5 text-[var(--vscode-charts-green)]"
               />
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -258,7 +258,7 @@ function Sidebar() {
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7 text-muted-foreground"
+                    className="h-7 w-7 text-description"
                     aria-label="Open settings"
                     onClick={() => {
                       setIsSettingsDialogOpen(true);
@@ -272,16 +272,13 @@ function Sidebar() {
             </div>
             {isMultiUserMode && (
               <div className="flex items-center justify-between w-full">
-                <p
-                  className="text-[11px] text-muted-foreground truncate"
-                  title={user?.name ?? 'Guest'}
-                >
+                <p className="text-[11px] text-description truncate" title={user?.name ?? 'Guest'}>
                   Welcome, {user?.name ?? 'Guest'}
                 </p>
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="text-xs text-red-600 hover:text-red-700 shrink-0 h-auto py-0 px-1"
+                  className="text-label-secondary text-error hover:text-error shrink-0 h-auto py-0 px-1"
                   onClick={() => {
                     void handleLogout();
                   }}
@@ -292,7 +289,7 @@ function Sidebar() {
             )}
           </div>
         </SidebarHeader>
-        <SidebarContent className="flex-1 overflow-hidden border-y border-border/60">
+        <SidebarContent className="flex-1 overflow-hidden border-y border-surface-border/60">
           <div ref={sectionsContainerRef} className="flex h-full flex-col overflow-hidden">
             {SECTION_KEYS.map((key, index) => {
               const title = SECTION_TITLES[key];
@@ -305,7 +302,7 @@ function Sidebar() {
                   key={key}
                   className={cn(
                     'relative flex min-h-0 flex-col',
-                    index > 0 && 'border-t border-border/60',
+                    index > 0 && 'border-t border-surface-border/60',
                   )}
                   style={getSectionFlexStyle(key)}
                 >
@@ -331,12 +328,12 @@ function Sidebar() {
                     <div>
                       <div
                         data-testid={`sidebar-section-header-${key}`}
-                        className="group/sidebar-section-header mx-1 flex items-center rounded-md transition-colors hover:bg-accent focus-within:bg-accent"
+                        className="group/sidebar-section-header mx-1 flex items-center rounded-md transition-colors hover:bg-list-hover focus-within:bg-list-hover"
                       >
                         <button
                           type="button"
                           data-guidance={key === 'nodes' ? 'data-blocks' : undefined}
-                          className="flex min-w-0 flex-1 items-center justify-between px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                          className="flex min-w-0 flex-1 items-center justify-between px-2 py-1.5 text-label-secondary font-semibold uppercase tracking-wide text-description"
                           onClick={() => {
                             toggleSection(key);
                           }}
@@ -350,7 +347,7 @@ function Sidebar() {
                             />
                             <span>{title}</span>
                           </span>
-                          <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                          <div className="flex items-center gap-2 text-[11px] text-description">
                             {key === 'nodes' && (
                               <span className="font-semibold text-foreground/80">
                                 {selectedCount > 0
@@ -362,11 +359,12 @@ function Sidebar() {
                               <Circle
                                 data-testid="tasks-connection-indicator"
                                 className={cn('h-3 w-3', {
-                                  'text-green-500 fill-green-500': isConnected,
-                                  'text-amber-500 fill-amber-500 animate-pulse': isConnecting,
-                                  'text-muted-foreground fill-muted-foreground':
+                                  'fill-[var(--vscode-charts-green)] text-[var(--vscode-charts-green)]':
+                                    isConnected,
+                                  'text-warning fill-warning animate-pulse': isConnecting,
+                                  'text-description fill-description':
                                     !isConnected && !isConnecting && !connectionError,
-                                  'text-red-500 fill-red-500': !!connectionError,
+                                  'fill-error text-error': !!connectionError,
                                 })}
                               />
                             )}
@@ -375,7 +373,7 @@ function Sidebar() {
                         <HelpIcon
                           targetKey={SECTION_HELP_KEYS[key]}
                           label={title}
-                          className="h-5 w-5 shrink-0 text-muted-foreground"
+                          className="h-5 w-5 shrink-0 text-description"
                         />
                         {key === 'views' && (
                           <div className="pr-1.5">
@@ -387,7 +385,7 @@ function Sidebar() {
                                       type="button"
                                       variant="ghost"
                                       size="icon"
-                                      className="h-6 w-6 text-muted-foreground"
+                                      className="h-6 w-6 text-description"
                                       aria-label="Edit visible views"
                                     >
                                       <Pencil className="h-3.5 w-3.5" />
@@ -432,7 +430,7 @@ function Sidebar() {
                             ref={(node) => {
                               assignSectionScrollRef(key, node);
                             }}
-                            className="flex h-full min-h-0 flex-col overflow-y-auto scrollbar-none px-2 py-2 text-sm"
+                            className="flex h-full min-h-0 flex-col overflow-y-auto scrollbar-none px-2 py-2 text-body"
                           >
                             {key === 'views' && renderViewsBody()}
                             {key === 'nodes' && (

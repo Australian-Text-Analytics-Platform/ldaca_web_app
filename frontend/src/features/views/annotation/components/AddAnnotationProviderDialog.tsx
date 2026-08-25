@@ -136,7 +136,7 @@ export function AddAnnotationProviderDialog({
                   setError(null);
                 }}
               />
-              <p className="text-xs text-muted-foreground">
+              <p className="text-label-secondary text-description">
                 Must implement OpenAI&apos;s Chat Completions API.
               </p>
             </div>
@@ -145,7 +145,7 @@ export function AddAnnotationProviderDialog({
           <div className="space-y-1.5">
             <Label htmlFor="annotation-provider-api-key">
               API Key
-              <span className="ml-1 font-normal text-muted-foreground">(optional)</span>
+              <span className="ml-1 font-normal text-description">(optional)</span>
             </Label>
             <Input
               id="annotation-provider-api-key"
@@ -158,7 +158,7 @@ export function AddAnnotationProviderDialog({
                 setError(null);
               }}
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-label-secondary text-description">
               {definition.requiresApiKey
                 ? 'You can save this provider now, but an API key is required before use.'
                 : 'Leave blank when the Custom endpoint does not require authentication.'}
@@ -181,13 +181,13 @@ export function AddAnnotationProviderDialog({
                 acceptPlaceholderOnTab({ event, value: name, setValue: setName });
               }}
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-label-secondary text-description">
               Press Tab to accept the gray suggestion, or start typing your own name.
             </p>
           </div>
 
           {error ? (
-            <p role="alert" className="text-sm text-destructive">
+            <p role="alert" className="text-body text-error">
               {error}
             </p>
           ) : null}

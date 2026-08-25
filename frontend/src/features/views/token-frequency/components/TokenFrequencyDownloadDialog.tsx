@@ -78,7 +78,7 @@ const TokenFrequencyDownloadDialogContent = ({
 
       <div className="space-y-4 py-2">
         <div className="space-y-2">
-          <Label className="text-sm font-medium">Format</Label>
+          <Label className="text-body font-medium">Format</Label>
           <div className="flex flex-wrap gap-3">
             {formats.map((fmt) => (
               <label key={fmt.value} className="flex items-center gap-2 cursor-pointer">
@@ -88,7 +88,7 @@ const TokenFrequencyDownloadDialogContent = ({
                     if (checked) setSelectedFormat(fmt.value);
                   }}
                 />
-                <span className="text-sm">{fmt.label}</span>
+                <span className="text-body">{fmt.label}</span>
               </label>
             ))}
           </div>
@@ -102,7 +102,7 @@ const TokenFrequencyDownloadDialogContent = ({
               setIncludeStopWords(checked === true);
             }}
           />
-          <Label htmlFor="include-stop-words" className="text-sm cursor-pointer">
+          <Label htmlFor="include-stop-words" className="text-body cursor-pointer">
             Download stop words as well
           </Label>
         </div>

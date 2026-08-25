@@ -1,2 +1,2 @@
-export { ChromeTabs } from './ChromeTabs';
-export type { ChromeTabItem } from './ChromeTabs';
+export { EditorTabs } from './EditorTabs';
+export type { EditorTabItem } from './EditorTabs';

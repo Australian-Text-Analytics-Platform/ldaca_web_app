@@ -60,13 +60,13 @@ export function AnnotationAiSettings({
           setAdvancedOpen(open);
           onAdvancedOpenChange?.(open);
         }}
-        className="relative rounded-lg border bg-background/60"
+        className="relative rounded-lg border bg-editor/60"
       >
         <CollapsibleTrigger
           data-guidance="annotation-ai-settings-trigger"
           aria-label="Advanced settings"
           title={advancedOpen ? 'Collapse advanced settings' : 'Expand advanced settings'}
-          className="group grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors duration-300 ease-out hover:bg-muted/30 focus-visible:outline-hidden data-[state=closed]:w-full data-[state=open]:absolute data-[state=open]:top-2 data-[state=open]:right-2 data-[state=open]:z-10 data-[state=open]:size-7 data-[state=open]:grid-cols-1 data-[state=open]:gap-0 data-[state=open]:p-0 motion-reduce:transition-none"
+          className="group grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-3 py-2 text-body transition-colors duration-300 ease-out hover:bg-panel/30 focus-visible:outline-hidden data-[state=closed]:w-full data-[state=open]:absolute data-[state=open]:top-2 data-[state=open]:right-2 data-[state=open]:z-10 data-[state=open]:size-7 data-[state=open]:grid-cols-1 data-[state=open]:gap-0 data-[state=open]:p-0 motion-reduce:transition-none"
         >
           {advancedOpen ? null : (
             <>
@@ -77,7 +77,7 @@ export function AnnotationAiSettings({
                 {selected ? (
                   <>
                     <span className="truncate font-medium">{selected.name}</span>
-                    <span className="truncate text-xs text-muted-foreground">
+                    <span className="truncate text-label-secondary text-description">
                       {selectedNeedsKey
                         ? 'Needs API key'
                         : providerConfigurationSecondaryText(selected)}
@@ -87,15 +87,12 @@ export function AnnotationAiSettings({
                   <span className="truncate font-medium">No provider selected</span>
                 )}
               </span>
-              <span
-                className="truncate text-left text-muted-foreground"
-                title={selectedModelSummary}
-              >
+              <span className="truncate text-left text-description" title={selectedModelSummary}>
                 {selectedModelSummary}
               </span>
             </>
           )}
-          <span className="inline-flex size-7 items-center justify-center rounded-md border bg-background group-data-[state=open]:border-0 group-data-[state=open]:bg-transparent">
+          <span className="inline-flex size-7 items-center justify-center rounded-md border bg-editor group-data-[state=open]:border-0 group-data-[state=open]:bg-transparent">
             <ChevronDown
               className="size-4 transition-transform duration-300 group-data-[state=open]:rotate-180 motion-reduce:transition-none"
               aria-hidden="true"
@@ -129,14 +126,14 @@ export function AnnotationAiSettings({
                         {selected ? (
                           <span className="flex min-w-0 items-baseline gap-2">
                             <span className="truncate font-medium">{selected.name}</span>
-                            <span className="truncate text-xs text-muted-foreground">
+                            <span className="truncate text-label-secondary text-description">
                               {selectedNeedsKey
                                 ? 'Needs API key'
                                 : providerConfigurationSecondaryText(selected)}
                             </span>
                           </span>
                         ) : (
-                          <span className="text-muted-foreground">Select a provider</span>
+                          <span className="text-description">Select a provider</span>
                         )}
                       </Button>
                     </PopoverTrigger>
@@ -146,7 +143,7 @@ export function AnnotationAiSettings({
                     >
                       <div className="flex flex-col gap-1">
                         {configurations.length === 0 ? (
-                          <p className="px-2 py-2 text-sm text-muted-foreground">
+                          <p className="px-2 py-2 text-body text-description">
                             No providers configured
                           </p>
                         ) : (
@@ -155,7 +152,7 @@ export function AnnotationAiSettings({
                               key={configuration.id}
                               type="button"
                               disabled={!canListModels(configuration)}
-                              className="flex min-w-0 items-baseline gap-2 rounded-sm px-2 py-2 text-left hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-inherit"
+                              className="flex min-w-0 items-baseline gap-2 rounded-sm px-2 py-2 text-left hover:bg-list-hover hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-inherit"
                               onClick={() => {
                                 onProviderChange(
                                   configuration,
@@ -164,10 +161,10 @@ export function AnnotationAiSettings({
                                 setProviderOpen(false);
                               }}
                             >
-                              <span className="truncate text-sm font-medium">
+                              <span className="truncate text-body font-medium">
                                 {configuration.name}
                               </span>
-                              <span className="truncate text-xs text-muted-foreground">
+                              <span className="truncate text-label-secondary text-description">
                                 {canListModels(configuration)
                                   ? providerConfigurationSecondaryText(configuration)
                                   : 'Needs API key'}
@@ -178,7 +175,7 @@ export function AnnotationAiSettings({
                         <div className="mt-1 border-t pt-1">
                           <button
                             type="button"
-                            className="flex w-full items-center gap-2 rounded-sm px-2 py-2 text-left text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+                            className="flex w-full items-center gap-2 rounded-sm px-2 py-2 text-left text-body font-medium hover:bg-list-hover hover:text-foreground"
                             onClick={() => {
                               setProviderOpen(false);
                               setAddOpen(true);
@@ -207,7 +204,7 @@ export function AnnotationAiSettings({
                       disabled={(disabled ?? false) || selectedNeedsKey}
                     />
                     {selectedNeedsKey ? (
-                      <p className="text-xs text-destructive">
+                      <p className="text-label-secondary text-error">
                         Add an API key in Settings → AI before listing models or running Annotation.
                       </p>
                     ) : null}

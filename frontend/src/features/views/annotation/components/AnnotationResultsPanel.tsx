@@ -252,12 +252,9 @@ export function AnnotationResultsPanel({
   );
 
   return (
-    <section
-      aria-label="Annotation Results"
-      className="mt-5 rounded-lg border bg-background/60 p-4"
-    >
+    <section aria-label="Annotation Results" className="mt-5 rounded-lg border bg-editor/60 p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h3 data-guidance="annotation-manual-results" className="text-base font-semibold">
+        <h3 data-guidance="annotation-manual-results" className="text-body font-semibold">
           Annotations
         </h3>
         {resultsQuery.data ? (
@@ -312,22 +309,22 @@ export function AnnotationResultsPanel({
         ) : null}
       </div>
       {resultsQuery.isLoading || countQuery.isLoading ? (
-        <div className="rounded-md border border-border px-4 py-3 text-sm text-muted-foreground">
+        <div className="rounded-md border border-surface-border px-4 py-3 text-body text-description">
           Loading annotations...
         </div>
       ) : resultsQuery.isError || countQuery.isError ? (
-        <div className="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+        <div className="rounded-md border border-error/30 bg-error/5 px-4 py-3 text-body text-error">
           Could not load annotations.
         </div>
       ) : rows.length === 0 ? (
-        <div className="rounded-md border border-dashed border-border px-4 py-3 text-sm text-muted-foreground">
+        <div className="rounded-md border border-dashed border-surface-border px-4 py-3 text-body text-description">
           {activeDifferenceColumn ? 'No annotation differences.' : 'No rows to annotate.'}
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-border bg-card">
+        <div className="overflow-hidden rounded-lg border border-surface-border bg-surface">
           <div ref={tableViewportRef} className="max-h-96 overflow-auto">
             <Table className="w-full table-auto" disableContainer>
-              <TableHeader className="sticky top-0 z-10 bg-card">
+              <TableHeader className="sticky top-0 z-10 bg-surface">
                 <TableRow>
                   <TableHead>{textColumn}</TableHead>
                   <TableHead className="w-px whitespace-nowrap">{annotationColumn}</TableHead>
@@ -498,12 +495,12 @@ export function AnnotationResultsPanel({
                         >
                           <SelectTrigger
                             aria-label={`Class for row ${String(rowPosition + 1)}`}
-                            className="w-full text-sm"
+                            className="w-full text-body"
                           >
                             <SelectValue placeholder="Select class" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value={NO_CLASS_VALUE} className="text-muted-foreground">
+                            <SelectItem value={NO_CLASS_VALUE} className="text-description">
                               None
                             </SelectItem>
                             {classOptions.map((name) => (
@@ -520,7 +517,7 @@ export function AnnotationResultsPanel({
                             <ArrowRight
                               role="img"
                               aria-label="corrected to"
-                              className="mx-auto size-4 text-muted-foreground"
+                              className="mx-auto size-4 text-description"
                             />
                           </TableCell>
                           <TableCell className="w-px">
@@ -565,15 +562,12 @@ export function AnnotationResultsPanel({
                             >
                               <SelectTrigger
                                 aria-label={`Correction for row ${String(rowPosition + 1)}`}
-                                className="w-full text-sm"
+                                className="w-full text-body"
                               >
                                 <SelectValue placeholder="None" />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem
-                                  value={NO_CLASS_VALUE}
-                                  className="text-muted-foreground"
-                                >
+                                <SelectItem value={NO_CLASS_VALUE} className="text-description">
                                   None
                                 </SelectItem>
                                 {classOptions.map((name) => (

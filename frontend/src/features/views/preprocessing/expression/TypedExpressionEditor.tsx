@@ -3,39 +3,40 @@ import { EditorView } from '@codemirror/view';
 
 const extensions = [EditorView.lineWrapping];
 
-// Match the app's input styling (border, radius, font, focus ring)
+// Match the VS Code input geometry and semantic theme tokens.
 const baseTheme = EditorView.theme({
   '&': {
-    fontSize: '0.875rem',
-    borderRadius: 'calc(var(--radius) - 2px)',
-    border: '1px solid var(--input)',
-    backgroundColor: 'var(--background)',
+    color: 'var(--vscode-input-foreground)',
+    fontSize: 'var(--vscode-fontSize-body1)',
+    borderRadius: 'var(--vscode-cornerRadius-small)',
+    border: '1px solid var(--vscode-input-border)',
+    backgroundColor: 'var(--vscode-input-background)',
   },
   '&.cm-focused': {
-    outline: '2px solid var(--ring)',
-    outlineOffset: '1px',
+    outline: '1px solid var(--vscode-focusBorder)',
+    outlineOffset: '0',
   },
   '.cm-content': {
     fontFamily:
       'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-    padding: '8px 0',
+    padding: '4px 0',
     minHeight: '3.5rem',
   },
   '.cm-line': {
-    padding: '0 12px',
+    padding: '0 6px',
   },
   '.cm-gutters': {
     display: 'none',
   },
   '.cm-placeholder': {
-    color: 'var(--muted-foreground)',
+    color: 'var(--vscode-input-placeholderForeground)',
     fontStyle: 'normal',
   },
   '.cm-activeLine': {
     backgroundColor: 'transparent',
   },
   '.cm-selectionBackground': {
-    backgroundColor: 'color-mix(in srgb, var(--ring) 25%, transparent) !important',
+    backgroundColor: 'var(--vscode-editor-selectionBackground) !important',
   },
 });
 

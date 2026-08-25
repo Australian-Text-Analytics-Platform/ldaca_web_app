@@ -64,7 +64,7 @@ const ChartImageDownloadDialogContent = ({
       </AlertDialogHeader>
 
       <div className="space-y-2 py-2">
-        <Label className="text-sm font-medium">Format</Label>
+        <Label className="text-body font-medium">Format</Label>
         <div className="flex flex-wrap gap-3">
           {CHART_IMAGE_FORMATS.map((fmt) => (
             <label key={fmt.value} className="flex cursor-pointer items-center gap-2">
@@ -74,7 +74,7 @@ const ChartImageDownloadDialogContent = ({
                   if (checked) setSelectedFormat(fmt.value);
                 }}
               />
-              <span className="text-sm">{fmt.label}</span>
+              <span className="text-body">{fmt.label}</span>
             </label>
           ))}
         </div>
@@ -92,7 +92,7 @@ const ChartImageDownloadDialogContent = ({
                     toggleExtra(opt.id, checked === true);
                   }}
                 />
-                <span className="text-sm">{opt.label}</span>
+                <span className="text-body">{opt.label}</span>
               </label>
             ))}
           </div>

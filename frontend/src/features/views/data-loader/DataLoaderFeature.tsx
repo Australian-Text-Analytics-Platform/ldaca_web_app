@@ -64,9 +64,9 @@ function FileListShell({
 }: FileListShellProps) {
   let stateClasses = '';
   if (isDropActive) {
-    stateClasses = empty ? 'border-primary text-foreground' : 'border-primary';
+    stateClasses = empty ? 'border-button text-foreground' : 'border-button';
   } else if (empty) {
-    stateClasses = 'border-muted-foreground/60 text-muted-foreground border-dashed';
+    stateClasses = 'border-surface-border-foreground/60 text-description border-dashed';
   }
 
   return (
@@ -77,12 +77,12 @@ function FileListShell({
         role="toolbar"
         aria-label="File list"
         data-guidance="file-library-toolbar"
-        className="border-border/60 flex items-center justify-start border-b px-2 py-1.5"
+        className="border-surface-border/60 flex items-center justify-start border-b px-2 py-1.5"
       >
         <Button
           size="icon"
           variant="ghost"
-          className="text-muted-foreground hover:text-foreground h-7 w-7 shrink-0"
+          className="text-description hover:text-foreground h-7 w-7 shrink-0"
           onClick={onCreateRootFolder}
           disabled={creatingFolder}
           aria-label="Add root folder"
@@ -501,13 +501,13 @@ function DataLoaderFeature() {
                 />
               </div>
 
-              <div className="text-muted-foreground text-xs">
+              <div className="text-description text-label-secondary">
                 Drop files and folders into the file list, or use the upload buttons. Folder picking
                 is available if this browser cannot accept a dropped folder.
               </div>
 
               {uploadBusy ? (
-                <div className="bg-muted/50 flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-sm">
+                <div className="bg-panel/50 flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-body">
                   <div role="status" aria-live="polite" className="flex min-w-0 items-center gap-2">
                     <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
                     <span className="truncate">{progressText}</span>
@@ -527,10 +527,10 @@ function DataLoaderFeature() {
                 onDrop={(e) => {
                   void handleFileAreaDrop(e);
                 }}
-                className={`flex min-h-0 flex-1 flex-col rounded-md transition-colors ${isFileDropActive ? 'border-primary bg-primary/5 ring-primary/20 border ring-2' : ''}`}
+                className={`flex min-h-0 flex-1 flex-col rounded-md transition-colors ${isFileDropActive ? 'border-button bg-button/5 ring-focus/20 border ring-2' : ''}`}
               >
                 {loadingFiles ? (
-                  <div className="text-muted-foreground flex items-center gap-2 text-sm">
+                  <div className="text-description flex items-center gap-2 text-body">
                     <Loader2 className="h-4 w-4 animate-spin" /> Loading files…
                   </div>
                 ) : fileTree.length === 0 ? (
@@ -542,7 +542,7 @@ function DataLoaderFeature() {
                       openCreateFolderDialog('', 'root');
                     }}
                   >
-                    <div className="flex flex-1 items-start px-4 py-3 text-sm">
+                    <div className="flex flex-1 items-start px-4 py-3 text-body">
                       {isFileDropActive
                         ? 'Drop files or folders here to upload them.'
                         : 'No files found. Upload a dataset to begin.'}
@@ -584,7 +584,7 @@ function DataLoaderFeature() {
                   </FileListShell>
                 )}
               </div>
-              <div className="text-muted-foreground flex shrink-0 flex-wrap items-center justify-between gap-3 text-xs">
+              <div className="text-description flex shrink-0 flex-wrap items-center justify-between gap-3 text-label-secondary">
                 <div>Total files: {totalFileCount}</div>
               </div>
             </CardContent>

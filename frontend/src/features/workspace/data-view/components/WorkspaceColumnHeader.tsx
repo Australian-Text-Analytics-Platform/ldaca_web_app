@@ -105,8 +105,8 @@ export function WorkspaceColumnHeader({
           colInst.pin(isPinnedLeft ? false : 'left');
         }}
         className={cn(
-          'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-transparent text-muted-foreground transition-colors hover:bg-muted-foreground/10 hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring',
-          isPinnedLeft && 'text-primary',
+          'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-transparent text-description transition-colors hover:bg-panel-foreground/10 hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-focus',
+          isPinnedLeft && 'text-link',
         )}
         aria-pressed={isPinnedLeft}
         aria-label={isPinnedLeft ? `Unpin column ${column}` : `Pin column ${column} to the left`}
@@ -126,7 +126,7 @@ export function WorkspaceColumnHeader({
       ) : (
         <div className="min-w-0">
           <span
-            className="block max-w-[160px] truncate text-xs font-medium text-foreground"
+            className="block max-w-[160px] truncate text-label-secondary font-medium text-foreground"
             title={column}
           >
             {column}
@@ -138,14 +138,14 @@ export function WorkspaceColumnHeader({
       <button
         type="button"
         onClick={onSort}
-        className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
+        className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-sm text-description transition-colors hover:text-foreground"
         aria-label={`Sort by ${column}`}
       >
         {sortState ? (
           sortState.desc ? (
-            <ArrowDown className="h-3.5 w-3.5 text-primary" />
+            <ArrowDown className="h-3.5 w-3.5 text-link" />
           ) : (
-            <ArrowUp className="h-3.5 w-3.5 text-primary" />
+            <ArrowUp className="h-3.5 w-3.5 text-link" />
           )
         ) : (
           <ArrowUpDown className="h-3.5 w-3.5" />
@@ -161,16 +161,16 @@ export function WorkspaceColumnHeader({
             size="sm"
             disabled={isColumnBusy || !canCast}
             className={cn(
-              'h-7 w-fit justify-between gap-1 px-1.5 text-xs font-medium',
+              'h-7 w-fit justify-between gap-1 px-1.5 text-label-secondary font-medium',
               isColumnBusy && 'cursor-progress opacity-80',
             )}
             aria-label={`Change data type for column ${column}`}
           >
             <span className="truncate">{displayLabel}</span>
             {isColumnBusy ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-description" />
             ) : (
-              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+              <ChevronDown className="h-3.5 w-3.5 text-description" />
             )}
           </Button>
         </DropdownMenuTrigger>
@@ -182,7 +182,7 @@ export function WorkspaceColumnHeader({
             }}
           >
             {availableTypes.map((t) => (
-              <DropdownMenuRadioItem key={t.value} value={t.value} className="text-xs">
+              <DropdownMenuRadioItem key={t.value} value={t.value} className="text-label-secondary">
                 {t.label}
               </DropdownMenuRadioItem>
             ))}
@@ -197,7 +197,7 @@ export function WorkspaceColumnHeader({
           variant="ghost"
           size="icon"
           onClick={onToggleExpand}
-          className="h-7 w-7 shrink-0 text-muted-foreground hover:text-primary"
+          className="h-7 w-7 shrink-0 text-description hover:text-link"
           aria-label={isCollapsedColumn ? `Expand column ${column}` : `Collapse column ${column}`}
         >
           {isCollapsedColumn ? (
@@ -217,7 +217,7 @@ export function WorkspaceColumnHeader({
               size="icon"
               disabled={isColumnBusy}
               className={cn(
-                'h-7 w-7 shrink-0 text-muted-foreground hover:text-primary',
+                'h-7 w-7 shrink-0 text-description hover:text-link',
                 isColumnBusy && 'cursor-progress opacity-80',
               )}
               aria-label={`Column settings for ${column}`}
@@ -234,7 +234,7 @@ export function WorkspaceColumnHeader({
               <DropdownMenuItem
                 disabled={isColumnBusy}
                 onSelect={onStartRename}
-                className="text-xs"
+                className="text-label-secondary"
               >
                 Rename
               </DropdownMenuItem>
@@ -243,7 +243,7 @@ export function WorkspaceColumnHeader({
               <DropdownMenuItem
                 disabled={isColumnBusy}
                 onSelect={onRequestDelete}
-                className="text-xs text-destructive focus:text-destructive"
+                className="text-label-secondary text-error focus:text-error"
               >
                 Delete
               </DropdownMenuItem>

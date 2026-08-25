@@ -848,14 +848,12 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
         ) : null,
       )}
       {runAllReviewError ? (
-        <p className="mt-4 text-sm text-destructive">
+        <p className="mt-4 text-body text-error">
           Could not load Review: {runAllReviewError.message}
         </p>
       ) : null}
       {reviewError ? (
-        <p className="mt-4 text-sm text-destructive">
-          Could not load Review: {reviewError.message}
-        </p>
+        <p className="mt-4 text-body text-error">Could not load Review: {reviewError.message}</p>
       ) : null}
 
       {/* Results */}
@@ -969,7 +967,7 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
       {analysisError && (
         <Card>
           <CardContent>
-            <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            <div className="rounded-md border border-error/30 bg-error/10 px-4 py-3 text-body text-error">
               {analysisError}
             </div>
           </CardContent>
@@ -1002,8 +1000,8 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
       {/* Loading State */}
       {isLoading.graph && (
         <div className="text-center py-12">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <p className="text-gray-600 mt-2">Loading workspace...</p>
+          <div className="inline-block size-8 animate-spin rounded-full border-2 border-surface-border border-t-primary" />
+          <p className="text-description mt-2">Loading workspace...</p>
         </div>
       )}
     </div>

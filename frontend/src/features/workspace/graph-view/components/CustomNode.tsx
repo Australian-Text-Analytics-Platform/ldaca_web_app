@@ -21,11 +21,12 @@ import {
 import type { WorkspaceGraphNodeCard } from '../graphNodeModel';
 import { cn } from '@/lib/utils';
 import { normalizeNodeAccentColor } from '@/lib/nodeColor';
-import { GREY, toBgColor } from '@/features/views/common/vizPalette';
+import { GREY, foregroundForVizColor } from '@/features/views/common/vizPalette';
+import { DataBlockName } from '@/components/DataBlockName';
 import type { NodeInputPointerPosition } from '@/stores/nodeInputRequestsStore';
 import { CUSTOM_NODE_TOOLBAR_BUTTON_CLASS, CustomNodeActionMenu } from './CustomNodeActionMenu';
-import { CustomNodeRenameForm } from './CustomNodeRenameForm';
 import { DataBlockExportDialog } from '@/features/workspace/common/components/DataBlockExportDialog';
+import { DataBlockRenameDialog } from '@/features/workspace/common/components/DataBlockRenameDialog';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import {
   releaseToolbarOwner,
@@ -63,8 +64,8 @@ interface CustomNodeUiState {
    * Decided at open time from the space beside the trigger so a node near the
    * graph's left edge isn't clipped on the left. */
   menuOpensRight: boolean;
-  isRenaming: boolean;
-  newName: string;
+  renameOpen: boolean;
+  renameValue: string;
   copied: boolean;
   isHovered: boolean;
   isToolbarHovered: boolean;
@@ -74,9 +75,9 @@ interface CustomNodeUiState {
 
 type CustomNodeUiAction =
   | { type: 'set-menu'; showMenu: boolean; opensUp?: boolean; opensRight?: boolean }
-  | { type: 'start-rename'; name: string }
-  | { type: 'set-rename-name'; name: string }
-  | { type: 'cancel-rename' }
+  | { type: 'open-rename'; name: string }
+  | { type: 'set-rename-value'; value: string }
+  | { type: 'set-rename-open'; open: boolean }
   | { type: 'copy-id' }
   | { type: 'copy-id-reset' }
   | { type: 'show-toolbar' }
@@ -91,8 +92,8 @@ const initialCustomNodeUiState: CustomNodeUiState = {
   showMenu: false,
   menuOpensUp: false,
   menuOpensRight: false,
-  isRenaming: false,
-  newName: '',
+  renameOpen: false,
+  renameValue: '',
   copied: false,
   isHovered: false,
   isToolbarHovered: false,
@@ -120,17 +121,21 @@ function customNodeUiReducer(
         menuOpensUp: action.opensUp ?? false,
         menuOpensRight: action.opensRight ?? false,
       };
-    case 'start-rename':
+    case 'open-rename':
       return {
         ...state,
         showMenu: false,
-        isRenaming: true,
-        newName: action.name,
+        renameOpen: true,
+        renameValue: action.name,
       };
-    case 'set-rename-name':
-      return { ...state, newName: action.name };
-    case 'cancel-rename':
-      return { ...state, isRenaming: false, newName: '' };
+    case 'set-rename-value':
+      return { ...state, renameValue: action.value };
+    case 'set-rename-open':
+      return {
+        ...state,
+        renameOpen: action.open,
+        renameValue: action.open ? state.renameValue : '',
+      };
     case 'copy-id':
       return { ...state, copied: true };
     case 'copy-id-reset':
@@ -163,18 +168,17 @@ function customNodeUiReducer(
 function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>) {
   const { node, isFresh, onDelete, onRename, onCopy, onUndo, onRedo, onAddToSelection } = data;
   const { currentWorkspaceId, currentWorkspace } = useWorkspaceData();
-  // Visual state is selection (React Flow ``selected``) plus an optional
-  // per-node accent: a valid ``node.color`` paints a coloured left spine on the
-  // card (see ``accentBorderStyle``) without tinting the header/body, so the
-  // node name stays high-contrast.
+  // Selection and identity are deliberately independent: the persisted Data
+  // Block colour fills the name surface, while React Flow selection adds one
+  // detached, theme-inverse outline around the card.
   const isSelected = selected;
   const [uiState, dispatchUi] = useReducer(customNodeUiReducer, initialCustomNodeUiState);
   const {
     showMenu,
     menuOpensUp,
     menuOpensRight,
-    isRenaming,
-    newName,
+    renameOpen,
+    renameValue,
     copied,
     isHovered,
     isToolbarHovered,
@@ -182,7 +186,6 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
     showExportDialog,
   } = uiState;
   const menuRef = useRef<HTMLDivElement>(null);
-  const renameInputRef = useRef<HTMLInputElement>(null);
 
   const zoom = useStore((s) => s.transform[2]);
   const isZoomedOut = zoom < COMPACT_NODE_ZOOM_THRESHOLD;
@@ -196,17 +199,10 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
   const nodeShape = node.shape;
 
   // Per-node colour. A valid ``#rrggbb`` ``Node.color`` is the block's identity
-  // colour; unset / un-analysed blocks default to grey. The colour is drawn as a
-  // 6px solid left spine on both cards, and a light background tint (`fillColor`)
-  // fills the whole compact card when zoomed out, or just the header strip when
-  // zoomed in, so the colour reads clearly while black text stays legible.
+  // colour; unset / un-analysed blocks default to grey. Saturated colour fills
+  // the identity surface, with the higher-contrast light or dark name colour.
   const effectiveColor = normalizeNodeAccentColor(node.color) ?? GREY;
-  const accentBorderStyle: React.CSSProperties = {
-    borderLeftColor: effectiveColor,
-    borderLeftWidth: 6,
-    borderLeftStyle: 'solid',
-  };
-  const fillColor = toBgColor(effectiveColor);
+  const identityForeground = foregroundForVizColor(effectiveColor);
 
   /** Shows this node's toolbar and claims singleton ownership so any other
    * node's hover toolbar hides at once. Called on node/toolbar mouse-enter. */
@@ -267,43 +263,11 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
   };
 
   /**
-   * Starts inline rename mode from the node settings menu.
+   * Opens the shared Data Block rename dialog from the node settings menu.
    */
   const handleRenameClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    dispatchUi({ type: 'start-rename', name: node.name });
-    setTimeout(() => {
-      renameInputRef.current?.focus();
-      renameInputRef.current?.select();
-    }, 10);
-  };
-
-  /**
-   * Submits the inline node rename form.
-   */
-  const handleRenameSubmit = (e: React.SyntheticEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (newName.trim()) {
-      onRename(node.id, newName.trim());
-    }
-    dispatchUi({ type: 'cancel-rename' });
-  };
-
-  /**
-   * Leaves inline rename mode without changing the node name.
-   */
-  const handleRenameCancel = () => {
-    dispatchUi({ type: 'cancel-rename' });
-  };
-
-  /**
-   * Lets Escape cancel inline rename without graph interaction.
-   */
-  const handleRenameKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      handleRenameCancel();
-    }
+    dispatchUi({ type: 'open-rename', name: node.name });
   };
 
   /**
@@ -349,28 +313,16 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
     }
   };
 
-  // True when this node currently owns the popped-out action toolbar/menu: an
-  // open settings menu, an open delete dialog, or a hover while this node is the
-  // singleton toolbar owner. Drives both the toolbar's visibility and a matching
-  // highlight on the node card. The toolbar is offset below the node, so
-  // highlighting its owner removes any ambiguity about which node a floating
-  // menu belongs to when nodes sit close together.
-  const isToolbarActive =
-    showMenu ||
-    showDeleteConfirm ||
-    showExportDialog ||
-    ((isHovered || isToolbarHovered) && activeToolbarId === id);
+  // The settings menu remains mounted when the pointer leaves the node. Plain
+  // hover visibility still belongs to the singleton owner so only one graph
+  // toolbar can be visible at a time. Dialogs do not keep toolbar chrome alive
+  // behind their modal overlays.
+  const isToolbarVisible = showMenu || ((isHovered || isToolbarHovered) && activeToolbarId === id);
 
-  // Visual treatment: selected nodes get a primary border + ring; all
-  // others use the flat default card look. ``node.color`` (when set) is layered
-  // on as a coloured left spine via ``accentBorderStyle`` on the card element.
-  // A node with its toolbar/menu popped out gets a stronger primary ring +
-  // elevated shadow so the offset toolbar is clearly tied to it (twMerge lets
-  // the active ring win over the softer selection ring when both apply).
+  // The detached outline is the sole persistent node-state decoration.
   const nodeClasses = cn(
-    'w-64 rounded-lg border-2 bg-white text-sm transition-all duration-150 ease-in-out shadow-md',
-    isSelected ? 'border-primary ring-2 ring-primary/30' : 'border-border',
-    isToolbarActive && 'border-primary ring-2 ring-primary shadow-lg',
+    'w-80 rounded-md border border-surface-border bg-surface text-body',
+    isSelected && 'outline outline-2 outline-offset-2 outline-data-block-selection',
   );
 
   /**
@@ -406,11 +358,11 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
   const nodeToolbar = (
     <NodeToolbar
       nodeId={id}
-      isVisible={isToolbarActive}
+      isVisible={isToolbarVisible}
       position={Position.Bottom}
       align="center"
       offset={0}
-      className="nodrag nopan flex items-center gap-1 rounded-lg border border-border bg-white/95 p-1 shadow-lg"
+      className="nodrag nopan flex items-center gap-1 rounded-md border border-surface-border bg-surface p-1"
       onMouseEnter={() => {
         dispatchUi({ type: 'set-toolbar-hovered', isToolbarHovered: true });
         setActiveToolbarOwner(id);
@@ -450,7 +402,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
         onClick={handleAddClick}
         className={CUSTOM_NODE_TOOLBAR_BUTTON_CLASS}
         title="Add to selection"
-        aria-label="Add node to selection"
+        aria-label="Add Data Block to selection"
       >
         <Plus className="h-4 w-4" />
       </button>
@@ -470,14 +422,14 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
             Delete &ldquo;{nodeName}&rdquo;?
           </AlertDialogTitle>
           <AlertDialogDescription>
-            This will permanently delete this node and its data. This action cannot be undone.
+            This will permanently delete this Data Block and its data. This action cannot be undone.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <AlertDialogAction
             onClick={handleDeleteConfirm}
-            className="bg-destructive text-white hover:bg-destructive/90"
+            className="bg-error text-button-foreground hover:bg-error/90"
           >
             Delete
           </AlertDialogAction>
@@ -498,6 +450,23 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
     />
   );
 
+  const renameDialog = (
+    <DataBlockRenameDialog
+      open={renameOpen}
+      onOpenChange={(open) => {
+        dispatchUi({ type: 'set-rename-open', open });
+      }}
+      currentName={node.name}
+      value={renameValue}
+      onValueChange={(value) => {
+        dispatchUi({ type: 'set-rename-value', value });
+      }}
+      onRename={(name) => {
+        onRename(node.id, name);
+      }}
+    />
+  );
+
   // Red "new" dot for nodes that appeared mid-session and haven't been
   // interacted with yet (``isFresh``). Cleared on first click/selection
   // via markInteracted. Absolute-positioned in the node's top-right.
@@ -515,7 +484,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
   const newDotPokeOutPx = 4 * newDotInverseScale;
   const newDot = isFresh ? (
     <span
-      className="pointer-events-none absolute right-0 top-0 z-20 h-3 w-3 rounded-full bg-red-500 ring-2 ring-white"
+      className="pointer-events-none absolute right-0 top-0 z-20 h-3 w-3 rounded-full bg-error ring-1 ring-surface"
       style={{
         transform: `translate(${String(newDotPokeOutPx)}px, ${String(-newDotPokeOutPx)}px) scale(${String(newDotInverseScale)})`,
         transformOrigin: 'top right',
@@ -528,53 +497,48 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
   if (isZoomedOut) {
     // Compact view keeps critical controls visible while preserving the compact footprint.
     const compactClasses = cn(
-      'flex items-start rounded-lg border-2 p-4 transition-all duration-150 ease-in-out shadow-md',
-      isSelected ? 'border-primary ring-2 ring-primary/30' : 'border-border',
-      // Match the full card: highlight the node whose toolbar/menu is popped out.
-      isToolbarActive && 'border-primary ring-2 ring-primary shadow-lg',
+      'flex items-start rounded-md border border-surface-border p-3',
+      isSelected && 'outline outline-2 outline-offset-2 outline-data-block-selection',
     );
     return (
       <div
         className={compactClasses}
+        data-testid="custom-node-compact-card"
         onMouseEnter={showToolbar}
         onMouseLeave={hideToolbar}
         style={{
-          minWidth: '180px',
-          maxWidth: '300px',
+          minWidth: '220px',
+          maxWidth: '360px',
           position: 'relative',
-          // Zoomed out: fill the whole compact card with the block's background
-          // tint, keeping the 6px FG spine and the normal selection border.
-          backgroundColor: fillColor,
+          backgroundColor: effectiveColor,
+          color: identityForeground,
           // ``isFresh`` red "new" dot rendered below marks newly-created
           // nodes the user hasn't acknowledged yet.
-          ...accentBorderStyle,
         }}
       >
         {newDot}
         {nodeToolbar}
-        <div
-          className="pr-16 font-bold text-3xl leading-snug whitespace-normal"
-          style={{
-            wordBreak: 'break-word',
-            overflowWrap: 'anywhere',
-            hyphens: 'auto',
-          }}
+        <DataBlockName
+          name={nodeName}
+          backgroundColor={effectiveColor}
+          maxLines={3}
+          fadeEdge="head"
+          className="w-full text-heading-1 font-semibold leading-snug"
           title={nodeName}
-        >
-          {nodeName}
-        </div>
+        />
         <Handle
           type="target"
           position={Position.Left}
-          className="w-2! h-2! bg-gray-400! opacity-0 pointer-events-none"
+          className="w-2! h-2! bg-panel-foreground! opacity-0 pointer-events-none"
         />
         <Handle
           type="source"
           position={Position.Right}
-          className="w-2! h-2! bg-gray-400! opacity-0 pointer-events-none"
+          className="w-2! h-2! bg-panel-foreground! opacity-0 pointer-events-none"
         />
         {deleteDialog}
         {exportDialog}
+        {renameDialog}
       </div>
     );
   }
@@ -586,73 +550,57 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
       onMouseEnter={showToolbar}
       onMouseLeave={hideToolbar}
       style={{
-        minWidth: '256px',
+        minWidth: '320px',
         minHeight: '120px',
         position: 'relative',
-        ...accentBorderStyle,
       }}
     >
       {newDot}
-      {/* Node Header — zoomed in, only this top strip carries the block's
-          background tint; the body stays white so metadata reads cleanly.
-          The border keeps its normal selected/unselected treatment. */}
+      {/* The saturated header is the persistent identity surface; the neutral
+          body keeps metadata quiet and selection stays outside the card. */}
       <div
-        className={cn(
-          'flex items-start justify-between p-2 rounded-t-lg border-b-2 min-h-fit relative',
-          isSelected ? 'border-primary/40' : 'border-border',
-        )}
-        style={{ backgroundColor: fillColor }}
+        data-testid="custom-node-identity-header"
+        className="relative flex min-h-fit items-start justify-between rounded-t-md border-b border-surface-border px-3 py-2"
+        style={{ backgroundColor: effectiveColor, color: identityForeground }}
       >
-        <div className="flex items-center flex-1 mr-2">
-          {isRenaming ? (
-            <CustomNodeRenameForm
-              inputRef={renameInputRef}
-              value={newName}
-              onValueChange={(name) => {
-                dispatchUi({ type: 'set-rename-name', name });
-              }}
-              onSubmit={handleRenameSubmit}
-              onCancel={handleRenameCancel}
-              onKeyDown={handleRenameKeyDown}
-            />
-          ) : (
-            <div
-              className="font-bold text-sm leading-tight overflow-hidden"
-              style={{
-                wordBreak: 'break-all',
-                overflowWrap: 'anywhere',
-                hyphens: 'auto',
-              }}
-              title={nodeName}
-            >
-              {nodeName}
-            </div>
-          )}
+        <div className="flex min-w-0 flex-1 items-center">
+          <DataBlockName
+            name={nodeName}
+            backgroundColor={effectiveColor}
+            maxLines={3}
+            className="w-full text-body font-semibold leading-snug"
+            title={nodeName}
+          />
         </div>
       </div>
 
       {/* Node Body */}
-      <div className="p-3 bg-white rounded-b-lg space-y-1">
+      <div className="space-y-1 rounded-b-md bg-surface p-3">
         <div className="flex items-center justify-between group">
-          <div className="font-mono text-xs text-gray-500 truncate max-w-45" title={node.id}>
-            id: {node.id.substring(0, 8)}...
+          <div
+            className="font-mono text-label-secondary text-description truncate max-w-45"
+            title={node.id}
+          >
+            id: {node.id.substring(0, 8)}…
           </div>
           <button
             onClick={handleCopyId}
-            className="p-1 hover:bg-gray-100 rounded transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+            className="p-1 hover:bg-panel rounded-sm transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
             title="Copy ID"
           >
             {copied ? (
-              <Check className="h-3 w-3 text-green-500" />
+              <Check className="h-3 w-3 text-[var(--vscode-charts-green)]" />
             ) : (
-              <Copy className="h-3 w-3 text-gray-400" />
+              <Copy className="h-3 w-3 text-description" />
             )}
           </button>
         </div>
         {shapeLabel ? (
-          <div className="font-mono text-xs text-gray-700">Shape: {shapeLabel}</div>
+          <div className="font-mono text-label-secondary text-foreground">Shape: {shapeLabel}</div>
         ) : (
-          <div className="font-mono text-xs text-gray-400 italic">Shape unavailable</div>
+          <div className="font-mono text-label-secondary text-description italic">
+            Shape unavailable
+          </div>
         )}
       </div>
 
@@ -660,16 +608,17 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
       <Handle
         type="target"
         position={Position.Left}
-        className="w-2! h-2! bg-gray-400! opacity-0 pointer-events-none"
+        className="w-2! h-2! bg-panel-foreground! opacity-0 pointer-events-none"
       />
       <Handle
         type="source"
         position={Position.Right}
-        className="w-2! h-2! bg-gray-400! opacity-0 pointer-events-none"
+        className="w-2! h-2! bg-panel-foreground! opacity-0 pointer-events-none"
       />
       {nodeToolbar}
       {deleteDialog}
       {exportDialog}
+      {renameDialog}
     </div>
   );
 }

@@ -70,9 +70,9 @@ function WorkspaceGraphControlButton({
         '!h-10 !w-10 !min-w-10 !justify-start !gap-3 !overflow-hidden !px-3',
         'transition-[width,background-color,color] duration-150 ease-out',
         'group-hover/workspace-controls:!w-40 group-focus-within/workspace-controls:!w-40',
-        'disabled:!bg-muted disabled:!text-muted-foreground disabled:opacity-50',
-        active && '!bg-violet-100 !text-violet-700',
-        destructive && !disabled && '!text-destructive hover:!bg-destructive/10',
+        'disabled:!bg-editor disabled:!text-[var(--vscode-icon-foreground)] disabled:!opacity-40',
+        active && '!bg-list-active !text-[var(--vscode-list-activeSelectionForeground)]',
+        destructive && !disabled && '!text-error hover:!bg-error/10',
       )}
     >
       <span className="flex size-4 shrink-0 items-center justify-center [&_svg]:!size-4 [&_svg]:!max-h-none [&_svg]:!max-w-none [&_svg]:!fill-none">
@@ -80,7 +80,7 @@ function WorkspaceGraphControlButton({
       </span>
       <span
         aria-hidden="true"
-        className="pointer-events-none whitespace-nowrap text-xs font-medium opacity-0 transition-opacity duration-100 group-hover/workspace-controls:opacity-100 group-focus-within/workspace-controls:opacity-100"
+        className="pointer-events-none whitespace-nowrap text-label-secondary font-medium opacity-0 transition-opacity duration-100 group-hover/workspace-controls:opacity-100 group-focus-within/workspace-controls:opacity-100"
       >
         {label}
       </span>
@@ -96,7 +96,7 @@ const GraphSelectionControl = ({ selected, total }: { selected: number; total: n
   <div
     role="status"
     aria-label={`${String(selected)} of ${String(total)} selected`}
-    className="flex h-10 w-10 min-w-10 items-center justify-start gap-3 overflow-hidden px-2 text-xs font-semibold text-foreground tabular-nums transition-[width,padding] duration-150 ease-out group-hover/workspace-controls:w-40 group-hover/workspace-controls:px-3 group-focus-within/workspace-controls:w-40 group-focus-within/workspace-controls:px-3"
+    className="flex h-10 w-10 min-w-10 items-center justify-start gap-3 overflow-hidden px-2 text-label-secondary font-semibold text-foreground tabular-nums transition-[width,padding] duration-150 ease-out group-hover/workspace-controls:w-40 group-hover/workspace-controls:px-3 group-focus-within/workspace-controls:w-40 group-focus-within/workspace-controls:px-3"
   >
     <span className="shrink-0">
       {selected}/{total}
@@ -172,7 +172,7 @@ function WorkspaceGraphDeleteControl() {
               This cannot be undone. The following data blocks will be removed:
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <ul className="max-h-60 overflow-y-auto rounded border bg-muted/40 p-2 text-sm">
+          <ul className="max-h-60 overflow-y-auto rounded-sm border bg-panel/40 p-2 text-body">
             {selectedForDelete.map((item) => (
               <li key={item.id}>{item.name}</li>
             ))}
@@ -229,7 +229,7 @@ function WorkspaceGraphControls({
       showZoom={false}
       showFitView={false}
       showInteractive={false}
-      className="group/workspace-controls overflow-hidden rounded-md border border-border bg-background shadow-md"
+      className="group/workspace-controls overflow-hidden rounded-md border border-surface-border bg-editor"
       style={{ zIndex: 20 }}
       aria-label="Workspace graph controls"
     >
@@ -290,7 +290,7 @@ function WorkspaceGraphControls({
  * Flow: render graph-card skeleton blocks first, then show a spinner label so the loading state preserves the canvas footprint.
  */
 const GraphLoadingState = () => (
-  <div className="flex h-full items-center justify-center bg-muted/20">
+  <div className="flex h-full items-center justify-center bg-panel/20">
     <div className="flex flex-col items-center gap-4">
       <div className="grid grid-cols-2 gap-3">
         <Skeleton className="h-24 w-36 rounded-lg" />
@@ -298,7 +298,7 @@ const GraphLoadingState = () => (
         <Skeleton className="h-24 w-24 rounded-lg" />
         <Skeleton className="h-24 w-48 rounded-lg" />
       </div>
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+      <div className="flex items-center gap-2 text-body text-description">
         <Loader2 className="h-4 w-4 animate-spin" />
         <span>Loading workspace graph…</span>
       </div>
@@ -314,8 +314,8 @@ const GraphLoadingState = () => (
 const GraphEmptyState = () => (
   <div className="flex h-full items-center justify-center p-6 text-center">
     <div>
-      <h3 className="text-sm font-semibold text-foreground">No workspace loaded</h3>
-      <p className="mt-1 text-xs text-muted-foreground">
+      <h3 className="text-body font-semibold text-foreground">No workspace loaded</h3>
+      <p className="mt-1 text-label-secondary text-description">
         Open or create a workspace in Data Loader to see the graph.
       </p>
     </div>
@@ -354,7 +354,7 @@ export function WorkspaceGraphFeature({ fallback }: WorkspaceGraphFeatureProps) 
         defaultEdgeOptions={graph.defaultEdgeOptions}
         onInit={graph.handleInit}
         attributionPosition="bottom-left"
-        className="bg-gray-50"
+        className="bg-editor text-editor-foreground"
         style={{ width: '100%', height: '100%' }}
         defaultViewport={{ x: 0, y: 0, zoom: 1 }}
         minZoom={0.05}
@@ -367,7 +367,12 @@ export function WorkspaceGraphFeature({ fallback }: WorkspaceGraphFeatureProps) 
         onConnectStart={graph.handleConnectStart}
         onConnectEnd={graph.handleConnectEnd}
       >
-        <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
+        <Background
+          variant={BackgroundVariant.Dots}
+          gap={20}
+          size={1}
+          color="var(--vscode-charts-lines)"
+        />
         <WorkspaceGraphControls
           selected={graph.selectedCount}
           total={graph.totalNodes}
@@ -381,8 +386,8 @@ export function WorkspaceGraphFeature({ fallback }: WorkspaceGraphFeatureProps) 
         {showOverview && (
           <MiniMap
             position="bottom-right"
-            nodeColor="#e2e8f0"
-            maskColor="rgba(255, 255, 255, 0.8)"
+            nodeColor="var(--vscode-list-activeSelectionBackground)"
+            maskColor="color-mix(in srgb, var(--vscode-editor-background) 80%, transparent)"
           />
         )}
       </ReactFlow>

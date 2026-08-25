@@ -228,7 +228,7 @@ export function ResultAddToWorkspaceDialog({
             <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
               <div className="space-y-1">
                 <Label htmlFor="sync-add-to-workspace-columns">Sync columns</Label>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-body text-description">
                   Apply shared optional-column selections to every checked Data Block.
                 </p>
               </div>
@@ -286,7 +286,7 @@ export function ResultAddToWorkspaceDialog({
                     </div>
                     <div className="space-y-2">
                       <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm font-medium">Columns</p>
+                        <p className="text-body font-medium">Columns</p>
                         <ColumnSelectionActions
                           sourceName={source.node_name}
                           onSelectAll={() => {
@@ -298,15 +298,15 @@ export function ResultAddToWorkspaceDialog({
                         />
                       </div>
                       <div className="grid gap-2 sm:grid-cols-2">
-                        <label className="flex items-center gap-2 text-sm">
+                        <label className="flex items-center gap-2 text-body">
                           <Checkbox checked disabled />
                           <span>
                             {source.document_column}{' '}
-                            <span className="text-muted-foreground">(document, required)</span>
+                            <span className="text-description">(document, required)</span>
                           </span>
                         </label>
                         {source.metadata_columns.map((column) => (
-                          <label key={column} className="flex items-center gap-2 text-sm">
+                          <label key={column} className="flex items-center gap-2 text-body">
                             <Checkbox
                               checked={selected.includes(column)}
                               disabled={syncColumns && !sharedOptionalSet.has(column)}
@@ -318,18 +318,17 @@ export function ResultAddToWorkspaceDialog({
                           </label>
                         ))}
                         {mode === 'document' ? (
-                          <label className="flex items-center gap-2 text-sm">
+                          <label className="flex items-center gap-2 text-body">
                             <Checkbox checked disabled />
                             <span>
-                              CONC_extraction{' '}
-                              <span className="text-muted-foreground">(required)</span>
+                              CONC_extraction <span className="text-description">(required)</span>
                             </span>
                           </label>
                         ) : (
                           source.analysis_columns
                             .filter((column) => column !== source.document_column)
                             .map((column) => (
-                              <label key={column} className="flex items-center gap-2 text-sm">
+                              <label key={column} className="flex items-center gap-2 text-body">
                                 <Checkbox
                                   checked={selected.includes(column)}
                                   disabled={syncColumns && !sharedOptionalSet.has(column)}

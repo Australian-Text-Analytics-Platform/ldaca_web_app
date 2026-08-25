@@ -87,8 +87,8 @@ function TopicGraphControlButton({
         '!h-10 !w-10 !min-w-10 !justify-start !gap-3 !overflow-hidden !px-3',
         'transition-[width,background-color,color] duration-150 ease-out',
         'group-hover/topic-controls:!w-40 group-focus-within/topic-controls:!w-40',
-        'disabled:!bg-muted disabled:!text-muted-foreground disabled:opacity-50',
-        active && '!bg-violet-100 !text-violet-700',
+        'disabled:!bg-editor disabled:!text-[var(--vscode-icon-foreground)] disabled:!opacity-40',
+        active && '!bg-list-active !text-[var(--vscode-list-activeSelectionForeground)]',
       )}
     >
       <span className="flex size-4 shrink-0 items-center justify-center [&_svg]:!size-4 [&_svg]:!max-h-none [&_svg]:!max-w-none [&_svg]:!fill-none">
@@ -96,7 +96,7 @@ function TopicGraphControlButton({
       </span>
       <span
         aria-hidden="true"
-        className="pointer-events-none whitespace-nowrap text-xs font-medium opacity-0 transition-opacity duration-100 group-hover/topic-controls:opacity-100 group-focus-within/topic-controls:opacity-100"
+        className="pointer-events-none whitespace-nowrap text-label-secondary font-medium opacity-0 transition-opacity duration-100 group-hover/topic-controls:opacity-100 group-focus-within/topic-controls:opacity-100"
       >
         {label}
       </span>
@@ -157,7 +157,7 @@ function TopicBubbleNode({ data }: NodeProps<TopicFlowNode>) {
             className={cn(
               'transition-[fill-opacity,stroke,stroke-width] duration-100',
               !bubble.filteredOut &&
-                'group-hover:fill-opacity-[0.88] group-hover:stroke-ring group-hover:[stroke-width:2]',
+                'group-hover:fill-opacity-[0.88] group-hover:stroke-focus group-hover:[stroke-width:2]',
             )}
           />
           <text
@@ -185,10 +185,10 @@ function TopicBubbleNode({ data }: NodeProps<TopicFlowNode>) {
         role="tooltip"
         tabIndex={-1}
         data-testid={`topic-flow-tooltip-${String(bubble.id)}`}
-        className="pointer-events-none w-[min(18rem,calc(100%-1rem))] rounded-md border border-border bg-card p-3 text-xs text-card-foreground shadow-lg"
+        className="pointer-events-none w-[min(18rem,calc(100%-1rem))] rounded-md border border-surface-border bg-surface p-3 text-label-secondary text-surface-foreground"
       >
-        <div className="text-sm font-semibold">Topic {bubble.topic.id}</div>
-        <div className="mt-1 max-h-36 overflow-hidden text-muted-foreground">
+        <div className="text-body font-semibold">Topic {bubble.topic.id}</div>
+        <div className="mt-1 max-h-36 overflow-hidden text-description">
           <ResponsiveWordCloud
             words={bubble.topic.representative_words.map((term) => ({
               text: term.word,
@@ -537,7 +537,7 @@ function TopicModelingFlowChartInner({
         fitView
         fitViewOptions={FIT_VIEW_OPTIONS}
         attributionPosition="bottom-left"
-        className="bg-white"
+        className="bg-surface"
       >
         <Controls
           orientation="vertical"
@@ -545,7 +545,7 @@ function TopicModelingFlowChartInner({
           showZoom={false}
           showFitView={false}
           showInteractive={false}
-          className="group/topic-controls overflow-hidden rounded-md border border-border bg-background shadow-md"
+          className="group/topic-controls overflow-hidden rounded-md border border-surface-border bg-editor"
           style={{ zIndex: 20 }}
           aria-label="Topic graph controls"
         >

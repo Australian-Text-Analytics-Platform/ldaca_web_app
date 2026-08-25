@@ -84,7 +84,7 @@ export function FilterConditionValueInput({
         value={condition.operator === 'between' ? '' : String(condition.value ?? '')}
         disabled
         placeholder={hasSelection ? 'Select a column' : 'Select a data block to configure filters'}
-        className="flex-1 rounded-md border border-border/70 bg-muted px-2 py-1 text-sm text-muted-foreground"
+        className="flex-1 rounded-md border border-surface-border/70 bg-panel px-2 py-1 text-body text-description"
       />
     );
   }
@@ -158,10 +158,10 @@ export function FilterConditionValueInput({
             const percentage = Math.min(100, Math.max(0, Number(event.target.value) || 0));
             patch({ threshold: percentage / 100 });
           }}
-          className="w-20 rounded-md border border-input px-2 py-1 text-right text-sm text-foreground"
+          className="w-20 rounded-md border border-input-border px-2 py-1 text-right text-body text-foreground"
           disabled={disabled}
         />
-        <span className="text-sm text-muted-foreground">%</span>
+        <span className="text-body text-description">%</span>
       </div>
     );
   }
@@ -374,7 +374,7 @@ export function FilterConditionValueInput({
           onConditionChange(condition.id, 'value', Number.isNaN(parsed) ? '' : parsed);
         }}
         placeholder="Enter number"
-        className="flex-1 rounded-md border border-input px-2 py-1 text-sm text-foreground"
+        className="flex-1 rounded-md border border-input-border px-2 py-1 text-body text-foreground"
         disabled={disabled}
       />
     );
@@ -390,7 +390,7 @@ export function FilterConditionValueInput({
         onConditionChange(condition.id, 'value', event.target.value);
       }}
       placeholder="Enter value"
-      className="flex-1 rounded-md border border-input px-2 py-1 text-sm text-foreground"
+      className="flex-1 rounded-md border border-input-border px-2 py-1 text-body text-foreground"
       disabled={disabled}
     />
   );

@@ -18,14 +18,14 @@ const statusStyles: Record<
   { card: string; text: string; badge: string }
 > = {
   running: {
-    card: 'border-amber-200 bg-amber-50/80',
-    text: 'text-amber-900',
-    badge: 'border-amber-300 bg-white/70',
+    card: 'border-warning bg-warning-background/80',
+    text: 'text-warning',
+    badge: 'border-warning bg-surface',
   },
   queued: {
-    card: 'border-sky-200 bg-sky-50/80',
-    text: 'text-sky-900',
-    badge: 'border-sky-300 bg-white/70',
+    card: 'border-info bg-info-background',
+    text: 'text-foreground',
+    badge: 'border-info bg-surface',
   },
 };
 
@@ -46,9 +46,9 @@ function AnalysisTaskBanner({
   const trimmedMessage = message?.trim();
 
   return (
-    <Card className={cn('shadow-sm', styles.card, className)} data-testid="analysis-task-card">
+    <Card className={cn(styles.card, className)} data-testid="analysis-task-card">
       <CardContent
-        className={cn('flex items-start gap-3 py-4 text-sm', styles.text)}
+        className={cn('flex items-start gap-3 py-4 text-body', styles.text)}
         aria-label={`${analysisName} task ${status}${taskId ? ` (task ${taskId})` : ''}`}
       >
         <div

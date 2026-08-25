@@ -135,44 +135,44 @@ function LdacaRecordCard({
   const isImporting = importingId === record.id;
 
   return (
-    <div className="bg-card text-card-foreground rounded-md border p-4 shadow-sm">
+    <div className="bg-surface text-surface-foreground rounded-md border p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 space-y-2">
           <div className="space-y-1">
-            <h3 className="text-sm leading-5 font-semibold">
+            <h3 className="text-body leading-5 font-semibold">
               <a
                 href={ldacaRecordUrl(record)}
                 target="_blank"
                 rel="noreferrer"
-                className="rounded-sm underline-offset-2 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
+                className="rounded-sm underline-offset-2 hover:underline focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:outline-none"
               >
                 {record.title}
               </a>
             </h3>
-            <p className="text-muted-foreground text-xs break-all">
+            <p className="text-description text-label-secondary break-all">
               {/* crate_id may be '' on malformed records and must fall through to id */}
               {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing */}
               {record.crate_id || record.id}
             </p>
           </div>
           {record.description ? (
-            <p className="text-muted-foreground line-clamp-3 text-sm">{record.description}</p>
+            <p className="text-description line-clamp-3 text-body">{record.description}</p>
           ) : null}
           <div className="flex flex-wrap gap-1.5">
             {(record.types ?? []).slice(0, 4).map((typeName) => (
-              <Badge key={typeName} variant="secondary" className="text-xs">
+              <Badge key={typeName} variant="secondary" className="text-label-secondary">
                 {typeName}
               </Badge>
             ))}
             {/* file_formats is an Oni API field that may be absent at runtime despite the type */}
             {}
             {(record.file_formats ?? []).slice(0, 3).map((fileFormat) => (
-              <Badge key={fileFormat} variant="outline" className="text-xs">
+              <Badge key={fileFormat} variant="outline" className="text-label-secondary">
                 {fileFormat}
               </Badge>
             ))}
             {record.license ? (
-              <Badge variant="outline" className="max-w-full truncate text-xs">
+              <Badge variant="outline" className="max-w-full truncate text-label-secondary">
                 {record.license}
               </Badge>
             ) : null}
@@ -302,7 +302,7 @@ export function LdacaImportDialog(props: LdacaImportDialogProps) {
             {props.errorMessage ? (
               <p
                 role="alert"
-                className="border-destructive/30 bg-destructive/10 text-destructive rounded-md border px-3 py-2 text-sm"
+                className="border-error/30 bg-error/10 text-error rounded-md border px-3 py-2 text-body"
               >
                 {props.errorMessage}
               </p>
@@ -310,8 +310,8 @@ export function LdacaImportDialog(props: LdacaImportDialogProps) {
 
             <section className="flex min-h-0 flex-col gap-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-sm font-semibold">{listTitle}</h2>
-                <div className="text-muted-foreground flex items-center gap-2 text-xs">
+                <h2 className="text-body font-semibold">{listTitle}</h2>
+                <div className="text-description flex items-center gap-2 text-label-secondary">
                   {showingSearchResults ? (
                     <span>
                       {filteredSearchResults.length} of {props.searchResults.length}
@@ -376,7 +376,7 @@ export function LdacaImportDialog(props: LdacaImportDialogProps) {
                   />
                 ))}
                 {showingSearchResults && !props.searching && listRecords.length === 0 ? (
-                  <p className="text-muted-foreground rounded-md border border-dashed px-3 py-2 text-sm">
+                  <p className="text-description rounded-md border border-dashed px-3 py-2 text-body">
                     No results match the selected filters.
                   </p>
                 ) : null}

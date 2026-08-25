@@ -39,27 +39,32 @@ export function RefreshStatusBanner() {
   return (
     <div className="pointer-events-none fixed left-1/2 top-4 z-50 flex -translate-x-1/2 flex-col gap-2">
       {showRefreshBanner && bannerAttemptsLabel && (
-        <div className="pointer-events-auto flex max-w-xl flex-wrap items-center gap-2 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-900 shadow-lg">
-          <span className="font-medium text-amber-900">Connection hiccup</span>
-          <span className="text-xs text-amber-900/80">{bannerMessage}</span>
-          <span className="text-xs text-amber-900/70">Attempts {bannerAttemptsLabel}</span>
+        <div className="pointer-events-auto flex max-w-xl flex-wrap items-center gap-2 rounded-lg border border-warning bg-warning-background px-4 py-2 text-body text-warning">
+          <span className="font-medium text-warning">Connection hiccup</span>
+          <span className="text-label-secondary text-warning/80">{bannerMessage}</span>
+          <span className="text-label-secondary text-warning/70">
+            Attempts {bannerAttemptsLabel}
+          </span>
           {bannerTime && (
-            <span className="text-xs text-amber-900/60">Last failure {bannerTime}</span>
+            <span className="text-label-secondary text-warning/60">Last failure {bannerTime}</span>
           )}
           <button
             type="button"
             onClick={() => {
               void refreshAuth();
             }}
-            className="rounded-full border border-amber-400 px-3 py-1 text-xs font-medium text-amber-900 hover:bg-amber-100"
+            className="rounded-full border border-warning px-3 py-1 text-label-secondary font-medium text-warning hover:bg-warning-background"
           >
             Retry now
           </button>
         </div>
       )}
       {showRefreshChip && (
-        <div className="flex items-center gap-2 self-center rounded-full bg-slate-900/90 px-3 py-1 text-xs font-medium text-white shadow-lg">
-          <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-300" aria-hidden />
+        <div className="flex items-center gap-2 self-center rounded-full bg-widget px-3 py-1 text-label-secondary font-medium text-widget-foreground">
+          <span
+            className="h-2 w-2 animate-pulse rounded-full bg-[var(--vscode-charts-green)]"
+            aria-hidden
+          />
           Reconnecting…
         </div>
       )}

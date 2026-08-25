@@ -151,7 +151,7 @@ export function TopicModelingBubbleChartSection({
     <>
       <div ref={chartRef} className="relative w-full" style={{ containerType: 'inline-size' }}>
         <div
-          className="overflow-hidden rounded-lg border border-muted-foreground/30 bg-background"
+          className="overflow-hidden rounded-lg border border-surface-border-foreground/30 bg-editor"
           data-testid="topic-bubble-chart-shell"
           style={{ height: 'clamp(320px, 55cqw, 520px)' }}
         >

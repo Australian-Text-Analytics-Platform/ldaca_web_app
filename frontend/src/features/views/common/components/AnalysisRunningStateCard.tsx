@@ -71,30 +71,32 @@ export function AnalysisRunningStateCard({
   const elapsed = useElapsedSeconds(startedAt);
 
   return (
-    <div className="space-y-3 rounded-md border border-amber-300/60 bg-amber-50/60 p-4 text-amber-900">
+    <div className="space-y-3 rounded-md border border-warning/60 bg-warning-background/60 p-4 text-warning">
       <div className="flex items-center gap-3">
         <Loader2 className="h-5 w-5 animate-spin" />
-        <div className="space-y-0.5 text-sm">
+        <div className="space-y-0.5 text-body">
           <div className="flex items-baseline gap-3">
             <p className="font-medium">{title}</p>
             {elapsed > 0 && (
-              <span className="text-xs text-amber-800/70">
+              <span className="text-label-secondary text-warning/70">
                 Running for {formatElapsed(elapsed)}
               </span>
             )}
           </div>
-          <p className="text-amber-800/90">{message}</p>
-          {taskId ? <p className="text-xs text-amber-800/80">Task ID: {taskId}</p> : null}
+          <p className="text-warning/90">{message}</p>
+          {taskId ? (
+            <p className="text-label-secondary text-warning/80">Task ID: {taskId}</p>
+          ) : null}
         </div>
       </div>
 
       {normalizedProgress !== null ? (
         <div className="space-y-1">
-          <div className="flex items-center justify-between text-xs text-amber-900/90">
+          <div className="flex items-center justify-between text-label-secondary text-warning/90">
             <span>Progress</span>
             <span>{Math.round(normalizedProgress)}%</span>
           </div>
-          <Progress value={normalizedProgress} className="h-2 bg-amber-100" />
+          <Progress value={normalizedProgress} className="h-2 bg-warning-background" />
         </div>
       ) : null}
     </div>

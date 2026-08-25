@@ -82,7 +82,7 @@ export function DataBlockExportDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-2">
-          <label htmlFor={`node-export-format-${dataBlock.id}`} className="text-sm font-medium">
+          <label htmlFor={`node-export-format-${dataBlock.id}`} className="text-body font-medium">
             Format
           </label>
           <Select

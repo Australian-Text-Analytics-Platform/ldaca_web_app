@@ -69,7 +69,7 @@ export function QuotationEngineSettingsFields({
 
   return (
     <fieldset className={cn('space-y-3', className)}>
-      <legend className="block text-sm font-medium text-foreground">Quotation engine</legend>
+      <legend className="block text-body font-medium text-foreground">Quotation engine</legend>
       <div className="flex flex-wrap gap-4">
         {ENGINE_OPTIONS.map((option) => {
           const inputId = `${idPrefix}-${option.value}`;
@@ -79,7 +79,7 @@ export function QuotationEngineSettingsFields({
               key={option.value}
               htmlFor={inputId}
               className={cn(
-                'flex cursor-pointer items-center gap-2 text-sm font-normal text-foreground',
+                'flex cursor-pointer items-center gap-2 text-body font-normal text-foreground',
                 checked ? 'font-medium' : null,
               )}
             >
@@ -112,7 +112,7 @@ export function QuotationEngineSettingsFields({
             placeholder="remote-quotation-engine"
             aria-invalid={error ? true : undefined}
           />
-          {error ? <p className="text-xs text-destructive">{error}</p> : null}
+          {error ? <p className="text-label-secondary text-error">{error}</p> : null}
         </div>
       ) : null}
     </fieldset>

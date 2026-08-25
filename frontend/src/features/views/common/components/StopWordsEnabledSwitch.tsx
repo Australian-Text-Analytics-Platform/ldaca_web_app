@@ -11,7 +11,7 @@ export function StopWordsEnabledSwitch({
   label = 'Enable stop words',
 }: Props) {
   return (
-    <label className="flex items-center gap-2 text-xs text-muted-foreground">
+    <label className="flex items-center gap-2 text-label-secondary text-description">
       <Switch size="sm" checked={checked} onCheckedChange={onCheckedChange} aria-label={label} />
       {label}
     </label>

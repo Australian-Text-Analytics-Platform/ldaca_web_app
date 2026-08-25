@@ -14,7 +14,7 @@ export type WorkspaceDataTableFeatureProps = Record<string, never>;
  */
 const LoadingState = () => (
   <div className="space-y-4 p-6">
-    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+    <div className="flex items-center gap-2 text-body text-description">
       <Loader2 className="h-4 w-4 animate-spin" />
       <span>Loading data block…</span>
     </div>
@@ -24,7 +24,7 @@ const LoadingState = () => (
         <Skeleton className="h-6 w-32" />
         <Skeleton className="h-6 w-20" />
       </div>
-      <div className="space-y-3 rounded-lg border border-dashed border-border/50 p-4">
+      <div className="space-y-3 rounded-lg border border-dashed border-surface-border/50 p-4">
         {Array.from({ length: 6 }).map((_, index) => (
           <div key={index} className="grid grid-cols-4 gap-4">
             <Skeleton className="h-3 w-full" />
@@ -46,8 +46,8 @@ const LoadingState = () => (
 const EmptyState = () => (
   <div className="flex h-full items-center justify-center p-6 text-center">
     <div>
-      <h3 className="text-sm font-semibold text-foreground">No Data Block Selected</h3>
-      <p className="mt-1 text-xs text-muted-foreground">
+      <h3 className="text-body font-semibold text-foreground">No Data Block Selected</h3>
+      <p className="mt-1 text-label-secondary text-description">
         Select a data block from the graph to view its data.
       </p>
     </div>

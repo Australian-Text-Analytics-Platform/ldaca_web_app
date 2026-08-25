@@ -10,11 +10,12 @@ export function Toaster({ ...props }: ToasterProps) {
       toastOptions={{
         duration: 3500,
         classNames: {
-          toast: 'bg-background border border-border text-foreground shadow-lg',
-          title: 'text-sm font-medium',
-          description: 'text-xs text-muted-foreground',
-          actionButton: 'bg-primary text-primary-foreground',
-          cancelButton: 'bg-muted text-muted-foreground',
+          toast:
+            'rounded-md border border-[var(--vscode-widget-border)] bg-widget text-widget-foreground shadow-[var(--vscode-shadow-lg)]',
+          title: 'text-body font-semibold',
+          description: 'text-body-secondary text-description',
+          actionButton: 'bg-button text-button-foreground',
+          cancelButton: 'bg-panel text-description',
         },
       }}
       richColors

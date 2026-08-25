@@ -170,27 +170,27 @@ export function ModelNameCombobox({
         <ScrollArea className="h-[min(16rem,var(--radix-popover-content-available-height))]">
           <div className="p-1">
             {modelsQuery.isLoading ? (
-              <div className="flex items-center gap-2 px-2 py-3 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2 px-2 py-3 text-body text-description">
                 <Loader2 className="size-4 animate-spin" aria-hidden="true" />
                 Loading models…
               </div>
             ) : modelsQuery.isError ? (
-              <div className="px-2 py-3 text-sm text-destructive">
+              <div className="px-2 py-3 text-body text-error">
                 {modelsQuery.error instanceof Error
                   ? modelsQuery.error.message
                   : 'Failed to load models'}
               </div>
             ) : filtered.length === 0 ? (
-              <div className="px-2 py-3 text-sm text-muted-foreground">No matching models</div>
+              <div className="px-2 py-3 text-body text-description">No matching models</div>
             ) : (
               filtered.map((model) => (
                 <button
                   key={model.id}
                   type="button"
                   className={cn(
-                    'relative flex w-full rounded-sm px-2 py-2 pr-8 text-left text-sm',
-                    'hover:bg-accent hover:text-accent-foreground',
-                    model.id === value && 'bg-accent/50',
+                    'relative flex w-full rounded-sm px-2 py-2 pr-8 text-left text-body',
+                    'hover:bg-list-hover hover:text-foreground',
+                    model.id === value && 'bg-list-hover/50',
                   )}
                   onClick={() => {
                     onChange(model.id);

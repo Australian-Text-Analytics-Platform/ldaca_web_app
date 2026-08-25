@@ -118,7 +118,7 @@ const IsoDateInput = React.forwardRef<HTMLInputElement, IsoDateInputProps>((prop
         }
       }}
       placeholder={placeholder}
-      className={`${parentClassName ? `${parentClassName} ` : ''}px-2 py-1 rounded-md border border-border text-sm font-mono text-foreground`}
+      className={`${parentClassName ? `${parentClassName} ` : ''}px-2 py-1 rounded-md border border-surface-border text-body font-mono text-foreground`}
       size={28}
       style={{ width: '28ch', minWidth: '28ch', maxWidth: '28ch', flex: 'none' }}
     />
@@ -278,10 +278,10 @@ export function DateTimePickerField({
           }
         }}
       />
-      <CalendarIcon className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+      <CalendarIcon className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-description" />
       {open && !disabled && (
         <div className="absolute left-0 top-full z-50 mt-2 w-max">
-          <Card className="w-fit py-4 shadow-lg">
+          <Card className="w-fit py-4">
             <CardContent className="px-4">
               <Calendar
                 mode="single"
@@ -304,7 +304,7 @@ export function DateTimePickerField({
               <div className="flex w-full flex-col gap-3">
                 <Label htmlFor={timeInputId}>Time</Label>
                 <div className="relative flex w-full items-center">
-                  <Clock2Icon className="pointer-events-none absolute left-2.5 h-4 w-4 text-muted-foreground" />
+                  <Clock2Icon className="pointer-events-none absolute left-2.5 h-4 w-4 text-description" />
                   <Input
                     id={timeInputId}
                     type="time"

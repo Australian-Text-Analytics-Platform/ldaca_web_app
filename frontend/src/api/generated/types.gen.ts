@@ -4527,6 +4527,10 @@ export type UserPreferences = {
      */
     analysis_multi_tab_enabled?: boolean;
     /**
+     * Color Theme
+     */
+    color_theme?: 'light-2026' | 'dark-2026';
+    /**
      * Contextual Hints Enabled
      */
     contextual_hints_enabled?: boolean;
@@ -4550,6 +4554,10 @@ export type UserPreferencesPatch = {
      * Analysis Multi Tab Enabled
      */
     analysis_multi_tab_enabled?: boolean;
+    /**
+     * Color Theme
+     */
+    color_theme?: 'light-2026' | 'dark-2026';
     /**
      * Contextual Hints Enabled
      */

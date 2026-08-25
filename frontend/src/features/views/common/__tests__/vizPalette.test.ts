@@ -5,6 +5,8 @@ import {
   RANDOMIZABLE_FG,
   VIZ_PALETTE,
   VIZ_PALETTE_BG,
+  VIZ_TINT_FOREGROUND,
+  foregroundForVizColor,
   pickRandomColor,
   toBgColor,
 } from '../vizPalette';
@@ -18,16 +20,19 @@ function luminance(hex: string): number {
   return 0.2126 * linear(1) + 0.7152 * linear(3) + 0.0722 * linear(5);
 }
 
-/** Contrast ratio of black text (#000000) against a background colour. */
-const blackTextContrast = (bg: string): number => (luminance(bg) + 0.05) / 0.05;
+const contrast = (foreground: string, background: string): number => {
+  const lighter = Math.max(luminance(foreground), luminance(background));
+  const darker = Math.min(luminance(foreground), luminance(background));
+  return (lighter + 0.05) / (darker + 0.05);
+};
 
 describe('toBgColor', () => {
   it('produces a light tint with strong black-text contrast for every FG colour', () => {
     for (const fg of VIZ_PALETTE) {
       const bg = toBgColor(fg);
       expect(bg).toMatch(/^#[0-9a-f]{6}$/);
-      // Comfortably above WCAG AAA (7:1) so black text is always legible.
-      expect(blackTextContrast(bg)).toBeGreaterThan(7);
+      // Comfortably above WCAG AAA (7:1) with the fixed tint foreground in either UI theme.
+      expect(contrast(VIZ_TINT_FOREGROUND, bg)).toBeGreaterThan(7);
     }
   });
 
@@ -37,6 +42,19 @@ describe('toBgColor', () => {
 
   it('returns invalid input unchanged', () => {
     expect(toBgColor('not-a-color')).toBe('not-a-color');
+  });
+});
+
+describe('foregroundForVizColor', () => {
+  it('chooses a WCAG-readable foreground for every saturated identity colour', () => {
+    for (const background of VIZ_PALETTE) {
+      const foreground = foregroundForVizColor(background);
+      expect(contrast(foreground, background)).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it('falls back to the dark foreground for invalid input', () => {
+    expect(foregroundForVizColor('not-a-color')).toBe(VIZ_TINT_FOREGROUND);
   });
 });
 

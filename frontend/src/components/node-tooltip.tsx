@@ -75,7 +75,7 @@ export function NodeTooltipContent({ children, position, className, ...props }: 
   return (
     <NodeToolbar
       isVisible={isVisible}
-      className={cn('rounded-sm bg-primary p-2 text-primary-foreground', className)}
+      className={cn('rounded-sm bg-button p-2 text-button-foreground', className)}
       position={position}
       {...props}
     >

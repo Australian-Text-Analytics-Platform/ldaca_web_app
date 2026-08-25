@@ -484,7 +484,7 @@ export function ConcordanceDispersionSummary({
         <ReferenceArea
           x1={dragRange.x1}
           x2={dragRange.x2}
-          fill="var(--primary)"
+          fill="var(--vscode-button-background)"
           fillOpacity={0.12}
           strokeOpacity={0}
         />
@@ -492,7 +492,7 @@ export function ConcordanceDispersionSummary({
       {dragStartX != null && (
         <ReferenceLine
           x={dragStartX}
-          stroke="var(--primary)"
+          stroke="var(--vscode-button-background)"
           strokeDasharray="4 4"
           strokeWidth={2}
         />
@@ -568,11 +568,11 @@ export function ConcordanceDispersionSummary({
   return (
     <Card
       data-testid="concordance-dispersion-chart"
-      className="mt-4 shadow-sm"
+      className="mt-4"
       style={sourceColor ? { borderLeftWidth: '3px', borderLeftColor: sourceColor } : undefined}
     >
       <CardHeader className="gap-3 pb-2 md:flex-row md:items-start md:justify-between">
-        <CardTitle className="text-base">{chartTitle}</CardTitle>
+        <CardTitle className="text-body">{chartTitle}</CardTitle>
         <div className="flex flex-wrap items-center justify-end gap-3">
           {selection && selection.selectedIndices.size > 0 && (
             <Button type="button" variant="outline" size="sm" onClick={selection.onClear}>
@@ -580,7 +580,7 @@ export function ConcordanceDispersionSummary({
             </Button>
           )}
           {onBinCountChange && (
-            <div className="flex items-center gap-2 text-sm text-foreground">
+            <div className="flex items-center gap-2 text-body text-foreground">
               <span id={`${controlId}-bin-count`}>Bin No.</span>
               <Select
                 value={String(binCount)}
@@ -610,7 +610,7 @@ export function ConcordanceDispersionSummary({
             </div>
           )}
           {onChartModeChange && (
-            <div className="flex items-center gap-2 text-sm text-foreground">
+            <div className="flex items-center gap-2 text-body text-foreground">
               <span id={`${controlId}-chart-mode`}>Chart</span>
               <Popover
                 open={chartMenuOpen}
@@ -640,7 +640,7 @@ export function ConcordanceDispersionSummary({
                       <button
                         key={value}
                         type="button"
-                        className="flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground focus-visible:outline-hidden"
+                        className="flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-left text-body hover:bg-list-hover hover:text-foreground focus-visible:bg-list-hover focus-visible:text-foreground focus-visible:outline-hidden"
                         onClick={() => {
                           onChartModeChange(value);
                           setChartMenuOpen(false);
@@ -651,14 +651,14 @@ export function ConcordanceDispersionSummary({
                       </button>
                     ))}
                     <Collapsible open={cumulativeOptionOpen} onOpenChange={setCumulativeOptionOpen}>
-                      <CollapsibleTrigger className="group flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground focus-visible:outline-hidden">
+                      <CollapsibleTrigger className="group flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-body text-description hover:bg-list-hover hover:text-foreground focus-visible:bg-list-hover focus-visible:text-foreground focus-visible:outline-hidden">
                         More
                         <ChevronRight className="size-4 transition-transform group-data-[state=open]:rotate-90" />
                       </CollapsibleTrigger>
                       <CollapsibleContent className="pt-0.5">
                         <button
                           type="button"
-                          className="flex w-full items-center justify-between rounded-sm py-1.5 pr-2 pl-5 text-left text-sm hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground focus-visible:outline-hidden"
+                          className="flex w-full items-center justify-between rounded-sm py-1.5 pr-2 pl-5 text-left text-body hover:bg-list-hover hover:text-foreground focus-visible:bg-list-hover focus-visible:text-foreground focus-visible:outline-hidden"
                           onClick={() => {
                             onChartModeChange('cumulative');
                             setChartMenuOpen(false);
@@ -717,13 +717,13 @@ export function ConcordanceDispersionSummary({
           </ResponsiveContainer>
         </ChartContainer>
       </CardContent>
-      <CardFooter className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
-        <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+      <CardFooter className="flex flex-wrap items-center justify-between gap-2 text-body text-description">
+        <div className="flex flex-wrap items-center gap-3 text-label-secondary text-description">
           {allSeries.map((item) => (
             <button
               key={item.key}
               type="button"
-              className={`flex items-center gap-2 rounded px-1 py-0.5 ${
+              className={`flex items-center gap-2 rounded-sm px-1 py-0.5 ${
                 item.hidden ? 'opacity-50 line-through' : ''
               }`}
               disabled={!onToggleMatchedTexts}
@@ -744,7 +744,7 @@ export function ConcordanceDispersionSummary({
         {onUncasedMatchedTextsChange ? (
           <label
             htmlFor={`${controlId}-uncased`}
-            className="flex items-center gap-2 text-xs text-foreground"
+            className="flex items-center gap-2 text-label-secondary text-foreground"
           >
             <Checkbox
               id={`${controlId}-uncased`}

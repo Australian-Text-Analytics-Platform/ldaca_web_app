@@ -42,7 +42,7 @@ export function DataPortalCredentialPanel() {
   return (
     <section className="space-y-3">
       <div className="flex items-center gap-2">
-        <h3 className="text-sm font-semibold">LDaCA Data Portal credential</h3>
+        <h3 className="text-body font-semibold">LDaCA Data Portal credential</h3>
         <Badge variant={configured || deploymentConfigured ? 'outline' : 'secondary'}>
           {configured
             ? credentials.storage === 'browser'
@@ -53,7 +53,7 @@ export function DataPortalCredentialPanel() {
               : 'Not configured'}
         </Badge>
       </div>
-      <p className="text-sm text-muted-foreground">
+      <p className="text-body text-description">
         {credentials.storage === 'browser'
           ? 'This token stays in this browser for the current account and is sent only with Data Portal requests.'
           : 'The local backend stores this write-only token for Data Portal search and imports.'}{' '}

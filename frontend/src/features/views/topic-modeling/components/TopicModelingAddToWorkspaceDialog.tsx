@@ -97,7 +97,7 @@ export function TopicModelingAddToWorkspaceDialog({
                     </div>
                     <div className="space-y-2">
                       <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm font-medium">Source columns</p>
+                        <p className="text-body font-medium">Source columns</p>
                         <ColumnSelectionActions
                           sourceName={source.name}
                           onSelectAll={() => {
@@ -115,14 +115,14 @@ export function TopicModelingAddToWorkspaceDialog({
                         />
                       </div>
                       <div className="grid gap-2 sm:grid-cols-2">
-                        <label className="flex items-center gap-2 text-sm">
+                        <label className="flex items-center gap-2 text-body">
                           <Checkbox checked disabled />
                           <span title="The dominant topic assignment is always included.">
-                            TOPIC_top1 <span className="text-muted-foreground">(required)</span>
+                            TOPIC_top1 <span className="text-description">(required)</span>
                           </span>
                         </label>
                         {source.columns.map((column) => (
-                          <label key={column} className="flex items-center gap-2 text-sm">
+                          <label key={column} className="flex items-center gap-2 text-body">
                             <Checkbox
                               checked={selectedColumns[source.id]?.includes(column) ?? false}
                               onCheckedChange={() => {

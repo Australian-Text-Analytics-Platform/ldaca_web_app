@@ -175,11 +175,19 @@ describe('WorkspaceGraphFeature', () => {
 
     const clearButton = within(controls).getByRole('button', { name: 'Clear selection' });
     expect(clearButton).toBeDisabled();
-    expect(clearButton).toHaveClass('disabled:!bg-muted', 'disabled:!text-muted-foreground');
+    expect(clearButton).toHaveClass(
+      'disabled:!bg-editor',
+      'disabled:!text-[var(--vscode-icon-foreground)]',
+      'disabled:!opacity-40',
+    );
 
     const deleteButton = within(controls).getByRole('button', { name: 'Delete (0)' });
     expect(deleteButton).toBeDisabled();
-    expect(deleteButton).toHaveClass('disabled:!bg-muted', 'disabled:!text-muted-foreground');
+    expect(deleteButton).toHaveClass(
+      'disabled:!bg-editor',
+      'disabled:!text-[var(--vscode-icon-foreground)]',
+      'disabled:!opacity-40',
+    );
 
     const buttons = within(controls).getAllByRole('button');
     expect(buttons.map((button) => button.getAttribute('aria-label'))).toEqual([

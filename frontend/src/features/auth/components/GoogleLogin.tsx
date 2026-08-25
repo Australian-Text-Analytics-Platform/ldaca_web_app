@@ -2,6 +2,7 @@ import { GoogleLogin as OAuthGoogleLogin, GoogleOAuthProvider } from '@react-oau
 import { AuthProviderCard } from '@/features/auth/components/AuthProviderCard';
 import { buildGoogleLoginUri } from '@/features/auth/authRedirectUrls';
 import { useAuth } from '@/features/auth/hooks/useAuth';
+import { useActiveTheme } from '@/features/theme/themeRuntime';
 
 interface GoogleLoginProps {
   isLoading?: boolean;
@@ -11,6 +12,7 @@ interface GoogleLoginProps {
 export default function GoogleLogin({ isLoading, error }: GoogleLoginProps) {
   const loginUri = buildGoogleLoginUri();
   const { authInfo } = useAuth();
+  const colorTheme = useActiveTheme();
   const injectedClientId = authInfo?.google_client_id?.trim();
   /* eslint-disable @typescript-eslint/prefer-nullish-coalescing -- empty runtime/build values intentionally fall through */
   const clientId =
@@ -31,7 +33,7 @@ export default function GoogleLogin({ isLoading, error }: GoogleLoginProps) {
           size="large"
           text="signin_with"
           shape="rectangular"
-          theme="outline"
+          theme={colorTheme === 'dark-2026' ? 'filled_black' : 'outline'}
         />
       </AuthProviderCard>
     </GoogleOAuthProvider>

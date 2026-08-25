@@ -146,11 +146,11 @@ export function WorkspaceManagerCard({
       </CardHeader>
       <CardContent className="flex flex-1 flex-col min-h-0 overflow-hidden">
         {busy && !workspaces.length ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2 text-body text-description">
             <Loader2 className="h-4 w-4 animate-spin" /> Loading workspaces…
           </div>
         ) : workspaces.length === 0 ? (
-          <div className="rounded-md border border-dashed border-muted-foreground/60 px-4 py-3 text-center text-sm text-muted-foreground">
+          <div className="rounded-md border border-dashed border-surface-border-foreground/60 px-4 py-3 text-center text-body text-description">
             No workspaces yet. Create one to get started.
           </div>
         ) : (
@@ -167,15 +167,12 @@ export function WorkspaceManagerCard({
                   <div
                     key={workspaceId}
                     data-testid={`workspace-manager-item-${workspaceId}`}
-                    className="flex flex-col gap-3 rounded-md border border-destructive/50 bg-destructive/5 px-4 py-3 @min-[480px]/workspace-manager:flex-row @min-[480px]/workspace-manager:items-center @min-[480px]/workspace-manager:justify-between"
+                    className="flex flex-col gap-3 rounded-md border border-error/50 bg-error/5 px-4 py-3 @min-[480px]/workspace-manager:flex-row @min-[480px]/workspace-manager:items-center @min-[480px]/workspace-manager:justify-between"
                   >
                     <div className="min-w-0">
                       <div className="flex items-center gap-1 font-medium">
-                        <CircleAlert
-                          className="h-4 w-4 shrink-0 text-destructive"
-                          aria-hidden="true"
-                        />
-                        <span className="text-destructive">{workspaceName}</span>
+                        <CircleAlert className="h-4 w-4 shrink-0 text-error" aria-hidden="true" />
+                        <span className="text-error">{workspaceName}</span>
                         <DropdownMenu modal={false}>
                           <DropdownMenuTrigger asChild>
                             <Button
@@ -189,7 +186,7 @@ export function WorkspaceManagerCard({
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="start" className="max-w-xs">
                             <DropdownMenuLabel>Description</DropdownMenuLabel>
-                            <div className="px-2 py-1.5 text-sm text-popover-foreground whitespace-pre-wrap">
+                            <div className="px-2 py-1.5 text-body text-widget-foreground whitespace-pre-wrap">
                               {workspaceDescription && workspaceDescription.length > 0
                                 ? workspaceDescription
                                 : 'No description added yet.'}
@@ -197,15 +194,15 @@ export function WorkspaceManagerCard({
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
-                      <div className="mt-1 break-all text-[11px] text-muted-foreground">
+                      <div className="mt-1 break-all text-[11px] text-description">
                         <span>Workspace ID: </span>
                         <span>{workspaceId}</span>
                       </div>
-                      <div className="mt-2 text-xs text-muted-foreground">
+                      <div className="mt-2 text-label-secondary text-description">
                         Created {formatTimestamp(workspace.created_at)} | Updated{' '}
                         {formatTimestamp(workspace.modified_at)}
                       </div>
-                      <div className="mt-2 max-w-prose text-xs text-muted-foreground">
+                      <div className="mt-2 max-w-prose text-label-secondary text-description">
                         {workspace.message}
                       </div>
                     </div>
@@ -257,10 +254,10 @@ export function WorkspaceManagerCard({
                   data-testid={`workspace-manager-item-${workspaceId}`}
                   className={`flex flex-col gap-2 rounded-md border px-4 py-3 @min-[480px]/workspace-manager:flex-row @min-[480px]/workspace-manager:items-center @min-[480px]/workspace-manager:justify-between ${
                     loadFailure
-                      ? 'border-destructive/50 bg-destructive/5'
+                      ? 'border-error/50 bg-error/5'
                       : isActive
-                        ? 'border-primary bg-primary/10 ring-1 ring-primary/20 shadow-sm'
-                        : 'border-border/70 bg-background'
+                        ? 'border-button bg-button/10 ring-1 ring-focus/20'
+                        : 'border-surface-border/70 bg-editor'
                   }`}
                 >
                   <div>
@@ -279,8 +276,8 @@ export function WorkspaceManagerCard({
                         <Star
                           className={`h-4 w-4 ${
                             isFavorite(workspaceId)
-                              ? 'fill-yellow-400 text-yellow-400'
-                              : 'text-muted-foreground'
+                              ? 'fill-[var(--vscode-charts-orange)] text-[var(--vscode-charts-orange)]'
+                              : 'text-description'
                           }`}
                         />
                       </Button>
@@ -299,7 +296,7 @@ export function WorkspaceManagerCard({
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="start" className="max-w-xs">
                           <DropdownMenuLabel>Description</DropdownMenuLabel>
-                          <div className="px-2 py-1.5 text-sm text-popover-foreground whitespace-pre-wrap">
+                          <div className="px-2 py-1.5 text-body text-widget-foreground whitespace-pre-wrap">
                             {/* an empty/whitespace description should fall through to the placeholder */}
                             {}
                             {workspace.description.trim() || 'No description added yet.'}
@@ -307,14 +304,14 @@ export function WorkspaceManagerCard({
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
-                    <div className="text-xs text-muted-foreground">
+                    <div className="text-label-secondary text-description">
                       Updated {formatTimestamp(workspace.modified_at)} | {blockCount} data block
                       {blockCount === 1 ? '' : 's'}
                     </div>
                     {loadFailure ? (
                       <div
                         role="alert"
-                        className="mt-2 flex max-w-prose items-start gap-1.5 text-xs text-destructive"
+                        className="mt-2 flex max-w-prose items-start gap-1.5 text-label-secondary text-error"
                       >
                         <CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                         <span>

@@ -164,7 +164,7 @@ export const TokenFrequencyResultsPanel = ({
       {isSuccessfulState ? (
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-4">
+            <div className="space-y-2 rounded-lg border border-surface-border/60 bg-panel/20 p-4">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-3">
                   <Label htmlFor="stop-words">Stop words filter ({appliedStopCount})</Label>
@@ -189,7 +189,7 @@ export const TokenFrequencyResultsPanel = ({
                 onBlur={onStopWordsApply}
                 placeholder="the, and, of"
                 disabled={isLoadingStopWords || !stopWordsEnabled}
-                className="w-full resize-y overflow-y-auto rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
+                className="w-full resize-y overflow-y-auto rounded-md border border-input-border bg-editor px-3 py-2 text-body text-foreground focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-focus"
               />
               <div className="flex items-center gap-2">
                 <Button
@@ -223,12 +223,12 @@ export const TokenFrequencyResultsPanel = ({
                   targetKey="analysis.token-frequency.stop-words"
                   label="About default stop words"
                   tooltip="Add Default opens a dialog where you pick a language (a guess is pre-selected from the column's text) whose default stop words are appended to your current list. Add bags from several languages and edit the list before or after applying. Click to open the tutorial."
-                  className="h-5 w-5 text-muted-foreground"
+                  className="h-5 w-5 text-description"
                 />
               </div>
             </div>
 
-            <div className="space-y-4 rounded-lg border border-border/60 bg-muted/20 p-4">
+            <div className="space-y-4 rounded-lg border border-surface-border/60 bg-panel/20 p-4">
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-2">
                   <Label htmlFor="token-limit">Cloud display limit (10–100)</Label>
@@ -266,7 +266,7 @@ export const TokenFrequencyResultsPanel = ({
                   </Button>
                 </div>
                 {tokenLimitError ? (
-                  <p className="text-xs text-destructive">{tokenLimitError}</p>
+                  <p className="text-label-secondary text-error">{tokenLimitError}</p>
                 ) : null}
               </div>
 
@@ -301,7 +301,7 @@ export const TokenFrequencyResultsPanel = ({
                   </Button>
                 </div>
                 {listLimitError ? (
-                  <p className="text-xs text-destructive">{listLimitError}</p>
+                  <p className="text-label-secondary text-error">{listLimitError}</p>
                 ) : null}
               </div>
             </div>

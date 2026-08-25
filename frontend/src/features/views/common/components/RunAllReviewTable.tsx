@@ -208,9 +208,9 @@ export function RunAllReviewTable({
   });
 
   return (
-    <section aria-label={`${title} Review`} className="rounded-lg border bg-background/60 p-4">
+    <section aria-label={`${title} Review`} className="rounded-lg border bg-editor/60 p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h3 data-guidance={guidanceTarget} className="text-base font-semibold">
+        <h3 data-guidance={guidanceTarget} className="text-body font-semibold">
           {title} Review
         </h3>
         {data ? (
@@ -266,9 +266,9 @@ export function RunAllReviewTable({
         ) : null}
       </div>
       {query.isError || countQuery.isError ? (
-        <p className="text-sm text-destructive">Could not load Review.</p>
+        <p className="text-body text-error">Could not load Review.</p>
       ) : query.isLoading || countQuery.isLoading || !data ? (
-        <p className="text-sm text-muted-foreground">Loading Review...</p>
+        <p className="text-body text-description">Loading Review...</p>
       ) : (
         <AnalysisTableFrame
           maxHeightClass="max-h-96"
@@ -283,7 +283,7 @@ export function RunAllReviewTable({
           }
         >
           <Table disableContainer>
-            <TableHeader className="sticky top-0 z-10 bg-card">
+            <TableHeader className="sticky top-0 z-10 bg-surface">
               <TableRow>
                 {visibleRequiredColumns.map((column) => (
                   <TableHead key={column}>
@@ -407,7 +407,7 @@ export function RunAllReviewTable({
                           <ArrowRight
                             role="img"
                             aria-label="corrected to"
-                            className="mx-auto size-4 text-muted-foreground"
+                            className="mx-auto size-4 text-description"
                           />
                         </TableCell>
                         <TableCell className="w-px">
@@ -452,7 +452,7 @@ export function RunAllReviewTable({
                           >
                             <SelectTrigger
                               aria-label={`Correction for row ${String(rowPosition + 1)}`}
-                              className="h-8 min-w-28 text-sm"
+                              className="h-8 min-w-28 text-body"
                             >
                               <SelectValue placeholder="None" />
                             </SelectTrigger>

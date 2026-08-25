@@ -179,7 +179,7 @@ describe('AnnotationResultsPanel', () => {
       'sticky',
       'top-0',
       'z-10',
-      'bg-card',
+      'bg-surface',
     );
     const headers = screen.getAllByRole('columnheader');
     expect(headers[0]).toHaveTextContent('text');

@@ -52,11 +52,11 @@ export function ConcordanceDispersionCell({
     <TooltipProvider delayDuration={120} skipDelayDuration={0}>
       <div className="w-full">
         <div
-          className="relative h-6 overflow-hidden rounded-sm bg-slate-100"
+          className="relative h-6 overflow-hidden rounded-sm bg-panel"
           data-testid="concordance-dispersion-bar"
           style={{ width: `${String(widthPercent)}%` }}
         >
-          <div className="absolute left-0 right-0 top-1/2 h-px -translate-y-1/2 bg-slate-300" />
+          <div className="absolute left-0 right-0 top-1/2 h-px -translate-y-1/2 bg-chart-grid" />
           {hits.map((hit, index) => {
             const startIndex = getNumericIndex(hit[CONCORDANCE_COLUMN_KEYS.startIdx]);
             if (startIndex === null) {
@@ -88,7 +88,7 @@ export function ConcordanceDispersionCell({
                 </TooltipTrigger>
                 <TooltipContent
                   side="top"
-                  className="max-w-md whitespace-normal break-words border border-slate-200 bg-white px-3 py-2 text-xs text-black shadow-md"
+                  className="max-w-md whitespace-normal break-words border border-surface-border bg-surface px-3 py-2 text-label-secondary text-black"
                 >
                   <span>{leftContext} </span>
                   <span style={{ color: matchColor, fontWeight: 600 }}>{rawText}</span>

@@ -43,7 +43,7 @@ export function QuotationHighlightedCell({
 
   return (
     <span>
-      {clipped.prefixEllipsis ? <span className="mr-1 text-muted-foreground">...</span> : null}
+      {clipped.prefixEllipsis ? <span className="mr-1 text-description">...</span> : null}
       {segments.map((segment) => {
         const primaryType = segment.primaryType;
         if (segment.types.length === 0 || primaryType === null) {
@@ -61,7 +61,7 @@ export function QuotationHighlightedCell({
             {segment.types.map((type) => (
               <span
                 key={type}
-                className="mr-1 cursor-pointer rounded border px-1 py-0.5 align-baseline text-[10px] font-semibold"
+                className="mr-1 cursor-pointer rounded-sm border px-1 py-0.5 align-baseline text-badge font-semibold"
                 style={{
                   color: '#0f172a',
                   borderColor: getQuotationHighlightColor(type),
@@ -108,9 +108,9 @@ export function QuotationHighlightedCell({
           </span>
         );
       })}
-      {clipped.suffixEllipsis ? <span className="ml-1 text-muted-foreground">...</span> : null}
+      {clipped.suffixEllipsis ? <span className="ml-1 text-description">...</span> : null}
       {row.quoteType ? (
-        <span className="ml-1 rounded border border-gray-200 bg-gray-100 px-1 py-0.5 align-baseline text-[10px] text-gray-600">
+        <span className="ml-1 rounded-sm border border-surface-border bg-panel px-1 py-0.5 align-baseline text-badge text-description">
           {row.quoteType}
         </span>
       ) : null}

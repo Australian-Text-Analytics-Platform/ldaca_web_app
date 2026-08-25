@@ -8,8 +8,8 @@ export interface InsetCardProps extends React.HTMLAttributes<HTMLDivElement> {
 
 /**
  * Ref-forwarding card shell used by workspace split panes. It mirrors the
- * sidebar inset treatment so graph/table cards keep visible shadows and rounded
- * corners inside overflow-constrained layout parents.
+ * sidebar inset treatment so graph/table cards keep bounded flat surfaces and
+ * rounded-sm corners inside overflow-constrained layout parents.
  */
 export const InsetCard = React.forwardRef<HTMLDivElement, InsetCardProps>(
   ({ className, innerClassName, innerRef, children, ...props }, ref) => (
@@ -17,7 +17,7 @@ export const InsetCard = React.forwardRef<HTMLDivElement, InsetCardProps>(
       <div
         ref={innerRef}
         className={cn(
-          'flex w-full min-h-0 min-w-0 flex-1 flex-col rounded-xl border border-border/60 bg-white shadow-sm overflow-hidden',
+          'flex w-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg border bg-surface',
           innerClassName,
         )}
       >

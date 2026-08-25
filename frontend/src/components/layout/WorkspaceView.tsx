@@ -51,7 +51,7 @@ function WorkspaceView({
       <button
         type="button"
         onClick={onToggleCollapse}
-        className="absolute top-4.5 right-0 z-30 inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-l-full rounded-r-none border border-border bg-white text-gray-700 shadow-sm transition-all hover:bg-slate-50 active:scale-95"
+        className="absolute top-4.5 right-0 z-30 inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-l-full rounded-r-none border border-surface-border bg-surface text-foreground transition-all hover:bg-panel active:scale-95"
         aria-label="Expand right panel"
         title="Expand right panel"
       >
@@ -67,7 +67,7 @@ function WorkspaceView({
         className="min-h-30 p-2 pb-0 pl-0 max-md:pl-2 @max-[639px]/workspace-shell:pl-2"
         style={{ height: `calc(${String(ratio * 100)}% - 0.125rem)` }}
       >
-        <div className="p-2 bg-muted border-b border-border shrink-0">
+        <div className="p-2 bg-panel border-b border-surface-border shrink-0">
           <WorkspaceControls onToggleCollapse={onToggleCollapse} />
         </div>
         <div className="flex-1 min-h-0">

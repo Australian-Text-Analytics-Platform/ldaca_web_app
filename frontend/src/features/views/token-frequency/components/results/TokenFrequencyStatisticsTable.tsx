@@ -200,11 +200,11 @@ const buildColumns = (
       const isOveruse = info.getValue();
       const directionColor = isOveruse ? studyColor : referenceColor;
       const fallbackClass = isOveruse
-        ? 'bg-emerald-100 text-emerald-800'
+        ? 'bg-[color-mix(in_srgb,var(--vscode-charts-green)_12%,transparent)] text-foreground'
         : 'bg-rose-100 text-rose-800';
       return (
         <span
-          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${directionColor ? 'text-white' : fallbackClass}`}
+          className={`inline-flex rounded-full px-2 py-0.5 text-label-secondary font-semibold ${directionColor ? 'text-button-foreground' : fallbackClass}`}
           style={{ backgroundColor: directionColor ?? undefined }}
         >
           {isOveruse ? 'Study' : 'Reference'}
@@ -262,17 +262,17 @@ const buildColumns = (
       const significance = info.row.original.significance;
       const badgeClass =
         significance === '****'
-          ? 'bg-red-100 text-red-800'
+          ? 'bg-error-background text-error'
           : significance === '***'
             ? 'bg-orange-100 text-orange-800'
             : significance === '**'
-              ? 'bg-yellow-100 text-yellow-800'
+              ? 'bg-[var(--vscode-editor-findMatchHighlightBackground)] text-foreground'
               : significance === '*'
-                ? 'bg-green-100 text-green-800'
-                : 'bg-muted text-muted-foreground';
+                ? 'bg-[color-mix(in_srgb,var(--vscode-charts-green)_12%,transparent)] text-foreground'
+                : 'bg-panel text-description';
       return (
         <span
-          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${badgeClass}`}
+          className={`inline-flex rounded-full px-2 py-0.5 text-label-secondary font-semibold ${badgeClass}`}
         >
           {significance ?? 'n.s.'}
         </span>
@@ -406,7 +406,7 @@ export const TokenFrequencyStatisticsTable = ({
               />
             </div>
             {hasCorpusLegend ? (
-              <div className="flex flex-wrap items-center gap-4 text-sm">
+              <div className="flex flex-wrap items-center gap-4 text-body">
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <span
@@ -456,7 +456,7 @@ export const TokenFrequencyStatisticsTable = ({
         </div>
 
         {onTokenFilterChange ? (
-          <div className="flex flex-col gap-2 rounded-md border bg-muted/20 p-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-2 rounded-md border bg-panel/20 p-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2">
               <Label htmlFor="stats-token-filter" className="font-semibold">
                 Filter tokens
@@ -468,7 +468,7 @@ export const TokenFrequencyStatisticsTable = ({
               />
             </div>
             <div className="flex flex-1 items-center gap-2 sm:max-w-md">
-              <Search className="h-4 w-4 text-muted-foreground" />
+              <Search className="h-4 w-4 text-description" />
               <Input
                 id="stats-token-filter"
                 placeholder="Filter tokens (use * as wildcard, e.g. pre* or *ing)"
@@ -495,7 +495,7 @@ export const TokenFrequencyStatisticsTable = ({
         ) : null}
 
         {tokenFilter ? (
-          <p className="text-xs text-muted-foreground">
+          <p className="text-label-secondary text-description">
             {filteredCount} match{filteredCount !== 1 ? 'es' : ''} of {totalCount}
           </p>
         ) : null}
@@ -503,7 +503,7 @@ export const TokenFrequencyStatisticsTable = ({
         {totalCount > 0 ? (
           <>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-300 border-collapse text-sm">
+              <table className="w-full min-w-300 border-collapse text-body">
                 <thead>
                   {table.getHeaderGroups().map((headerGroup) => (
                     <tr key={headerGroup.id} className="border-b text-left">
@@ -555,11 +555,14 @@ export const TokenFrequencyStatisticsTable = ({
             </div>
 
             {filteredCount === 0 ? (
-              <p className="text-sm text-muted-foreground">No tokens match the current filter.</p>
+              <p className="text-body text-description">No tokens match the current filter.</p>
             ) : (
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-2 text-sm">
-                  <Label htmlFor="stats-rows-per-page" className="text-xs text-muted-foreground">
+                <div className="flex items-center gap-2 text-body">
+                  <Label
+                    htmlFor="stats-rows-per-page"
+                    className="text-label-secondary text-description"
+                  >
                     Rows per page
                   </Label>
                   <Input
@@ -598,7 +601,7 @@ export const TokenFrequencyStatisticsTable = ({
                   >
                     Previous
                   </Button>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-label-secondary text-description">
                     Page {pageIndex + 1} / {pageCount}
                   </span>
                   <Button
@@ -626,7 +629,7 @@ export const TokenFrequencyStatisticsTable = ({
             )}
           </>
         ) : (
-          <p className="text-sm text-muted-foreground">No statistics available.</p>
+          <p className="text-body text-description">No statistics available.</p>
         )}
       </div>
     </TooltipProvider>

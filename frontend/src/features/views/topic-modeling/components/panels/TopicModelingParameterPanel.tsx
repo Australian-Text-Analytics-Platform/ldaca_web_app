@@ -142,12 +142,12 @@ export function TopicModelingParameterPanel({
       <div className="inline-grid w-max max-w-full gap-1" data-testid="topic-sampling-wrapper">
         <Label
           htmlFor={inputId}
-          className="whitespace-nowrap text-xs font-medium text-muted-foreground"
+          className="whitespace-nowrap text-label-secondary font-medium text-description"
         >
           {label}
         </Label>
         <div
-          className="flex w-full items-center rounded-md border border-input bg-transparent shadow-xs focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50"
+          className="flex w-full items-center rounded-md border border-input-border bg-transparent focus-within:border-focus focus-within:ring-[3px] focus-within:ring-focus/50"
           data-testid="topic-sampling-control"
         >
           <Input
@@ -158,7 +158,7 @@ export function TopicModelingParameterPanel({
             max={100}
             step={1}
             value={sample.percent}
-            className="h-9 w-14 flex-1 border-0 bg-transparent px-2 text-right text-sm shadow-none focus-visible:ring-0"
+            className="h-9 w-14 flex-1 border-0 bg-transparent px-2 text-right text-body shadow-none focus-visible:ring-0"
             onChange={(event) => {
               onCorpusSampleChange(index, { percent: event.target.value });
             }}
@@ -168,7 +168,7 @@ export function TopicModelingParameterPanel({
               });
             }}
           />
-          <span className="pr-2 text-sm text-muted-foreground">%</span>
+          <span className="pr-2 text-body text-description">%</span>
         </div>
       </div>
     );
@@ -227,13 +227,13 @@ export function TopicModelingParameterPanel({
           <div className="min-w-[11rem] space-y-1">
             <Label
               htmlFor="topic-segmentation-method"
-              className="flex items-center gap-1.5 whitespace-nowrap text-xs font-medium text-muted-foreground"
+              className="flex items-center gap-1.5 whitespace-nowrap text-label-secondary font-medium text-description"
             >
               Segmentation method
               <span
                 aria-label="Segmentation method controls which text spans become Topic Segments"
                 title="Automatic packs nearby text and may overlap boundaries. Paragraph uses each non-empty line. Sentence uses Unicode sentence boundaries."
-                className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground"
+                className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-description"
               >
                 <CircleHelp className="h-4 w-4" />
               </span>
@@ -262,13 +262,13 @@ export function TopicModelingParameterPanel({
           <div className="min-w-[12rem] space-y-1">
             <Label
               htmlFor="topic-max-segment-tokens"
-              className="flex items-center gap-1.5 whitespace-nowrap text-xs font-medium text-muted-foreground"
+              className="flex items-center gap-1.5 whitespace-nowrap text-label-secondary font-medium text-description"
             >
               Maximum tokens per segment
               <span
                 aria-label="Tokens are model units and may be words or parts of words"
                 title="Sets the largest Topic Segment from 32 to 510 model tokens. Oversized Paragraph and Sentence segments keep their beginning and report truncation after the run."
-                className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground"
+                className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-description"
               >
                 <CircleHelp className="h-4 w-4" />
               </span>
@@ -281,7 +281,7 @@ export function TopicModelingParameterPanel({
               max={510}
               step={1}
               value={maxSegmentTokensValueDraft}
-              className="h-9 w-full px-2 text-right text-sm"
+              className="h-9 w-full px-2 text-right text-body"
               onChange={(event) => {
                 setMaxSegmentTokensDraft({
                   source: maxSegmentTokens,
@@ -295,13 +295,13 @@ export function TopicModelingParameterPanel({
           <div className="min-w-[11rem] space-y-1">
             <Label
               htmlFor="topic-min-cluster-size"
-              className="flex items-center gap-1.5 whitespace-nowrap text-xs font-medium text-muted-foreground"
+              className="flex items-center gap-1.5 whitespace-nowrap text-label-secondary font-medium text-description"
             >
               Min topic size
               <span
                 aria-label="Min topic size controls the smallest number of Topic Segments that can form a natural topic"
                 title="Sets the HDBSCAN minimum topic size for the initial run. Smaller values can produce more natural topics. Changing it requires running a new analysis; Number of topics only merges the resulting topics."
-                className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground"
+                className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-description"
               >
                 <CircleHelp className="h-4 w-4" />
               </span>
@@ -313,7 +313,7 @@ export function TopicModelingParameterPanel({
               min={2}
               step={1}
               value={minClusterSizeValueDraft}
-              className="h-9 w-full px-2 text-right text-sm"
+              className="h-9 w-full px-2 text-right text-body"
               onChange={(event) => {
                 setMinClusterSizeDraft({
                   source: minClusterSize,
@@ -328,7 +328,7 @@ export function TopicModelingParameterPanel({
           <div className="min-w-[9rem] space-y-1">
             <Label
               htmlFor="random-seed"
-              className="block whitespace-nowrap text-xs font-medium text-muted-foreground"
+              className="block whitespace-nowrap text-label-secondary font-medium text-description"
             >
               Random Seed
             </Label>
@@ -338,7 +338,7 @@ export function TopicModelingParameterPanel({
               min={0}
               step={1}
               value={randomSeed}
-              className={`h-9 w-full text-right text-sm${!randomSeedUserSet ? ' text-muted-foreground' : ''}`}
+              className={`h-9 w-full text-right text-body${!randomSeedUserSet ? ' text-description' : ''}`}
               onChange={(e) => {
                 onRandomSeedChange(Math.max(0, Number(e.target.value) || 0));
               }}

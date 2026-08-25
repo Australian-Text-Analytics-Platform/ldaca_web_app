@@ -121,7 +121,9 @@ function TokenizerModelSelector({
 
   return (
     <div className={cn('space-y-1', className)}>
-      <span className="block text-xs font-medium text-muted-foreground">Tokenizer Model</span>
+      <span className="block text-label-secondary font-medium text-description">
+        Tokenizer Model
+      </span>
       <DisabledReasonTooltip reason={isDisabled ? reason : undefined} className="w-full">
         <Select
           open={open}
@@ -134,7 +136,7 @@ function TokenizerModelSelector({
           }}
           disabled={isDisabled}
         >
-          <SelectTrigger className="w-full text-sm" aria-label="Tokenizer model">
+          <SelectTrigger className="w-full text-body" aria-label="Tokenizer model">
             <SelectValue placeholder="None">
               {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- empty value should display the placeholder, not '' */}
               {selectedModel?.label ?? (value ? value : 'None')}
@@ -160,16 +162,16 @@ function TokenizerModelSelector({
             {recommended.length > 0 ? (
               <SelectGroup
                 data-testid="tokenizer-model-recommendations"
-                className="my-1 rounded-lg border border-primary/40 bg-transparent p-1 shadow-xs"
+                className="my-1 rounded-lg border border-button/40 bg-transparent p-1"
               >
-                <SelectLabel className="px-2 py-1 text-xs font-medium text-primary">
+                <SelectLabel className="px-2 py-1 text-label-secondary font-medium text-link">
                   Recommended
                 </SelectLabel>
                 {recommended.map((option) => (
                   <SelectItem key={option.model} value={option.model}>
                     <span className="flex min-w-0 flex-col">
                       <span className="truncate">{option.label}</span>
-                      <span className="truncate font-mono text-xs text-muted-foreground">
+                      <span className="truncate font-mono text-label-secondary text-description">
                         {option.model}
                       </span>
                     </span>
@@ -181,7 +183,7 @@ function TokenizerModelSelector({
               <SelectItem key={option.model} value={option.model}>
                 <span className="flex min-w-0 flex-col">
                   <span className="truncate">{option.label}</span>
-                  <span className="truncate font-mono text-xs text-muted-foreground">
+                  <span className="truncate font-mono text-label-secondary text-description">
                     {option.model}
                   </span>
                 </span>

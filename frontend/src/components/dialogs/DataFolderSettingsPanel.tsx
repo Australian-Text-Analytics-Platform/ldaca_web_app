@@ -100,7 +100,7 @@ export function DataFolderSettingsPanel() {
       }}
     >
       <div className="grid gap-4 py-4">
-        <p className="break-all text-sm text-muted-foreground">
+        <p className="break-all text-body text-description">
           Current: {currentPath ?? 'Not configured'}
         </p>
         <div className="grid gap-2 sm:grid-cols-4 sm:items-center sm:gap-4">

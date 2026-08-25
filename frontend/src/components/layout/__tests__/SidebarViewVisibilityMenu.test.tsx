@@ -165,9 +165,9 @@ describe('Sidebar view visibility menu', () => {
     expect(sidebarContainer).toHaveClass(
       'p-2',
       'pr-0!',
-      '[&_[data-slot=sidebar-inner]]:rounded-xl',
+      '[&_[data-slot=sidebar-inner]]:rounded-lg',
       '[&_[data-slot=sidebar-inner]]:border',
-      '[&_[data-slot=sidebar-inner]]:shadow-sm',
+      '[&_[data-slot=sidebar-inner]]:bg-sidebar',
     );
     expect(screen.getByTestId('sidebar-title')).toBeInTheDocument();
     expect(screen.getByTestId('sidebar-section-views')).toBeInTheDocument();
@@ -185,8 +185,8 @@ describe('Sidebar view visibility menu', () => {
       expanded: true,
     });
     expect(screen.getByTestId('sidebar-section-header-views')).toHaveClass(
-      'hover:bg-accent',
-      'focus-within:bg-accent',
+      'hover:bg-list-hover',
+      'focus-within:bg-list-hover',
     );
     expect(viewsToggle).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByTestId('sidebar-section-twistie-views')).toHaveClass('lucide-chevron-down');

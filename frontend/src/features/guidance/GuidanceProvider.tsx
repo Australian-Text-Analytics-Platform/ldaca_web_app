@@ -51,20 +51,19 @@ type GuidanceSession =
     }
   | { kind: 'tour'; definition: GuidedTourDefinition; started: boolean };
 
-const GUIDANCE_ACCENT = '#2563eb';
 const DisableContextualHintsContext = createContext<(() => void) | null>(null);
 
 const guidanceStyles = {
   floater: { filter: 'none' },
   tooltip: {
-    backgroundColor: 'var(--popover)',
-    border: '1px solid var(--border)',
-    borderRadius: 'calc(var(--radius) + 4px)',
-    boxShadow: '0 18px 48px rgba(15, 23, 42, 0.18), 0 2px 8px rgba(15, 23, 42, 0.1)',
-    color: 'var(--popover-foreground)',
+    backgroundColor: 'var(--vscode-editorWidget-background)',
+    border: '1px solid var(--vscode-widget-border)',
+    borderRadius: 'var(--vscode-cornerRadius-large)',
+    boxShadow: 'var(--vscode-shadow-lg)',
+    color: 'var(--vscode-editorWidget-foreground)',
     fontSize: 13,
     maxWidth: 'calc(100vw - 24px)',
-    padding: '18px 18px 14px',
+    padding: '16px',
   },
   tooltipContainer: { lineHeight: 1.55, textAlign: 'left' },
   tooltipTitle: {
@@ -74,28 +73,28 @@ const guidanceStyles = {
     lineHeight: 1.25,
   },
   tooltipContent: {
-    color: 'var(--muted-foreground)',
+    color: 'var(--vscode-descriptionForeground)',
     paddingBottom: 16,
     paddingTop: 8,
   },
-  tooltipFooter: { borderTop: '1px solid var(--border)', paddingTop: 12 },
+  tooltipFooter: { borderTop: '1px solid var(--vscode-widget-border)', paddingTop: 12 },
   buttonPrimary: {
-    backgroundColor: GUIDANCE_ACCENT,
-    borderRadius: 'calc(var(--radius) - 2px)',
-    boxShadow: '0 1px 2px rgba(15, 23, 42, 0.18)',
-    color: '#ffffff',
-    fontSize: 13,
+    backgroundColor: 'var(--vscode-button-background)',
+    borderRadius: 'var(--vscode-cornerRadius-small)',
+    boxShadow: 'none',
+    color: 'var(--vscode-button-foreground)',
+    fontSize: 12,
     fontWeight: 600,
     lineHeight: 1.2,
-    padding: '8px 13px',
+    padding: '5px 8px',
   },
   buttonBack: {
-    color: 'var(--muted-foreground)',
-    fontSize: 13,
+    color: 'var(--vscode-descriptionForeground)',
+    fontSize: 12,
     fontWeight: 500,
     padding: '8px 6px',
   },
-  buttonSkip: { color: 'var(--muted-foreground)', fontSize: 13 },
+  buttonSkip: { color: 'var(--vscode-descriptionForeground)', fontSize: 12 },
 } satisfies NonNullable<JoyrideProps['styles']>;
 
 function ContextualHintTooltip({
@@ -130,7 +129,7 @@ function ContextualHintTooltip({
         <div style={styles.tooltipFooterSpacer}>
           <button
             type="button"
-            className="rounded-md bg-destructive px-3 py-2 text-xs font-semibold text-destructive-foreground shadow-sm transition-colors hover:bg-destructive/90 focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
+            className="rounded-md bg-error px-3 py-2 text-label-secondary font-semibold text-button-foreground transition-colors hover:bg-error/90 focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-focus"
             onClick={requestDisable ?? undefined}
           >
             Disable Hints
@@ -140,7 +139,7 @@ function ContextualHintTooltip({
           <button type="button" style={styles.buttonBack} {...closeProps} />
           <button type="button" style={styles.buttonPrimary} {...primaryProps} />
         </div>
-        <p className="order-last w-full text-right text-[11px] text-muted-foreground">
+        <p className="order-last w-full text-right text-[11px] text-description">
           Esc = Not now · Enter = Got it
         </p>
       </div>
@@ -390,7 +389,7 @@ export function GuidanceProvider({
                 tooltipComponent={isHint ? ContextualHintTooltip : undefined}
                 options={{
                   arrowBase: 22,
-                  arrowColor: 'var(--popover)',
+                  arrowColor: 'var(--vscode-editorWidget-background)',
                   arrowSize: 11,
                   buttons: isHint ? ['primary'] : ['back', 'skip', 'primary'],
                   blockTargetInteraction: true,
@@ -398,14 +397,15 @@ export function GuidanceProvider({
                   dismissKeyAction: isHint ? 'close' : false,
                   offset: 14,
                   overlayClickAction: false,
-                  overlayColor: 'rgba(15, 23, 42, 0.36)',
-                  primaryColor: GUIDANCE_ACCENT,
+                  overlayColor:
+                    'color-mix(in srgb, var(--vscode-editor-background) 45%, transparent)',
+                  primaryColor: 'var(--vscode-button-background)',
                   scrollDuration: reducedMotion ? 0 : 300,
                   skipBeacon: true,
                   spotlightPadding: 6,
                   spotlightRadius: 14,
                   targetWaitTimeout: 3_000,
-                  textColor: 'var(--popover-foreground)',
+                  textColor: 'var(--vscode-editorWidget-foreground)',
                   width: 360,
                   zIndex: 1,
                 }}
@@ -425,7 +425,7 @@ export function GuidanceProvider({
             <AlertDialogFooter>
               <AlertDialogCancel>Keep hints on</AlertDialogCancel>
               <AlertDialogAction
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                className="bg-error text-button-foreground hover:bg-error/90"
                 onClick={disableContextualHints}
               >
                 Disable Hints

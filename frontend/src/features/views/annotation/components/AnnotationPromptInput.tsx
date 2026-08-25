@@ -79,7 +79,7 @@ export function AnnotationPromptInput({
         value={value}
         disabled={disabled}
         placeholder={defaultPrompt}
-        className="min-h-24 text-sm leading-relaxed"
+        className="min-h-24 text-body leading-relaxed"
         autoComplete="off"
         spellCheck={false}
         onChange={(event) => {
@@ -91,8 +91,8 @@ export function AnnotationPromptInput({
         onKeyDown={handleKeyDown}
       />
       {isEmpty && !disabled ? (
-        <p className="text-xs text-muted-foreground">
-          Press <kbd className="rounded border bg-muted px-1 font-mono text-[10px]">Tab</kbd> to
+        <p className="text-label-secondary text-description">
+          Press <kbd className="rounded-sm border bg-panel px-1 font-mono text-badge">Tab</kbd> to
           start from the default prompt, or just start typing your own.
         </p>
       ) : null}

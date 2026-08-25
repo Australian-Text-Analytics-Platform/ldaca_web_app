@@ -1,7 +1,7 @@
 /**
- * Generic Chrome-style tabbed shell shared by every analysis view. It owns the
+ * Generic editor-tab shell shared by every analysis view. It owns the
  * per-workspace tab group for a given analysis type and renders the active
- * tab's analysis panel beneath the protruding tab strip.
+ * tab's analysis panel inside one continuous editor surface.
  *
  * Why this exists: the orchestration (load tab group → auto-create one tab on entry →
  * draw the tab bar → mount the feature keyed by the active tab) is identical

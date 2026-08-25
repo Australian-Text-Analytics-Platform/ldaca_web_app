@@ -70,6 +70,7 @@ async def test_missing_preferences_return_schema_versioned_defaults(tmp_path: Pa
         "favorite_workspaces": [],
         "analysis_multi_tab_enabled": False,
         "contextual_hints_enabled": True,
+        "color_theme": "light-2026",
     }
     stored = rtoml.loads(
         user_preferences_path(settings, "root").read_text(encoding="utf-8")
@@ -98,10 +99,55 @@ async def test_patch_changes_only_explicit_fields(
     assert result.hidden_views == ["quotation"]
     assert result.favorite_workspaces == ["workspace-a"]
     assert result.contextual_hints_enabled is False
+    assert result.color_theme == "light-2026"
     stored = rtoml.loads(
         user_preferences_path(_settings, "root").read_text(encoding="utf-8")
     )
     assert stored["schema_version"] == 2
+
+
+@pytest.mark.anyio
+async def test_existing_schema_two_preferences_default_to_light_theme(
+    tmp_path: Path,
+) -> None:
+    preferences, _credentials, settings = _stores(tmp_path)
+    path = user_preferences_path(settings, "root")
+    path.parent.mkdir(parents=True)
+    path.write_text(
+        rtoml.dumps(
+            {
+                "schema_version": 2,
+                "hidden_views": [],
+                "favorite_workspaces": [],
+                "analysis_multi_tab_enabled": False,
+                "contextual_hints_enabled": True,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = await preferences.get("root")
+
+    assert result.color_theme == "light-2026"
+
+
+@pytest.mark.anyio
+async def test_theme_patch_round_trips_without_changing_other_preferences(
+    tmp_path: Path,
+) -> None:
+    preferences, _credentials, _settings = _stores(tmp_path)
+    await preferences.update(
+        "root",
+        UserPreferencesPatch(favorite_workspaces=["workspace-a"]),
+    )
+
+    result = await preferences.update(
+        "root",
+        UserPreferencesPatch(color_theme="dark-2026"),
+    )
+
+    assert result.color_theme == "dark-2026"
+    assert result.favorite_workspaces == ["workspace-a"]
 
 
 @pytest.mark.anyio
@@ -293,12 +339,14 @@ def test_preferences_api_reads_and_patches_current_user(files_test_client) -> No
     initial = files_test_client.get("/api/preferences")
     assert initial.status_code == 200
     assert initial.json()["contextual_hints_enabled"] is True
+    assert initial.json()["color_theme"] == "light-2026"
 
     updated = files_test_client.patch(
         "/api/preferences",
         json={
             "favorite_workspaces": ["workspace-a"],
             "contextual_hints_enabled": False,
+            "color_theme": "dark-2026",
         },
     )
 
@@ -306,6 +354,13 @@ def test_preferences_api_reads_and_patches_current_user(files_test_client) -> No
     assert updated.json()["favorite_workspaces"] == ["workspace-a"]
     assert updated.json()["contextual_hints_enabled"] is False
     assert updated.json()["analysis_multi_tab_enabled"] is False
+    assert updated.json()["color_theme"] == "dark-2026"
+
+    invalid = files_test_client.patch(
+        "/api/preferences",
+        json={"color_theme": "system"},
+    )
+    assert invalid.status_code == 422
 
 
 def test_multi_user_credential_api_reports_browser_ownership_and_denies_writes(

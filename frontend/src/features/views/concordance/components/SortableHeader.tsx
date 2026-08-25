@@ -27,14 +27,14 @@ export function SortableHeader({
 
   return (
     <TableHead
-      className={`px-3 py-2 text-left text-xs font-medium uppercase tracking-wider cursor-pointer hover:bg-gray-100 ${isSorted ? 'text-blue-600' : 'text-gray-500'}`}
+      className={`px-3 py-2 text-left text-label-secondary font-medium uppercase tracking-wider cursor-pointer hover:bg-panel ${isSorted ? 'text-link' : 'text-description'}`}
       onClick={() => {
         onSort(columnKey, paginationKey, requestNodeId);
       }}
     >
       <div className="flex items-center space-x-1">
         <span>{label}</span>
-        <span className={`text-xs ${isSorted ? 'text-blue-600' : 'text-gray-400'}`}>
+        <span className={`text-label-secondary ${isSorted ? 'text-link' : 'text-description'}`}>
           {sortIcon}
         </span>
       </div>

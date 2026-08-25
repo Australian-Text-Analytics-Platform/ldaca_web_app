@@ -146,16 +146,19 @@ export function PaginationJump({
           setError(null);
           setOpen(true);
         }}
-        className={cn('size-9 text-muted-foreground hover:text-foreground', triggerClassName)}
+        className={cn('size-9 text-description hover:text-foreground', triggerClassName)}
       >
         <MoreHorizontal className="h-4 w-4" />
         <span className="sr-only">Jump to page</span>
       </Button>
       {open && (
-        <div className="absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2 rounded-md border border-border bg-popover px-3 py-2 text-popover-foreground shadow-lg">
+        <div className="absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2 rounded-md border border-surface-border bg-widget px-3 py-2 text-widget-foreground">
           <form className="flex items-center gap-2" onSubmit={handleSubmit} noValidate>
             {showPageLabel && (
-              <label className="text-xs font-medium text-muted-foreground" htmlFor={inputId}>
+              <label
+                className="text-label-secondary font-medium text-description"
+                htmlFor={inputId}
+              >
                 Page:
               </label>
             )}
@@ -172,10 +175,7 @@ export function PaginationJump({
               placeholder={String(totalPages)}
               aria-invalid={error ? 'true' : undefined}
               aria-describedby={error ? errorId : undefined}
-              className={cn(
-                'h-8 w-16 text-sm',
-                error && 'border-destructive focus-visible:ring-destructive',
-              )}
+              className={cn('h-8 w-16 text-body', error && 'border-error focus-visible:ring-error')}
             />
             <Button type="submit" size="sm">
               Go

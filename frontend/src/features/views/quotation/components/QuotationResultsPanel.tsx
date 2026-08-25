@@ -109,7 +109,7 @@ export function QuotationResultsPanel({
           {headerAction}
         </div>
         {reviewRowUnit ? (
-          <fieldset className="flex items-center gap-4 text-sm">
+          <fieldset className="flex items-center gap-4 text-body">
             <legend className="sr-only">Page quotation review by</legend>
             <span>Page by:</span>
             {(['documents', 'matches'] as const).map((unit) => (
@@ -128,7 +128,7 @@ export function QuotationResultsPanel({
             ))}
           </fieldset>
         ) : null}
-        <div className="space-y-2 text-sm">
+        <div className="space-y-2 text-body">
           <div className="flex flex-wrap items-center gap-4">
             <MetadataColumnSelector
               availableColumns={quotationMetadataColumns}
@@ -139,7 +139,7 @@ export function QuotationResultsPanel({
               <div className="flex items-center gap-2">
                 <label
                   htmlFor="quotation-context-length"
-                  className="text-sm font-medium text-foreground"
+                  className="text-body font-medium text-foreground"
                 >
                   Context length (words per side)
                 </label>
@@ -166,7 +166,7 @@ export function QuotationResultsPanel({
                 disabled={isSavingContextLength}
               />
               {isSavingContextLength && (
-                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <div className="flex items-center gap-1 text-label-secondary text-description">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   <span>Saving…</span>
                 </div>
@@ -174,7 +174,7 @@ export function QuotationResultsPanel({
             </div>
           </div>
           <span
-            className={`text-xs ${contextLengthError ? 'text-destructive' : 'text-muted-foreground'}`}
+            className={`text-label-secondary ${contextLengthError ? 'text-error' : 'text-description'}`}
           >
             {contextLengthError ??
               `Enter a whole number between 0 and ${String(MAX_CONTEXT_LENGTH)}.`}

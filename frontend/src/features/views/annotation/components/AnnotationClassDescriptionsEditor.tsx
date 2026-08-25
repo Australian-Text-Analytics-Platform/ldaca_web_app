@@ -130,7 +130,7 @@ export function AnnotationClassDescriptionsEditor({
 
   if (!nodeId) {
     return (
-      <div className="mt-4 rounded-md border border-dashed border-border px-4 py-3 text-sm text-muted-foreground">
+      <div className="mt-4 rounded-md border border-dashed border-surface-border px-4 py-3 text-body text-description">
         Select a Codebook Data Block to edit codes.
       </div>
     );
@@ -138,7 +138,7 @@ export function AnnotationClassDescriptionsEditor({
 
   if (classDescriptions.query.isError) {
     return (
-      <div className="mt-4 rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+      <div className="mt-4 rounded-md border border-error/30 bg-error/5 px-4 py-3 text-body text-error">
         Could not load the codebook.
       </div>
     );
@@ -147,7 +147,7 @@ export function AnnotationClassDescriptionsEditor({
   return (
     <div className="mt-3 space-y-3">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <h3 className="text-sm font-semibold">Codes</h3>
+        <h3 className="text-body font-semibold">Codes</h3>
         <Dialog open={isEditOpen} onOpenChange={handleOpenChange}>
           <DialogTrigger asChild>
             <Button
@@ -177,7 +177,7 @@ export function AnnotationClassDescriptionsEditor({
             </DialogHeader>
             <div className="max-h-[60vh] space-y-2 overflow-y-auto pr-1">
               {editorRows.length === 0 ? (
-                <p className="rounded-md border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
+                <p className="rounded-md border border-dashed border-surface-border px-4 py-6 text-center text-body text-description">
                   No codes yet. Use “Add code” to create one.
                 </p>
               ) : (
@@ -209,7 +209,7 @@ export function AnnotationClassDescriptionsEditor({
                       variant="ghost"
                       size="icon"
                       aria-label={`Delete code ${String(index + 1)}`}
-                      className="shrink-0 text-muted-foreground hover:text-destructive"
+                      className="shrink-0 text-description hover:text-error"
                       onClick={() => {
                         handleDeleteClass(index);
                       }}
@@ -255,11 +255,11 @@ export function AnnotationClassDescriptionsEditor({
       </div>
 
       {classDescriptions.query.isLoading ? (
-        <div className="rounded-md border border-border px-4 py-3 text-sm text-muted-foreground">
+        <div className="rounded-md border border-surface-border px-4 py-3 text-body text-description">
           Loading codebook...
         </div>
       ) : classChips.length === 0 ? (
-        <div className="rounded-md border border-dashed border-border px-4 py-3 text-sm text-muted-foreground">
+        <div className="rounded-md border border-dashed border-surface-border px-4 py-3 text-body text-description">
           No codes yet.
         </div>
       ) : (

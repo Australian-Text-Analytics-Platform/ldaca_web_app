@@ -107,7 +107,15 @@ The **Working Directory** indicator at the bottom of the left sidebar shows the 
 - The default location is `~/Documents/ldaca`. This applies when running the app locally — via self-hosting, the Tauri desktop app, or UVX.
 - This section is not available in multi-user mode, where storage is managed server-side.
 
-<h2 id="help-ui-help-feedback">8. Help and Feedback</h2>
+<h2 id="help-ui-appearance">8. Appearance</h2>
+
+Open **Settings → General → Appearance** to switch between **Light 2026** and
+**Dark 2026**. The interface changes immediately and the selection is saved to
+your account. Wordflow uses the last successful selection during startup so a
+reload does not briefly show the other theme. Charts and Data Block identity
+colors remain stable, while downloaded chart images keep a white background.
+
+<h2 id="help-ui-help-feedback">9. Help and Feedback</h2>
 
 The **Help** and **Feedback** buttons at the very bottom of the left sidebar provide quick access to assistance.
 

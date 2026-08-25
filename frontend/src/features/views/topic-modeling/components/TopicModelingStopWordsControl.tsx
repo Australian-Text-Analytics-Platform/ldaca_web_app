@@ -148,7 +148,10 @@ export function TopicModelingStopWordsControl({
             void replaceWithLanguage(value);
           }}
         >
-          <SelectTrigger className="h-9 w-56 max-w-full text-xs" aria-label="Stop words language">
+          <SelectTrigger
+            className="h-9 w-56 max-w-full text-label-secondary"
+            aria-label="Stop words language"
+          >
             <SelectValue placeholder="Select language" />
           </SelectTrigger>
           <SelectContent>
@@ -218,7 +221,7 @@ export function TopicModelingStopWordsControl({
                 setEditorDraft(event.target.value);
               }}
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-label-secondary text-description">
               {String(normalizedEditorWordCount)} normalized words
             </p>
           </div>

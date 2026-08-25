@@ -31,10 +31,13 @@ proof, except provider callbacks with their own one-use validation.
 | `GET /api/events` | `backend_events` | 200 SSE | Unified bounded resource-refresh stream |
 
 `UserPreferences` has exactly `hidden_views`, `favorite_workspaces`,
-`analysis_multi_tab_enabled`, and `contextual_hints_enabled`. `PATCH` changes
-only fields present in the request. Unknown fields and invalid nulls are
-rejected. The durable `preferences.toml` schema is version 2; earlier schemas
-are rejected. Provider credential responses never include secret values.
+`analysis_multi_tab_enabled`, `contextual_hints_enabled`, and `color_theme`.
+The theme is exactly `light-2026` or `dark-2026` and defaults to `light-2026`.
+`PATCH` changes only fields present in the request. Unknown fields, invalid
+theme identifiers, and invalid nulls are rejected. The durable
+`preferences.toml` schema remains version 2 because omitted `color_theme`
+loads through that default; earlier schemas are rejected. Provider credential
+responses never include secret values.
 
 `GET /api/provider-credentials` reports `storage: backend`, the ordered safe
 `annotation_providers` collection, and Data Portal presence in single-user

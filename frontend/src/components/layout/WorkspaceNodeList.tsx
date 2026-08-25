@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
 import type React from 'react';
 import { cn } from '@/lib/utils';
 import { normalizeNodeAccentColor } from '@/lib/nodeColor';
-import { GREY, toBgColor } from '@/features/views/common/vizPalette';
+import { GREY, foregroundForVizColor } from '@/features/views/common/vizPalette';
+import { DataBlockName } from '@/components/DataBlockName';
 import { useFreshNodesStore } from '@/stores/freshNodesStore';
 import { usePinnedNodesStore } from '@/stores/pinnedNodesStore';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -19,73 +19,6 @@ interface WorkspaceNodeListProps {
   renderPinnedRowAction: (node: WorkspaceGraphNode) => React.ReactNode;
   /** Hover actions rendered for every node row. */
   renderRowActions: (node: WorkspaceGraphNode) => React.ReactNode;
-}
-
-/**
- * Renders a data-block name with a left-edge fade and right-aligned text.
- * Used by: WorkspaceNodeList rows because long path-like node names are more
- * useful when their suffix stays visible and leading row actions fade over the
- * clipped prefix instead of forcing an ellipsis at the right edge.
- * Flow: measure text overflow, use RTL clipping only when the name exceeds the
- * row width, and show the left fade while clipped or while leading actions are
- * visible on hover/focus.
- */
-function NodeRowName({ name, fadeColor }: { name: string; fadeColor: string }) {
-  const wrapRef = useRef<HTMLSpanElement>(null);
-  const textRef = useRef<HTMLSpanElement>(null);
-  const [overflowing, setOverflowing] = useState(false);
-
-  useEffect(() => {
-    const wrap = wrapRef.current;
-    const text = textRef.current;
-    if (!wrap || !text) return;
-
-    const measure = () => {
-      setOverflowing(text.offsetWidth > wrap.clientWidth + 1);
-    };
-
-    measure();
-    if (typeof ResizeObserver === 'undefined') {
-      return;
-    }
-
-    const observer = new ResizeObserver(measure);
-    observer.observe(wrap);
-    observer.observe(text);
-    return () => {
-      observer.disconnect();
-    };
-  }, [name]);
-
-  return (
-    <span
-      ref={wrapRef}
-      dir={overflowing ? 'rtl' : 'ltr'}
-      className={cn(
-        'relative min-w-0 flex-1 overflow-hidden',
-        overflowing ? 'block' : 'flex justify-end text-right',
-      )}
-    >
-      <span
-        ref={textRef}
-        dir="ltr"
-        className="block w-max whitespace-nowrap text-right text-xs font-medium text-foreground"
-      >
-        {name}
-      </span>
-      <span
-        data-testid="node-name-left-fade"
-        aria-hidden="true"
-        style={{
-          backgroundImage: `linear-gradient(to right, ${fadeColor} 0%, ${fadeColor} 40%, transparent 100%)`,
-        }}
-        className={cn(
-          'pointer-events-none absolute inset-y-0 left-0 w-10 group-hover/row:w-32',
-          overflowing ? 'opacity-100' : 'opacity-0 group-hover/row:opacity-100',
-        )}
-      />
-    </span>
-  );
 }
 
 /** Called by: WorkspaceNodeList row onKeyDown handlers. */
@@ -154,12 +87,10 @@ function WorkspaceNodeList({
                 const isPinned = pinnedIdSet.has(node.id);
                 const pinnedRowAction = isPinned ? renderPinnedRowAction(node) : null;
                 const rowActions = renderRowActions(node);
-                // Block colour: the row is always filled with the light background
-                // tint of the block's colour (grey for unset / un-analysed blocks),
-                // with a 4px FG spine on the left; a selected row also takes the
-                // full FG colour as its border.
+                // Saturated block colour owns the row's identity. Selection is
+                // independent and uses one detached theme-inverse outline.
                 const effectiveColor = normalizeNodeAccentColor(node.color) ?? GREY;
-                const rowBackgroundColor = toBgColor(effectiveColor);
+                const identityForeground = foregroundForVizColor(effectiveColor);
 
                 return (
                   <Tooltip key={node.id}>
@@ -181,38 +112,24 @@ function WorkspaceNodeList({
                         aria-label={`${checked ? 'Deselect' : 'Select'} ${displayName}`}
                         className="group/row relative block w-full rounded-md text-left focus-visible:outline-hidden"
                       >
-                        {/* Inner box carries the border/background. */}
+                        {/* Inner box carries the identity surface and selection halo. */}
                         <div
                           className={cn(
-                            'relative flex items-center gap-2 overflow-visible rounded-md border px-2 py-1 text-xs transition-colors duration-150 ease-out group-focus-visible/row:ring-1 group-focus-visible/row:ring-ring',
+                            'relative flex min-h-control items-center gap-2 overflow-visible rounded-md border border-surface-border px-3 py-1 text-body group-focus-visible/row:ring-1 group-focus-visible/row:ring-inset group-focus-visible/row:ring-focus',
                             isPinned && pinnedRowAction && 'pl-8',
-                            checked
-                              ? 'ring-1 ring-primary/20'
-                              : 'border-border/60 group-hover/row:border-border',
+                            checked &&
+                              'outline outline-2 outline-offset-2 outline-data-block-selection',
                           )}
                           data-testid={`workspace-node-row-${node.id}`}
                           style={{
-                            backgroundColor: rowBackgroundColor,
-                            // Selected: full FG-colour border. Unselected keeps the
-                            // neutral border class; both keep the 4px FG left spine.
-                            // Use per-side longhands (not the `borderColor`
-                            // shorthand) so they never conflict with borderLeftColor.
-                            ...(checked
-                              ? {
-                                  borderTopColor: effectiveColor,
-                                  borderRightColor: effectiveColor,
-                                  borderBottomColor: effectiveColor,
-                                }
-                              : {}),
-                            borderLeftColor: effectiveColor,
-                            borderLeftWidth: '4px',
-                            borderLeftStyle: 'solid',
+                            backgroundColor: effectiveColor,
+                            color: identityForeground,
                           }}
                         >
                           {pinnedRowAction && (
                             <div
                               data-testid="pinned-row-pin-action"
-                              className="absolute top-1/2 left-1 z-10 flex -translate-y-1/2 items-center opacity-100 group-hover/row:pointer-events-none group-hover/row:opacity-0"
+                              className="absolute top-1/2 left-1 z-10 flex -translate-y-1/2 items-center opacity-100 group-hover/row:invisible group-hover/row:pointer-events-none group-hover/row:opacity-0 group-focus-within/row:invisible group-focus-within/row:pointer-events-none group-focus-within/row:opacity-0"
                               onPointerDown={(event) => {
                                 event.stopPropagation();
                               }}
@@ -226,20 +143,27 @@ function WorkspaceNodeList({
                               {pinnedRowAction}
                             </div>
                           )}
-                          <NodeRowName name={displayName} fadeColor={rowBackgroundColor} />
+                          <DataBlockName
+                            name={displayName}
+                            backgroundColor={effectiveColor}
+                            maxLines={1}
+                            fadeEdge="head"
+                            className="min-w-0 flex-1 text-body font-semibold leading-snug"
+                            fadeClassName="group-hover/row:w-28 group-hover/row:opacity-100 group-focus-within/row:w-28 group-focus-within/row:opacity-100"
+                          />
                           {isFresh && (
                             <span
-                              className="pointer-events-none h-2 w-2 shrink-0 rounded-full bg-red-500 transition-opacity duration-150 group-hover/row:opacity-0"
+                              className="pointer-events-none h-2 w-2 shrink-0 rounded-full bg-error transition-opacity duration-150 group-hover/row:opacity-0 group-focus-within/row:opacity-0"
                               title="New data block"
                               aria-label="New data block"
                             />
                           )}
                           {rowActions && (
-                            // Hover-revealed leading actions, absolutely positioned
-                            // so the row keeps one stable height while names fade.
+                            // Hover-revealed leading buttons sit directly on the
+                            // identity surface without a second card around them.
                             // Stop row-toggle when interacting with the actions.
                             <div
-                              className="absolute top-1/2 left-1 flex -translate-y-1/2 items-center opacity-0 pointer-events-none group-hover/row:!pointer-events-auto group-hover/row:opacity-100"
+                              className="invisible pointer-events-none absolute top-1/2 left-1 flex -translate-y-1/2 items-center opacity-0 group-hover/row:visible group-hover/row:!pointer-events-auto group-hover/row:opacity-100 group-focus-within/row:visible group-focus-within/row:!pointer-events-auto group-focus-within/row:opacity-100"
                               onPointerDown={(event) => {
                                 event.stopPropagation();
                               }}
@@ -250,7 +174,6 @@ function WorkspaceNodeList({
                                 event.stopPropagation();
                               }}
                               role="toolbar"
-                              tabIndex={-1}
                               aria-label={`Actions for ${displayName}`}
                             >
                               {rowActions}
@@ -271,7 +194,7 @@ function WorkspaceNodeList({
               })}
             </div>
           ) : (
-            <div className="rounded-md bg-accent/40 px-2 py-2 text-xs text-muted-foreground">
+            <div className="rounded-md bg-list-hover/40 px-2 py-2 text-label-secondary text-description">
               No data blocks
             </div>
           )}

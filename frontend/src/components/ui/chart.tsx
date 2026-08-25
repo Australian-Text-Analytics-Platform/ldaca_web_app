@@ -125,14 +125,14 @@ const ChartTooltipContent = React.forwardRef<HTMLDivElement, ChartTooltipContent
       <div
         ref={ref}
         className={cn(
-          'grid gap-2 rounded-lg border border-border bg-card p-3 text-sm text-card-foreground shadow-lg supports-[backdrop-filter]:backdrop-blur',
+          'grid gap-2 rounded-md border border-[var(--vscode-widget-border)] bg-widget p-2 text-body text-widget-foreground shadow-[var(--vscode-shadow-lg)]',
           className,
         )}
       >
         {!hideLabel && resolvedLabel && (
-          <div className="font-medium text-card-foreground">{resolvedLabel}</div>
+          <div className="font-medium text-surface-foreground">{resolvedLabel}</div>
         )}
-        <div className="grid gap-1 text-xs text-muted-foreground">
+        <div className="grid gap-1 text-label-secondary text-description">
           {items.map((item, index) => {
             const key = String(item.dataKey ?? item.name ?? index);
             const data = config[key] ?? config[item.name ?? ''];
@@ -151,7 +151,7 @@ const ChartTooltipContent = React.forwardRef<HTMLDivElement, ChartTooltipContent
                     )}
                     style={colorVariable ? { background: colorVariable } : undefined}
                   />
-                  <span className="font-medium text-card-foreground">
+                  <span className="font-medium text-surface-foreground">
                     {data?.label ??
                       (nameKey && item.payload?.[nameKey] != null
                         ? // eslint-disable-next-line @typescript-eslint/no-base-to-string -- recharts payload value is an untyped runtime label expected to be a primitive
@@ -160,7 +160,7 @@ const ChartTooltipContent = React.forwardRef<HTMLDivElement, ChartTooltipContent
                   </span>
                   {Icon ? <Icon className="h-3.5 w-3.5" /> : null}
                 </div>
-                <span className="font-mono text-card-foreground">
+                <span className="font-mono text-surface-foreground">
                   {item.value?.toLocaleString() ?? item.value}
                 </span>
               </div>

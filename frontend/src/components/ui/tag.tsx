@@ -6,21 +6,22 @@ import { cn } from '@/lib/utils';
 
 /** Used by `Tag` to map its tone and size props to semantic-chip styles. */
 const tagVariants = cva(
-  'inline-flex items-center gap-2 whitespace-nowrap rounded-full border px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/30 disabled:pointer-events-none disabled:opacity-60',
+  'inline-flex items-center gap-2 whitespace-nowrap rounded-full border px-3 py-1 text-label-secondary font-medium transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-focus/30 disabled:pointer-events-none disabled:opacity-60',
   {
     variants: {
       tone: {
         /** Ref-forwarding tag primitive for compact semantic labels that can render as child elements. */
-        muted: 'border-border bg-muted/60 text-muted-foreground',
-        neutral: 'border-border bg-background text-foreground/80',
-        info: 'border-sky-300/70 bg-sky-50 text-sky-900',
-        success: 'border-emerald-300/70 bg-emerald-50 text-emerald-900',
-        warning: 'border-amber-400 bg-amber-50 text-amber-900',
+        muted: 'border-surface-border bg-panel/60 text-description',
+        neutral: 'border-surface-border bg-editor text-foreground/80',
+        info: 'border-info bg-info-background text-foreground',
+        success:
+          'border-[var(--vscode-charts-green)] bg-[color-mix(in_srgb,var(--vscode-charts-green)_12%,transparent)] text-foreground',
+        warning: 'border-warning bg-warning-background text-warning',
         danger: 'border-rose-400 bg-rose-50 text-rose-900',
       },
       size: {
         sm: 'gap-1.5 px-2.5 py-0.5 text-[0.7rem]',
-        md: 'px-3 py-1 text-xs',
+        md: 'px-3 py-1 text-label-secondary',
       },
     },
     defaultVariants: {

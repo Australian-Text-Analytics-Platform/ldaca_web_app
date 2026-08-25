@@ -72,7 +72,7 @@ export function AnalysisCardLayout({
   footerGuidanceTarget,
   cardRef,
 }: AnalysisCardLayoutProps) {
-  const cardToneClassName = cn('w-full min-w-0', tone === 'error' && 'border-destructive/50');
+  const cardToneClassName = cn('w-full min-w-0', tone === 'error' && 'border-error/50');
   const runAllLabel = actions?.runAllLabel ?? 'Run All';
   const previewDisabledReason = actions?.previewDisabled
     ? actions.isPreviewing

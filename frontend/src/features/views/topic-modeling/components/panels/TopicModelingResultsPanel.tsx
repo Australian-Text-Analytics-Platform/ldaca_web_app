@@ -144,7 +144,7 @@ function ClusterCountControl({
   };
 
   return (
-    <div className="grid min-w-0 gap-1 text-xs text-muted-foreground">
+    <div className="grid min-w-0 gap-1 text-label-secondary text-description">
       <div className="flex items-center gap-3">
         <label htmlFor="topic-cluster-count" className="font-medium">
           Number of topics
@@ -213,7 +213,7 @@ function ClusterCountControl({
           step={1}
           value={numberDraft}
           disabled={pending || !clustering.adjustable}
-          className="h-9 w-16 shrink-0 rounded-md border border-input bg-background px-2 text-right text-sm tabular-nums disabled:cursor-not-allowed disabled:opacity-50"
+          className="h-9 w-16 shrink-0 rounded-md border border-input-border bg-editor px-2 text-right text-body tabular-nums disabled:cursor-not-allowed disabled:opacity-50"
           onChange={(event) => {
             const raw = event.target.value;
             setNumberDraft(raw);
@@ -235,7 +235,7 @@ function ClusterCountControl({
         />
       </div>
       {error ? (
-        <span className="flex items-center gap-2 text-destructive">
+        <span className="flex items-center gap-2 text-error">
           {error}
           {onRetry ? (
             <button type="button" className="underline" onClick={onRetry}>
@@ -258,7 +258,10 @@ function WordsPerTopicControl({
   const [draft, setDraft] = useState({ source: value, value: String(value) });
   const displayed = draft.source === value ? draft.value : String(value);
   return (
-    <label htmlFor="topic-words-per-topic" className="grid gap-1 text-xs text-muted-foreground">
+    <label
+      htmlFor="topic-words-per-topic"
+      className="grid gap-1 text-label-secondary text-description"
+    >
       <span className="font-medium">Words per topic</span>
       <input
         id="topic-words-per-topic"
@@ -267,7 +270,7 @@ function WordsPerTopicControl({
         min={3}
         max={100}
         value={displayed}
-        className="h-9 w-full rounded-md border border-input bg-background px-2 text-right text-sm"
+        className="h-9 w-full rounded-md border border-input-border bg-editor px-2 text-right text-body"
         onChange={(event) => {
           setDraft({ source: value, value: event.target.value });
         }}
@@ -321,7 +324,7 @@ function TopNTopicsControl({
   };
 
   return (
-    <div className="grid gap-1 text-xs text-muted-foreground">
+    <div className="grid gap-1 text-label-secondary text-description">
       <div className="flex items-center gap-1.5">
         <label htmlFor="topic-top-n" className="font-medium">
           Top topics per document
@@ -331,7 +334,7 @@ function TopNTopicsControl({
             <button
               type="button"
               aria-label="About Top topics per document"
-              className="inline-flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="inline-flex size-5 shrink-0 items-center justify-center rounded-full text-description transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
             >
               <CircleHelp className="h-3.5 w-3.5" />
             </button>
@@ -351,7 +354,7 @@ function TopNTopicsControl({
         step={1}
         value={displayed}
         disabled={pending || !inclusion.adjustable}
-        className="h-9 w-full rounded-md border border-input bg-background px-2 text-right text-sm"
+        className="h-9 w-full rounded-md border border-input-border bg-editor px-2 text-right text-body"
         onChange={(event) => {
           setDraft({ source: applied, value: event.target.value });
         }}
@@ -459,7 +462,7 @@ export function TopicModelingResultsPanel({
           />
         ) : null}
 
-        {isErrorState ? <p className="text-sm text-muted-foreground">{error}</p> : null}
+        {isErrorState ? <p className="text-body text-description">{error}</p> : null}
 
         {isSuccessfulState ? (
           <div className="relative" aria-busy={projectionPending}>
@@ -476,7 +479,7 @@ export function TopicModelingResultsPanel({
               <div className="space-y-4">
                 {truncationWarning ? (
                   <p
-                    className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
+                    className="rounded-md border border-warning bg-warning-background px-3 py-2 text-body text-warning"
                     role="status"
                   >
                     {truncationWarning}
@@ -505,16 +508,16 @@ export function TopicModelingResultsPanel({
                     <div className="flex w-full flex-col gap-3">
                       <section
                         aria-labelledby="topic-result-settings-heading"
-                        className="rounded-lg border border-border/70 bg-muted/20 p-3"
+                        className="rounded-lg border border-surface-border/70 bg-panel/20 p-3"
                       >
                         <div className="mb-4 flex items-center justify-between gap-3">
                           <h3
                             id="topic-result-settings-heading"
-                            className="text-sm font-medium text-foreground"
+                            className="text-body font-medium text-foreground"
                           >
                             Result settings
                           </h3>
-                          <span className="rounded-full border bg-background px-2.5 py-1 text-xs tabular-nums text-muted-foreground">
+                          <span className="rounded-full border bg-editor px-2.5 py-1 text-label-secondary tabular-nums text-description">
                             Topics ({topics.length})
                           </span>
                         </div>
@@ -523,7 +526,7 @@ export function TopicModelingResultsPanel({
                           <section aria-labelledby="topic-structure-settings" className="space-y-2">
                             <h4
                               id="topic-structure-settings"
-                              className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                              className="text-label-secondary font-semibold uppercase tracking-wide text-description"
                             >
                               Topic structure
                             </h4>
@@ -556,7 +559,7 @@ export function TopicModelingResultsPanel({
                           <section aria-labelledby="topic-word-settings" className="space-y-2">
                             <h4
                               id="topic-word-settings"
-                              className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                              className="text-label-secondary font-semibold uppercase tracking-wide text-description"
                             >
                               Representative words
                             </h4>
@@ -611,9 +614,9 @@ export function TopicModelingResultsPanel({
               <div
                 role="status"
                 aria-live="polite"
-                className="absolute inset-0 z-20 flex items-center justify-center rounded-lg bg-muted/45 backdrop-blur-[1px]"
+                className="absolute inset-0 z-20 flex items-center justify-center rounded-lg bg-panel/45"
               >
-                <div className="flex items-center gap-2 rounded-md border bg-background px-4 py-3 text-sm font-medium shadow-sm">
+                <div className="flex items-center gap-2 rounded-md border bg-editor px-4 py-3 text-body font-medium">
                   <LoaderCircle className="size-5 animate-spin" aria-hidden="true" />
                   Updating topics…
                 </div>

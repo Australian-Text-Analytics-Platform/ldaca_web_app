@@ -130,7 +130,7 @@ export function ConcordanceRowsTable({
 }: Props) {
   return (
     <Table className="min-w-180" disableContainer>
-      <TableHeader className="bg-gray-50 sticky top-0 z-10">
+      <TableHeader className="bg-panel sticky top-0 z-10">
         {table.getHeaderGroups().map((headerGroup) => (
           <TableRow key={headerGroup.id}>
             {headerGroup.headers.map((header) => renderHeader(header))}
@@ -143,7 +143,7 @@ export function ConcordanceRowsTable({
         ) : rows.length === 0 ? (
           <TableRow>
             <TableCell
-              className="h-24 text-center text-muted-foreground"
+              className="h-24 text-center text-description"
               colSpan={tableColumns.length || 1}
             >
               No matching rows on this page for &quot;{searchWord}&quot;. Source rows without
@@ -206,7 +206,7 @@ export function ConcordancePlainHeader({
   return (
     <TableHead
       key={header.id}
-      className={`px-3 py-2 text-xs font-medium uppercase tracking-wider text-gray-500 ${alignmentClassForColumn(header.column.id) || 'text-left'}`}
+      className={`px-3 py-2 text-label-secondary font-medium uppercase tracking-wider text-description ${alignmentClassForColumn(header.column.id) || 'text-left'}`}
     >
       <DisabledReasonTooltip reason={hint} side="bottom">
         <span>{header.column.id}</span>

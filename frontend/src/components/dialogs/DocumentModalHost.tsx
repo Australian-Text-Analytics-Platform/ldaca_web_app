@@ -21,17 +21,17 @@ const DOCUMENT_PRESENTATION: Record<
   tutorial: {
     docType: 'tutorial',
     title: 'Tutorial',
-    spinnerColor: 'border-blue-600',
+    spinnerColor: 'border-button',
   },
   info: {
     docType: 'information',
     title: 'Information',
-    spinnerColor: 'border-blue-500',
+    spinnerColor: 'border-info',
   },
   reference: {
     docType: 'reference',
     title: 'Reference',
-    spinnerColor: 'border-emerald-600',
+    spinnerColor: 'border-[var(--vscode-charts-green)]',
   },
 };
 

@@ -3,6 +3,11 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import WorkspaceNodeList from '../WorkspaceNodeList';
+import {
+  GREY,
+  VIZ_LIGHT_FOREGROUND,
+  foregroundForVizColor,
+} from '@/features/views/common/vizPalette';
 import { usePinnedNodesStore } from '@/stores/pinnedNodesStore';
 
 /** Minimal node fixture used to verify row activation and display-name behavior. */
@@ -66,7 +71,7 @@ describe('WorkspaceNodeList', () => {
     expect(onToggleNodeSelection).toHaveBeenCalledTimes(3);
   });
 
-  it('paints a left accent from the node color while keeping the label legible', () => {
+  it('uses the saturated node color as the identity surface with legible text', () => {
     render(
       <WorkspaceNodeList
         workspaceId="workspace-1"
@@ -77,17 +82,18 @@ describe('WorkspaceNodeList', () => {
       />,
     );
 
-    const accentBox = screen.getByTestId('workspace-node-row-node-1');
-    expect(accentBox).toHaveStyle({ borderLeftWidth: '4px' });
-    expect(accentBox.style.borderLeftColor).not.toBe('');
-    // The name is a sibling of the accent border, never overlaid by it.
-    expect(screen.getByText('Corpus')).toBeInTheDocument();
-    expect(screen.getByTestId('node-name-left-fade').style.backgroundImage).toContain(
-      accentBox.style.backgroundColor,
+    const identitySurface = screen.getByTestId('workspace-node-row-node-1');
+    expect(identitySurface).toHaveStyle({
+      backgroundColor: '#2563eb',
+      color: VIZ_LIGHT_FOREGROUND,
+    });
+    expect(identitySurface.style.borderLeftWidth).toBe('');
+    expect(screen.getByTestId('data-block-name-head-fade').style.backgroundImage).toContain(
+      identitySurface.style.backgroundColor,
     );
   });
 
-  it('defaults an uncoloured node to a grey spine and a background fill', () => {
+  it('defaults an uncoloured node to a saturated grey identity surface', () => {
     render(
       <WorkspaceNodeList
         workspaceId="workspace-1"
@@ -98,12 +104,32 @@ describe('WorkspaceNodeList', () => {
       />,
     );
 
-    // Un-analysed blocks default to grey: a 4px left spine plus a light fill,
-    // rather than no accent at all.
-    const accentBox = screen.getByTestId('workspace-node-row-node-1');
-    expect(accentBox).toHaveStyle({ borderLeftWidth: '4px' });
-    expect(accentBox.style.borderLeftColor).not.toBe('');
-    expect(accentBox.style.backgroundColor).not.toBe('');
+    const identitySurface = screen.getByTestId('workspace-node-row-node-1');
+    expect(identitySurface).toHaveStyle({
+      backgroundColor: GREY,
+      color: foregroundForVizColor(GREY),
+    });
+    expect(identitySurface.style.borderLeftWidth).toBe('');
+  });
+
+  it('uses one detached inverse-neutral outline for selection', () => {
+    render(
+      <WorkspaceNodeList
+        workspaceId="workspace-1"
+        nodes={nodes}
+        selectedNodeIds={['node-1']}
+        {...defaultRowActions}
+        onToggleNodeSelection={vi.fn()}
+      />,
+    );
+
+    const selectedSurface = screen.getByTestId('workspace-node-row-node-1');
+    expect(selectedSurface).toHaveClass(
+      'outline-2',
+      'outline-offset-2',
+      'outline-data-block-selection',
+    );
+    expect(selectedSurface).not.toHaveClass('ring-focus/20');
   });
 
   it('groups pinned nodes before selected non-pinned nodes and regular nodes', () => {
@@ -184,8 +210,11 @@ describe('WorkspaceNodeList', () => {
 
     expect(within(pinVisibility).getByRole('button', { name: 'Unpin Beta' })).toBeInTheDocument();
     expect(hoverToolbar).toHaveClass('opacity-0');
+    expect(hoverToolbar).toHaveClass('invisible');
     expect(hoverToolbar).toHaveClass('left-1');
     expect(hoverToolbar).not.toHaveClass('right-1');
+    expect(hoverToolbar).not.toHaveClass('rounded-md', 'bg-surface', 'p-0.5');
+    expect(pinVisibility).toHaveClass('group-focus-within/row:invisible');
   });
 
   it('lets hover-revealed row actions receive pointer clicks', () => {
@@ -209,9 +238,14 @@ describe('WorkspaceNodeList', () => {
 
     expect(hoverToolbar).toHaveClass('pointer-events-none');
     expect(hoverToolbar).toHaveClass('group-hover/row:!pointer-events-auto');
+    expect(hoverToolbar).toHaveClass(
+      'group-focus-within/row:visible',
+      'group-focus-within/row:!pointer-events-auto',
+      'group-focus-within/row:opacity-100',
+    );
   });
 
-  it('right-aligns long data-block names and fades the left edge for leading actions', () => {
+  it('keeps long-name suffixes on one line and fades the clipped head', () => {
     render(
       <WorkspaceNodeList
         workspaceId="workspace-1"
@@ -229,12 +263,15 @@ describe('WorkspaceNodeList', () => {
 
     const row = screen.getByRole('button', { name: `Select ${longNodeName}` });
     const label = within(row).getByText(longNodeName);
+    const nameViewport = within(row).getByTestId('data-block-name');
 
-    expect(label).toHaveClass('text-right');
+    expect(label).toHaveClass('whitespace-nowrap');
     expect(label).not.toHaveClass('truncate');
+    expect(nameViewport).toHaveStyle({ maxHeight: '1lh' });
 
-    const fade = within(row).getByTestId('node-name-left-fade');
+    const fade = within(row).getByTestId('data-block-name-head-fade');
     expect(fade).toHaveClass('left-0');
-    expect(fade).toHaveClass('group-hover/row:w-32');
+    expect(fade).not.toHaveClass('right-0');
+    expect(fade).toHaveClass('group-hover/row:w-28');
   });
 });

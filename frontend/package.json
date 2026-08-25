@@ -78,8 +78,11 @@
   "scripts": {
     "dev": "vite",
     "dev:tauri": "vite --host 0.0.0.0 --port 3001 --strictPort",
-    "build": "tsc --noEmit && vite build && node scripts/verify-build.mjs",
+    "build": "pnpm theme:check && pnpm theme:audit && tsc --noEmit && vite build && node scripts/verify-build.mjs",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck:tooling && pnpm test && pnpm knip && pnpm build && pnpm docs:check && pnpm versions:check",
+    "theme:generate": "node scripts/generate-vscode-theme.mjs",
+    "theme:check": "node scripts/generate-vscode-theme.mjs --check",
+    "theme:audit": "node scripts/check-theme-contract.mjs",
     "preview": "vite preview",
     "openapi:schema": "cd ../backend && uv run python scripts/export_openapi.py --output ../frontend/openapi/ldaca-wordflow.openapi.json",
     "openapi:generate": "pnpm openapi:schema && openapi-ts -f openapi.config.ts",

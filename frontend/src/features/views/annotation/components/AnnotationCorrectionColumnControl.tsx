@@ -49,10 +49,10 @@ export function AnnotationCorrectionColumnControl({
         ]}
         disabled={disabled || availableColumns === null}
         ariaLabel="Correction column"
-        triggerPrefix={<span className="mr-1 shrink-0 text-muted-foreground">Correction:</span>}
+        triggerPrefix={<span className="mr-1 shrink-0 text-description">Correction:</span>}
         searchPlaceholder="Filter columns… (* and ? wildcards)"
         emptyMessage="No matching columns"
-        triggerClassName="h-8 w-auto min-w-36 text-sm"
+        triggerClassName="h-8 w-auto min-w-36 text-body"
         onChange={(next) => {
           if (next === CREATE_CORRECTION_COLUMN) {
             onCreate();

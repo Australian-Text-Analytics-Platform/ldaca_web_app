@@ -22,13 +22,13 @@ const CONFIG: Record<DocLinkKind, DocLinkConfig> = {
   tutorial: {
     Icon: CircleHelp,
     defaultLabel: 'Learn more',
-    defaultClassName: 'h-6 w-6 text-muted-foreground',
+    defaultClassName: 'h-6 w-6 text-description',
     missingMessage: 'No anchor found for this help item.',
   },
   info: {
     Icon: Info,
     defaultLabel: 'More info',
-    defaultClassName: 'h-6 w-6 text-blue-500',
+    defaultClassName: 'h-6 w-6 text-link',
     missingMessage: 'No anchor found for this information item.',
   },
   reference: {

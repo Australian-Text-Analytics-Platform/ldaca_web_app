@@ -17,12 +17,14 @@ import { isTabbedMainView } from '@/features/views/viewRegistry';
 import { GuidanceProvider } from '@/features/guidance/GuidanceProvider';
 import { NodeInputPointerCarrier } from '@/components/layout/NodeInputPointerCarrier';
 import { ResizeHandle } from '@/components/layout/ResizeHandle';
+import { AccountThemeSynchronizer } from '@/features/theme/AccountThemeSynchronizer';
 
 const WorkspaceView = lazy(() => import('@/components/layout/WorkspaceView'));
 
 export function WorkspaceShell() {
   return (
     <QueryProvider>
+      <AccountThemeSynchronizer />
       <WorkspaceShellContent />
     </QueryProvider>
   );
@@ -56,7 +58,7 @@ function WorkspaceShellContent() {
         <ViewRouteSync />
         <ErrorBoundary>
           <SidebarProvider
-            className="bg-linear-to-br from-slate-50 to-blue-50"
+            className="bg-[var(--vscode-titleBar-activeBackground)]"
             style={{ ['--sidebar-width' as string]: `${String(sidebarWidth)}px` }}
           >
             <DocumentModalHost />
@@ -76,7 +78,7 @@ function WorkspaceShellContent() {
               />
 
               <SidebarInset className="@container/workspace-shell flex h-full flex-1 flex-col overflow-hidden bg-transparent md:m-0! md:ml-0! md:rounded-none! md:shadow-none!">
-                <header className="border-border/40 border-b bg-white px-4 py-3 md:hidden">
+                <header className="border-b bg-[var(--vscode-titleBar-activeBackground)] px-4 py-2 md:hidden">
                   <div className="flex items-center justify-between">
                     <SidebarTrigger />
                   </div>
@@ -102,8 +104,8 @@ function WorkspaceShellContent() {
                       }}
                       innerClassName={
                         isTabbedMain
-                          ? // Tabbed views own their card; strip the shared frame
-                            // (border/bg/shadow/padding) so tabs protrude above it.
+                          ? // Tabbed views own their continuous editor surface,
+                            // so strip the shared frame and padding.
                             'overflow-hidden border-0 bg-transparent p-0 shadow-none'
                           : 'overflow-y-auto scrollbar-none p-4'
                       }
@@ -141,7 +143,7 @@ function WorkspaceShellContent() {
                       <ErrorBoundary>
                         <Suspense
                           fallback={
-                            <div className="text-muted-foreground flex h-full items-center justify-center bg-white text-sm">
+                            <div className="flex h-full items-center justify-center bg-editor text-body text-description">
                               Loading workspace view…
                             </div>
                           }

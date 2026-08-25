@@ -100,7 +100,7 @@ export function FilePreviewContent({
         </DialogHeader>
         <Card className="flex w-full min-w-0 flex-col" style={{ maxHeight: cardMaxHeight }}>
           <CardHeader className="border-b px-6 py-4">
-            <CardTitle className="truncate text-lg font-semibold">
+            <CardTitle className="truncate text-heading-3 font-semibold">
               {title ?? `File${filename ? `: ${filename}` : ''}`}
             </CardTitle>
             <CardDescription>{description ?? ''}</CardDescription>
@@ -109,7 +109,7 @@ export function FilePreviewContent({
             {headerSlot}
             {fileType === 'excel' && sheetNames && sheetNames.length > 0 && (
               <div>
-                <label className="mb-2 block text-sm font-medium text-foreground">Sheet</label>
+                <label className="mb-2 block text-body font-medium text-foreground">Sheet</label>
                 <Select value={selectedSheet ?? ''} onValueChange={handleSheetChange}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select a sheet" />
@@ -122,26 +122,26 @@ export function FilePreviewContent({
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="mt-1 text-xs text-muted-foreground">
+                <p className="mt-1 text-label-secondary text-description">
                   The first sheet loads by default. Choose another to refresh the preview.
                 </p>
               </div>
             )}
             <div>
-              <label className="mb-2 block text-sm font-medium text-foreground">
+              <label className="mb-2 block text-body font-medium text-foreground">
                 Preview (first rows)
               </label>
-              <div className="max-h-60 w-full min-w-0 max-w-full overflow-x-auto overflow-y-auto rounded border border-border">
+              <div className="max-h-60 w-full min-w-0 max-w-full overflow-x-auto overflow-y-auto rounded-sm border border-surface-border">
                 {loading ? (
-                  <div className="p-4 text-sm text-muted-foreground">Loading…</div>
+                  <div className="p-4 text-body text-description">Loading…</div>
                 ) : error ? (
-                  <div className="p-4 text-sm text-destructive">{error}</div>
+                  <div className="p-4 text-body text-error">{error}</div>
                 ) : previewData.length === 0 ? (
-                  <div className="p-4 text-sm text-muted-foreground">No preview</div>
+                  <div className="p-4 text-body text-description">No preview</div>
                 ) : (
-                  <table className="min-w-max text-xs">
+                  <table className="min-w-max text-label-secondary">
                     <thead>
-                      <tr className="bg-muted">
+                      <tr className="bg-panel">
                         {columns.map((column) => (
                           <th key={column} className="px-2 py-1 text-left font-medium">
                             {column}
@@ -151,10 +151,7 @@ export function FilePreviewContent({
                     </thead>
                     <tbody>
                       {previewData.map((row, rowIndex) => (
-                        <tr
-                          key={rowIndex}
-                          className={rowIndex % 2 ? 'bg-muted/50' : 'bg-background'}
-                        >
+                        <tr key={rowIndex} className={rowIndex % 2 ? 'bg-panel/50' : 'bg-editor'}>
                           {columns.map((column) => (
                             <td
                               key={column}

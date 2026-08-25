@@ -22,6 +22,9 @@ flowchart LR
     LOCAL["Local form and panel state"] <--> FEATURES
     FEATURES --> UI["Shared components and Workspace surfaces"]
     QUERY --> PREFS["Account preferences"]
+    BOOT["Synchronous theme bootstrap cache"] --> THEME["VS Code theme runtime"]
+    PREFS -->|"successful account reconciliation"| THEME
+    THEME --> UI
     LOCAL --> ACKS["Per-user device acknowledgment history"]
     PREFS --> GUIDANCE["Guidance provider"]
     ACKS --> GUIDANCE
@@ -57,6 +60,19 @@ flowchart LR
 - `src/features/preferences/` reads and mutates synchronized account preferences
   through TanStack Query. Server preference data is never mirrored into
   Zustand.
+- `public/theme-bootstrap.js` applies the last-known `ldaca-color-theme-v1`
+  cache before the React bundle executes. `src/features/theme/` owns the only
+  live theme runtime and exposes the active `light-2026` or `dark-2026` value
+  through `useSyncExternalStore`. The local value prevents startup flicker;
+  after the preference query succeeds, TanStack Query's account value is
+  authoritative. No system, custom, high-contrast, `.dark`, or feature-flag
+  theme path exists.
+- `theme/vscode-2026.json` is the normalized source manifest pinned to VS Code
+  1.134.0 commit `474a349ad5b745e512ef86b864d1c74f7264dd7a`.
+  The offline generator owns `src/styles/vscode-2026.generated.css`; build
+  freshness and the theme source audit prevent manual generated-CSS edits,
+  legacy tokens, presentation palettes, and decorative elevation from
+  returning.
 - `src/features/provider-credentials/` owns the mode-specific Settings facade,
   the non-devtools multi-user provider-configuration store, and request-boundary
   credential injection. Components receive safe ordered configuration metadata
@@ -132,3 +148,10 @@ lag the backend and must not be used to infer the canonical backend surface.
 The project uses React Compiler. Manual memoization is reserved for
 identity-sensitive boundaries such as contexts, effects, React Flow, tables,
 and external-library adapters rather than routine render optimization.
+
+Live UI chrome, CodeMirror, React Flow, Recharts, Sonner, Joyride, Markdown,
+and OAuth presentation consume the semantic VS Code variables. Persisted Data
+Block and series colors retain identity across themes. Chart and image export
+renderers deliberately keep a white canvas and their stable export palette;
+brand and provider assets are likewise raw-color exceptions rather than theme
+tokens.

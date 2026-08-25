@@ -60,7 +60,7 @@ vi.mock('@xyflow/react', () => ({
  * Returns the visible settings button when portal/menu render duplicates occur.
  */
 const getLatestNodeSettingsButton = () => {
-  const buttons = screen.getAllByRole('button', { name: /node settings/i });
+  const buttons = screen.getAllByRole('button', { name: /data block actions/i });
   return buttons[buttons.length - 1] as HTMLButtonElement;
 };
 
@@ -121,7 +121,9 @@ describe('CustomNode', () => {
     render(<CustomNode {...props} />);
 
     await user.hover(screen.getByTitle('Corpus'));
-    fireEvent.click(screen.getByRole('button', { name: 'Add node to selection' }), {
+    const card = screen.getByTestId('custom-node-card');
+    expect(card).not.toHaveClass('ring-1', 'ring-inset', 'ring-focus');
+    fireEvent.click(screen.getByRole('button', { name: 'Add Data Block to selection' }), {
       clientX: 180,
       clientY: 220,
       detail: 1,
@@ -204,13 +206,13 @@ describe('CustomNode', () => {
     );
   });
 
-  it('paints a left color accent on the card when the node has a color', () => {
+  it('uses a saturated identity header and a detached selection outline', () => {
     mockZoom = 1;
     const props = {
       id: 'node-1',
       type: 'custom',
       data: nodeData({ color: '#2563eb' }),
-      selected: false,
+      selected: true,
       dragging: false,
       zIndex: 0,
       selectable: true,
@@ -224,11 +226,19 @@ describe('CustomNode', () => {
     render(<CustomNode {...props} />);
 
     const card = screen.getByTestId('custom-node-card');
-    expect(card).toHaveStyle({ borderLeftWidth: '6px' });
-    expect(card.style.borderLeftColor).not.toBe('');
+    const identityHeader = screen.getByTestId('custom-node-identity-header');
+    expect(card).toHaveClass(
+      'w-80',
+      'outline-2',
+      'outline-offset-2',
+      'outline-data-block-selection',
+    );
+    expect(card.style.borderLeftWidth).toBe('');
+    expect(identityHeader).toHaveStyle({ backgroundColor: '#2563eb', color: '#ffffff' });
+    expect(screen.getByTitle('Corpus')).toHaveStyle({ maxHeight: '3lh' });
   });
 
-  it('marks the rename input as non-draggable so React Flow does not intercept clicks', async () => {
+  it('opens the shared Data Block rename dialog from the full node menu', async () => {
     mockZoom = 1;
     const user = userEvent.setup();
     const props = {
@@ -255,14 +265,15 @@ describe('CustomNode', () => {
     fireEvent.click(getLatestNodeSettingsButton());
     await user.click(screen.getByRole('button', { name: 'Rename' }));
 
-    const renameInputs = screen.getAllByDisplayValue(
-      'sample_data/ADO/qldelection2020_samidata_tweets',
-    );
-    const renameInput = renameInputs[renameInputs.length - 1] as HTMLInputElement;
+    const dialog = screen.getByRole('alertdialog');
+    const renameInput = screen.getByRole('textbox', { name: 'New Data Block name' });
 
     await waitFor(() => expect(renameInput).toHaveFocus());
-    expect(renameInput).toHaveClass('nodrag');
-    expect(renameInput).toHaveClass('nopan');
+    expect(dialog).toHaveClass('w-[calc(100vw-2rem)]', 'min-w-0', 'max-w-lg');
+    expect(screen.getByRole('heading', { name: 'Rename Data Block' })).toBeInTheDocument();
+    expect(renameInput).toHaveValue('sample_data/ADO/qldelection2020_samidata_tweets');
+    expect(renameInput).toHaveClass('border-input-border', 'focus-visible:border-focus');
+    expect(renameInput).not.toHaveClass('focus:ring-blue-500');
   });
 
   it('keeps settings and delete controls visible in the zoomed-out node view', async () => {
@@ -301,11 +312,69 @@ describe('CustomNode', () => {
     expect(screen.queryByText(/Shape:/)).not.toBeInTheDocument();
     expect(getLatestNodeSettingsButton()).toBeInTheDocument();
 
+    const compactCard = screen.getByTestId('custom-node-compact-card');
+    expect(compactCard).toHaveStyle({ minWidth: '220px', maxWidth: '360px' });
+    expect(compactCard).toHaveClass(
+      'outline-2',
+      'outline-offset-2',
+      'outline-data-block-selection',
+    );
+    expect(screen.getByTitle('sample_data/ADO/qldelection2020_candidate_tweets')).toHaveStyle({
+      maxHeight: '3lh',
+    });
+    expect(screen.getByTitle('sample_data/ADO/qldelection2020_candidate_tweets')).toHaveClass(
+      'flex',
+      'flex-col',
+      'justify-end',
+    );
+    const compactHeadFade = screen.getByTestId('data-block-name-head-fade');
+    expect(compactHeadFade).toHaveClass('inset-x-0', 'top-0');
+
     fireEvent.click(getLatestNodeSettingsButton());
     expect(screen.getByRole('button', { name: 'Rename' })).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Delete' }));
     expect(screen.getByText(/This action cannot be undone/)).toBeInTheDocument();
+  });
+
+  it('renames from the zoomed-out node menu', async () => {
+    mockZoom = 0.59;
+    const user = userEvent.setup();
+    const onRename = vi.fn();
+    const name = 'sample_data/ADO/qldelection2020_candidate_tweets';
+
+    render(
+      <CustomNode
+        id="node-zoomed-out"
+        type="custom"
+        data={{
+          ...nodeData({ id: 'node-zoomed-out', name }),
+          onRename,
+        }}
+        selected={false}
+        dragging={false}
+        zIndex={0}
+        selectable
+        deletable
+        draggable
+        isConnectable
+        positionAbsoluteX={0}
+        positionAbsoluteY={0}
+      />,
+    );
+
+    await user.hover(screen.getByTitle(name));
+    fireEvent.click(getLatestNodeSettingsButton());
+    await user.click(screen.getByRole('button', { name: 'Rename' }));
+
+    const renameInput = await screen.findByRole('textbox', { name: 'New Data Block name' });
+    await waitFor(() => expect(renameInput).toHaveFocus());
+    expect(screen.getByRole('heading', { name: 'Rename Data Block' })).toBeInTheDocument();
+    await user.clear(renameInput);
+    await user.type(renameInput, 'Renamed Data Block{Enter}');
+
+    expect(onRename).toHaveBeenCalledWith('node-zoomed-out', 'Renamed Data Block');
+    expect(screen.queryByRole('textbox', { name: 'New Data Block name' })).not.toBeInTheDocument();
   });
 
   it('hides the node toolbar immediately when the pointer leaves the node', async () => {
@@ -340,7 +409,7 @@ describe('CustomNode', () => {
     expect(getLatestNodeSettingsButton()).toBeInTheDocument();
 
     await user.unhover(nodeLabel);
-    expect(screen.queryAllByRole('button', { name: /node settings/i })).toHaveLength(0);
+    expect(screen.queryAllByRole('button', { name: /data block actions/i })).toHaveLength(0);
   });
 
   it('counter-scales the fresh "new" dot so it stays a constant size when zoomed out', () => {

@@ -40,7 +40,7 @@ export function RenameInput({ column, disabled, onSubmit, onCancel }: RenameInpu
           onCancel();
         }
       }}
-      className="h-7 w-40 truncate text-xs"
+      className="h-7 w-40 truncate text-label-secondary"
       aria-label={`Rename column ${column}`}
     />
   );

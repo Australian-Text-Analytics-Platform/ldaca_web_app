@@ -53,7 +53,7 @@ export function ConcatSubTab(props: ConcatSubTabComponentProps) {
           {renderNodeInputsPanel?.()}
 
           {mismatches.length > 0 && (
-            <div className="space-y-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+            <div className="space-y-2 rounded-md border border-error/40 bg-error/10 p-3 text-body text-error">
               <div className="font-semibold">Schema mismatches detected:</div>
               <ul className="space-y-2">
                 {mismatches.map((mismatch) => (
@@ -62,7 +62,7 @@ export function ConcatSubTab(props: ConcatSubTabComponentProps) {
                     {mismatch.details.map((detail, idx) => (
                       <div
                         key={`concat-mismatch-${mismatch.nodeId}-${String(idx)}`}
-                        className="text-destructive"
+                        className="text-error"
                       >
                         {detail}
                       </div>
@@ -78,12 +78,12 @@ export function ConcatSubTab(props: ConcatSubTabComponentProps) {
               <Label>Schema status</Label>
               <HelpIcon targetKey="preprocessing.concat.schema-status" label="Schema status" />
             </div>
-            <div className="rounded-md border border-muted-foreground/40 bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+            <div className="rounded-md border border-surface-border-foreground/40 bg-panel/40 px-3 py-2 text-body text-description">
               {statusMessage}
             </div>
           </div>
 
-          <label className="flex items-center gap-2 text-sm">
+          <label className="flex items-center gap-2 text-body">
             <Checkbox
               id="concat-deduplicate"
               checked={form.deduplicate}

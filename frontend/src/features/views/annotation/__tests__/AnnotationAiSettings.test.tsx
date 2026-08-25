@@ -86,8 +86,8 @@ describe('AnnotationAiSettings', () => {
     const advancedSummary = screen.getByRole('button', { name: 'Advanced settings' });
     expect(within(advancedSummary).getByText('OpenRouter personal')).toHaveClass('font-medium');
     expect(within(advancedSummary).getByText('OpenRouter')).toHaveClass(
-      'text-xs',
-      'text-muted-foreground',
+      'text-label-secondary',
+      'text-description',
     );
 
     await user.click(screen.getByRole('button', { name: 'Advanced settings' }));
@@ -120,8 +120,8 @@ describe('AnnotationAiSettings', () => {
     const advancedSummary = screen.getByRole('button', { name: 'Advanced settings' });
     expect(within(advancedSummary).getByText('OpenRouter personal')).toHaveClass('font-medium');
     expect(within(advancedSummary).getByText('OpenRouter')).toHaveClass(
-      'text-xs',
-      'text-muted-foreground',
+      'text-label-secondary',
+      'text-description',
     );
     expect(screen.getByText('model-1')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Provider' })).not.toBeInTheDocument();

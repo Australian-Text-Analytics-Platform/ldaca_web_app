@@ -33,11 +33,11 @@ function CorpusRoleSwitch({
   onStudyNodeChange: (nodeId: string) => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-2 border-t border-border/60 pt-3">
+    <div className="flex flex-wrap items-center gap-2 border-t border-surface-border/60 pt-3">
       <span
         className={cn(
-          'whitespace-nowrap text-xs font-medium',
-          isStudy ? 'text-foreground' : 'text-muted-foreground',
+          'whitespace-nowrap text-label-secondary font-medium',
+          isStudy ? 'text-foreground' : 'text-description',
         )}
       >
         Study Corpus
@@ -52,8 +52,8 @@ function CorpusRoleSwitch({
       />
       <span
         className={cn(
-          'whitespace-nowrap text-xs font-medium',
-          isStudy ? 'text-muted-foreground' : 'text-foreground',
+          'whitespace-nowrap text-label-secondary font-medium',
+          isStudy ? 'text-description' : 'text-foreground',
         )}
       >
         Reference Corpus

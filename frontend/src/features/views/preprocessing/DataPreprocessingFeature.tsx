@@ -1,21 +1,7 @@
-import { lazy, Suspense, useState } from 'react';
 import { Calculator, Code2, Filter, Layers, Merge, Search, Shuffle } from 'lucide-react';
-import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
-import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
-import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
-import { useGuidance } from '@/features/guidance/GuidanceContext';
-import { CONTEXTUAL_HINT_IDS } from '@/features/guidance/registry';
-import { useProgressiveContextualHints } from '@/features/guidance/useProgressiveContextualHints';
-import { NodeInputsPanel } from '@/features/views/common/components/NodeInputsPanel';
-import type { NodeSelectionRenderArgs } from '@/features/views/common/components/NodeSelectionList';
-import { useTabNodeInputs } from '@/features/views/common/nodeInputs';
-import { DEFAULT_TAB_INPUT_SET_ID } from '@/features/views/common/tabs/tabStateOps';
-import {
-  preprocessingInputsKey,
-  usePreprocessingInputsStore,
-} from '@/stores/preprocessingInputsStore';
-import { useAuthStore } from '@/stores/authStore';
-import { isArrowStringField } from '@/lib/arrow/arrowTable';
+import { lazy, Suspense, useState } from 'react';
+import InfoIcon from '@/components/help/InfoIcon';
+import { type EditorTabItem, EditorTabs } from '@/components/tabs';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,24 +11,97 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tabs, TabsContent } from '@/components/ui/tabs';
+import { useGuidance } from '@/features/guidance/GuidanceContext';
+import { CONTEXTUAL_HINT_IDS } from '@/features/guidance/registry';
+import { useProgressiveContextualHints } from '@/features/guidance/useProgressiveContextualHints';
+import { NodeInputsPanel } from '@/features/views/common/components/NodeInputsPanel';
+import type { NodeSelectionRenderArgs } from '@/features/views/common/components/NodeSelectionList';
+import { useTabNodeInputs } from '@/features/views/common/nodeInputs';
+import { DEFAULT_TAB_INPUT_SET_ID } from '@/features/views/common/tabs/tabStateOps';
+import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
+import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
+import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
+import { isArrowStringField } from '@/lib/arrow/arrowTable';
+import { useAuthStore } from '@/stores/authStore';
+import {
+  preprocessingInputsKey,
+  usePreprocessingInputsStore,
+} from '@/stores/preprocessingInputsStore';
+import { AggregateSubTab } from './aggregate/AggregateSubTab';
+import { PreprocessingApplyModeControl } from './components/PreprocessingApplyModeControl';
+import { ConcatSubTab } from './concat/ConcatSubTab';
 import { FilterSubTab } from './filter/FilterSubTab';
 import { JoinSubTab } from './join/JoinSubTab';
-import { ConcatSubTab } from './concat/ConcatSubTab';
-import { SliceSubTab } from './slice/SliceSubTab';
-import { AggregateSubTab } from './aggregate/AggregateSubTab';
-import { ReplaceSubTab } from './replace/ReplaceSubTab';
-import { PreprocessingApplyModeControl } from './components/PreprocessingApplyModeControl';
-import InfoIcon from '@/components/help/InfoIcon';
-import { MAX_CONCAT_NODES, MAX_JOIN_NODES } from './types';
 import {
   CREATE_DATA_BLOCK_MODE,
   EDITABLE_PREPROCESSING_TABS,
   type PreprocessingApplyMode,
 } from './preprocessingApplyMode';
+import { ReplaceSubTab } from './replace/ReplaceSubTab';
+import { SliceSubTab } from './slice/SliceSubTab';
+import { MAX_CONCAT_NODES, MAX_JOIN_NODES } from './types';
 
 type DataPrepSubtab = 'filter' | 'slice' | 'join' | 'concat' | 'find' | 'aggregate' | 'expression';
+
+const PREPROCESSING_TABS: EditorTabItem[] = [
+  {
+    id: 'filter',
+    title: 'Filter',
+    icon: <Filter className="size-4" />,
+    tabDomId: 'preprocessing-tab-filter',
+    panelDomId: 'preprocessing-panel-filter',
+    'data-guidance': 'preprocessing-operation-filter',
+  },
+  {
+    id: 'slice',
+    title: 'Sample',
+    icon: <Shuffle className="size-4" />,
+    tabDomId: 'preprocessing-tab-slice',
+    panelDomId: 'preprocessing-panel-slice',
+    'data-guidance': 'preprocessing-operation-sample',
+  },
+  {
+    id: 'join',
+    title: 'Join',
+    icon: <Merge className="size-4" />,
+    tabDomId: 'preprocessing-tab-join',
+    panelDomId: 'preprocessing-panel-join',
+    'data-guidance': 'preprocessing-operation-join',
+  },
+  {
+    id: 'concat',
+    title: 'Stack',
+    icon: <Layers className="size-4" />,
+    tabDomId: 'preprocessing-tab-concat',
+    panelDomId: 'preprocessing-panel-concat',
+    'data-guidance': 'preprocessing-operation-stack',
+  },
+  {
+    id: 'find',
+    title: 'Find',
+    icon: <Search className="size-4" />,
+    tabDomId: 'preprocessing-tab-find',
+    panelDomId: 'preprocessing-panel-find',
+    'data-guidance': 'preprocessing-operation-find',
+  },
+  {
+    id: 'aggregate',
+    title: 'Create',
+    icon: <Calculator className="size-4" />,
+    tabDomId: 'preprocessing-tab-aggregate',
+    panelDomId: 'preprocessing-panel-aggregate',
+    'data-guidance': 'preprocessing-operation-create',
+  },
+  {
+    id: 'expression',
+    title: 'Expression',
+    icon: <Code2 className="size-4" />,
+    tabDomId: 'preprocessing-tab-expression',
+    panelDomId: 'preprocessing-panel-expression',
+    'data-guidance': 'preprocessing-operation-expression',
+  },
+];
 
 const EMPTY_PREPROCESSING_INPUTS: [] = [];
 
@@ -54,7 +113,7 @@ const TypedExpressionSubTab = lazy(() =>
 
 /** Shown only while the CodeMirror-backed expression subtab chunk is loading. */
 const PolarsExpressionFallback = () => (
-  <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+  <div className="rounded-md border border-surface-border/60 bg-panel/30 px-3 py-2 text-body text-description">
     Loading expression editor...
   </div>
 );
@@ -285,7 +344,7 @@ function DataPreprocessingFeature() {
               tooltip="Learn what data preprocessing is and how it can help you."
             />
           </div>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-body text-description">
             Prepare your dataset with filtering, sampling, join, stack, find, and create tools.
           </p>
         </div>
@@ -298,52 +357,25 @@ function DataPreprocessingFeature() {
         }}
         className="space-y-4"
       >
-        <ScrollArea
-          data-testid="preprocessing-tabs-scroll-area"
-          scrollbars="horizontal"
-          type="always"
-          className="h-12 w-full"
-        >
-          <TabsList
-            aria-label="Data preprocessing sub-views"
-            className="flex w-max flex-nowrap justify-start gap-2"
-          >
-            <TabsTrigger data-guidance="preprocessing-operation-filter" value="filter">
-              <Filter className="mr-1.5 h-4 w-4" />
-              Filter
-            </TabsTrigger>
-            <TabsTrigger data-guidance="preprocessing-operation-sample" value="slice">
-              <Shuffle className="mr-1.5 h-4 w-4" />
-              Sample
-            </TabsTrigger>
-            <TabsTrigger data-guidance="preprocessing-operation-join" value="join">
-              <Merge className="mr-1.5 h-4 w-4" />
-              Join
-            </TabsTrigger>
-            <TabsTrigger data-guidance="preprocessing-operation-stack" value="concat">
-              <Layers className="mr-1.5 h-4 w-4" />
-              Stack
-            </TabsTrigger>
-            <TabsTrigger data-guidance="preprocessing-operation-find" value="find">
-              <Search className="mr-1.5 h-4 w-4" />
-              Find
-            </TabsTrigger>
-            <TabsTrigger data-guidance="preprocessing-operation-create" value="aggregate">
-              <Calculator className="mr-1.5 h-4 w-4" />
-              Create
-            </TabsTrigger>
-            <TabsTrigger data-guidance="preprocessing-operation-expression" value="expression">
-              <Code2 className="mr-1.5 h-4 w-4" />
-              Expression
-            </TabsTrigger>
-          </TabsList>
-        </ScrollArea>
+        <EditorTabs
+          aria-label="Data preprocessing sub-views"
+          tabs={PREPROCESSING_TABS}
+          activeTabId={activeSubtab}
+          onActivate={(id) => {
+            setActiveSubtab(id as DataPrepSubtab);
+          }}
+        />
 
         {supportsUpdateMode && (
           <PreprocessingApplyModeControl value={applyMode} onChange={setApplyMode} />
         )}
 
-        <TabsContent value="filter" className="space-y-4">
+        <TabsContent
+          id="preprocessing-panel-filter"
+          aria-labelledby="preprocessing-tab-filter"
+          value="filter"
+          className="space-y-4"
+        >
           <FilterSubTab
             renderNodeInputsPanel={renderNodeInputsPanel}
             selectedNodeId={selectedNodeId}
@@ -358,7 +390,12 @@ function DataPreprocessingFeature() {
           />
         </TabsContent>
 
-        <TabsContent value="slice" className="space-y-4">
+        <TabsContent
+          id="preprocessing-panel-slice"
+          aria-labelledby="preprocessing-tab-slice"
+          value="slice"
+          className="space-y-4"
+        >
           <SliceSubTab
             renderNodeInputsPanel={renderNodeInputsPanel}
             currentWorkspaceId={currentWorkspaceId}
@@ -371,7 +408,12 @@ function DataPreprocessingFeature() {
           />
         </TabsContent>
 
-        <TabsContent value="join" className="space-y-4">
+        <TabsContent
+          id="preprocessing-panel-join"
+          aria-labelledby="preprocessing-tab-join"
+          value="join"
+          className="space-y-4"
+        >
           <JoinSubTab
             renderNodeInputsPanel={renderNodeInputsPanel}
             selectedNodeIds={selectedNodeIds}
@@ -389,7 +431,12 @@ function DataPreprocessingFeature() {
           />
         </TabsContent>
 
-        <TabsContent value="concat" className="space-y-4">
+        <TabsContent
+          id="preprocessing-panel-concat"
+          aria-labelledby="preprocessing-tab-concat"
+          value="concat"
+          className="space-y-4"
+        >
           <ConcatSubTab
             renderNodeInputsPanel={renderNodeInputsPanel}
             selectedNodeIds={selectedNodeIds}
@@ -403,7 +450,12 @@ function DataPreprocessingFeature() {
           />
         </TabsContent>
 
-        <TabsContent value="find" className="space-y-4">
+        <TabsContent
+          id="preprocessing-panel-find"
+          aria-labelledby="preprocessing-tab-find"
+          value="find"
+          className="space-y-4"
+        >
           <ReplaceSubTab
             renderNodeInputsPanel={renderNodeInputsPanel}
             currentWorkspaceId={currentWorkspaceId}
@@ -419,7 +471,12 @@ function DataPreprocessingFeature() {
           />
         </TabsContent>
 
-        <TabsContent value="aggregate" className="space-y-4">
+        <TabsContent
+          id="preprocessing-panel-aggregate"
+          aria-labelledby="preprocessing-tab-aggregate"
+          value="aggregate"
+          className="space-y-4"
+        >
           <AggregateSubTab
             renderNodeInputsPanel={renderNodeInputsPanel}
             currentWorkspaceId={currentWorkspaceId}
@@ -434,7 +491,12 @@ function DataPreprocessingFeature() {
           />
         </TabsContent>
 
-        <TabsContent value="expression" className="space-y-4">
+        <TabsContent
+          id="preprocessing-panel-expression"
+          aria-labelledby="preprocessing-tab-expression"
+          value="expression"
+          className="space-y-4"
+        >
           <Suspense fallback={<PolarsExpressionFallback />}>
             <TypedExpressionSubTab
               renderNodeInputsPanel={renderNodeInputsPanel}

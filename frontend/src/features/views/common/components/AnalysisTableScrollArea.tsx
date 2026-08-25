@@ -38,7 +38,7 @@ interface AnalysisTableFrameProps extends AnalysisTableScrollAreaProps {
 }
 
 /**
- * Adds the standard rounded/bordered analysis table shell around
+ * Adds the standard rounded-sm/bordered analysis table shell around
  * AnalysisTableScrollArea.
  * Used by: Annotation preview/Review and Concordance/Quotation result blocks
  * because those views need the same clipped border boundary around scrollable
@@ -54,7 +54,7 @@ export const AnalysisTableFrame = ({
   viewportRef,
 }: AnalysisTableFrameProps) => (
   <div
-    className={cn('overflow-hidden rounded-lg border border-border bg-card', className)}
+    className={cn('overflow-hidden rounded-lg border border-surface-border bg-surface', className)}
     style={style}
   >
     <AnalysisTableScrollArea

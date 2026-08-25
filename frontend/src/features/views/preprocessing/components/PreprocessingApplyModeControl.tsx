@@ -16,11 +16,11 @@ export function PreprocessingApplyModeControl({
 }: PreprocessingApplyModeControlProps) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <span className="text-sm font-medium text-foreground">Apply result as</span>
+      <span className="text-body font-medium text-foreground">Apply result as</span>
       <div
         role="group"
         aria-label="Apply result as"
-        className="inline-flex rounded-md border border-input bg-background p-0.5"
+        className="inline-flex rounded-md border border-input-border bg-editor p-0.5"
       >
         <Button
           type="button"

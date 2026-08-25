@@ -253,6 +253,7 @@ export function MultiSeriesChart({
 
   const xAxisElement = (
     <XAxis
+      stroke="var(--vscode-charts-foreground)"
       dataKey={xKey}
       type={xAxisType}
       domain={xAxis?.domain}
@@ -265,7 +266,9 @@ export function MultiSeriesChart({
       minTickGap={xAxis?.minTickGap}
     />
   );
-  const yAxisElement = <YAxis allowDecimals={yAxis?.allowDecimals} />;
+  const yAxisElement = (
+    <YAxis stroke="var(--vscode-charts-foreground)" allowDecimals={yAxis?.allowDecimals} />
+  );
 
   const heightStyle = typeof height === 'number' ? { height: `${String(height)}px` } : { height };
   const initialChartHeight = typeof height === 'number' ? height : 240;
@@ -278,7 +281,7 @@ export function MultiSeriesChart({
       <ChartContainer config={chartConfig} className={containerClass}>
         {showOverflowWarning && (
           <div
-            className="mb-2 flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900"
+            className="mb-2 flex items-start gap-2 rounded-md border border-warning bg-warning-background px-3 py-2 text-label-secondary text-warning"
             role="status"
           >
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
@@ -301,7 +304,7 @@ export function MultiSeriesChart({
           >
             {chartType === 'bar' ? (
               <BarChart data={data as never} margin={margin} onClick={handleChartClick as never}>
-                <CartesianGrid strokeDasharray="3 3" />
+                <CartesianGrid stroke="var(--vscode-charts-lines)" strokeDasharray="3 3" />
                 {xAxisElement}
                 {yAxisElement}
                 {tooltipElement}
@@ -330,7 +333,7 @@ export function MultiSeriesChart({
               </BarChart>
             ) : chartType === 'area' ? (
               <AreaChart data={data as never} margin={margin} onClick={handleChartClick as never}>
-                <CartesianGrid strokeDasharray="3 3" />
+                <CartesianGrid stroke="var(--vscode-charts-lines)" strokeDasharray="3 3" />
                 {xAxisElement}
                 {yAxisElement}
                 {tooltipElement}
@@ -354,7 +357,7 @@ export function MultiSeriesChart({
               </AreaChart>
             ) : (
               <LineChart data={data as never} margin={margin} onClick={handleChartClick as never}>
-                <CartesianGrid strokeDasharray="3 3" />
+                <CartesianGrid stroke="var(--vscode-charts-lines)" strokeDasharray="3 3" />
                 {xAxisElement}
                 {yAxisElement}
                 {tooltipElement}

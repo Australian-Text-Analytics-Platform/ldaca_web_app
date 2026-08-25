@@ -306,14 +306,14 @@ export function WorkspaceTable({
         );
       },
       meta: {
-        headerClassName: 'whitespace-nowrap border-r border-border/70 px-2 py-2 text-left',
+        headerClassName: 'whitespace-nowrap border-r border-surface-border/70 px-2 py-2 text-left',
         headerMaxWidth: isWideColumn
           ? isCollapsedColumn
             ? COLLAPSED_COLUMN_MAX_WIDTH
             : EXPANDED_COLUMN_MAX_WIDTH
           : undefined,
         cellClassName:
-          'whitespace-nowrap border-r border-border/60 px-2 py-1.5 text-sm text-foreground',
+          'whitespace-nowrap border-r border-surface-border/60 px-2 py-1.5 text-body text-foreground',
         cellMaxWidth: isWideColumn
           ? isCollapsedColumn
             ? COLLAPSED_COLUMN_MAX_WIDTH
@@ -396,16 +396,10 @@ export function WorkspaceTable({
     if (variant === 'header') style.top = 0;
     if (pinState === 'left') {
       style.left = `${String(col.getStart('left'))}px`;
-      style.boxShadow =
-        variant === 'header'
-          ? '2px 0 0 -1px rgba(15, 23, 42, 0.12)'
-          : '2px 0 0 -1px rgba(15, 23, 42, 0.08)';
+      style.boxShadow = '2px 0 0 -1px var(--vscode-surface-border)';
     } else {
       style.right = `${String(col.getStart('right'))}px`;
-      style.boxShadow =
-        variant === 'header'
-          ? '-2px 0 0 -1px rgba(15, 23, 42, 0.12)'
-          : '-2px 0 0 -1px rgba(15, 23, 42, 0.08)';
+      style.boxShadow = '-2px 0 0 -1px var(--vscode-surface-border)';
     }
     return style;
   };
@@ -417,8 +411,8 @@ export function WorkspaceTable({
     return (
       <div className="flex items-center justify-center py-12">
         <div className="flex items-center space-x-3">
-          <Loader2 className="h-6 w-6 animate-spin text-primary" />
-          <span className="text-sm font-medium text-muted-foreground">Loading data...</span>
+          <Loader2 className="h-6 w-6 animate-spin text-link" />
+          <span className="text-body font-medium text-description">Loading data...</span>
         </div>
       </div>
     );
@@ -427,9 +421,9 @@ export function WorkspaceTable({
   return (
     <>
       <div className="flex h-full w-full flex-col min-h-0">
-        <ScrollArea viewportRef={viewportRef} scrollbars="both" className="flex-1 bg-white">
+        <ScrollArea viewportRef={viewportRef} scrollbars="both" className="flex-1 bg-surface">
           <Table disableContainer className="w-max table-auto">
-            <TableHeader className="sticky top-0 z-20 bg-muted">
+            <TableHeader className="sticky top-0 z-20 bg-panel">
               {tableInstance.getHeaderGroups().map((hg) => (
                 <TableRow key={hg.id}>
                   {hg.headers.map((header) => {
@@ -440,7 +434,7 @@ export function WorkspaceTable({
                         className={cn(
                           meta?.headerClassName,
                           'h-8 px-1 py-1 last:border-r-0',
-                          header.column.getIsPinned() ? 'bg-muted shadow-sm' : 'bg-muted',
+                          header.column.getIsPinned() ? 'bg-panel' : 'bg-panel',
                         )}
                         style={{
                           ...(meta?.headerMinWidth
@@ -471,11 +465,11 @@ export function WorkspaceTable({
                 </TableRow>
               ))}
             </TableHeader>
-            <TableBody className="divide-y divide-border/60 bg-white">
+            <TableBody className="divide-y divide-border/60 bg-surface">
               {tableRows.map((row) => (
                 <TableRow
                   key={row.id}
-                  className="cursor-pointer transition-colors duration-150 hover:bg-muted/40 [&>td]:px-1 [&>td]:py-1"
+                  className="cursor-pointer transition-colors duration-150 hover:bg-panel/40 [&>td]:px-1 [&>td]:py-1"
                   onClick={() => {
                     const detailTextColumn =
                       documentColumn &&
@@ -493,7 +487,7 @@ export function WorkspaceTable({
                         className={cn(
                           meta?.cellClassName,
                           'last:border-r-0',
-                          cell.column.getIsPinned() ? 'bg-white' : undefined,
+                          cell.column.getIsPinned() ? 'bg-surface' : undefined,
                         )}
                         style={{
                           ...(meta?.cellMinWidth
@@ -525,7 +519,7 @@ export function WorkspaceTable({
                 <TableRow>
                   <TableCell
                     colSpan={visibleColumnCount}
-                    className="px-4 py-6 text-center text-sm text-muted-foreground"
+                    className="px-4 py-6 text-center text-body text-description"
                   >
                     No rows to display
                   </TableCell>
@@ -573,7 +567,7 @@ export function WorkspaceTable({
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-error text-button-foreground hover:bg-error/90"
               onClick={() => {
                 void confirmDeleteColumn();
               }}

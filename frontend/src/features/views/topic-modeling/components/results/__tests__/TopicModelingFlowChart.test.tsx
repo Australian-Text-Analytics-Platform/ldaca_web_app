@@ -199,7 +199,11 @@ describe('TopicModelingFlowChart', () => {
     for (const name of ['Clear lasso filter', 'Download chart']) {
       const button = screen.getByRole('button', { name });
       expect(button).toBeDisabled();
-      expect(button).toHaveClass('disabled:!bg-muted', 'disabled:!text-muted-foreground');
+      expect(button).toHaveClass(
+        'disabled:!bg-editor',
+        'disabled:!text-[var(--vscode-icon-foreground)]',
+        'disabled:!opacity-40',
+      );
     }
   });
 

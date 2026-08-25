@@ -69,7 +69,7 @@ export function FilterValueChecklist({
         }}
         disabled={disabled}
         placeholder="Search values (supports * and ?)"
-        className="h-8 text-sm"
+        className="h-8 text-body"
         aria-label="Filter checklist values"
       />
 
@@ -102,17 +102,17 @@ export function FilterValueChecklist({
       </div>
 
       {loading && options.length === 0 ? (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <div className="flex items-center gap-2 text-body text-description">
           <Loader2 className="h-4 w-4 animate-spin" />
           <span>Loading categories…</span>
         </div>
       ) : error ? (
-        <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+        <div className="rounded-md border border-error/40 bg-error/10 px-3 py-2 text-label-secondary text-error">
           Failed to load categories: {error}
         </div>
       ) : (
         <div
-          className="max-h-48 overflow-y-auto rounded-md border border-border/60 bg-background px-3 py-2"
+          className="max-h-48 overflow-y-auto rounded-md border border-surface-border/60 bg-editor px-3 py-2"
           onScroll={(event) => {
             const target = event.currentTarget;
             if (
@@ -125,7 +125,7 @@ export function FilterValueChecklist({
           }}
         >
           {filteredOptions.length === 0 ? (
-            <div className="text-xs text-muted-foreground">
+            <div className="text-label-secondary text-description">
               {options.length === 0 ? 'No categories available.' : 'No matching categories found.'}
             </div>
           ) : (
@@ -134,8 +134,8 @@ export function FilterValueChecklist({
               return (
                 <label
                   key={option.key}
-                  className={`flex items-center gap-2 py-1 text-sm ${
-                    option.isNull ? 'text-amber-700' : 'text-foreground'
+                  className={`flex items-center gap-2 py-1 text-body ${
+                    option.isNull ? 'text-warning' : 'text-foreground'
                   }`}
                 >
                   <Checkbox
@@ -153,7 +153,7 @@ export function FilterValueChecklist({
                     {option.isNull ? 'Null (no value)' : option.label}
                   </span>
                   {option.count !== undefined ? (
-                    <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                    <span className="shrink-0 text-label-secondary tabular-nums text-description">
                       (count: {formatCount(option.count)})
                     </span>
                   ) : null}
@@ -162,7 +162,7 @@ export function FilterValueChecklist({
             })
           )}
           {loading && options.length > 0 ? (
-            <div className="flex items-center gap-2 py-2 text-xs text-muted-foreground">
+            <div className="flex items-center gap-2 py-2 text-label-secondary text-description">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
               <span>Loading more…</span>
             </div>

@@ -75,18 +75,18 @@ export function OperationPopover({ onSelect, disabled, children }: OperationPopo
                       handleSelect(qualifiedMethod);
                     }}
                     className={cn(
-                      'flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-sm',
-                      'hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground focus-visible:outline-hidden',
+                      'flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-body',
+                      'hover:bg-list-hover hover:text-foreground focus-visible:bg-list-hover focus-visible:text-foreground focus-visible:outline-hidden',
                     )}
                   >
-                    <span className="font-mono text-xs">.{qualifiedMethod}()</span>
-                    <span className="ml-2 text-xs text-muted-foreground">{op.label}</span>
+                    <span className="font-mono text-label-secondary">.{qualifiedMethod}()</span>
+                    <span className="ml-2 text-label-secondary text-description">{op.label}</span>
                   </button>
                 );
               });
               return (
                 <Collapsible key={namespace} defaultOpen={false} className="mb-2 last:mb-0">
-                  <CollapsibleTrigger className="flex w-full items-center justify-between px-2 py-1 text-xs font-semibold text-muted-foreground hover:text-foreground focus-visible:outline-hidden [&[data-state=open]>svg]:rotate-180">
+                  <CollapsibleTrigger className="flex w-full items-center justify-between px-2 py-1 text-label-secondary font-semibold text-description hover:text-foreground focus-visible:outline-hidden [&[data-state=open]>svg]:rotate-180">
                     {label}
                     <ChevronDown className="size-3 transition-transform duration-200" />
                   </CollapsibleTrigger>
@@ -95,7 +95,7 @@ export function OperationPopover({ onSelect, disabled, children }: OperationPopo
               );
             })}
             {Object.keys(operations).length === 0 && (
-              <p className="px-2 py-3 text-center text-sm text-muted-foreground">
+              <p className="px-2 py-3 text-center text-body text-description">
                 No operations available
               </p>
             )}

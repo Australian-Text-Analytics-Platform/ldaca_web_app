@@ -20,6 +20,7 @@ class UserPreferences(_StrictModel):
     favorite_workspaces: list[str] = Field(default_factory=list)
     analysis_multi_tab_enabled: bool = False
     contextual_hints_enabled: bool = True
+    color_theme: Literal["light-2026", "dark-2026"] = "light-2026"
 
     @field_validator("hidden_views", "favorite_workspaces")
     @classmethod
@@ -38,6 +39,7 @@ class UserPreferencesPatch(_StrictModel):
     favorite_workspaces: list[str] = Field(default_factory=list)
     analysis_multi_tab_enabled: bool = False
     contextual_hints_enabled: bool = True
+    color_theme: Literal["light-2026", "dark-2026"] = "light-2026"
 
     @field_validator("hidden_views", "favorite_workspaces")
     @classmethod

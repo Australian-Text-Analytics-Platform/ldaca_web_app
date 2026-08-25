@@ -88,7 +88,7 @@ export function SearchableSelect({
 
   const selectedOption = [...pinnedRows, ...options].find((option) => option.value === value);
   const triggerContent = selectedOption?.label ?? selectedOption?.value ?? (
-    <span className="text-muted-foreground">{placeholder}</span>
+    <span className="text-description">{placeholder}</span>
   );
 
   /** Applies a row's value and returns the control to its resting state. */
@@ -156,7 +156,7 @@ export function SearchableSelect({
           }}
           {...triggerData}
           className={cn(
-            'flex h-9 w-full items-center justify-between gap-2 whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm text-foreground shadow-sm focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
+            'flex h-control w-full items-center justify-between gap-1.5 whitespace-nowrap rounded-sm border border-input-border bg-[var(--vscode-dropdown-background)] px-1.5 py-1 text-body text-[var(--vscode-dropdown-foreground)] focus-visible:border-focus focus-visible:outline focus-visible:outline-1 focus-visible:outline-focus disabled:cursor-not-allowed disabled:text-disabled',
             triggerClassName,
           )}
         >
@@ -189,7 +189,7 @@ export function SearchableSelect({
         <div className="border-b p-2">
           <div className="relative">
             <Search
-              className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
+              className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-description"
               aria-hidden="true"
             />
             <Input
@@ -203,7 +203,7 @@ export function SearchableSelect({
               }
               value={query}
               placeholder={searchPlaceholder}
-              className="h-8 pl-7 text-sm"
+              className="pl-7"
               onChange={(event) => {
                 setQuery(event.target.value);
                 setActiveIndex(0);
@@ -212,7 +212,7 @@ export function SearchableSelect({
             />
           </div>
           {matcher && (
-            <p className="mt-1 px-0.5 text-[10px] text-muted-foreground">
+            <p className="mt-1 px-0.5 text-badge text-description">
               {String(matchedOptions.length)} of {String(options.length)} match
             </p>
           )}
@@ -225,7 +225,7 @@ export function SearchableSelect({
           className="max-h-64 overflow-y-auto p-1"
         >
           {rows.length === 0 ? (
-            <div className="px-3 py-3 text-center text-xs text-muted-foreground">
+            <div className="px-3 py-3 text-center text-label-secondary text-description">
               {emptyMessage}
             </div>
           ) : (
@@ -242,8 +242,8 @@ export function SearchableSelect({
                   aria-selected={isSelected}
                   data-active={isActive ? 'true' : undefined}
                   className={cn(
-                    'relative flex w-full items-center rounded-sm py-1.5 pl-2 pr-8 text-left text-sm',
-                    isActive && 'bg-accent text-accent-foreground',
+                    'relative flex h-control-sm w-full items-center rounded-sm py-0.5 pl-2 pr-8 text-left text-body',
+                    isActive && 'bg-list-hover text-foreground',
                   )}
                   onMouseMove={() => {
                     setActiveIndex(index);

@@ -4,12 +4,12 @@
  * colours and the combined results table's per-source colours).
  *
  * Two roles per colour:
- * - FG (`VIZ_PALETTE`): the saturated identity colour. Used for the node card's
- *   left accent spine, the sidebar row spine, word-cloud text, chart series,
- *   and as the value persisted on ``Node.color``.
+ * - FG (`VIZ_PALETTE`): the saturated identity colour. Used for graph and list
+ *   Data Block identity surfaces, word-cloud text, chart series, and as the
+ *   value persisted on ``Node.color``.
  * - BG (`toBgColor` / `VIZ_PALETTE_BG`): a light tint of the same hue for
- *   filling backgrounds behind black text (frequency list rows, node card
- *   fills, sidebar row fills). Every BG tint keeps black-text contrast well
+ *   filling backgrounds behind black text (for example frequency list rows).
+ *   Every BG tint keeps black-text contrast well
  *   above WCAG AAA (>=15:1), so dark text is always legible on it.
  *
  * ``GREY`` is the default colour for new / un-analysed data blocks and is
@@ -17,7 +17,7 @@
  * manually, in which case it persists like any other choice.
  *
  * Used by: useNodeColorControls (allocation), CustomNode + WorkspaceNodeList
- * (fills/spines), token-frequency result views, and analysis chart legends.
+ * (identity surfaces), token-frequency result views, and analysis chart legends.
  */
 export const VIZ_PALETTE: string[] = [
   '#2563eb',
@@ -37,10 +37,46 @@ export const VIZ_PALETTE: string[] = [
 /** Neutral grey — the default for new/un-analysed blocks; excluded from random allocation. */
 export const GREY = '#6b7280';
 
+/** Foreground paired with the theme-independent light tints returned by `toBgColor`. */
+export const VIZ_TINT_FOREGROUND = '#111827';
+
+/** Light foreground candidate for saturated Data Block identity surfaces. */
+export const VIZ_LIGHT_FOREGROUND = '#ffffff';
+
 /** FG colours eligible for random allocation to a freshly-analysed block (grey excluded). */
 export const RANDOMIZABLE_FG: string[] = VIZ_PALETTE.filter((color) => color !== GREY);
 
 const HEX_COLOR_RE = /^#[0-9a-f]{6}$/i;
+
+/** WCAG relative luminance of an ``#rrggbb`` colour. */
+function relativeLuminance(hex: string): number {
+  const linearChannel = (offset: number): number => {
+    const channel = parseInt(hex.slice(offset, offset + 2), 16) / 255;
+    return channel <= 0.04045 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4);
+  };
+  return 0.2126 * linearChannel(1) + 0.7152 * linearChannel(3) + 0.0722 * linearChannel(5);
+}
+
+/** Contrast ratio between two valid ``#rrggbb`` colours. */
+function contrastRatio(first: string, second: string): number {
+  const firstLuminance = relativeLuminance(first);
+  const secondLuminance = relativeLuminance(second);
+  const lighter = Math.max(firstLuminance, secondLuminance);
+  const darker = Math.min(firstLuminance, secondLuminance);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+/**
+ * Chooses the higher-contrast foreground for a saturated Data Block colour.
+ * Invalid colours fall back to the existing dark foreground.
+ */
+export function foregroundForVizColor(background: string): string {
+  if (!HEX_COLOR_RE.test(background)) return VIZ_TINT_FOREGROUND;
+  return contrastRatio(VIZ_LIGHT_FOREGROUND, background) >
+    contrastRatio(VIZ_TINT_FOREGROUND, background)
+    ? VIZ_LIGHT_FOREGROUND
+    : VIZ_TINT_FOREGROUND;
+}
 
 /** Fraction of the source colour blended over white to make its background tint. */
 const BG_COLOR_MIX = 0.18;
@@ -53,7 +89,7 @@ const clampChannel = (value: number): number => Math.max(0, Math.min(255, Math.r
  * guaranteeing high contrast for black text (validated >=15:1 for every FG
  * palette colour). Works for custom user-picked colours too, not just the
  * palette. Returns the input unchanged when it is not a valid hex colour.
- * Used by: node card fills, sidebar row fills, and the frequency list row bars.
+ * Used by: frequency list row bars and other light-tint visualisation surfaces.
  */
 export function toBgColor(fg: string, mix: number = BG_COLOR_MIX): string {
   if (!HEX_COLOR_RE.test(fg)) return fg;

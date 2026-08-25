@@ -8,6 +8,7 @@ import { loadRemoteRegistry } from '@/tutorials/remoteRegistry';
 import { WorkspaceShell } from '@/components/layout/WorkspaceShell';
 import { GlobalHosts } from '@/components/layout/GlobalHosts';
 import { BackendConnectionGate } from '@/components/layout/BackendConnectionGate';
+import { Button } from '@/components/ui/button';
 
 function App() {
   return <AppContent />;
@@ -70,15 +71,14 @@ function AuthGate() {
         hint={blockingCopy.hint}
         error={blockingCopy.error}
         actions={
-          <button
+          <Button
             type="button"
             onClick={() => {
               void refreshAuth();
             }}
-            className="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white shadow hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
           >
             Retry connection
-          </button>
+          </Button>
         }
       />
     );

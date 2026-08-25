@@ -105,7 +105,7 @@ describe('RunAllReviewTable', () => {
       'sticky',
       'top-0',
       'z-10',
-      'bg-card',
+      'bg-surface',
     );
     expect(screen.getByLabelText('Rows per page')).toHaveTextContent('10');
     expect(screen.getByRole('link', { name: '2' })).toBeInTheDocument();

@@ -26,7 +26,7 @@ import { useUIStore } from '@/stores';
 import { computeDagreLayout } from '../services/graphLayout';
 import { projectWorkspaceGraphNodeCard, type WorkspaceGraphNodeCard } from '../graphNodeModel';
 
-const EDGE_STROKE = '#0f172a';
+const EDGE_STROKE = 'var(--vscode-charts-lines)';
 const EMPTY_FRESH_IDS = new Set<string>();
 /** Registers the React Flow node renderer used for workspace graph nodes. */
 const nodeTypes = { customNode: CustomNode } as const;

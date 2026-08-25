@@ -28,26 +28,26 @@ function BlockingScreen({
   showLogo = true,
 }: BlockingScreenProps) {
   return (
-    <div className="min-h-dvh bg-linear-to-br from-slate-50 via-slate-100 to-blue-50 flex items-center justify-center px-4 py-10">
-      <div className="w-full max-w-xl text-center space-y-4 bg-white/80 backdrop-blur rounded-2xl shadow-2xl border border-white/60 px-10 py-12">
+    <div className="flex min-h-dvh items-center justify-center bg-editor px-4 py-10">
+      <div className="w-full max-w-xl space-y-4 rounded-lg border bg-surface px-10 py-12 text-center">
         {showLogo && (
           <div className="flex justify-center">
-            <img src={logo} alt="LDaCA Logo" className="h-16 w-auto object-contain drop-shadow" />
+            <img src={logo} alt="LDaCA Logo" className="h-16 w-auto object-contain" />
           </div>
         )}
         <div className="space-y-2">
-          <h1 className="text-2xl font-semibold text-gray-900">{title}</h1>
-          <p className="text-base text-gray-600">{description}</p>
+          <h1 className="text-heading-1 font-semibold">{title}</h1>
+          <p className="text-body text-description">{description}</p>
         </div>
         <div className="flex flex-col items-center space-y-3">
-          <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-100 border-t-blue-600" />
-          <p className="text-gray-800 font-medium">{status}</p>
-          {hint && <p className="text-sm text-gray-500 max-w-sm mx-auto">{hint}</p>}
+          <div className="size-8 animate-spin rounded-full border-2 border-surface-border border-t-primary" />
+          <p className="font-semibold">{status}</p>
+          {hint && <p className="mx-auto max-w-sm text-body-secondary text-description">{hint}</p>}
         </div>
         {error && (
-          <div className="text-left rounded-xl border border-red-200 bg-red-50 px-4 py-3">
-            <p className="text-sm font-semibold text-red-700 mb-1">Still waiting…</p>
-            <p className="text-sm text-red-600">{error}</p>
+          <div className="rounded-md border border-error bg-error-background px-3 py-2 text-left">
+            <p className="mb-1 text-body font-semibold text-error">Still waiting…</p>
+            <p className="text-body text-error">{error}</p>
           </div>
         )}
         {actions && <div className="flex flex-wrap justify-center gap-3">{actions}</div>}

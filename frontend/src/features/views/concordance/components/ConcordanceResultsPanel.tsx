@@ -111,7 +111,7 @@ function ConcordanceSourceSummaries({ summaries }: { summaries: ConcordanceSourc
         <p
           key={nodeId}
           aria-label="Concordance result summary"
-          className="px-4 py-2.5 text-sm leading-5 text-muted-foreground"
+          className="px-4 py-2.5 text-body leading-5 text-description"
         >
           <span>Found </span>
           <span className="font-semibold tabular-nums text-foreground">
@@ -316,7 +316,7 @@ export function ConcordanceResultsPanel({
             </Tabs>
             <div className="flex flex-wrap items-center gap-4">
               {!showDispersion ? (
-                <label className="flex items-center gap-2 text-sm text-foreground">
+                <label className="flex items-center gap-2 text-body text-foreground">
                   <input
                     type="checkbox"
                     checked={highlightL1R1}
@@ -339,7 +339,7 @@ export function ConcordanceResultsPanel({
           </div>
           {showDispersion ? (
             <div className="flex flex-wrap items-center gap-4">
-              <label className="flex items-center gap-2 text-sm text-foreground">
+              <label className="flex items-center gap-2 text-body text-foreground">
                 <input
                   type="checkbox"
                   checked={proportionalDispersionBars}
@@ -471,7 +471,7 @@ export function ConcordanceResultsPanel({
                 })}
             </div>
           ) : (
-            <div className="rounded-md border border-muted bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
+            <div className="rounded-md border border-surface-border bg-panel/50 px-4 py-3 text-body text-description">
               No data available
             </div>
           )}

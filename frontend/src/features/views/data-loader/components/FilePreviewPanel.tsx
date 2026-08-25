@@ -65,7 +65,7 @@ export function FilePreviewPanel({ filename, open, onClose }: FilePreviewPanelPr
   const footer = (
     <CardFooter className="border-t px-6 py-4">
       <div className="flex w-full flex-wrap items-center justify-between gap-3">
-        <div className="text-xs text-muted-foreground">Page {page}</div>
+        <div className="text-label-secondary text-description">Page {page}</div>
         <div className="flex items-center gap-2">
           <Button onClick={handlePrev} disabled={!canPrev || loading} variant="outline" size="sm">
             Prev

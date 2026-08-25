@@ -100,8 +100,7 @@ function DatetimeFormatPanelContent({
       <Card>
         <CardHeader>
           <CardTitle>
-            Convert <span className="text-muted-foreground">&ldquo;{columnName}&rdquo;</span> to
-            Datetime
+            Convert <span className="text-description">&ldquo;{columnName}&rdquo;</span> to Datetime
           </CardTitle>
           <CardDescription>
             Provide a strftime format or let Auto Fill guess it from sample values.
@@ -111,7 +110,7 @@ function DatetimeFormatPanelContent({
         <CardContent className="space-y-4">
           <div>
             <div className="mb-2 flex items-center justify-between">
-              <span className="text-sm font-medium text-foreground">Custom format</span>
+              <span className="text-body font-medium text-foreground">Custom format</span>
               <Button
                 type="button"
                 onClick={handleAutoFill}
@@ -129,21 +128,21 @@ function DatetimeFormatPanelContent({
               onChange={(event) => {
                 setCustomFormat(event.target.value);
               }}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
+              className="w-full rounded-md border border-input-border bg-editor px-3 py-2 text-body text-foreground focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-focus"
             />
-            <div className="mt-1 text-xs text-muted-foreground">
+            <div className="mt-1 text-label-secondary text-description">
               Use Python strftime codes.
               {autoFillTried && autoFillError && (
-                <span className="ml-1 text-destructive">{autoFillError}</span>
+                <span className="ml-1 text-error">{autoFillError}</span>
               )}
               {autoFillTried && !autoFillError && customFormat && (
-                <span className="ml-1 text-green-600">Inferred.</span>
+                <span className="ml-1 text-[var(--vscode-charts-green)]">Inferred.</span>
               )}
             </div>
           </div>
         </CardContent>
 
-        <CardFooter className="border-t border-border/70 pt-4">
+        <CardFooter className="border-t border-surface-border/70 pt-4">
           <div className="flex w-full items-center justify-end gap-2">
             <Button variant="outline" onClick={handleCancel} type="button">
               Cancel

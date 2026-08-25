@@ -49,7 +49,7 @@ export function NodeColumnSelector({
   const triggerAriaLabel = typeof label === 'string' ? label : undefined;
 
   const heading = label && (
-    <span className={cn('block text-xs font-medium text-muted-foreground', labelClassName)}>
+    <span className={cn('block text-label-secondary font-medium text-description', labelClassName)}>
       {label}
     </span>
   );
@@ -65,7 +65,7 @@ export function NodeColumnSelector({
             disabled
             ariaLabel={triggerAriaLabel}
             placeholder={noColumnsMessage}
-            triggerClassName={cn('text-sm', triggerClassName)}
+            triggerClassName={cn('text-body', triggerClassName)}
           />
         </DisabledReasonTooltip>
       </div>
@@ -96,7 +96,7 @@ export function NodeColumnSelector({
           pinnedOptions={
             clearOptionValue ? [{ value: clearOptionValue, label: clearOptionLabel }] : undefined
           }
-          triggerClassName={cn('text-sm', triggerClassName)}
+          triggerClassName={cn('text-body', triggerClassName)}
         />
       </DisabledReasonTooltip>
     </div>

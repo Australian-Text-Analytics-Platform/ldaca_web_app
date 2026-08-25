@@ -243,8 +243,10 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-baseline gap-2">
-              <CardTitle className="text-base font-semibold">Juxtorpus</CardTitle>
-              <span className="text-xs text-muted-foreground">- based on keyword analysis.</span>
+              <CardTitle className="text-body font-semibold">Juxtorpus</CardTitle>
+              <span className="text-label-secondary text-description">
+                - based on keyword analysis.
+              </span>
               <HelpIcon
                 targetKey="analysis.token-frequency.unified-word-cloud"
                 label="Unified word cloud"
@@ -275,7 +277,7 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
               <div className="space-y-3">
                 <TooltipProvider delayDuration={0} skipDelayDuration={0}>
                   <div
-                    className="flex items-center gap-1.5 text-sm"
+                    className="flex items-center gap-1.5 text-body"
                     aria-label="Reference to Study color scale"
                   >
                     <Tooltip>
@@ -296,7 +298,7 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
                       <TooltipContent>{nodeAName}</TooltipContent>
                     </Tooltip>
                     <div
-                      className="h-2.5 w-28 rounded"
+                      className="h-2.5 w-28 rounded-sm"
                       aria-hidden="true"
                       style={{
                         background: `linear-gradient(to right, ${nodeAColor}, ${nodeBColor})`,
@@ -378,7 +380,7 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
                 </div>
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">
+              <p className="text-body text-description">
                 Unified cloud appears when two data block results and comparative statistics are
                 available.
               </p>

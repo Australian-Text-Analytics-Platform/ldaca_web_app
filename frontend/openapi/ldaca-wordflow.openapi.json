@@ -9087,6 +9087,15 @@
             "title": "Analysis Multi Tab Enabled",
             "type": "boolean"
           },
+          "color_theme": {
+            "default": "light-2026",
+            "enum": [
+              "light-2026",
+              "dark-2026"
+            ],
+            "title": "Color Theme",
+            "type": "string"
+          },
           "contextual_hints_enabled": {
             "default": true,
             "title": "Contextual Hints Enabled",
@@ -9118,6 +9127,15 @@
             "default": false,
             "title": "Analysis Multi Tab Enabled",
             "type": "boolean"
+          },
+          "color_theme": {
+            "default": "light-2026",
+            "enum": [
+              "light-2026",
+              "dark-2026"
+            ],
+            "title": "Color Theme",
+            "type": "string"
           },
           "contextual_hints_enabled": {
             "default": true,

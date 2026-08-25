@@ -116,12 +116,12 @@ export function RowDetailPanel({
         <div className="overflow-y-auto max-h-[calc(80vh-120px)] pr-1">
           {/* Summary / customization fields */}
           {customization?.summaryFields && customization.summaryFields.length > 0 && (
-            <div className="mb-6 grid grid-cols-2 gap-4 text-sm">
+            <div className="mb-6 grid grid-cols-2 gap-4 text-body">
               {customization.summaryFields.map((field) => (
                 <div key={field.label}>
-                  <span className="font-medium text-gray-700">{field.label}:</span>
+                  <span className="font-medium text-foreground">{field.label}:</span>
                   <span
-                    className={`ml-2 ${field.highlight ? 'font-mono bg-yellow-100 px-1 rounded' : ''}`}
+                    className={`ml-2 ${field.highlight ? 'font-mono bg-[var(--vscode-editor-findMatchHighlightBackground)] px-1 rounded-sm' : ''}`}
                   >
                     {field.value}
                   </span>
@@ -133,11 +133,11 @@ export function RowDetailPanel({
           {/* Document text */}
           {documentContent !== null && (
             <div className="mb-6">
-              <h4 className="font-medium text-gray-700 mb-2">
+              <h4 className="font-medium text-foreground mb-2">
                 Document{textColumn ? `: ${textColumn}` : ''}
               </h4>
-              <div className="bg-gray-50 p-4 rounded-lg border">
-                <div className="font-mono text-sm whitespace-pre-wrap max-h-96 overflow-y-auto">
+              <div className="bg-panel p-4 rounded-lg border">
+                <div className="font-mono text-body whitespace-pre-wrap max-h-96 overflow-y-auto">
                   {documentContent}
                 </div>
               </div>
@@ -147,15 +147,15 @@ export function RowDetailPanel({
           {/* Metadata table */}
           {metadataEntries.length > 0 && (
             <div>
-              <h4 className="font-medium text-gray-700 mb-2">Metadata</h4>
-              <div className="bg-white border border-border rounded-lg overflow-hidden">
+              <h4 className="font-medium text-foreground mb-2">Metadata</h4>
+              <div className="bg-surface border border-surface-border rounded-lg overflow-hidden">
                 <Table>
-                  <TableHeader className="bg-gray-50">
+                  <TableHeader className="bg-panel">
                     <TableRow>
-                      <TableHead className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                      <TableHead className="px-3 py-2 text-left text-label-secondary font-medium uppercase tracking-wider text-description">
                         Field
                       </TableHead>
-                      <TableHead className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                      <TableHead className="px-3 py-2 text-left text-label-secondary font-medium uppercase tracking-wider text-description">
                         Value
                       </TableHead>
                     </TableRow>
@@ -169,7 +169,7 @@ export function RowDetailPanel({
                           <TableCell>
                             <div className="max-w-md whitespace-pre-wrap wrap-break-word">
                               {typeof value === 'object' && value !== null ? (
-                                <pre className="text-xs bg-gray-100 p-2 rounded overflow-x-auto">
+                                <pre className="text-label-secondary bg-panel p-2 rounded-sm overflow-x-auto">
                                   {displayValue}
                                 </pre>
                               ) : (

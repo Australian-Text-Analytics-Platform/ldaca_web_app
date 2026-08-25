@@ -1,5 +1,6 @@
 import { AuthProviderCard } from '@/features/auth/components/AuthProviderCard';
 import { buildCilogonLoginUrl } from '@/features/auth/authRedirectUrls';
+import { Button } from '@/components/ui/button';
 
 interface CILogonLoginProps {
   isLoading?: boolean;
@@ -11,11 +12,8 @@ export default function CILogonLogin({ isLoading, error }: CILogonLoginProps) {
 
   return (
     <AuthProviderCard isLoading={isLoading} error={error}>
-      <a href={loginUrl} className="block">
-        <button
-          type="button"
-          className="w-full flex items-center justify-center gap-3 px-4 py-2.5 border border-gray-300 rounded-md bg-white text-gray-700 text-sm font-medium shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
-        >
+      <Button asChild variant="secondary" className="w-full">
+        <a href={loginUrl}>
           <img
             src="https://www.cilogon.org/favicon.ico"
             alt=""
@@ -25,8 +23,8 @@ export default function CILogonLogin({ isLoading, error }: CILogonLoginProps) {
             }}
           />
           Sign in with CILogon
-        </button>
-      </a>
+        </a>
+      </Button>
     </AuthProviderCard>
   );
 }

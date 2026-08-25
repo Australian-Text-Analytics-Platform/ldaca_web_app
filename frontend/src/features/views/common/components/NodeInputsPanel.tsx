@@ -292,9 +292,9 @@ export function NodeInputsPanel({
   const inputRequestTargetFilled = !canAddMore;
   const inputRequestTargetDisabled = disabled || !canAddMore;
   const statusVariantClass = {
-    info: 'border-sky-500/50 bg-sky-100/60 text-sky-900',
-    warning: 'border-amber-500/60 bg-amber-100/60 text-amber-900',
-    error: 'border-destructive/50 bg-destructive/10 text-destructive',
+    info: 'border-info bg-info-background text-foreground',
+    warning: 'border-warning/60 bg-warning-background/60 text-warning',
+    error: 'border-error/50 bg-error/10 text-error',
   }[statusVariant];
 
   return (
@@ -306,7 +306,7 @@ export function NodeInputsPanel({
         className="scroll-mt-16 flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5 px-3 pt-1.5"
       >
         <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <label className="block text-sm font-medium text-muted-foreground">
+          <label className="block text-body font-medium text-description">
             {title} ({countLabel})
           </label>
           {headerAddon}
@@ -321,7 +321,7 @@ export function NodeInputsPanel({
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="h-7 px-2 text-xs text-muted-foreground"
+                className="h-7 px-2 text-label-secondary text-description"
                 onClick={onClear}
                 disabled={disabled}
               >
@@ -335,7 +335,7 @@ export function NodeInputsPanel({
                 type="button"
                 variant="outline"
                 size="sm"
-                className="h-7 px-2 text-xs"
+                className="h-7 px-2 text-label-secondary"
                 disabled={disabled || !canAddMore || availableNodes.length === 0}
                 onClick={() => {
                   handleAdd(availableNodes.map((node) => node.id));
@@ -353,7 +353,7 @@ export function NodeInputsPanel({
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="h-7 px-2 text-xs"
+                  className="h-7 px-2 text-label-secondary"
                   disabled={disabled || !canAddMore || !hasPresets}
                 >
                   <Bookmark className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
@@ -364,12 +364,12 @@ export function NodeInputsPanel({
                 <div className="max-h-72 overflow-y-auto py-1">
                   {addableGraphIds.length > 0 && (
                     <>
-                      <div className="px-3 pb-1 pt-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                      <div className="px-3 pb-1 pt-2 text-[11px] font-medium uppercase tracking-wide text-description">
                         Current graph selection
                       </div>
                       <button
                         type="button"
-                        className="flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-sm hover:bg-muted/60"
+                        className="flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-body hover:bg-panel/60"
                         onClick={() => {
                           handleAdd(addableGraphIds);
                           setPresetOpen(false);
@@ -378,7 +378,7 @@ export function NodeInputsPanel({
                         <span className="truncate font-medium">
                           Current selection ({addableGraphIds.length})
                         </span>
-                        <span className="truncate text-[11px] text-muted-foreground">
+                        <span className="truncate text-[11px] text-description">
                           {graphSelectionLabels.join(', ')}
                         </span>
                       </button>
@@ -386,7 +386,7 @@ export function NodeInputsPanel({
                   )}
                   {recentPresets.length > 0 && (
                     <>
-                      <div className="px-3 pb-1 pt-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                      <div className="px-3 pb-1 pt-2 text-[11px] font-medium uppercase tracking-wide text-description">
                         Recent
                       </div>
                       {recentPresets.map((preset, idx) => (
@@ -399,7 +399,7 @@ export function NodeInputsPanel({
                               ? 'All of these are already added or unavailable'
                               : undefined
                           }
-                          className="flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-sm hover:bg-muted/60 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-body hover:bg-panel/60 disabled:cursor-not-allowed disabled:opacity-50"
                           onClick={() => {
                             handleAdd(preset.addableIds);
                             setPresetOpen(false);
@@ -427,7 +427,7 @@ export function NodeInputsPanel({
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="h-7 px-2 text-xs"
+                  className="h-7 px-2 text-label-secondary"
                   disabled={disabled || !canAddMore || availableNodes.length === 0}
                 >
                   <Plus className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
@@ -438,7 +438,7 @@ export function NodeInputsPanel({
                 <div className="border-b p-2">
                   <div className="relative">
                     <Search
-                      className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
+                      className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-description"
                       aria-hidden="true"
                     />
                     <Input
@@ -448,13 +448,13 @@ export function NodeInputsPanel({
                         setBlockSearch(e.target.value);
                       }}
                       placeholder="Search data blocks…"
-                      className="h-8 pl-7 text-sm"
+                      className="h-8 pl-7 text-body"
                     />
                   </div>
                 </div>
                 <div className="max-h-64 overflow-y-auto py-1">
                   {filteredAvailableNodes.length === 0 ? (
-                    <div className="px-3 py-3 text-center text-xs text-muted-foreground">
+                    <div className="px-3 py-3 text-center text-label-secondary text-description">
                       No matching data blocks
                     </div>
                   ) : (
@@ -467,7 +467,7 @@ export function NodeInputsPanel({
                           type="button"
                           disabled={Boolean(reason)}
                           title={reason ?? undefined}
-                          className="flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-sm hover:bg-muted/60 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-body hover:bg-panel/60 disabled:cursor-not-allowed disabled:opacity-50"
                           onClick={() => {
                             handleAdd([id]);
                             setBlockOpen(false);
@@ -475,9 +475,7 @@ export function NodeInputsPanel({
                           }}
                         >
                           <span className="truncate">{node.name}</span>
-                          {reason && (
-                            <span className="text-[10px] text-muted-foreground">{reason}</span>
-                          )}
+                          {reason && <span className="text-badge text-description">{reason}</span>}
                         </button>
                       );
                     })
@@ -492,7 +490,10 @@ export function NodeInputsPanel({
       {statusMessage && (
         <div className="px-3">
           <div
-            className={cn('rounded-md border px-3 py-2 text-xs leading-snug', statusVariantClass)}
+            className={cn(
+              'rounded-md border px-3 py-2 text-label-secondary leading-snug',
+              statusVariantClass,
+            )}
           >
             {statusMessage}
           </div>
@@ -500,7 +501,7 @@ export function NodeInputsPanel({
       )}
 
       {selectionItems.length === 0 ? (
-        <div className="mx-3 rounded-md border border-dashed border-muted-foreground/40 bg-muted/40 p-3 text-sm italic text-muted-foreground">
+        <div className="mx-3 rounded-md border border-dashed border-surface-border-foreground/40 bg-panel/40 p-3 text-body italic text-description">
           {emptyMessage ?? (
             <>
               No data blocks selected. Use{' '}
@@ -524,23 +525,23 @@ export function NodeInputsPanel({
         />
       )}
       {maxNodes != null && count > maxNodes && (
-        <div className="mt-1 flex items-center gap-1 px-3 text-sm text-amber-600">
+        <div className="mt-1 flex items-center gap-1 px-3 text-body text-warning">
           Maximum {maxNodes} data block{maxNodes === 1 ? '' : 's'} allowed here. Currently {count}{' '}
           selected.
         </div>
       )}
       {showInputRequestTarget ? (
-        <div className="absolute inset-0 z-10 rounded-lg bg-background/75 p-1 backdrop-blur-[1px]">
+        <div className="absolute inset-0 z-10 rounded-lg bg-editor/75 p-1">
           <button
             type="button"
             aria-label={inputRequestTargetFilled ? `${title} is already filled` : `Add to ${title}`}
             disabled={inputRequestTargetDisabled}
             className={cn(
-              'flex h-full min-h-24 w-full items-center justify-center gap-5 rounded-lg border-2 border-dashed border-muted-foreground/35 bg-card/95 px-7 text-left transition-colors',
-              'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed',
+              'flex h-full min-h-24 w-full items-center justify-center gap-5 rounded-lg border-2 border-dashed border-surface-border-foreground/35 bg-surface/95 px-7 text-left transition-colors',
+              'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-not-allowed',
               inputRequestTargetFilled
-                ? 'border-destructive/60 bg-destructive/5'
-                : 'hover:border-primary/70 hover:bg-card disabled:opacity-60',
+                ? 'border-error/60 bg-error/5'
+                : 'hover:border-button/70 hover:bg-surface disabled:opacity-60',
             )}
             onClick={() => {
               if (handleAdd([pendingInputRequest.nodeId])) {
@@ -550,19 +551,19 @@ export function NodeInputsPanel({
           >
             {inputRequestTargetFilled ? (
               <OctagonX
-                className="size-10 stroke-[1.7] text-destructive"
+                className="size-10 stroke-[1.7] text-error"
                 data-testid="filled-selector-stop-icon"
                 aria-hidden="true"
               />
             ) : (
-              <Plus className="size-10 stroke-[1.7] text-muted-foreground" aria-hidden="true" />
+              <Plus className="size-10 stroke-[1.7] text-description" aria-hidden="true" />
             )}
             <span className="flex min-w-0 flex-col gap-1">
-              <span className="truncate text-base font-semibold text-foreground">{title}</span>
+              <span className="truncate text-body font-semibold text-foreground">{title}</span>
               <span
                 className={cn(
-                  'text-xs',
-                  inputRequestTargetFilled ? 'text-destructive' : 'text-muted-foreground',
+                  'text-label-secondary',
+                  inputRequestTargetFilled ? 'text-error' : 'text-description',
                 )}
               >
                 {inputRequestTargetFilled
@@ -574,7 +575,7 @@ export function NodeInputsPanel({
           <button
             type="button"
             aria-label="Discard latest carried Data Block"
-            className="absolute right-3 top-3 inline-flex h-7 items-center gap-1 rounded-md bg-background/90 px-2 text-xs text-muted-foreground shadow-sm hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+            className="absolute right-3 top-3 inline-flex h-7 items-center gap-1 rounded-md bg-editor/90 px-2 text-label-secondary text-description hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-focus"
             onClick={() => {
               consumeInputRequest(pendingInputRequest.id);
             }}

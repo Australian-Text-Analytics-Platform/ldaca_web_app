@@ -14,7 +14,7 @@ const baseTab: AnalysisTab = {
   annotation_correction_columns: {},
 };
 
-// ChromeTabs uses pointer capture, which jsdom does not implement.
+// EditorTabs uses pointer capture, which jsdom does not implement.
 beforeAll(() => {
   Element.prototype.setPointerCapture = vi.fn();
   Element.prototype.releasePointerCapture = vi.fn();
@@ -44,6 +44,18 @@ function renderPanel(
 }
 
 describe('AnalysisTabbedPanel', () => {
+  it('frames the tab strip and content as one continuous editor surface', () => {
+    renderPanel(undefined, { multiTabEnabled: true });
+
+    const surface = screen.getByTestId('analysis-editor-surface');
+    const tablist = screen.getByRole('tablist', { name: /analysis tabs/i });
+    const scrollArea = screen.getByTestId('analysis-editor-content');
+    expect(surface).toHaveClass('overflow-hidden', 'rounded-md', 'border', 'bg-surface');
+    expect(tablist).toHaveClass('px-[8px]', 'pt-[8px]');
+    expect(tablist).not.toHaveClass('border-b', 'bg-panel/30');
+    expect(scrollArea).not.toHaveClass('border', 'shadow-sm', 'rounded-xl');
+  });
+
   it('renders the active tab title and its panel children', () => {
     renderPanel(undefined, { multiTabEnabled: true });
 
@@ -106,8 +118,8 @@ describe('AnalysisTabbedPanel', () => {
     const first = screen.getAllByRole('tab')[0]!;
 
     fireEvent.pointerDown(first, { button: 0, pointerId: 1, clientX: 0 });
-    fireEvent.pointerMove(first, { pointerId: 1, clientX: 60 });
-    fireEvent.pointerUp(first, { pointerId: 1, clientX: 60 });
+    fireEvent.pointerMove(first, { pointerId: 1, clientX: 50 });
+    fireEvent.pointerUp(first, { pointerId: 1, clientX: 50 });
 
     expect(onReorder).toHaveBeenCalledWith(['tab-2', 'tab-1']);
   });

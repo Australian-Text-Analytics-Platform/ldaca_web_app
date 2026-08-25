@@ -208,12 +208,9 @@ export function AnnotationAiPreviewPanel({
   const comparisonError = predictions.query.isError || preview.comparison.query.isError;
 
   return (
-    <section
-      aria-label="AI Annotation Preview"
-      className="mt-5 rounded-lg border bg-background/60 p-4"
-    >
+    <section aria-label="AI Annotation Preview" className="mt-5 rounded-lg border bg-editor/60 p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h3 data-guidance="annotation-ai-preview-results" className="text-base font-semibold">
+        <h3 data-guidance="annotation-ai-preview-results" className="text-body font-semibold">
           AI Preview
         </h3>
         <div className="flex flex-wrap items-center gap-2">
@@ -269,7 +266,7 @@ export function AnnotationAiPreviewPanel({
         belowTable={
           <>
             {predictions.query.isError ? (
-              <div className="flex items-center justify-between gap-3 border-t border-destructive/30 bg-destructive/5 px-4 py-2 text-sm text-destructive">
+              <div className="flex items-center justify-between gap-3 border-t border-error/30 bg-error/5 px-4 py-2 text-body text-error">
                 <span>
                   {predictions.query.error instanceof Error
                     ? predictions.query.error.message
@@ -314,7 +311,7 @@ export function AnnotationAiPreviewPanel({
         }
       >
         <Table className="w-full table-auto" disableContainer>
-          <TableHeader className="sticky top-0 z-10 bg-card">
+          <TableHeader className="sticky top-0 z-10 bg-surface">
             <TableRow>
               <TableHead>{columns.text}</TableHead>
               <TableHead className="w-px whitespace-nowrap">
@@ -362,17 +359,14 @@ export function AnnotationAiPreviewPanel({
               <PaginatedTableProcessingRow columnCount={tableColumns.length} />
             ) : page.query.isError ? (
               <TableRow>
-                <TableCell
-                  className="h-24 text-center text-destructive"
-                  colSpan={tableColumns.length}
-                >
+                <TableCell className="h-24 text-center text-error" colSpan={tableColumns.length}>
                   Could not load annotations.
                 </TableCell>
               </TableRow>
             ) : page.rows.length === 0 ? (
               <TableRow>
                 <TableCell
-                  className="h-24 text-center text-muted-foreground"
+                  className="h-24 text-center text-description"
                   colSpan={tableColumns.length}
                 >
                   No rows to annotate.
@@ -411,24 +405,24 @@ export function AnnotationAiPreviewPanel({
                         <span role="status" aria-label="Predicting annotation">
                           <Loader2
                             aria-hidden="true"
-                            className="size-4 animate-spin text-muted-foreground"
+                            className="size-4 animate-spin text-description"
                           />
                         </span>
                       ) : (
                         <div className="flex items-center gap-2">
                           {existing ? (
                             <>
-                              <span className="shrink-0 text-sm text-muted-foreground">
+                              <span className="shrink-0 text-body text-description">
                                 {existing}
                               </span>
                               <ArrowRight
                                 role="img"
                                 aria-label="changes to"
-                                className="size-4 shrink-0 text-muted-foreground"
+                                className="size-4 shrink-0 text-description"
                               />
                             </>
                           ) : null}
-                          <span className="text-sm">{value || '—'}</span>
+                          <span className="text-body">{value || '—'}</span>
                         </div>
                       )}
                     </TableCell>
@@ -438,7 +432,7 @@ export function AnnotationAiPreviewPanel({
                           <ArrowRight
                             role="img"
                             aria-label="corrected to"
-                            className="mx-auto size-4 text-muted-foreground"
+                            className="mx-auto size-4 text-description"
                           />
                         </TableCell>
                         <TableCell className="w-px">
@@ -451,15 +445,12 @@ export function AnnotationAiPreviewPanel({
                           >
                             <SelectTrigger
                               aria-label={`Correct prediction for row ${String(rowPosition + 1)}`}
-                              className="h-8 min-w-28 text-sm"
+                              className="h-8 min-w-28 text-body"
                             >
                               <SelectValue placeholder="None" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem
-                                value={NO_CORRECTION_VALUE}
-                                className="text-muted-foreground"
-                              >
+                              <SelectItem value={NO_CORRECTION_VALUE} className="text-description">
                                 None
                               </SelectItem>
                               {correction.classOptions.map((name) => (

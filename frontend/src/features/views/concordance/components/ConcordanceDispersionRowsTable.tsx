@@ -62,12 +62,12 @@ export function ConcordanceDispersionRowsTable({
 }: Props) {
   return (
     <Table className="w-full" disableContainer>
-      <TableHeader className="bg-gray-50 sticky top-0 z-10">
+      <TableHeader className="bg-panel sticky top-0 z-10">
         <TableRow>
           {tableColumns.map((columnKey) => (
             <TableHead
               key={columnKey}
-              className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+              className="px-3 py-2 text-left text-label-secondary font-medium uppercase tracking-wider text-description"
               style={
                 columnKey === CONCORDANCE_DISPERSION_COLUMN
                   ? dispersionColumnStyle
@@ -83,7 +83,7 @@ export function ConcordanceDispersionRowsTable({
         {rows.length === 0 ? (
           <TableRow>
             <TableCell
-              className="h-24 text-center text-muted-foreground"
+              className="h-24 text-center text-description"
               colSpan={tableColumns.length || 1}
             >
               No matching rows on this page for &quot;{searchWord}&quot;. Source rows without

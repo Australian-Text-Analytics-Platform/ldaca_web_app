@@ -137,8 +137,8 @@ export function PreviewTable({
           </div>
           {loadingBadge}
           {ready && !error && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <label htmlFor="preview-page-size" className="text-sm text-muted-foreground">
+            <div className="flex items-center gap-2 text-body text-description">
+              <label htmlFor="preview-page-size" className="text-body text-description">
                 Rows per page
               </label>
               <Select
@@ -165,28 +165,28 @@ export function PreviewTable({
       </CardHeader>
       <CardContent className="space-y-4 pt-0">
         {!ready ? (
-          <div className="rounded-md border border-dashed border-muted-foreground/40 bg-muted/40 p-4 text-sm text-muted-foreground">
+          <div className="rounded-md border border-dashed border-surface-border-foreground/40 bg-panel/40 p-4 text-body text-description">
             {readyMessage}
           </div>
         ) : error ? (
-          <div className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
+          <div className="rounded-md border border-error/40 bg-error/10 p-4 text-body text-error">
             {error}
           </div>
         ) : (
           <ScrollArea
             type="always"
             scrollbars="horizontal"
-            className="rounded-lg border border-border"
+            className="rounded-lg border border-surface-border"
           >
             <Table disableContainer>
-              <TableHeader className="bg-muted/40">
+              <TableHeader className="bg-panel/40">
                 {columnsToRender.length > 0 ? (
                   table.getHeaderGroups().map((headerGroup) => (
                     <TableRow key={headerGroup.id}>
                       {headerGroup.headers.map((header) => (
                         <TableHead
                           key={header.id}
-                          className="px-3 py-2 text-left text-xs font-medium tracking-wide text-muted-foreground"
+                          className="px-3 py-2 text-left text-label-secondary font-medium tracking-wide text-description"
                         >
                           {header.isPlaceholder
                             ? null
@@ -197,7 +197,7 @@ export function PreviewTable({
                   ))
                 ) : (
                   <TableRow>
-                    <TableHead className="px-3 py-2 text-left text-xs font-medium tracking-wide text-muted-foreground">
+                    <TableHead className="px-3 py-2 text-left text-label-secondary font-medium tracking-wide text-description">
                       No columns
                     </TableHead>
                   </TableRow>
@@ -208,10 +208,10 @@ export function PreviewTable({
                   <TableRow>
                     <TableCell
                       colSpan={tableColSpan}
-                      className="px-3 py-6 text-center text-muted-foreground"
+                      className="px-3 py-6 text-center text-description"
                     >
                       <span className="inline-flex items-center gap-2">
-                        <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                        <Loader2 className="h-5 w-5 animate-spin text-link" />
                         Loading preview…
                       </span>
                     </TableCell>
@@ -220,7 +220,7 @@ export function PreviewTable({
                   <TableRow>
                     <TableCell
                       colSpan={tableColSpan}
-                      className="px-3 py-6 text-center text-muted-foreground"
+                      className="px-3 py-6 text-center text-description"
                     >
                       No rows match the current configuration.
                     </TableCell>
@@ -229,7 +229,7 @@ export function PreviewTable({
                   table.getRowModel().rows.map((row) => (
                     <TableRow
                       key={row.id}
-                      className="cursor-pointer transition-colors duration-150 hover:bg-muted/40"
+                      className="cursor-pointer transition-colors duration-150 hover:bg-panel/40"
                       onClick={() => {
                         const original = row.original;
                         const detailTextColumn =
@@ -249,7 +249,7 @@ export function PreviewTable({
                         return (
                           <TableCell
                             key={cell.id}
-                            className="max-w-xs truncate px-3 py-2 font-mono text-xs text-foreground"
+                            className="max-w-xs truncate px-3 py-2 font-mono text-label-secondary text-foreground"
                             title={(cellValue ?? '') as string}
                           >
                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -265,8 +265,8 @@ export function PreviewTable({
         )}
       </CardContent>
       {ready && !error && data.length > 0 && (
-        <CardFooter className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-muted/20 py-4">
-          <div className="text-sm text-muted-foreground">Page {currentPage}</div>
+        <CardFooter className="flex flex-wrap items-center justify-between gap-3 border-t border-surface-border bg-panel/20 py-4">
+          <div className="text-body text-description">Page {currentPage}</div>
           <div className="flex items-center gap-2">
             <Button
               type="button"
@@ -279,7 +279,7 @@ export function PreviewTable({
             >
               Previous
             </Button>
-            <span className="text-sm text-muted-foreground">Page {currentPage}</span>
+            <span className="text-body text-description">Page {currentPage}</span>
             <Button
               type="button"
               onClick={() => {

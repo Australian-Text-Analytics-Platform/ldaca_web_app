@@ -71,24 +71,24 @@ export function WorkspaceControls({ onToggleCollapse }: { onToggleCollapse?: () 
         <button
           type="button"
           onClick={onToggleCollapse}
-          className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-gray-300 bg-white/80 text-gray-700 shadow-sm hover:bg-gray-50"
+          className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-surface-border bg-surface text-foreground hover:bg-panel"
           aria-label="Collapse workspace panel"
           title="Collapse"
         >
           <PanelRightClose className="h-4 w-4" />
         </button>
       )}
-      <h3 className="text-sm font-medium text-gray-700">Workspace Graph View</h3>
+      <h3 className="text-body font-medium text-foreground">Workspace Graph View</h3>
       <HelpIcon
         targetKey="ui.workspace-graph-view"
         label="Workspace Graph View"
-        className="h-5 w-5 text-muted-foreground"
+        className="h-5 w-5 text-description"
       />
-      <span className="text-gray-300">|</span>
+      <span className="text-description">|</span>
 
       {isEditing ? (
         <input
-          className="px-2 py-1 border rounded text-sm"
+          className="px-2 py-1 border rounded-sm text-body"
           value={renameDraft.value}
           onChange={(e) => {
             setRenameDraft({ baseName: currentWorkspaceName, value: e.target.value });
@@ -104,7 +104,7 @@ export function WorkspaceControls({ onToggleCollapse }: { onToggleCollapse?: () 
           aria-label="Workspace name"
         />
       ) : (
-        <span className="text-sm font-semibold text-gray-800">
+        <span className="text-body font-semibold text-foreground">
           {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- show placeholder for an empty name, not only null/undefined */}
           {currentWorkspace?.name || 'No Workspace'}
         </span>
@@ -112,7 +112,7 @@ export function WorkspaceControls({ onToggleCollapse }: { onToggleCollapse?: () 
 
       {currentWorkspace && (
         <button
-          className="inline-flex items-center gap-1 text-xs text-gray-600 hover:text-gray-800 px-2 py-1 border rounded"
+          className="inline-flex items-center gap-1 text-label-secondary text-description hover:text-foreground px-2 py-1 border rounded-sm"
           onClick={startRename}
           title="Rename"
           aria-label="Rename workspace"

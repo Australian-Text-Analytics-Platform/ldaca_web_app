@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   useWorkspaceData: vi.fn(),
   multiTabEnabled: false,
   updatePreferences: vi.fn(),
+  preferencesReady: true,
 }));
 
 vi.mock('@/lib/isTauri', () => ({
@@ -35,9 +36,13 @@ vi.mock('@/features/preferences/useUserPreferences', () => ({
       favorite_workspaces: [],
       analysis_multi_tab_enabled: mocks.multiTabEnabled,
       contextual_hints_enabled: true,
+      color_theme: 'light-2026',
     },
+    isError: false,
+    isSuccess: mocks.preferencesReady,
+    refetch: vi.fn(),
   }),
-  useUpdateUserPreferences: () => ({ mutate: mocks.updatePreferences }),
+  useUpdateUserPreferences: () => ({ mutate: mocks.updatePreferences, isPending: false }),
 }));
 
 /** Resets the preferences store to a deterministic snapshot before rendering. */
@@ -69,6 +74,7 @@ describe('SettingsDialog', () => {
     vi.clearAllMocks();
     resetPreferenceState();
     mocks.isTauri.mockReturnValue(false);
+    mocks.preferencesReady = true;
     mocks.useWorkspaceData.mockReturnValue({
       currentWorkspaceId: 'workspace-1',
       workspaces: [],
@@ -87,6 +93,33 @@ describe('SettingsDialog', () => {
     expect(mocks.updatePreferences).toHaveBeenCalledWith({
       analysis_multi_tab_enabled: true,
     });
+  });
+
+  it('switches themes optimistically and rolls the runtime back when saving fails', async () => {
+    const { applyColorTheme, getActiveTheme } = await import('@/features/theme/themeRuntime');
+    applyColorTheme('light-2026');
+    const user = userEvent.setup();
+    renderSettingsDialog();
+
+    await user.click(screen.getByRole('switch', { name: 'Use Dark 2026 theme' }));
+
+    expect(getActiveTheme()).toBe('dark-2026');
+    expect(mocks.updatePreferences).toHaveBeenCalledWith(
+      { color_theme: 'dark-2026' },
+      expect.objectContaining({ onError: expect.any(Function) }),
+    );
+    const mutationOptions = mocks.updatePreferences.mock.calls.at(-1)?.[1] as
+      | { onError?: () => void }
+      | undefined;
+    mutationOptions?.onError?.();
+    expect(getActiveTheme()).toBe('light-2026');
+  });
+
+  it('disables the appearance switch until account preferences resolve', () => {
+    mocks.preferencesReady = false;
+    renderSettingsDialog();
+
+    expect(screen.getByRole('switch', { name: 'Use Dark 2026 theme' })).toBeDisabled();
   });
 
   it('disables multi-tab directly without inspecting or deleting existing tabs', async () => {

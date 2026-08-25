@@ -200,7 +200,7 @@ export function ConcordanceDispersionNodeBlock({
     const combinedBelowTable = (
       <>
         {reviewRowUnit === null ? (
-          <div className="border-t border-border bg-muted/40 px-4 pt-2 text-sm text-muted-foreground">
+          <div className="border-t border-surface-border bg-panel/40 px-4 pt-2 text-body text-description">
             {combinedPageSizeSummary}
           </div>
         ) : null}
@@ -220,16 +220,20 @@ export function ConcordanceDispersionNodeBlock({
           loading={combinedLoading}
           showPageSize
         />
-        {resultSummary ? <div className="border-t border-border">{resultSummary}</div> : null}
+        {resultSummary ? (
+          <div className="border-t border-surface-border">{resultSummary}</div>
+        ) : null}
       </>
     );
 
     return (
       <div key={CONCORDANCE_COMBINED_NODE_KEY} className="mb-6">
         <div className="flex items-center mb-4">
-          <h3 className="text-lg font-semibold text-gray-800">Combined Results</h3>
+          <h3 className="text-heading-3 font-semibold text-foreground">Combined Results</h3>
           <div className="ml-auto flex items-center">
-            <span className="text-xs text-gray-500">Rows colored by source data block</span>
+            <span className="text-label-secondary text-description">
+              Rows colored by source data block
+            </span>
           </div>
         </div>
         <AnalysisTableFrame
@@ -354,7 +358,7 @@ export function ConcordanceDispersionNodeBlock({
   const belowTable = (
     <>
       {reviewRowUnit === null ? (
-        <div className="border-t border-border bg-muted/40 px-4 pt-2 text-sm text-muted-foreground">
+        <div className="border-t border-surface-border bg-panel/40 px-4 pt-2 text-body text-description">
           {pageSizeSummary}
         </div>
       ) : null}
@@ -374,7 +378,7 @@ export function ConcordanceDispersionNodeBlock({
         loading={nodeIsLoading}
         showPageSize
       />
-      {resultSummary ? <div className="border-t border-border">{resultSummary}</div> : null}
+      {resultSummary ? <div className="border-t border-surface-border">{resultSummary}</div> : null}
     </>
   );
 
@@ -386,7 +390,7 @@ export function ConcordanceDispersionNodeBlock({
             className="inline-block h-3 w-3 shrink-0 rounded-full"
             style={{ backgroundColor: context.nodeColor }}
           />
-          <h3 className="text-sm font-medium text-foreground">
+          <h3 className="text-body font-medium text-foreground">
             {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty-string display name must fall back to the node key */}
             {context.displayName || nodeKey}
           </h3>
@@ -414,7 +418,7 @@ export function ConcordanceDispersionNodeBlock({
           sourceColor={context.nodeColor}
           termColors={termColors}
           getRowClassName={(_row, index) =>
-            `cursor-pointer ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`
+            `cursor-pointer ${index % 2 === 0 ? 'bg-surface' : 'bg-panel'}`
           }
           onRowClick={(row) => {
             if (actualNodeId && column) {

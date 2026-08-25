@@ -1,147 +1,189 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "./styles/vscode-2026.generated.css";
 
-@custom-variant dark (&:is(.dark *));
+@custom-variant dark (&:where([data-theme="dark-2026"], [data-theme="dark-2026"] *));
 
 @plugin "@tailwindcss/typography";
 
 @theme inline {
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-resize-handle-active: var(--resize-handle-active);
-}
-
-:root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(1 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-  --resize-handle-active: oklch(0.623 0.214 259.815);
-}
-
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
-  --resize-handle-active: oklch(0.707 0.165 254.624);
+  --radius-sm: var(--vscode-cornerRadius-small);
+  --radius-md: var(--vscode-cornerRadius-medium);
+  --radius-lg: var(--vscode-cornerRadius-large);
+  --radius-xl: var(--vscode-cornerRadius-xLarge);
+  --spacing-control: var(--vscode-control-height);
+  --spacing-control-sm: var(--vscode-control-compactHeight);
+  --spacing-pane-header: var(--vscode-paneHeader-height);
+  --text-heading-1: var(--vscode-fontSize-heading1);
+  --text-heading-2: var(--vscode-fontSize-heading2);
+  --text-heading-3: var(--vscode-fontSize-heading3);
+  --text-body: var(--vscode-fontSize-body1);
+  --text-body-secondary: var(--vscode-fontSize-body2);
+  --text-label: var(--vscode-fontSize-label1);
+  --text-label-secondary: var(--vscode-fontSize-label2);
+  --text-badge: var(--vscode-fontSize-label3);
+  --color-foreground: var(--vscode-foreground);
+  --color-editor: var(--vscode-editor-background);
+  --color-editor-foreground: var(--vscode-editor-foreground);
+  --color-surface: var(--vscode-surface-background);
+  --color-surface-foreground: var(--vscode-surface-foreground);
+  --color-surface-border: var(--vscode-surface-border);
+  --color-panel: var(--vscode-panel-background);
+  --color-widget: var(--vscode-editorWidget-background);
+  --color-widget-foreground: var(--vscode-editorWidget-foreground);
+  --color-menu: var(--vscode-menu-background);
+  --color-menu-foreground: var(--vscode-menu-foreground);
+  --color-description: var(--vscode-descriptionForeground);
+  --color-disabled: var(--vscode-disabledForeground);
+  --color-focus: var(--vscode-focusBorder);
+  --color-data-block-selection: var(--vscode-list-activeSelectionForeground);
+  --color-link: var(--vscode-textLink-foreground);
+  --color-button: var(--vscode-button-background);
+  --color-button-foreground: var(--vscode-button-foreground);
+  --color-button-secondary: var(--vscode-button-secondaryBackground);
+  --color-button-secondary-foreground: var(--vscode-button-secondaryForeground);
+  --color-input-border: var(--vscode-input-border);
+  --color-overlay: color-mix(in srgb, var(--vscode-editor-background) 45%, transparent);
+  --color-list-hover: var(--vscode-list-hoverBackground);
+  --color-list-active: var(--vscode-list-activeSelectionBackground);
+  --color-list-inactive: var(--vscode-list-inactiveSelectionBackground);
+  --color-info: var(--vscode-inputValidation-infoBorder);
+  --color-info-background: var(--vscode-inputValidation-infoBackground);
+  --color-warning: var(--vscode-inputValidation-warningBorder);
+  --color-warning-background: var(--vscode-inputValidation-warningBackground);
+  --color-error: var(--vscode-inputValidation-errorBorder);
+  --color-error-background: var(--vscode-inputValidation-errorBackground);
+  --color-chart-1: var(--vscode-charts-blue);
+  --color-chart-2: var(--vscode-charts-red);
+  --color-chart-3: var(--vscode-charts-green);
+  --color-chart-4: var(--vscode-charts-orange);
+  --color-chart-5: var(--vscode-charts-purple);
+  --color-chart-grid: var(--vscode-charts-lines);
+  --color-chart-foreground: var(--vscode-charts-foreground);
+  --color-sidebar: var(--vscode-sideBar-background);
+  --color-sidebar-foreground: var(--vscode-sideBar-foreground);
+  --color-sidebar-primary: var(--vscode-button-background);
+  --color-sidebar-primary-foreground: var(--vscode-button-foreground);
+  --color-sidebar-accent: var(--vscode-list-hoverBackground);
+  --color-sidebar-accent-foreground: var(--vscode-list-hoverForeground);
+  --color-sidebar-border: var(--vscode-sideBar-border);
+  --color-sidebar-ring: var(--vscode-focusBorder);
+  --color-resize-handle-active: var(--vscode-focusBorder);
+  --color-editor-tab-active-background: var(--vscode-modernTab-activeBackground);
+  --color-editor-tab-hover-background: var(--vscode-modernTab-hoverBackground);
 }
 
 @layer base {
   html {
-    font-size: 13px;
+    background: var(--vscode-titleBar-activeBackground);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    font-size: var(--vscode-fontSize-body1);
+    font-weight: var(--vscode-fontWeight-regular);
   }
+
   * {
-    @apply border-border outline-ring/50;
+    border-color: var(--vscode-surface-border);
+    scrollbar-color: var(--vscode-scrollbarSlider-background) transparent;
+    scrollbar-width: thin;
   }
+
+  *::-webkit-scrollbar {
+    width: var(--vscode-scrollbar-size);
+    height: var(--vscode-scrollbar-size);
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: var(--vscode-scrollbarSlider-background);
+    border-radius: var(--vscode-cornerRadius-circle);
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: var(--vscode-scrollbarSlider-hoverBackground);
+  }
+
+  *::-webkit-scrollbar-thumb:active {
+    background: var(--vscode-scrollbarSlider-activeBackground);
+  }
+
   body {
-    @apply bg-background text-foreground;
+    min-width: 320px;
+    background: var(--vscode-editor-background);
+    color: var(--vscode-foreground);
+  }
+
+  ::selection {
+    background: var(--vscode-editor-selectionBackground);
+  }
+
+  strong,
+  b,
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-weight: var(--vscode-fontWeight-semiBold);
+  }
+}
+
+@layer components {
+  .react-flow {
+    --xy-background-color: transparent;
+    --xy-background-pattern-dots-color: var(--vscode-charts-lines);
+    --xy-background-pattern-lines-color: var(--vscode-charts-lines);
+    --xy-background-pattern-cross-color: var(--vscode-charts-lines);
+    --xy-edge-stroke: var(--vscode-charts-lines);
+    --xy-edge-stroke-selected: var(--vscode-focusBorder);
+    --xy-connectionline-stroke: var(--vscode-focusBorder);
+    --xy-attribution-background-color: color-mix(
+      in srgb,
+      var(--vscode-editor-background) 80%,
+      transparent
+    );
+    --xy-minimap-background-color: var(--vscode-editorWidget-background);
+    --xy-minimap-mask-background-color: color-mix(
+      in srgb,
+      var(--vscode-editor-background) 80%,
+      transparent
+    );
+    --xy-minimap-node-background-color: var(--vscode-list-activeSelectionBackground);
+    --xy-node-color: var(--vscode-foreground);
+    --xy-node-border: 1px solid var(--vscode-surface-border);
+    --xy-node-background-color: var(--vscode-surface-background);
+    --xy-node-group-background-color: var(--vscode-editor-inactiveSelectionBackground);
+    --xy-node-boxshadow-hover: none;
+    --xy-node-boxshadow-selected: 0 0 0 1px var(--vscode-focusBorder);
+    --xy-handle-background-color: var(--vscode-icon-foreground);
+    --xy-handle-border-color: var(--vscode-surface-background);
+    --xy-selection-background-color: var(--vscode-editor-inactiveSelectionBackground);
+    --xy-selection-border: 1px dotted var(--vscode-focusBorder);
+    --xy-controls-button-background-color: var(--vscode-editor-background);
+    --xy-controls-button-background-color-hover: var(--vscode-toolbar-hoverBackground);
+    --xy-controls-button-color: var(--vscode-icon-foreground);
+    --xy-controls-button-color-hover: var(--vscode-foreground);
+    --xy-controls-button-border-color: var(--vscode-surface-border);
+    --xy-controls-box-shadow: none;
+    --xy-edge-label-background-color: var(--vscode-editorWidget-background);
+    --xy-edge-label-color: var(--vscode-editorWidget-foreground);
   }
 }
 
 .tutorial-highlight {
   scroll-margin-top: 96px;
-  border-radius: 0.5rem;
-  background-color: rgba(59, 130, 246, 0.12);
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+  border-radius: var(--vscode-cornerRadius-large);
+  background-color: color-mix(in srgb, var(--vscode-focusBorder) 12%, transparent);
+  outline: 2px solid color-mix(in srgb, var(--vscode-focusBorder) 32%, transparent);
   animation: tutorial-highlight-fade 3.5s ease-out;
 }
 
 @keyframes tutorial-highlight-fade {
   0% {
-    background-color: rgba(59, 130, 246, 0.3);
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.35);
+    background-color: color-mix(in srgb, var(--vscode-focusBorder) 30%, transparent);
+    outline-color: color-mix(in srgb, var(--vscode-focusBorder) 45%, transparent);
   }
   100% {
-    background-color: rgba(59, 130, 246, 0);
-    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+    background-color: transparent;
+    outline-color: transparent;
   }
 }

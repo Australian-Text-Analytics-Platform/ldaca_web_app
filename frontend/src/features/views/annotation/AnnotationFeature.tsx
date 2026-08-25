@@ -150,9 +150,9 @@ function AnnotationColumnPicker({
 }: ColumnPickerProps) {
   return (
     <div className="space-y-1">
-      <Label className="block text-xs font-medium text-muted-foreground">{label}</Label>
+      <Label className="block text-label-secondary font-medium text-description">{label}</Label>
       <Select value={value} onValueChange={onValueChange} disabled={disabled}>
-        <SelectTrigger aria-label={label} className="w-full text-sm">
+        <SelectTrigger aria-label={label} className="w-full text-body">
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>
@@ -1078,9 +1078,9 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
               >
                 <section
                   aria-label="Main Data Block Setup"
-                  className="rounded-lg border bg-background/60 p-4"
+                  className="rounded-lg border bg-editor/60 p-4"
                 >
-                  <h3 data-guidance="annotation-source" className="mb-3 text-base font-semibold">
+                  <h3 data-guidance="annotation-source" className="mb-3 text-body font-semibold">
                     Annotation Data Block
                   </h3>
                   <NodeInputsPanel
@@ -1105,15 +1105,12 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
                   />
                 </section>
 
-                <section
-                  aria-label="Codebook Setup"
-                  className="rounded-lg border bg-background/60 p-4"
-                >
+                <section aria-label="Codebook Setup" className="rounded-lg border bg-editor/60 p-4">
                   <div
                     data-guidance="annotation-codebook"
                     className="mb-3 flex items-center justify-between gap-2"
                   >
-                    <h3 className="text-base font-semibold">Codebook</h3>
+                    <h3 className="text-body font-semibold">Codebook</h3>
                     <Button
                       type="button"
                       variant="outline"
@@ -1161,13 +1158,13 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
             <section
               data-guidance="annotation-mode"
               aria-label="Annotation Mode"
-              className="mt-5 rounded-lg border bg-background/60 p-4"
+              className="mt-5 rounded-lg border bg-editor/60 p-4"
             >
               <div className="flex items-center gap-3">
                 <span
                   className={cn(
-                    'text-sm font-medium',
-                    annotationMode === 'manual' ? 'text-foreground' : 'text-muted-foreground',
+                    'text-body font-medium',
+                    annotationMode === 'manual' ? 'text-foreground' : 'text-description',
                   )}
                 >
                   Manual
@@ -1182,8 +1179,8 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
                 />
                 <span
                   className={cn(
-                    'text-sm font-medium',
-                    annotationMode === 'ai' ? 'text-foreground' : 'text-muted-foreground',
+                    'text-body font-medium',
+                    annotationMode === 'ai' ? 'text-foreground' : 'text-description',
                   )}
                 >
                   AI
@@ -1217,7 +1214,7 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
                         <div className="space-y-2">
                           <Label
                             htmlFor="annotation-ai-prompt"
-                            className="block text-xs font-medium text-muted-foreground"
+                            className="block text-label-secondary font-medium text-description"
                           >
                             Prompt
                             <span className="ml-1 font-normal">(optional)</span>
@@ -1250,7 +1247,7 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
                     }
                   >
                     <div className="space-y-2">
-                      <Label className="block text-xs font-medium text-muted-foreground">
+                      <Label className="block text-label-secondary font-medium text-description">
                         Example Data Block
                         <span className="ml-1 font-normal">(optional)</span>
                       </Label>
@@ -1331,7 +1328,7 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
                 }}
               />
               {annotationColumnError ? (
-                <p role="alert" className="text-sm text-destructive">
+                <p role="alert" className="text-body text-error">
                   {annotationColumnError}
                 </p>
               ) : null}
@@ -1401,7 +1398,7 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
                 }}
               />
               {correctionColumnError ? (
-                <p role="alert" className="text-sm text-destructive">
+                <p role="alert" className="text-body text-error">
                   {correctionColumnError}
                 </p>
               ) : null}
@@ -1447,7 +1444,7 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
       {annotationMode === 'ai' && annotationRunAll?.state === 'failed' ? (
         <div
           role="alert"
-          className="mt-4 rounded-md border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+          className="mt-4 rounded-md border border-error/40 bg-error/5 px-4 py-3 text-body text-error"
         >
           {annotationRunAll.error?.message ?? 'Annotation Run All failed.'}
         </div>
@@ -1510,7 +1507,7 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
           {(annotationRunAllResult.data?.failed_row_count ?? 0) > 0 ? (
             <div
               role="status"
-              className="mt-5 rounded-md border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm"
+              className="mt-5 rounded-md border border-warning bg-warning-background px-4 py-3 text-body"
             >
               Annotation completed with {annotationRunAllResult.data?.failed_row_count} failed row
               {annotationRunAllResult.data?.failed_row_count === 1 ? '' : 's'} across{' '}

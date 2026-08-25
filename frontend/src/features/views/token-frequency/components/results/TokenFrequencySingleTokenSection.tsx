@@ -189,7 +189,7 @@ const TokenFrequencySingleTokenSectionInner = ({
           <Card key={`${result.nodeId || result.displayName}-${String(index)}`} className="h-full">
             <CardHeader className="pb-3">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                <CardTitle className="min-w-0 flex-1 wrap-anywhere whitespace-normal text-base font-semibold">
+                <CardTitle className="min-w-0 flex-1 wrap-anywhere whitespace-normal text-body font-semibold">
                   {result.displayName}
                 </CardTitle>
                 <div
@@ -266,12 +266,12 @@ const TokenFrequencySingleTokenSectionInner = ({
                       className="grid items-center gap-2"
                       style={{ gridTemplateColumns: `${String(rankWidthCh)}ch minmax(0,1fr) 90px` }}
                     >
-                      <span className="text-right text-xs tabular-nums text-muted-foreground">
+                      <span className="text-right text-label-secondary tabular-nums text-description">
                         {rank}.
                       </span>
                       <button
                         type="button"
-                        className="group relative h-8 overflow-hidden rounded border text-left"
+                        className="group relative h-8 overflow-hidden rounded-sm border text-left"
                         onClick={() => {
                           onTokenClick(row.token);
                         }}
@@ -282,17 +282,17 @@ const TokenFrequencySingleTokenSectionInner = ({
                         title="Click to inspect in concordance. Right-click to add to stop words."
                       >
                         <span
-                          className="absolute inset-y-0 left-0 rounded bg-primary/20 group-hover:bg-primary/30"
+                          className="absolute inset-y-0 left-0 rounded-sm bg-button/20 group-hover:bg-button/30"
                           style={{
                             width: `${String(widthPct)}%`,
                             backgroundColor: toBgColor(color),
                           }}
                         />
-                        <span className="relative z-10 block truncate px-2 text-sm font-medium">
+                        <span className="relative z-10 block truncate px-2 text-body font-medium">
                           {row.token}
                         </span>
                       </button>
-                      <span className="text-right text-xs tabular-nums text-muted-foreground">
+                      <span className="text-right text-label-secondary tabular-nums text-description">
                         {frequency}
                       </span>
                     </div>

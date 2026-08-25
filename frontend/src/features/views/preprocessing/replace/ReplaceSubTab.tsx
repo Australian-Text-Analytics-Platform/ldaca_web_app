@@ -80,7 +80,7 @@ export function ReplaceSubTab(props: ReplaceSubTabComponentProps) {
           {renderNodeInputsPanel?.()}
 
           {hasSelection && stringColumns.length === 0 && (
-            <div className="rounded-md border border-dashed border-amber-400/60 bg-amber-100/70 p-4 text-sm text-amber-900">
+            <div className="rounded-md border border-dashed border-warning bg-warning-background/70 p-4 text-body text-warning">
               The selected data block has no string columns available for regex operations.
             </div>
           )}
@@ -135,7 +135,7 @@ export function ReplaceSubTab(props: ReplaceSubTabComponentProps) {
 
             {mode === 'replace' ? (
               <>
-                <span className="mb-2 text-sm text-muted-foreground">with</span>
+                <span className="mb-2 text-body text-description">with</span>
                 <div className="min-w-0 flex-1 space-y-2">
                   <Label htmlFor="find-replacement">Replacement</Label>
                   <Input
@@ -151,7 +151,7 @@ export function ReplaceSubTab(props: ReplaceSubTabComponentProps) {
               </>
             ) : (
               <>
-                <span className="mb-2 text-sm text-muted-foreground">join with</span>
+                <span className="mb-2 text-body text-description">join with</span>
                 <div className="w-56 max-w-full space-y-2">
                   <Label htmlFor="find-connector">Connector</Label>
                   <Input
@@ -168,7 +168,7 @@ export function ReplaceSubTab(props: ReplaceSubTabComponentProps) {
             )}
           </div>
         </CardContent>
-        <CardFooter className="flex items-center gap-3 border-t border-border bg-muted/20 py-4">
+        <CardFooter className="flex items-center gap-3 border-t border-surface-border bg-panel/20 py-4">
           <div className="flex flex-1 items-center gap-2">
             <Label htmlFor="replace-output-column" className="shrink-0">
               Output column name

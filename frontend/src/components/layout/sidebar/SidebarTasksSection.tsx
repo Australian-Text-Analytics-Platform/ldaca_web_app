@@ -13,15 +13,19 @@ const ACTIVE_STATES = new Set(['queued', 'running']);
 /** Display metadata consumed by task rows to keep icon, label, and color consistent. */
 const DEFAULT_STATUS_META = {
   icon: AlertCircle,
-  className: 'text-muted-foreground',
+  className: 'text-description',
   label: 'Unknown',
 };
 const STATUS_META: Record<string, { icon: typeof Clock; className: string; label: string }> = {
-  running: { icon: Clock, className: 'text-amber-600', label: 'Running' },
-  queued: { icon: Clock, className: 'text-muted-foreground', label: 'Queued' },
-  successful: { icon: CheckCircle, className: 'text-green-600', label: 'Successful' },
-  failed: { icon: XCircle, className: 'text-red-600', label: 'Failed' },
-  cancelled: { icon: Square, className: 'text-muted-foreground', label: 'Cancelled' },
+  running: { icon: Clock, className: 'text-warning', label: 'Running' },
+  queued: { icon: Clock, className: 'text-description', label: 'Queued' },
+  successful: {
+    icon: CheckCircle,
+    className: 'text-[var(--vscode-charts-green)]',
+    label: 'Successful',
+  },
+  failed: { icon: XCircle, className: 'text-error', label: 'Failed' },
+  cancelled: { icon: Square, className: 'text-description', label: 'Cancelled' },
   default: DEFAULT_STATUS_META,
 };
 
@@ -133,13 +137,13 @@ function SidebarTasksSection({
   return (
     <div className="flex flex-col gap-2">
       {connectionLabel && (
-        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+        <div className="flex items-center justify-between text-[11px] text-description">
           <span>{connectionLabel}</span>
           {connectionError && (
             <Button
               variant="ghost"
               size="sm"
-              className="h-6 px-2 text-[11px] text-red-600"
+              className="h-6 px-2 text-[11px] text-error"
               onClick={onReconnect}
               title="Retry connection"
             >
@@ -179,10 +183,10 @@ function SidebarTasksSection({
               <div
                 key={task.task_id}
                 className={cn(
-                  'rounded-md border bg-background text-left transition-colors',
+                  'rounded-md border bg-editor text-left transition-colors',
                   PROBLEMATIC_STATES.has(task.state.toLowerCase())
-                    ? 'border-red-200 bg-red-50/50 dark:border-red-950 dark:bg-red-950/20'
-                    : 'border-border/40',
+                    ? 'border-error bg-error-background/50'
+                    : 'border-surface-border/40',
                 )}
               >
                 <div
@@ -190,7 +194,7 @@ function SidebarTasksSection({
                   tabIndex={0}
                   aria-expanded={expanded}
                   aria-label={`Task: ${label}. ${expanded ? 'Collapse details' : 'Expand details'}`}
-                  className="flex cursor-pointer items-center gap-2 px-2.5 py-1.5 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="flex cursor-pointer items-center gap-2 px-2.5 py-1.5 outline-none focus-visible:ring-2 focus-visible:ring-focus"
                   onClick={() => {
                     toggleExpanded(task.task_id);
                   }}
@@ -201,49 +205,47 @@ function SidebarTasksSection({
                   }}
                 >
                   <StatusIcon className={cn('h-3.5 w-3.5 shrink-0', meta.className)} />
-                  <span className="min-w-0 flex-1 truncate text-xs font-medium capitalize text-foreground">
+                  <span className="min-w-0 flex-1 truncate text-label-secondary font-medium capitalize text-foreground">
                     {label}
                   </span>
                   {showProgress && (
                     <Progress
                       value={progressPercent}
                       className={cn('h-1 w-14 shrink-0', {
-                        'bg-emerald-500/20 **:data-[slot=progress-indicator]:bg-emerald-500':
+                        'bg-[color-mix(in_srgb,var(--vscode-charts-green)_20%,transparent)] **:data-[slot=progress-indicator]:bg-[var(--vscode-charts-green)]':
                           task.state === 'successful',
                       })}
                     />
                   )}
                   <ChevronDown
                     className={cn(
-                      'h-3 w-3 shrink-0 text-muted-foreground transition-transform',
+                      'h-3 w-3 shrink-0 text-description transition-transform',
                       expanded && 'rotate-180',
                     )}
                   />
                 </div>
 
                 {expanded && (
-                  <div className="space-y-2 border-t border-border/40 px-2.5 py-2">
+                  <div className="space-y-2 border-t border-surface-border/40 px-2.5 py-2">
                     {showProgress && (
                       <div className="space-y-1">
                         <Progress
                           value={progressPercent}
                           className={cn('h-1.5', {
-                            'bg-emerald-500/20 **:data-[slot=progress-indicator]:bg-emerald-500':
+                            'bg-[color-mix(in_srgb,var(--vscode-charts-green)_20%,transparent)] **:data-[slot=progress-indicator]:bg-[var(--vscode-charts-green)]':
                               task.state === 'successful',
                           })}
                         />
-                        <p className="text-[10px] text-muted-foreground">{progressPercent}%</p>
+                        <p className="text-badge text-description">{progressPercent}%</p>
                       </div>
                     )}
-                    {task.message && (
-                      <p className="text-[11px] text-muted-foreground">{task.message}</p>
-                    )}
+                    {task.message && <p className="text-[11px] text-description">{task.message}</p>}
                     {(task.state === 'queued' || task.state === 'running') &&
                       task.progress_message &&
                       task.progress_message !== task.message && (
-                        <p className="text-[11px] text-muted-foreground">{task.progress_message}</p>
+                        <p className="text-[11px] text-description">{task.progress_message}</p>
                       )}
-                    <dl className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1 text-[10px] text-muted-foreground">
+                    <dl className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1 text-badge text-description">
                       <dt>Created</dt>
                       <dd className="truncate">{formatTimestamp(task.created_at)}</dd>
                       <dt>Started</dt>
@@ -252,7 +254,7 @@ function SidebarTasksSection({
                       <dd className="truncate">{formatTimestamp(task.finished_at)}</dd>
                     </dl>
                     {(canStop || canClear) && (
-                      <div className="flex justify-end border-t border-border/40 pt-2">
+                      <div className="flex justify-end border-t border-surface-border/40 pt-2">
                         {canStop ? (
                           <Button
                             type="button"
@@ -289,7 +291,7 @@ function SidebarTasksSection({
             );
           })
         ) : (
-          <div className="rounded-md bg-accent/40 px-3 py-2 text-xs text-muted-foreground">
+          <div className="rounded-md bg-list-hover/40 px-3 py-2 text-label-secondary text-description">
             No tasks
           </div>
         )}

@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils';
 import { computeMenuPlacement, type NodeMenuPlacement } from './customNodeMenuPlacement';
 
 export const CUSTOM_NODE_TOOLBAR_BUTTON_CLASS =
-  'relative flex h-8 w-8 items-center justify-center rounded-md border border-border bg-white text-gray-600 shadow-sm transition-colors hover:bg-muted hover:text-gray-900';
+  'relative flex h-8 w-8 items-center justify-center rounded-md border border-surface-border bg-surface text-description transition-colors hover:bg-panel hover:text-foreground';
 
 interface CustomNodeActionMenuProps {
   menuRef: React.RefObject<HTMLDivElement | null>;
@@ -57,7 +57,7 @@ export function CustomNodeActionMenu({
         }}
         className={CUSTOM_NODE_TOOLBAR_BUTTON_CLASS}
         title="More options"
-        aria-label="Node settings"
+        aria-label="Data Block actions"
       >
         <Settings2 className="h-4 w-4" />
       </button>
@@ -65,7 +65,7 @@ export function CustomNodeActionMenu({
       {showMenu && (
         <div
           className={cn(
-            'absolute z-30 min-w-36 rounded-md border border-border bg-white shadow-lg',
+            'absolute z-30 min-w-36 rounded-md border border-surface-border bg-surface p-1',
             menuOpensUp ? 'bottom-9' : 'top-9',
             menuOpensRight ? 'left-0' : 'right-0',
           )}
@@ -73,7 +73,7 @@ export function CustomNodeActionMenu({
           <button
             type="button"
             onClick={onRenameClick}
-            className="w-full rounded-md px-3 py-2 text-left text-xs hover:bg-muted/60"
+            className="min-h-control w-full rounded-sm px-2 py-1 text-left text-label-secondary hover:bg-panel/60"
           >
             Rename
           </button>
@@ -81,7 +81,7 @@ export function CustomNodeActionMenu({
           <button
             type="button"
             onClick={onCopyNode}
-            className="w-full border-t border-border/60 px-3 py-2 text-left text-xs hover:bg-muted/60"
+            className="min-h-control w-full rounded-sm px-2 py-1 text-left text-label-secondary hover:bg-panel/60"
           >
             Clone
           </button>
@@ -89,7 +89,7 @@ export function CustomNodeActionMenu({
           <button
             type="button"
             onClick={onExportClick}
-            className="w-full border-t border-border/60 px-3 py-2 text-left text-xs hover:bg-muted/60"
+            className="min-h-control w-full rounded-sm px-2 py-1 text-left text-label-secondary hover:bg-panel/60"
           >
             Export
           </button>
@@ -98,7 +98,7 @@ export function CustomNodeActionMenu({
             type="button"
             onClick={onUndo}
             disabled={!canUndo}
-            className="w-full border-t border-border/60 px-3 py-2 text-left text-xs enabled:hover:bg-muted/60 disabled:cursor-not-allowed disabled:opacity-50"
+            className="min-h-control w-full rounded-sm px-2 py-1 text-left text-label-secondary enabled:hover:bg-panel/60 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Undo
           </button>
@@ -107,7 +107,7 @@ export function CustomNodeActionMenu({
             type="button"
             onClick={onRedo}
             disabled={!canRedo}
-            className="w-full border-t border-border/60 px-3 py-2 text-left text-xs enabled:hover:bg-muted/60 disabled:cursor-not-allowed disabled:opacity-50"
+            className="min-h-control w-full rounded-sm px-2 py-1 text-left text-label-secondary enabled:hover:bg-panel/60 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Redo
           </button>
@@ -115,7 +115,7 @@ export function CustomNodeActionMenu({
           <button
             type="button"
             onClick={onDeleteClick}
-            className="w-full border-t border-border/60 px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50"
+            className="min-h-control w-full rounded-sm px-2 py-1 text-left text-label-secondary text-error hover:bg-error-background"
           >
             Delete
           </button>

@@ -64,14 +64,14 @@ export function SequentialAnalysisResultsPanel({
           </CardTitle>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm text-muted-foreground">Chart Type</span>
+          <span className="text-body text-description">Chart Type</span>
           <Select
             value={model.chartType}
             onValueChange={(value) => {
               onChartTypeChange(value as ChartTypeOption);
             }}
           >
-            <SelectTrigger className="w-35 text-sm">
+            <SelectTrigger className="w-35 text-body">
               <SelectValue placeholder="Select chart" />
             </SelectTrigger>
             <SelectContent>
@@ -80,9 +80,9 @@ export function SequentialAnalysisResultsPanel({
               <SelectItem value="area">Area Chart</SelectItem>
             </SelectContent>
           </Select>
-          <span className="flex items-center gap-1 text-sm text-muted-foreground">
+          <span className="flex items-center gap-1 text-body text-description">
             X-axis
-            <Info className="h-3.5 w-3.5 cursor-help text-muted-foreground/70" aria-hidden="true" />
+            <Info className="h-3.5 w-3.5 cursor-help text-description/70" aria-hidden="true" />
           </span>
           <Select
             value={model.xAxisType}
@@ -91,7 +91,7 @@ export function SequentialAnalysisResultsPanel({
             }}
           >
             <SelectTrigger
-              className="w-35 text-sm"
+              className="w-35 text-body"
               title={
                 model.xAxisType === 'number'
                   ? 'Linear axis: time positions are spaced proportionally. Periods with no data appear as visible gaps — accurate but can look sparse for irregular series.'
@@ -116,20 +116,20 @@ export function SequentialAnalysisResultsPanel({
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2 xl:grid-cols-6">
-          <div className="rounded-md border border-border/60 p-3">
-            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        <div className="grid grid-cols-1 gap-4 text-body sm:grid-cols-2 xl:grid-cols-6">
+          <div className="rounded-md border border-surface-border/60 p-3">
+            <span className="text-label-secondary font-semibold uppercase tracking-wide text-description">
               Time Column
             </span>
-            <div className="mt-1 text-base font-semibold text-foreground">
+            <div className="mt-1 text-body font-semibold text-foreground">
               {summary.timeColumn || '—'}
             </div>
           </div>
-          <div className="rounded-md border border-border/60 p-3">
-            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          <div className="rounded-md border border-surface-border/60 p-3">
+            <span className="text-label-secondary font-semibold uppercase tracking-wide text-description">
               {summary.columnType === 'numeric' ? 'Numeric Interval' : 'Frequency'}
             </span>
-            <div className="mt-1 text-base font-semibold capitalize text-foreground">
+            <div className="mt-1 text-body font-semibold capitalize text-foreground">
               {summary.columnType === 'numeric'
                 ? summary.numericInterval != null
                   ? `${String(summary.numericInterval)}${summary.numericOrigin != null ? ` (origin ${String(summary.numericOrigin)})` : ''}`
@@ -137,35 +137,35 @@ export function SequentialAnalysisResultsPanel({
                 : summary.frequencyDisplay}
             </div>
           </div>
-          <div className="rounded-md border border-border/60 p-3">
-            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          <div className="rounded-md border border-surface-border/60 p-3">
+            <span className="text-label-secondary font-semibold uppercase tracking-wide text-description">
               Total
             </span>
-            <div className="mt-1 text-base font-semibold text-foreground">
+            <div className="mt-1 text-body font-semibold text-foreground">
               {`${String(counts.totalPointCount)}/${String(counts.totalDocumentCount)}`}
             </div>
           </div>
-          <div className="rounded-md border border-border/60 p-3">
-            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          <div className="rounded-md border border-surface-border/60 p-3">
+            <span className="text-label-secondary font-semibold uppercase tracking-wide text-description">
               Shown
             </span>
-            <div className="mt-1 text-base font-semibold text-foreground">
+            <div className="mt-1 text-body font-semibold text-foreground">
               {`${String(counts.shownPointCount)}/${String(counts.shownDocumentCount)}`}
             </div>
           </div>
-          <div className="rounded-md border border-border/60 p-3">
-            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          <div className="rounded-md border border-surface-border/60 p-3">
+            <span className="text-label-secondary font-semibold uppercase tracking-wide text-description">
               Chosen
             </span>
-            <div className="mt-1 text-base font-semibold text-foreground">
+            <div className="mt-1 text-body font-semibold text-foreground">
               {`${String(counts.chosenPointCount)}/${String(counts.chosenDocumentCount)}`}
             </div>
           </div>
-          <div className="rounded-md border border-border/60 p-3">
-            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          <div className="rounded-md border border-surface-border/60 p-3">
+            <span className="text-label-secondary font-semibold uppercase tracking-wide text-description">
               Groups
             </span>
-            <div className="mt-1 text-base font-semibold text-foreground">
+            <div className="mt-1 text-body font-semibold text-foreground">
               {summary.groupBy.length ? summary.groupBy.join(', ') : 'None'}
             </div>
           </div>

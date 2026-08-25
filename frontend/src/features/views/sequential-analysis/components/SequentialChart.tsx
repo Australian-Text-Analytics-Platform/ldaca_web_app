@@ -34,7 +34,7 @@ export function SequentialChart({
   const hasSelection = model.selection.selectedCount > 0 || model.selection.hasInvalidSelection;
   if (!model.chartData.length) {
     return (
-      <div className="flex h-40 items-center justify-center rounded-md border border-dashed border-muted-foreground/30 text-sm text-muted-foreground">
+      <div className="flex h-40 items-center justify-center rounded-md border border-dashed border-surface-border-foreground/30 text-body text-description">
         {model.status === 'malformed'
           ? 'The sequential analysis result is malformed and has no chartable rows.'
           : 'No sequential analysis data available. Adjust your configuration and try again.'}
@@ -45,7 +45,7 @@ export function SequentialChart({
   return (
     <div ref={containerRef}>
       {model.status === 'malformed' ? (
-        <div className="mb-3 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-foreground">
+        <div className="mb-3 rounded-md border border-warning bg-warning-background px-3 py-2 text-body text-foreground">
           Some malformed result rows were ignored ({String(model.diagnostics.length)} issue
           {model.diagnostics.length === 1 ? '' : 's'}).
         </div>
@@ -74,7 +74,7 @@ export function SequentialChart({
             <button
               key={group.id}
               type="button"
-              className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 transition-opacity hover:bg-muted/60"
+              className="flex cursor-pointer items-center gap-2 rounded-sm px-1 py-0.5 transition-opacity hover:bg-panel/60"
               style={{ opacity: isHidden ? 0.4 : 1 }}
               onClick={() => {
                 onToggleKey(group.id);
@@ -92,7 +92,7 @@ export function SequentialChart({
                 <div className="h-3 w-3 rounded-sm" style={{ backgroundColor: group.color }} />
               )}
               <span
-                className="text-sm font-medium text-muted-foreground"
+                className="text-body font-medium text-description"
                 style={{ textDecoration: isHidden ? 'line-through' : 'none' }}
               >
                 {group.label}

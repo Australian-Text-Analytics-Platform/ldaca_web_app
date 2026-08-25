@@ -173,7 +173,7 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
 
   /**
    * Persists a drag-and-drop reordering of the selection tab strip.
-   * Called by: WorkspaceSelectionTabs via the shared ChromeTabs ``onReorder``.
+   * Called by: WorkspaceSelectionTabs via the shared EditorTabs ``onReorder``.
    * Why: ordered membership belongs to the selection store, so every graph,
    * list, and table consumer sees the same order and active fallback.
    */

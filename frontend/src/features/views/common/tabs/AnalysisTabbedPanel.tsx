@@ -1,9 +1,7 @@
 /**
- * Analysis-view tabbed panel: a Chrome-style tab strip above a single content
- * card. The strip itself (layout, drag-to-reorder, inline rename, close, "+")
- * lives in the shared ``ChromeTabs`` component; this wrapper only adapts the
- * analysis tab shape, optionally hides the strip for the multi-tab preference,
- * and draws the body card for the active tab.
+ * Analysis-view editor surface with an optional shared tab strip. The strip
+ * owns layout and interactions while this wrapper adapts analysis tabs and
+ * frames the strip and active content as one continuous surface.
  *
  * Because this component draws its OWN card, the host must NOT wrap it in
  * another bordered card (WorkspaceShell neutralizes the main InsetCard frame for
@@ -15,9 +13,8 @@
  * panel content.
  */
 import { type ReactNode } from 'react';
-import { type ChromeTabItem, ChromeTabs } from '@/components/tabs';
+import { type EditorTabItem, EditorTabs } from '@/components/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { cn } from '@/lib/utils';
 import type { AnalysisTab } from './tabStateOps';
 
 export interface AnalysisTabbedPanelProps {
@@ -31,17 +28,17 @@ export interface AnalysisTabbedPanelProps {
   onReorder: (orderedTabIds: string[]) => void;
   /** Whether the user preference should expose create/select/close/rename tab controls. */
   multiTabEnabled?: boolean;
-  /** Content for the active tab, rendered inside the card below the strip. */
+  /** Content for the active tab, rendered inside the editor surface. */
   children: ReactNode;
 }
 
 /**
- * Renders the analysis content card and optional tab strip.
+ * Renders the analysis editor surface and optional tab strip.
  * Used by: AnalysisTabsHost because the host needs a presentational tabbed shell
  * decoupled from tab persistence (which lives in useWorkspaceTabs).
- * Flow: map analysis tabs to the shared ``ChromeTabs`` item shape, wire each
+ * Flow: map analysis tabs to the shared ``EditorTabs`` item shape, wire each
  * gesture to the host's intent callbacks when multi-tab UI is enabled, then
- * always render the active tab's children inside the analysis card.
+ * always render the active tab's children inside the analysis surface.
  */
 export function AnalysisTabbedPanel({
   tabs,
@@ -54,17 +51,20 @@ export function AnalysisTabbedPanel({
   multiTabEnabled = false,
   children,
 }: AnalysisTabbedPanelProps) {
-  const items: ChromeTabItem[] = tabs.map((tab) => ({
+  const items: EditorTabItem[] = tabs.map((tab) => ({
     id: tab.tab_id,
 
     title: tab.title || 'Untitled',
   }));
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div
+      data-testid="analysis-editor-surface"
+      className="flex h-full min-h-0 flex-col overflow-hidden rounded-md border border-surface-border/60 bg-surface"
+    >
       {multiTabEnabled ? (
-        <ChromeTabs
-          className="z-10 shrink-0 px-2 pt-1"
+        <EditorTabs
+          className="shrink-0"
           aria-label="Analysis tabs"
           tabs={items}
           activeTabId={activeTabId}
@@ -73,16 +73,13 @@ export function AnalysisTabbedPanel({
           onCreate={onCreate}
           onRename={onRename}
           onReorder={onReorder}
-          connectBelow
         />
       ) : null}
 
       <ScrollArea
+        data-testid="analysis-editor-content"
         scrollbars="both"
-        className={cn(
-          'min-h-0 flex-1 rounded-xl border border-border/60 bg-white shadow-sm',
-          multiTabEnabled ? '-mt-px border-t-0' : null,
-        )}
+        className="min-h-0 flex-1 bg-surface"
       >
         <div className="min-h-full p-4">{children}</div>
       </ScrollArea>
