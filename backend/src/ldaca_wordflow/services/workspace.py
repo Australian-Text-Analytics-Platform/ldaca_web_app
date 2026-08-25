@@ -72,7 +72,7 @@ from ..infrastructure.storage.layout import (
     NODE_SOURCE_STAGING_SUFFIX,
     SAFE_WORKSPACE_IMPORT_MARKER,
     SAFE_WORKSPACE_IMPORT_MARKER_CONTENT,
-    validate_display_name,
+    validate_workspace_name,
     workspace_staging_root,
     workspace_trash_root,
     workspaces_root,
@@ -1042,7 +1042,7 @@ class WorkspaceService:
             if "name" in request.model_fields_set:
                 assert request.name is not None
                 normalized_name = request.name.strip()
-                valid, reason = validate_display_name(normalized_name)
+                valid, reason = validate_workspace_name(normalized_name)
                 if not valid:
                     raise InvalidInputError(f"Invalid workspace name: {reason}")
                 if lease.workspace.name != normalized_name:
@@ -1210,7 +1210,7 @@ class WorkspaceService:
     ) -> WorkspaceRecord:
         """Stage and atomically publish one globally catalogued Workspace."""
 
-        is_valid, reason = validate_display_name(name)
+        is_valid, reason = validate_workspace_name(name)
         if not is_valid:
             raise InvalidInputError(f"Invalid workspace name: {reason}")
         if not self._accepting_mutations:

@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from io import BytesIO
 import json
+from pathlib import Path
 import zipfile
 
 from fastapi.testclient import TestClient
+import pytest
 
 from ldaca_wordflow.main import create_app
 from ldaca_wordflow.settings import Settings
@@ -138,6 +139,112 @@ def test_workspace_resource_uses_explicit_open_and_server_ordered_mutations(
         assert client.get(f"/api/workspaces/{workspace_id}/archive").json()[
             "code"
         ] == "workspace_not_open"
+
+
+def test_workspace_names_are_display_labels_and_storage_remains_uuid_keyed(
+    tmp_path: Path,
+) -> None:
+    with _client(tmp_path) as client:
+        unsafe = _unsafe_headers(client)
+        created = client.post(
+            "/api/workspaces",
+            json={"name": "  Fiscal 2025/26  "},
+            headers=unsafe,
+        )
+
+        assert created.status_code == 201
+        workspace_id = created.json()["id"]
+        assert created.json()["name"] == "Fiscal 2025/26"
+        assert (
+            client.put(f"/api/workspaces/{workspace_id}/open", headers=unsafe).status_code
+            == 200
+        )
+
+        renamed = client.patch(
+            f"/api/workspaces/{workspace_id}",
+            json={"name": r"Draft\..\Final"},
+            headers=unsafe,
+        )
+        assert renamed.status_code == 200
+        assert renamed.json()["name"] == r"Draft\..\Final"
+
+        assert (
+            client.delete(f"/api/workspaces/{workspace_id}/open", headers=unsafe).status_code
+            == 204
+        )
+        reopened = client.put(f"/api/workspaces/{workspace_id}/open", headers=unsafe)
+        assert reopened.status_code == 200
+        assert reopened.json()["name"] == r"Draft\..\Final"
+        assert client.get("/api/workspaces").json()[0]["name"] == r"Draft\..\Final"
+
+        workspace_entries = sorted(
+            path.name
+            for path in (tmp_path / "workspaces").iterdir()
+            if not path.name.startswith(".")
+        )
+        assert workspace_entries == [workspace_id]
+
+
+@pytest.mark.parametrize(
+    ("name", "expected_status"),
+    [
+        ("", 422),
+        ("   ", 400),
+        ("Control\x7fName", 400),
+        ("x" * 501, 422),
+    ],
+)
+def test_workspace_name_validation_retains_non_path_safety_limits(
+    tmp_path: Path,
+    name: str,
+    expected_status: int,
+) -> None:
+    with _client(tmp_path) as client:
+        response = client.post(
+            "/api/workspaces",
+            json={"name": name},
+            headers=_unsafe_headers(client),
+        )
+
+        assert response.status_code == expected_status
+
+
+def test_workspace_archive_round_trip_preserves_display_name_and_safe_filename(
+    tmp_path: Path,
+) -> None:
+    display_name = r"Archive / Draft\..\Final"
+    with _client(tmp_path) as client:
+        unsafe = _unsafe_headers(client)
+        created = client.post(
+            "/api/workspaces",
+            json={"name": display_name},
+            headers=unsafe,
+        ).json()
+        assert (
+            client.put(f"/api/workspaces/{created['id']}/open", headers=unsafe).status_code
+            == 200
+        )
+
+        exported = client.get(f"/api/workspaces/{created['id']}/archive")
+
+        assert exported.status_code == 200
+        disposition = exported.headers["content-disposition"]
+        assert "/" not in disposition
+        assert "\\" not in disposition
+        assert ".." not in disposition
+        assert ".zip" in disposition
+        with zipfile.ZipFile(BytesIO(exported.content)) as archive:
+            manifest = json.loads(archive.read("workspace/workspace.json"))
+        assert manifest["workspace"]["name"] == display_name
+
+        imported = client.post(
+            "/api/workspaces/imports?filename=display-label.zip",
+            content=exported.content,
+            headers={**unsafe, "Content-Type": "application/octet-stream"},
+        )
+
+        assert imported.status_code == 201
+        assert imported.json()["name"] == display_name
 
 
 def test_workspace_patch_can_explicitly_clear_nullable_description(

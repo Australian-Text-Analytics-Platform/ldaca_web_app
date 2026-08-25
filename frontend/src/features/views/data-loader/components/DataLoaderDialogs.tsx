@@ -92,12 +92,7 @@ export function DataLoaderDialogs({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Invalid workspace name</AlertDialogTitle>
-            <AlertDialogDescription>
-              {/* an empty alert message should fall through to the default copy */}
-              {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing */}
-              {workspaceNameAlert.message ||
-                'Workspace names cannot include path separators or traversal sequences.'}
-            </AlertDialogDescription>
+            <AlertDialogDescription>{workspaceNameAlert.message}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogAction onClick={workspaceNameAlert.onClose}>Got it</AlertDialogAction>
