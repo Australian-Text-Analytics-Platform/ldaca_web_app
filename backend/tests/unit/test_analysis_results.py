@@ -7,12 +7,13 @@ import uuid
 
 import polars as pl
 import pytest
-from pydantic import ValidationError
+from pydantic import TypeAdapter, ValidationError
 
 from ldaca_wordflow.analysis.generated_columns import TOPIC_DISTRIBUTION_COLUMN
 from ldaca_wordflow.models.analysis_results import (
+    AnalysisResultQuery,
     ConcordanceDocumentProjectionQuery,
-    QuotationResultQuery,
+    QuotationPreviewQuery,
     TopicModelingResultQuery,
     TopicModelingStoredResult,
 )
@@ -41,11 +42,14 @@ from ldaca_wordflow.shared.errors import (
 from ldaca_wordflow.shared.json_data import JsonData
 
 
-def test_quotation_result_query_contains_only_page_and_sort_controls() -> None:
+def test_quotation_preview_query_contains_only_page_and_sort_controls() -> None:
     with pytest.raises(ValidationError):
-        QuotationResultQuery.model_validate(
-            {"kind": "quotation", "context_length": 12}
-        )
+        QuotationPreviewQuery.model_validate({"context_length": 12})
+
+
+def test_generic_json_result_query_rejects_quotation() -> None:
+    with pytest.raises(ValidationError):
+        TypeAdapter(AnalysisResultQuery).validate_python({"kind": "quotation"})
 
 
 def _topic_stored_result() -> TopicModelingStoredResult:

@@ -4,12 +4,10 @@ import { toast } from 'sonner';
 import {
   type Analysis,
   type QuotationAnalysisRequest,
-  type QuotationAnalysisResponse,
   type QuotationEngineConfig,
-  type QuotationResultQuery,
+  type QuotationResult,
   type QuotationRunAllResult,
   type DataBlockCreationSource,
-  queryAnalysisResult,
 } from '@/api';
 import { Button } from '@/components/ui/button';
 import {
@@ -48,15 +46,12 @@ import { type QuotationHoverState } from './components/QuotationHighlightedCell'
 import { QuotationResultsPanel } from './components/QuotationResultsPanel';
 import { useQuotationContextPreference } from './hooks/useQuotationContextPreference';
 import { useQuotationEngineSettings } from './hooks/useQuotationEngineSettings';
-import { useQuotationResultControls } from './hooks/useQuotationResultControls';
 import { useQuotationRowDetail } from './hooks/useQuotationRowDetail';
 import { useQuotationTaskFlow } from './hooks/useQuotationTaskFlow';
+import { useQuotationPage } from './hooks/useQuotationPage';
 import { createNodeDataRequest, queryKeys } from '@/lib/queryKeys';
-import { fetchArrowTablePage, isArrowStringField } from '@/lib/arrow/arrowTable';
-import {
-  projectQuotationRunAllReviewPage,
-  type QuotationReviewRowUnit,
-} from './quotationRunAllReview';
+import { isArrowStringField } from '@/lib/arrow/arrowTable';
+import type { QuotationReviewRowUnit } from './quotationArrowPage';
 import { ResultAddToWorkspaceDialog } from '../common/components/ResultAddToWorkspaceDialog';
 import { projectWorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 
@@ -118,13 +113,17 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
     buildEngineRequest,
   } = useQuotationEngineSettings();
   const [selectedMetadataColumns, setSelectedMetadataColumns] = useState<string[]>([]);
-  const [resultQuery, setResultQuery] = useState<QuotationResultQuery | null>(null);
-  const [runAllReviewQuery, setRunAllReviewQuery] = useState<QuotationResultQuery>({
-    page: 1,
-    page_size: 20,
-    sort_by: null,
-    descending: false,
-  });
+  const [previewPageRequest, setPreviewPageRequest] = useState(() =>
+    createNodeDataRequest({ page: 1, page_size: 50 }),
+  );
+  const [runAllReviewQuery, setRunAllReviewQuery] = useState(() =>
+    createNodeDataRequest({
+      page: 1,
+      page_size: 20,
+      sort_by: null,
+      descending: false,
+    }),
+  );
   const [runAllReviewRowUnit, setRunAllReviewRowUnit] =
     useState<QuotationReviewRowUnit>('documents');
   const [isClearing, setIsClearing] = useState(false);
@@ -171,7 +170,7 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
     isStopping,
     result,
     isResultFetching,
-  } = useAnalysisFeature<QuotationAnalysisResponse, QuotationAnalysisRequest>({
+  } = useAnalysisFeature<QuotationResult, QuotationAnalysisRequest>({
     taskType: ANALYSIS_TASK_TYPES.quotation,
     workspaceId: currentWorkspaceId,
     tabId: host.tabId,
@@ -190,21 +189,9 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
     retiredAnalysisIds: analyses.flatMap((analysis) =>
       analysis.state === 'succeeded' ? analysis.supersedes_analysis_ids : [],
     ),
-    resultQuery: resultQuery ?? undefined,
-    // Initial hydration reads the stored canonical Result. Only an explicit
-    // page or sort change requests an alternate immutable projection.
-    fetchResult: async (taskId, rawQuery) => {
+    fetchResult: async (taskId) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
-      if (!rawQuery) {
-        return getAnalysisResultResource<QuotationAnalysisResponse>(currentWorkspaceId, taskId);
-      }
-      const query = rawQuery as QuotationResultQuery;
-      const { data } = await queryAnalysisResult({
-        body: { kind: 'quotation', ...query },
-        path: { workspace_id: currentWorkspaceId, analysis_id: taskId },
-        throwOnError: true,
-      });
-      return data as QuotationAnalysisResponse;
+      return getAnalysisResultResource<QuotationResult>(currentWorkspaceId, taskId);
     },
     // Restores saved request settings after reload.
     // Called by: useAnalysisFeature hydration to restore the quotation engine
@@ -221,7 +208,7 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
     // Clears quotation-specific state after the shared lifecycle deletes the task result.
     onCleared: () => {
       setIsClearing(false);
-      setResultQuery(null);
+      setPreviewPageRequest(createNodeDataRequest({ page: 1, page_size: 50 }));
       // Refresh the canonical forest; curated inputs remain in the Tab draft.
       refreshAnalyses();
     },
@@ -250,49 +237,6 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
     },
   });
   const runAllSource = runAllResultQuery.data?.source ?? null;
-  const runAllPageRequest = createNodeDataRequest({
-    page: runAllReviewQuery.page ?? 1,
-    page_size: runAllReviewQuery.page_size ?? 20,
-    sort_by: runAllReviewQuery.sort_by ?? null,
-    descending: runAllReviewQuery.descending ?? false,
-  });
-  const runAllTableQuery = useQuery({
-    queryKey:
-      currentWorkspaceId && quotationRunAll && runAllSource
-        ? queryKeys.analysisTableProjectionPage(
-            currentWorkspaceId,
-            quotationRunAll.id,
-            runAllSource.table.table_id,
-            runAllReviewRowUnit,
-            runAllPageRequest,
-          )
-        : queryKeys.inactiveAnalysisResult({ ...runAllPageRequest }),
-    enabled: Boolean(runAllSource),
-    queryFn: async () => {
-      if (!runAllSource) throw new Error('Run All table is unavailable');
-      return fetchArrowTablePage(runAllSource.table[runAllReviewRowUnit].rows_url, {
-        page: runAllPageRequest.page,
-        pageSize: runAllPageRequest.page_size,
-        sortBy: runAllPageRequest.sort_by,
-        descending: runAllPageRequest.descending,
-      });
-    },
-  });
-  const runAllReviewResult =
-    runAllSource && runAllTableQuery.data
-      ? projectQuotationRunAllReviewPage(
-          runAllSource,
-          runAllTableQuery.data,
-          {
-            page: runAllPageRequest.page,
-            page_size: runAllPageRequest.page_size,
-            sort_by: runAllPageRequest.sort_by,
-            descending: runAllPageRequest.descending,
-          },
-          runAllReviewRowUnit,
-        )
-      : null;
-
   const resultNodeId =
     serverRequest && typeof serverRequest.node_id === 'string'
       ? serverRequest.node_id
@@ -309,14 +253,35 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
   const previewActiveSelections = resultNodeId
     ? [{ nodeId: resultNodeId, column: resultColumn }]
     : activeSelections;
-  const { nodeState, resultsByNode } = useQuotationResultControls({
-    result: runAllReviewResult ?? result,
-    nodeId: runAllSource?.node_id ?? resultNodeId,
-    column: runAllSource?.document_column ?? resultColumn,
-  });
+  const pageRequest = runAllSource ? runAllReviewQuery : previewPageRequest;
+  const quotationPage = useQuotationPage(
+    currentWorkspaceId && quotationRunAll && runAllSource
+      ? {
+          kind: 'run_all',
+          workspaceId: currentWorkspaceId,
+          analysisId: quotationRunAll.id,
+          source: runAllSource,
+          rowUnit: runAllReviewRowUnit,
+        }
+      : currentWorkspaceId && tabTaskId && result && resultNodeId && resultColumn
+        ? {
+            kind: 'preview',
+            workspaceId: currentWorkspaceId,
+            analysisId: tabTaskId,
+            nodeId: resultNodeId,
+            documentColumn: resultColumn,
+          }
+        : null,
+    pageRequest,
+  );
+  const resultNodeKey = runAllSource?.node_id ?? resultNodeId;
+  const resultsByNode =
+    quotationPage.data && resultNodeKey ? { [resultNodeKey]: quotationPage.data } : {};
   const hasLoaded = Boolean(result);
   const showPreviewTable =
-    Boolean(resultNodeId) && (hasLoaded || (analysisState === 'succeeded' && isResultFetching));
+    Boolean(resultNodeId) &&
+    (hasLoaded ||
+      (analysisState === 'succeeded' && (isResultFetching || quotationPage.isFetching)));
 
   const savedContextLength = Number(host.settings['quotation.contextLength']);
   const {
@@ -426,7 +391,7 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
         hasLoaded,
         displayedNodes,
         activeSelections,
-        nodeState,
+        previewRequest: previewPageRequest,
         originalColumnsByNode,
         buildEngineRequest,
         supersedesAnalysisIds: tabTaskId ? [tabTaskId] : [],
@@ -434,11 +399,11 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
       actions: {
         runAnalysis,
         showErrorDialog,
-        setResultQuery: (query) => {
-          setResultQuery(query);
+        setPreviewRequest: (query) => {
+          setPreviewPageRequest(query);
         },
-        resetResultQuery: () => {
-          setResultQuery(null);
+        resetPreviewRequest: () => {
+          setPreviewPageRequest(createNodeDataRequest({ page: 1, page_size: 50 }));
         },
       },
     });
@@ -531,14 +496,14 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
       }));
       return;
     }
-    void handleSort(nodeId, columnName);
+    handleSort(nodeId, columnName);
   };
 
   useProgressiveContextualHints([
     CONTEXTUAL_HINT_IDS.quotation.inputs,
     ...(canRunQuotation ? [CONTEXTUAL_HINT_IDS.quotation.engine] : []),
     ...(showPreviewTable ? [CONTEXTUAL_HINT_IDS.quotation.previewResults] : []),
-    ...(runAllReviewResult ? [CONTEXTUAL_HINT_IDS.quotation.runAllResults] : []),
+    ...(runAllSource && quotationPage.data ? [CONTEXTUAL_HINT_IDS.quotation.runAllResults] : []),
     ...(runAllSource ? [CONTEXTUAL_HINT_IDS.quotation.addToWorkspace] : []),
   ]);
 
@@ -650,11 +615,11 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
           />
         ) : null}
 
-        {runAllReviewResult || showPreviewTable ? (
+        {runAllSource || showPreviewTable ? (
           <QuotationResultsPanel
-            title={runAllReviewResult ? 'Review' : 'Search Results'}
+            title={runAllSource ? 'Review' : 'Search Results'}
             guidanceTarget={
-              runAllReviewResult ? 'quotation-run-all-results' : 'quotation-preview-results'
+              runAllSource ? 'quotation-run-all-results' : 'quotation-preview-results'
             }
             headerAction={
               runAllSource ? (
@@ -709,7 +674,7 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
             onPageChange={effHandlePageChange}
             onPageSizeChange={effHandlePageSizeChange}
             onRowClick={handleQuotationRowClick}
-            isPageLoading={runAllSource ? runAllTableQuery.isFetching : isResultFetching}
+            isPageLoading={quotationPage.isFetching || isResultFetching}
           />
         ) : null}
       </div>

@@ -66,8 +66,8 @@ class ConcordanceDocumentProjectionQuery(_PagedQuery):
         return self
 
 
-class QuotationResultQuery(_PagedQuery):
-    kind: Literal["quotation"] = "quotation"
+class QuotationPreviewQuery(_PagedQuery):
+    """One on-demand Quotation Preview table page."""
 
 
 class AnnotationResultQuery(_StrictModel):
@@ -85,7 +85,6 @@ class AnnotationResultQuery(_StrictModel):
 AnalysisResultQuery = Annotated[
     TopicModelingResultQuery
     | ConcordanceResultQuery
-    | QuotationResultQuery
     | AnnotationResultQuery,
     Field(discriminator="kind"),
 ]
@@ -335,12 +334,6 @@ class QuotationStoredResult(PreviewReadyStoredResult):
 
 class QuotationResult(PreviewReadyStoredResult):
     kind: Literal["quotation"] = "quotation"
-    data: list[list[dict[str, JsonData]]] | None = None
-    columns: list[str] | None = None
-    metadata: ResultColumnMetadata | None = None
-    pagination: SourcePagePagination | None = None
-    sorting: ResultSorting | None = None
-    query: QuotationResultQuery | None = None
 
 
 class SequentialWorkerResult(_StrictModel):
@@ -773,7 +766,7 @@ __all__ = [
     "ProjectedTableIdentity",
     "ConcordanceDensityResult",
     "QuotationResult",
-    "QuotationResultQuery",
+    "QuotationPreviewQuery",
     "QuotationStoredResult",
     "QuotationRunAllResult",
     "QuotationRunAllStoredResult",

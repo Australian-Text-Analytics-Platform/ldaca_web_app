@@ -4,7 +4,9 @@ import {
   previewFile,
   previewNodeCreation,
   queryConcordanceDocumentProjection,
+  queryQuotationPreviewTable as queryQuotationPreviewTableRequest,
   type ConcordanceDocumentProjectionQuery,
+  type QuotationPreviewQuery,
   type WorkspaceNodeInfo,
   type WorkspaceSqlCreateRequest,
   type WorkspaceSqlQueryRequest,
@@ -60,6 +62,29 @@ export async function queryConcordanceDocumentProjectionTable(options: {
   const payload: unknown = data;
   if (!(payload instanceof Blob) && !(payload instanceof ArrayBuffer)) {
     throw new Error('Concordance document projection did not return Arrow IPC');
+  }
+  return decodeArrowPage(payload, response);
+}
+
+export async function queryQuotationPreviewArrowTable(options: {
+  baseUrl?: string;
+  path: { workspace_id: string; analysis_id: string };
+  body: QuotationPreviewQuery;
+  signal?: AbortSignal;
+}): Promise<ArrowTablePage> {
+  const { data, response } = await queryQuotationPreviewTableRequest({
+    ...options,
+    throwOnError: true,
+  });
+  const contentType = responseMediaType(response);
+  if (contentType !== ARROW_STREAM_MEDIA_TYPE) {
+    throw new Error(
+      `Expected ${ARROW_STREAM_MEDIA_TYPE}, received ${contentType ?? 'no content type'}`,
+    );
+  }
+  const payload: unknown = data;
+  if (!(payload instanceof Blob) && !(payload instanceof ArrayBuffer)) {
+    throw new Error('Quotation Preview did not return Arrow IPC');
   }
   return decodeArrowPage(payload, response);
 }

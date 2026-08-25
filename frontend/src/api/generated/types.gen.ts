@@ -2836,31 +2836,41 @@ export type QuotationEngineSelection = {
 export type QuotationEngineType = 'local' | 'remote';
 
 /**
+ * QuotationPreviewQuery
+ *
+ * One on-demand Quotation Preview table page.
+ */
+export type QuotationPreviewQuery = {
+    /**
+     * Descending
+     */
+    descending?: boolean;
+    /**
+     * Page
+     */
+    page?: number;
+    /**
+     * Page Size
+     */
+    page_size?: number;
+    /**
+     * Sort By
+     */
+    sort_by?: string | null;
+};
+
+/**
  * QuotationResult
  */
 export type QuotationResult = {
     /**
-     * Columns
-     */
-    columns?: Array<string> | null;
-    /**
-     * Data
-     */
-    data?: Array<Array<{
-        [key: string]: JsonDataOutput;
-    }>> | null;
-    /**
      * Kind
      */
     kind?: 'quotation';
-    metadata?: ResultColumnMetadata | null;
-    pagination?: SourcePagePagination | null;
-    query?: QuotationResultQuery | null;
     /**
      * Ready
      */
     ready?: true;
-    sorting?: ResultSorting | null;
 };
 
 /**
@@ -2900,32 +2910,6 @@ export type QuotationResultDataBlockCreationResult = {
      * Outputs
      */
     outputs: Array<DataBlockCreationOutput>;
-};
-
-/**
- * QuotationResultQuery
- */
-export type QuotationResultQuery = {
-    /**
-     * Descending
-     */
-    descending?: boolean;
-    /**
-     * Kind
-     */
-    kind?: 'quotation';
-    /**
-     * Page
-     */
-    page?: number;
-    /**
-     * Page Size
-     */
-    page_size?: number;
-    /**
-     * Sort By
-     */
-    sort_by?: string | null;
 };
 
 /**
@@ -7378,8 +7362,6 @@ export type QueryAnalysisResultData = {
     } & TopicModelingResultQuery) | ({
         kind: 'concordance';
     } & ConcordanceResultQuery) | ({
-        kind: 'quotation';
-    } & QuotationResultQuery) | ({
         kind: 'annotation';
     } & AnnotationResultQueryWritable);
     path: {
@@ -7477,6 +7459,76 @@ export type QueryAnalysisResultResponses = {
 };
 
 export type QueryAnalysisResultResponse = QueryAnalysisResultResponses[keyof QueryAnalysisResultResponses];
+
+export type QueryQuotationPreviewTableData = {
+    body: QuotationPreviewQuery;
+    path: {
+        /**
+         * Workspace Id
+         */
+        workspace_id: string;
+        /**
+         * Analysis Id
+         */
+        analysis_id: string;
+    };
+    query?: never;
+    url: '/api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/quotation-preview/query';
+};
+
+export type QueryQuotationPreviewTableErrors = {
+    /**
+     * Invalid request
+     */
+    400: ApiError;
+    /**
+     * Authentication required
+     */
+    401: ApiError;
+    /**
+     * Origin, CSRF, or access check failed
+     */
+    403: ApiError;
+    /**
+     * Resource not found
+     */
+    404: ApiError;
+    /**
+     * Resource state conflict
+     */
+    409: ApiError;
+    /**
+     * Retained artifact is no longer available
+     */
+    410: ApiError;
+    /**
+     * Request or resource exceeds the configured size limit
+     */
+    413: ApiError;
+    /**
+     * Request validation failed
+     */
+    422: ApiError;
+    /**
+     * Stored resource is corrupt
+     */
+    500: ApiError;
+    /**
+     * Storage capacity is exhausted
+     */
+    507: ApiError;
+};
+
+export type QueryQuotationPreviewTableError = QueryQuotationPreviewTableErrors[keyof QueryQuotationPreviewTableErrors];
+
+export type QueryQuotationPreviewTableResponses = {
+    /**
+     * Arrow IPC stream
+     */
+    200: Blob | File;
+};
+
+export type QueryQuotationPreviewTableResponse = QueryQuotationPreviewTableResponses[keyof QueryQuotationPreviewTableResponses];
 
 export type DownloadAnalysisTableData = {
     body?: never;

@@ -109,6 +109,11 @@ EXPECTED_OPERATIONS = {
         "query_analysis_result",
     ),
     (
+        "POST",
+        "/api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/quotation-preview/query",
+        "query_quotation_preview_table",
+    ),
+    (
         "GET",
         "/api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}",
         "download_analysis_table",

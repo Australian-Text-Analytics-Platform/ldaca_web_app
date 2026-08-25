@@ -8,7 +8,7 @@ import { MetadataColumnSelector } from '@/features/views/common/components/Metad
 import { PAGE_SIZE_OPTIONS_DEFAULT } from '@/features/views/common/constants';
 import type { NodeColumnSelection } from '@/features/views/common/nodeSelectionTypes';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
-import type { QuotationResultState } from '../hooks/useQuotationResultControls';
+import type { QuotationResultState, QuotationReviewRowUnit } from '../quotationArrowPage';
 import {
   buildQuotationDisplayColumns,
   buildQuotationMetadataColumns,
@@ -19,7 +19,6 @@ import {
 import { MAX_CONTEXT_LENGTH } from '../quotationTextClip';
 import { type QuotationHoverState } from './QuotationHighlightedCell';
 import { QuotationNodeBlock } from './QuotationNodeBlock';
-import type { QuotationReviewRowUnit } from '../quotationRunAllReview';
 
 interface QuotationResultsPanelProps {
   title?: string;
@@ -191,13 +190,7 @@ export function QuotationResultsPanel({
           const resultState = resultsByNode[nodeId];
           const rowsWithQuotes = filterQuotationRowsWithQuotes(resultState?.rows);
           const visibleMetadataColumns = showMetadata ? resolvedMetadataColumns : [];
-          const cols =
-            reviewRowUnit === 'matches'
-              ? buildQuotationDisplayColumns([
-                  ...(resultState?.metadata.quotation_columns ?? []),
-                  ...visibleMetadataColumns,
-                ])
-              : buildQuotationDisplayColumns(visibleMetadataColumns);
+          const cols = buildQuotationDisplayColumns(visibleMetadataColumns);
           return (
             <QuotationNodeBlock
               key={nodeId}
@@ -233,7 +226,6 @@ export function QuotationResultsPanel({
                     : 'Matches per page'
               }
               showPageSummary={reviewRowUnit === null}
-              highlightDocument={reviewRowUnit !== 'matches'}
             />
           );
         })}

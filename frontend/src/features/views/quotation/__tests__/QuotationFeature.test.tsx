@@ -140,13 +140,10 @@ vi.mock('../hooks/useQuotationRowDetail', () => ({
   }),
 }));
 
-vi.mock('../hooks/useQuotationResultControls', () => ({
-  useQuotationResultControls: (args: Record<string, unknown>) => {
-    quotationHydrationMocks.latestResultControlsArgs = args;
-    return {
-      nodeState: {},
-      resultsByNode: {},
-    };
+vi.mock('../hooks/useQuotationPage', () => ({
+  useQuotationPage: (target: unknown) => {
+    quotationHydrationMocks.latestResultControlsArgs = { target };
+    return { data: null, isFetching: false };
   },
 }));
 
@@ -224,11 +221,11 @@ describe('QuotationFeature Preview lifecycle', () => {
     quotationHydrationMocks.latestResultsPanelProps = null;
   });
 
-  it('passes the persisted Query-owned Result to quotation controls after hydration', async () => {
+  it('uses the persisted ready marker to target the Preview Arrow page', async () => {
     const host = {
       tabId: 'tab-1',
       analyses: [],
-      latestPreview: null,
+      latestPreview: { id: 'task-1' } as never,
       latestRunAll: null,
       activeAnalysis: null,
       inputSets: {},
@@ -240,23 +237,7 @@ describe('QuotationFeature Preview lifecycle', () => {
       clearCorrectionColumns: vi.fn(),
       refreshAnalyses: vi.fn(),
     };
-    const persistedResult = {
-      kind: 'quotation',
-      data: [],
-      columns: ['QUOTE_extraction'],
-      metadata: { all_columns: ['QUOTE_extraction'] },
-      pagination: {
-        page: 1,
-        page_size: 50,
-        total_source_rows: 1,
-        total_source_pages: 1,
-        result_count: 0,
-        has_next: false,
-        has_prev: false,
-      },
-      query: { kind: 'quotation', page: 1, page_size: 50 },
-      sorting: { sort_by: null, descending: false },
-    };
+    const persistedResult = { kind: 'quotation', ready: true };
     quotationHydrationMocks.request = {
       kind: 'quotation',
       node_id: 'node-1',
@@ -273,17 +254,19 @@ describe('QuotationFeature Preview lifecycle', () => {
       { node_id: 'node-1', column: 'text' },
     ]);
     expect(quotationHydrationMocks.latestResultControlsArgs).toEqual({
-      result: persistedResult,
-      nodeId: 'node-1',
-      column: 'text',
+      target: {
+        kind: 'preview',
+        workspaceId: 'workspace-1',
+        analysisId: 'task-1',
+        nodeId: 'node-1',
+        documentColumn: 'text',
+      },
     });
   });
 
-  it('hydrates the canonical Result before requesting alternate projections', async () => {
-    const canonicalResult = { kind: 'quotation', data: [] };
-    const projectedResult = { kind: 'quotation', data: [[{ text: 'projected' }]] };
+  it('hydrates only the canonical ready marker through the generic Result route', async () => {
+    const canonicalResult = { kind: 'quotation', ready: true };
     resultApiMocks.getAnalysisResult.mockResolvedValueOnce({ data: canonicalResult });
-    resultApiMocks.queryAnalysisResult.mockResolvedValueOnce({ data: projectedResult });
 
     renderFeature(
       <QuotationFeature
@@ -315,18 +298,7 @@ describe('QuotationFeature Preview lifecycle', () => {
     });
     expect(resultApiMocks.queryAnalysisResult).not.toHaveBeenCalled();
 
-    const projection = {
-      page: 2,
-      page_size: 50,
-      sort_by: null,
-      descending: false,
-    };
-    await expect(config.fetchResult('task-1', projection)).resolves.toBe(projectedResult);
-    expect(resultApiMocks.queryAnalysisResult).toHaveBeenCalledWith({
-      body: { kind: 'quotation', ...projection },
-      path: { workspace_id: 'workspace-1', analysis_id: 'task-1' },
-      throwOnError: true,
-    });
+    expect(resultApiMocks.queryAnalysisResult).not.toHaveBeenCalled();
   });
 
   it('keeps the Preview table shell mounted while the first page is processing', () => {

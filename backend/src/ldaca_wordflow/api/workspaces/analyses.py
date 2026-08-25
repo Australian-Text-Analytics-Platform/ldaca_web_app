@@ -20,6 +20,7 @@ from ...models.analysis_results import (
     ProjectedTableIdentity,
     ConcordanceDensityResult,
     ConcordanceDocumentProjectionQuery,
+    QuotationPreviewQuery,
     StoredArtifactIdentity,
 )
 from ...models.tables import (
@@ -385,6 +386,32 @@ async def query_analysis_result(
         allow_closing=False,
     )
     return _present_result(value, request, workspace_id, analysis_id)
+
+
+@router.post(
+    "/analyses/{analysis_id}/result/tables/quotation-preview/query",
+    response_class=Response,
+    responses={
+        **api_errors(400, 403, 404, 409, 410, 413, 422, 500, 507),
+        **ARROW_STREAM_RESPONSE,
+    },
+)
+async def query_quotation_preview_table(
+    workspace_id: uuid.UUID,
+    analysis_id: uuid.UUID,
+    body: QuotationPreviewQuery,
+    principal: Annotated[SessionPrincipal, Security(get_current_session)],
+    runtime: Runtime = Depends(get_runtime),
+) -> Response:
+    """Compute one Quotation Preview document page as Arrow IPC."""
+
+    result = await runtime.analysis_result_service.quotation_preview_page(
+        principal.user.id,
+        str(workspace_id),
+        str(analysis_id),
+        body,
+    )
+    return arrow_page_response(result)
 
 
 @router.get(

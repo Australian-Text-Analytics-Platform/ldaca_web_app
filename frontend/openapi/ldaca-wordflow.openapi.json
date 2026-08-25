@@ -5700,94 +5700,57 @@
         "title": "QuotationEngineType",
         "type": "string"
       },
+      "QuotationPreviewQuery": {
+        "additionalProperties": false,
+        "description": "One on-demand Quotation Preview table page.",
+        "properties": {
+          "descending": {
+            "default": false,
+            "title": "Descending",
+            "type": "boolean"
+          },
+          "page": {
+            "default": 1,
+            "minimum": 1.0,
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "default": 50,
+            "maximum": 500.0,
+            "minimum": 1.0,
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "sort_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sort By"
+          }
+        },
+        "title": "QuotationPreviewQuery",
+        "type": "object"
+      },
       "QuotationResult": {
         "additionalProperties": false,
         "properties": {
-          "columns": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Columns"
-          },
-          "data": {
-            "anyOf": [
-              {
-                "items": {
-                  "items": {
-                    "additionalProperties": {
-                      "$ref": "#/components/schemas/JsonData-Output"
-                    },
-                    "type": "object"
-                  },
-                  "type": "array"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Data"
-          },
           "kind": {
             "const": "quotation",
             "default": "quotation",
             "title": "Kind",
             "type": "string"
           },
-          "metadata": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ResultColumnMetadata"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "pagination": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/SourcePagePagination"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "query": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/QuotationResultQuery"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
           "ready": {
             "const": true,
             "default": true,
             "title": "Ready",
             "type": "boolean"
-          },
-          "sorting": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ResultSorting"
-              },
-              {
-                "type": "null"
-              }
-            ]
           }
         },
         "title": "QuotationResult",
@@ -5859,48 +5822,6 @@
           "outputs"
         ],
         "title": "QuotationResultDataBlockCreationResult",
-        "type": "object"
-      },
-      "QuotationResultQuery": {
-        "additionalProperties": false,
-        "properties": {
-          "descending": {
-            "default": false,
-            "title": "Descending",
-            "type": "boolean"
-          },
-          "kind": {
-            "const": "quotation",
-            "default": "quotation",
-            "title": "Kind",
-            "type": "string"
-          },
-          "page": {
-            "default": 1,
-            "minimum": 1.0,
-            "title": "Page",
-            "type": "integer"
-          },
-          "page_size": {
-            "default": 50,
-            "maximum": 500.0,
-            "minimum": 1.0,
-            "title": "Page Size",
-            "type": "integer"
-          },
-          "sort_by": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Sort By"
-          }
-        },
-        "title": "QuotationResultQuery",
         "type": "object"
       },
       "QuotationRunAllAnalysisRequest": {
@@ -14043,7 +13964,6 @@
                   "mapping": {
                     "annotation": "#/components/schemas/AnnotationResultQuery",
                     "concordance": "#/components/schemas/ConcordanceResultQuery",
-                    "quotation": "#/components/schemas/QuotationResultQuery",
                     "topic_modeling": "#/components/schemas/TopicModelingResultQuery"
                   },
                   "propertyName": "kind"
@@ -14054,9 +13974,6 @@
                   },
                   {
                     "$ref": "#/components/schemas/ConcordanceResultQuery"
-                  },
-                  {
-                    "$ref": "#/components/schemas/QuotationResultQuery"
                   },
                   {
                     "$ref": "#/components/schemas/AnnotationResultQuery"
@@ -14245,6 +14162,166 @@
           }
         ],
         "summary": "Query Analysis Result",
+        "tags": [
+          "analyses"
+        ]
+      }
+    },
+    "/api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/quotation-preview/query": {
+      "post": {
+        "description": "Compute one Quotation Preview document page as Arrow IPC.",
+        "operationId": "query_quotation_preview_table",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "analysis_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Analysis Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuotationPreviewQuery"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/vnd.apache.arrow.stream": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Arrow IPC stream"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Invalid request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Origin, CSRF, or access check failed"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Resource state conflict"
+          },
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Retained artifact is no longer available"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Request or resource exceeds the configured size limit"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Stored resource is corrupt"
+          },
+          "507": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Storage capacity is exhausted"
+          }
+        },
+        "security": [
+          {
+            "WordflowSession": []
+          }
+        ],
+        "summary": "Query Quotation Preview Table",
         "tags": [
           "analyses"
         ]
