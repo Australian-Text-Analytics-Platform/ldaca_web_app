@@ -13,7 +13,7 @@ import type {
 import { getAnalysisResource } from '../analysisApi';
 import { useAnalysisSession } from './useAnalysisSession';
 
-export type AnalysisSubmissionAction = 'preview' | 'run_all';
+type AnalysisSubmissionAction = 'preview' | 'run_all';
 
 export interface RunAnalysisOptions<TAnalysis extends Analysis> {
   action: AnalysisSubmissionAction;
