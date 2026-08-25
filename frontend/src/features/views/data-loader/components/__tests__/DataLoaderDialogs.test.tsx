@@ -83,9 +83,7 @@ describe('DataLoaderDialogs ownership', () => {
       screen.getByText('Invalid workspace name: name cannot contain control characters'),
     ).toBeInTheDocument();
     expect(
-      screen.queryByText(
-        'Workspace names cannot include path separators or traversal sequences.',
-      ),
+      screen.queryByText('Workspace names cannot include path separators or traversal sequences.'),
     ).not.toBeInTheDocument();
   });
 });
