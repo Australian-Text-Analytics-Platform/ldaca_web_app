@@ -126,10 +126,7 @@ export function WorkspaceControls({ onToggleCollapse }: { onToggleCollapse?: () 
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Invalid workspace name</AlertDialogTitle>
-            <AlertDialogDescription>
-              {nameAlertMessage ||
-                'Workspace names cannot include path separators or traversal sequences.'}
-            </AlertDialogDescription>
+            <AlertDialogDescription>{nameAlertMessage}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogAction

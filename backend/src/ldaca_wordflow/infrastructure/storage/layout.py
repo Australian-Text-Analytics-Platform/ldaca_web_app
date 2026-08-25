@@ -31,6 +31,17 @@ def validate_display_name(name: str) -> tuple[bool, str]:
     return True, ""
 
 
+def validate_workspace_name(name: str) -> tuple[bool, str]:
+    """Validate a Workspace display label independently of storage paths."""
+
+    trimmed = name.strip()
+    if not trimmed:
+        return False, "name cannot be empty"
+    if any(ord(character) < 32 or ord(character) == 127 for character in trimmed):
+        return False, "name cannot contain control characters"
+    return True, ""
+
+
 def validate_user_id(user_id: str) -> str:
     """Return one path-safe opaque principal identifier unchanged."""
 
@@ -98,6 +109,7 @@ __all__ = [
     "user_root",
     "validate_user_id",
     "validate_display_name",
+    "validate_workspace_name",
     "workspace_staging_root",
     "workspace_trash_root",
     "workspaces_root",

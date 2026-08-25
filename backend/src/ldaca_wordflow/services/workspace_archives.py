@@ -75,7 +75,7 @@ from ..infrastructure.storage.durable_fs import (
 from ..infrastructure.storage.layout import (
     SAFE_WORKSPACE_IMPORT_MARKER,
     SAFE_WORKSPACE_IMPORT_MARKER_CONTENT,
-    validate_display_name,
+    validate_workspace_name,
 )
 from .safe_paths import SafePathResolver
 from .storage_admission import StorageAdmissionService, StorageReservation
@@ -421,7 +421,7 @@ class WorkspaceArchiveService:
                     "Workspace workspace.json is missing or invalid"
                 ) from exc
             workspace_name = manifest.workspace.name.strip()
-            is_valid_name, reason = validate_display_name(workspace_name)
+            is_valid_name, reason = validate_workspace_name(workspace_name)
             if not is_valid_name:
                 raise InvalidWorkspaceArchiveError(f"Invalid workspace name: {reason}")
 
