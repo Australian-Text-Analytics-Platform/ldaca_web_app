@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useQueries } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
+  type Analysis,
   type ConcordanceAnalysisRequest,
   type ConcordanceAnalysisResponse,
   type ConcordanceRunAllResult,
@@ -236,7 +237,6 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
   // Table-only presentation state: remounting the Concordance feature restores
   // the default L1/R1 tint without changing the immutable Analysis request.
   const [highlightL1R1, setHighlightL1R1] = useState(true);
-  const [isSubmittingRunAll, setIsSubmittingRunAll] = useState(false);
   const [addToWorkspaceDialogOpen, setAddToWorkspaceDialogOpen] = useState(false);
   const [isAddingToWorkspace, setIsAddingToWorkspace] = useState(false);
   // Metadata visibility derives from the selected columns: any selection
@@ -284,10 +284,9 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
 
   const {
     request: serverRequest,
-    setLocalTaskId: setLocalConcordanceTaskId,
     isRunning: isSearching,
-    setIsRunning: setIsSearching,
-    runningRef,
+    isSubmittingRunAll,
+    runAnalysis,
     taskStatus: concordanceTaskStatus,
     banner: concordanceWaitingBanner,
     clearResults,
@@ -515,10 +514,7 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
       },
       actions: {
         setNodePagination,
-        setIsSearching,
-        setLocalTaskId: setLocalConcordanceTaskId,
-        runningRef,
-        onSubmitted: refreshAnalyses,
+        runAnalysis,
         prepareBeforeRun: ensureNodeColors,
       },
     });
@@ -604,18 +600,6 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
   // it enables the static Preview action. There is no selection-driven
   // auto-clear effect.
 
-  useEffect(() => {
-    if (!currentWorkspaceId) {
-      setLocalConcordanceTaskId(null);
-    }
-  }, [currentWorkspaceId, setLocalConcordanceTaskId]);
-
-  useEffect(() => {
-    if (concordanceTaskStatus.tasks.length === 0) {
-      setLocalConcordanceTaskId(null);
-    }
-  }, [concordanceTaskStatus.tasks.length, setLocalConcordanceTaskId]);
-
   // No auto-column recompute: a node's default column is chosen at add-time by
   // the node-inputs model, so there is no unlocked recompute effect here.
 
@@ -697,13 +681,15 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
       ignore_punctuation: ignorePunctuation,
       search_mode: searchMode,
     };
-    setIsSubmittingRunAll(true);
-    try {
-      await runConcordanceAll(host.tabId, { source }, tabTaskId ? [tabTaskId] : []);
-      refreshAnalyses();
-    } finally {
-      setIsSubmittingRunAll(false);
-    }
+    await runAnalysis<Analysis>({
+      action: 'run_all',
+      submit: () => runConcordanceAll(host.tabId, { source }, tabTaskId ? [tabTaskId] : []),
+      onError: (error) => {
+        toast.error(
+          error instanceof Error ? error.message : 'Could not start Concordance Run All.',
+        );
+      },
+    });
   };
 
   const handleAddToWorkspace = async (sources: DataBlockCreationSource[]) => {

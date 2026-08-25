@@ -5,6 +5,20 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Field, Utf8 } from 'apache-arrow';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Analysis } from '@/api';
+import type { RunAnalysisOptions } from '../../common/hooks/useAnalysisFeature';
+
+async function executeAnalysis<TAnalysis extends Analysis>(options: RunAnalysisOptions<TAnalysis>) {
+  try {
+    options.resetBeforeRun?.();
+    await options.prepare?.();
+    const response = await options.submit();
+    options.onSuccess?.(response);
+    return response;
+  } catch (error) {
+    options.onError(error);
+    return null;
+  }
+}
 
 /**
  * Wraps Concordance feature tests with a no-retry query client so failed
@@ -328,10 +342,9 @@ vi.mock('../../common/hooks/useAnalysisFeature', () => ({
       analysisState: mockAnalysisState === 'successful' ? 'succeeded' : null,
       analysisError: null,
       result,
-      setLocalTaskId: vi.fn(),
       isRunning: mockIsPreviewRunning,
-      setIsRunning: vi.fn(),
-      runningRef: { current: false },
+      isSubmittingRunAll: false,
+      runAnalysis: executeAnalysis,
       taskStatus: {
         tasks: mockAnalysisState ? [{ state: mockAnalysisState }] : [],
       },

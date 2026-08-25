@@ -1,5 +1,5 @@
-import { useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import type { Analysis } from '@/api';
 import { cancelAnalysis, clearTabAnalysis } from '@/api';
@@ -10,7 +10,23 @@ import type {
   AnalysisTaskStatus,
   CanonicalAnalysisTaskType,
 } from '../tasks/types';
+import { getAnalysisResource } from '../analysisApi';
 import { useAnalysisSession } from './useAnalysisSession';
+
+export type AnalysisSubmissionAction = 'preview' | 'run_all';
+
+export interface RunAnalysisOptions<TAnalysis extends Analysis> {
+  action: AnalysisSubmissionAction;
+  resetBeforeRun?: () => void;
+  prepare?: () => Promise<void>;
+  submit: () => Promise<TAnalysis>;
+  onSuccess?: (analysis: TAnalysis) => void;
+  onError: (error: unknown) => void;
+}
+
+export type RunAnalysis = <TAnalysis extends Analysis>(
+  options: RunAnalysisOptions<TAnalysis>,
+) => Promise<TAnalysis | null>;
 
 interface UseAnalysisFeatureConfig<TResult = unknown, TRequest = unknown> {
   taskType: CanonicalAnalysisTaskType;
@@ -42,11 +58,10 @@ interface UseAnalysisFeatureReturn<TResult, TRequest> {
   isResultPlaceholderData: boolean;
   resultError: string | null;
   retryResult: () => void;
-  setLocalTaskId: React.Dispatch<React.SetStateAction<string | null>>;
   isRunning: boolean;
+  isSubmittingRunAll: boolean;
   isStopping: boolean;
-  setIsRunning: (running: boolean) => void;
-  runningRef: React.RefObject<boolean>;
+  runAnalysis: RunAnalysis;
   taskStatus: AnalysisTaskStatus;
   banner: AnalysisTaskBannerState | null;
   stopTask: () => Promise<void>;
@@ -110,16 +125,36 @@ export function useAnalysisFeature<TResult = unknown, TRequest = unknown>(
 ): UseAnalysisFeatureReturn<TResult, TRequest> {
   const queryClient = useQueryClient();
   const configRef = useRef(config);
-  const [localTaskId, setLocalTaskId] = useState<string | null>(null);
-  const [localRunning, setLocalRunning] = useState(false);
+  const [pendingAction, setPendingAction] = useState<AnalysisSubmissionAction | null>(null);
+  const [handoff, setHandoff] = useState<{
+    action: AnalysisSubmissionAction;
+    analysisId: string;
+  } | null>(null);
   const [isStopping, setIsStopping] = useState(false);
-  const runningRef = useRef(false);
+  const submissionBusyRef = useRef(false);
   const appliedRequestIdRef = useRef<string | null>(null);
-  const localTaskWasRemoved =
-    localTaskId !== null &&
-    config.hydrationTaskId !== localTaskId &&
-    config.retiredAnalysisIds?.includes(localTaskId) === true;
-  const analysisId = config.hydrationTaskId ?? (localTaskWasRemoved ? null : localTaskId);
+  const handoffWasRemoved =
+    handoff !== null &&
+    !config.tabAnalysisIds.includes(handoff.analysisId) &&
+    config.retiredAnalysisIds?.includes(handoff.analysisId) === true;
+  const handoffWasAdopted = handoff !== null && config.tabAnalysisIds.includes(handoff.analysisId);
+  const effectiveHandoff = handoffWasRemoved || handoffWasAdopted ? null : handoff;
+  const previewHandoffId =
+    effectiveHandoff?.action === 'preview' ? effectiveHandoff.analysisId : null;
+  const analysisId = previewHandoffId ?? config.hydrationTaskId;
+  const handoffQuery = useQuery({
+    queryKey:
+      config.workspaceId && effectiveHandoff
+        ? queryKeys.analysis(config.workspaceId, effectiveHandoff.analysisId)
+        : queryKeys.inactiveAnalysis,
+    enabled: Boolean(config.workspaceId && effectiveHandoff),
+    queryFn: async (): Promise<Analysis> => {
+      if (!config.workspaceId || !effectiveHandoff) {
+        throw new Error('Analysis handoff is not active');
+      }
+      return getAnalysisResource(config.workspaceId, effectiveHandoff.analysisId);
+    },
+  });
   const session = useAnalysisSession<TResult>({
     workspaceId: config.workspaceId,
     analysisId,
@@ -131,28 +166,33 @@ export function useAnalysisFeature<TResult = unknown, TRequest = unknown>(
     },
   });
 
-  const analysis = localTaskWasRemoved ? null : session.analysis;
+  const analysis = session.analysis;
   const hydratedRequest =
     (analysis?.request as TRequest | undefined) ?? config.requestHydration?.request ?? null;
   const hydratedRequestId = analysis?.id ?? config.requestHydration?.analysisId ?? null;
-  const result = localTaskWasRemoved ? null : session.result;
+  const result = session.result;
   const lifecycleRunning = analysis?.state === 'queued' || analysis?.state === 'running';
-  const isRunning = localTaskWasRemoved ? false : analysis ? lifecycleRunning : localRunning;
-
-  // Task-dispatch hooks keep this callback alongside `runningRef` while a
-  // submission is in flight, so its identity must stay stable.
-  const setIsRunning = useCallback((running: boolean) => {
-    runningRef.current = running;
-    setLocalRunning(running);
-  }, []);
+  const handoffRunning =
+    handoffQuery.data?.state === 'queued' || handoffQuery.data?.state === 'running';
+  const previewSubmitting =
+    pendingAction === 'preview' || (effectiveHandoff?.action === 'preview' && handoffRunning);
+  const isSubmittingRunAll =
+    pendingAction === 'run_all' || (effectiveHandoff?.action === 'run_all' && handoffRunning);
+  const isRunning = previewSubmitting || isSubmittingRunAll || lifecycleRunning;
 
   useEffect(() => {
     configRef.current = config;
   }, [config]);
 
   useEffect(() => {
-    runningRef.current = isRunning;
-  }, [isRunning]);
+    if ((!handoffWasAdopted && !handoffWasRemoved) || pendingAction !== null) return;
+    submissionBusyRef.current = false;
+  }, [handoffWasAdopted, handoffWasRemoved, pendingAction]);
+
+  useEffect(() => {
+    if (pendingAction !== null || !handoffQuery.data || handoffRunning) return;
+    submissionBusyRef.current = false;
+  }, [handoffQuery.data, handoffRunning, pendingAction]);
 
   useEffect(() => {
     appliedRequestIdRef.current = null;
@@ -177,6 +217,47 @@ export function useAnalysisFeature<TResult = unknown, TRequest = unknown>(
         message: taskStatus.bannerMessage,
       }
     : null;
+
+  const runAnalysis = async <TAnalysis extends Analysis>({
+    action,
+    resetBeforeRun,
+    prepare,
+    submit,
+    onSuccess,
+    onError,
+  }: RunAnalysisOptions<TAnalysis>): Promise<TAnalysis | null> => {
+    if (submissionBusyRef.current || configRef.current.controlAnalysisId) return null;
+    submissionBusyRef.current = true;
+    setPendingAction(action);
+
+    let response: TAnalysis;
+    try {
+      resetBeforeRun?.();
+      await prepare?.();
+      response = await submit();
+    } catch (error) {
+      submissionBusyRef.current = false;
+      setPendingAction(null);
+      onError(error);
+      return null;
+    }
+
+    const workspaceId = configRef.current.workspaceId;
+    if (workspaceId) {
+      queryClient.setQueryData(queryKeys.analysis(workspaceId, response.id), response);
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.workspaceAnalyses(workspaceId),
+      });
+    }
+    setHandoff({ action, analysisId: response.id });
+    setPendingAction(null);
+    if (response.state !== 'queued' && response.state !== 'running') {
+      submissionBusyRef.current = false;
+    }
+    onSuccess?.(response);
+    return response;
+  };
+
   const clearResults = async (): Promise<boolean> => {
     const cfg = configRef.current;
     if (!cfg.workspaceId) return false;
@@ -195,8 +276,9 @@ export function useAnalysisFeature<TResult = unknown, TRequest = unknown>(
         queryKey: queryKeys.workspaceAnalyses(cfg.workspaceId),
       });
       void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceTabs(cfg.workspaceId) });
-      setLocalTaskId(null);
-      setIsRunning(false);
+      setPendingAction(null);
+      setHandoff(null);
+      submissionBusyRef.current = false;
       cfg.onCleared(clearedIds);
       return true;
     } catch (error) {
@@ -232,11 +314,10 @@ export function useAnalysisFeature<TResult = unknown, TRequest = unknown>(
     isResultPlaceholderData: session.isResultPlaceholderData,
     resultError: session.resultError,
     retryResult: session.retryResult,
-    setLocalTaskId,
     isRunning,
+    isSubmittingRunAll,
     isStopping,
-    setIsRunning,
-    runningRef,
+    runAnalysis,
     taskStatus,
     banner,
     stopTask,

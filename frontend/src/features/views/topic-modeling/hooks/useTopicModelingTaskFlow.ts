@@ -1,7 +1,7 @@
 import { toast } from 'sonner';
 import { submitTabAnalysis } from '@/api';
 import type { Analysis, TopicModelingRequest, TopicSegmentationMethod } from '@/api';
-import { runAnalysisTaskEnvelope } from '@/features/views/common/tasks/runAnalysisTaskEnvelope';
+import type { RunAnalysis } from '@/features/views/common/hooks/useAnalysisFeature';
 import type { NodeColumnSelection } from '@/features/views/common/nodeSelectionTypes';
 
 interface TopicModelingState {
@@ -18,11 +18,8 @@ interface TopicModelingState {
 }
 
 interface TopicModelingActions {
-  setIsRunning: (value: boolean) => void;
-  runningRef: React.RefObject<boolean>;
+  runAnalysis: RunAnalysis;
   setError: (value: string | null) => void;
-  setLocalTaskId: (id: string | null) => void;
-  onSubmitted: () => void;
   prepareBeforeRun?: () => Promise<void>;
 }
 
@@ -45,10 +42,10 @@ export function useTopicModelingTaskFlow({
     segmentationMethod,
     maxSegmentTokens,
   },
-  actions: { setIsRunning, runningRef, setError, setLocalTaskId, onSubmitted, prepareBeforeRun },
+  actions: { runAnalysis, setError, prepareBeforeRun },
 }: Params) {
   const handleRun = async () => {
-    if (!currentWorkspaceId || panelNodeIds.length === 0 || runningRef.current) return;
+    if (!currentWorkspaceId || panelNodeIds.length === 0) return;
     if (panelHasMissingColumns) {
       toast.error('Select a text column for all selected data blocks');
       return;
@@ -72,11 +69,8 @@ export function useTopicModelingTaskFlow({
       ...(sampleFractions != null ? { sample_fractions: sampleFractions } : {}),
     };
 
-    await runAnalysisTaskEnvelope<Analysis>({
-      runningRef,
-      setIsRunning,
-      setLocalTaskId,
-      onSubmitted,
+    await runAnalysis<Analysis>({
+      action: 'run_all',
       resetBeforeRun: () => {
         setError(null);
       },

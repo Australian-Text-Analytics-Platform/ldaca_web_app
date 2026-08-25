@@ -148,12 +148,10 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
     request: serverRequest,
     isRunning,
     isStopping,
-    setIsRunning,
-    runningRef,
+    runAnalysis,
     taskStatus,
     clearResults,
     stopTask,
-    setLocalTaskId,
     result: results,
   } = useAnalysisFeature<TokenFrequencyResponse, TokenFrequencyRequest>({
     taskType: ANALYSIS_TASK_TYPES.tokenFrequencies,
@@ -290,12 +288,9 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
       lastCompareNodeIds,
     },
     actions: {
-      setLocalTaskId,
-      setIsRunning,
-      runningRef,
+      runAnalysis,
       setLastCompareNodeIds,
       setStopWords,
-      onSubmitted: refreshAnalyses,
       prepareBeforeRun: ensureNodeColors,
     },
     navigation: {

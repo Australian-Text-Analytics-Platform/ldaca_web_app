@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
+  type Analysis,
   type QuotationAnalysisRequest,
   type QuotationAnalysisResponse,
   type QuotationEngineConfig,
@@ -127,7 +128,6 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
   const [runAllReviewRowUnit, setRunAllReviewRowUnit] =
     useState<QuotationReviewRowUnit>('documents');
   const [isClearing, setIsClearing] = useState(false);
-  const [isSubmittingRunAll, setIsSubmittingRunAll] = useState(false);
   const [addToWorkspaceDialogOpen, setAddToWorkspaceDialogOpen] = useState(false);
   const [isAddingToWorkspace, setIsAddingToWorkspace] = useState(false);
   const [errorDialogOpen, setErrorDialogOpen] = useState(false);
@@ -160,10 +160,9 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
 
   const {
     request: serverRequest,
-    setLocalTaskId,
     isRunning: isLoadingQuotations,
-    setIsRunning: setIsLoadingQuotations,
-    runningRef,
+    isSubmittingRunAll,
+    runAnalysis,
     banner: quotationWaitingBanner,
     taskStatus,
     analysisState,
@@ -433,7 +432,7 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
         supersedesAnalysisIds: tabTaskId ? [tabTaskId] : [],
       },
       actions: {
-        setIsLoadingQuotations,
+        runAnalysis,
         showErrorDialog,
         setResultQuery: (query) => {
           setResultQuery(query);
@@ -441,9 +440,6 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
         resetResultQuery: () => {
           setResultQuery(null);
         },
-        setLocalTaskId,
-        runningRef,
-        onSubmitted: refreshAnalyses,
       },
     });
 
@@ -467,17 +463,15 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
       column,
       engine,
     };
-    setIsSubmittingRunAll(true);
-    try {
-      await runQuotationAll(host.tabId, { source }, tabTaskId ? [tabTaskId] : []);
-      refreshAnalyses();
-    } catch (error) {
-      showErrorDialog(
-        error instanceof Error ? error.message : 'Could not start Quotation Run All.',
-      );
-    } finally {
-      setIsSubmittingRunAll(false);
-    }
+    await runAnalysis<Analysis>({
+      action: 'run_all',
+      submit: () => runQuotationAll(host.tabId, { source }, tabTaskId ? [tabTaskId] : []),
+      onError: (error) => {
+        showErrorDialog(
+          error instanceof Error ? error.message : 'Could not start Quotation Run All.',
+        );
+      },
+    });
   };
 
   const handleAddToWorkspace = async (sources: DataBlockCreationSource[]) => {

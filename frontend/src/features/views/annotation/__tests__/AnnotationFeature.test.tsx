@@ -4,6 +4,20 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Analysis } from '@/api';
+import type { RunAnalysisOptions } from '../../common/hooks/useAnalysisFeature';
+
+async function executeAnalysis<TAnalysis extends Analysis>(options: RunAnalysisOptions<TAnalysis>) {
+  try {
+    options.resetBeforeRun?.();
+    await options.prepare?.();
+    const response = await options.submit();
+    options.onSuccess?.(response);
+    return response;
+  } catch (error) {
+    options.onError(error);
+    return null;
+  }
+}
 
 vi.mock('@/features/guidance/GuidanceContext', () => ({
   useGuidance: () => ({ reachContextualHint: vi.fn(), startGuidedTour: vi.fn() }),
@@ -263,10 +277,9 @@ vi.mock('../../common/hooks/useAnalysisFeature', () => ({
     request: null,
     result: null,
     isRunning: false,
+    isSubmittingRunAll: false,
     isStopping: false,
-    setIsRunning: vi.fn(),
-    setLocalTaskId: vi.fn(),
-    runningRef: { current: false },
+    runAnalysis: executeAnalysis,
     taskStatus: { tasks: [] },
     banner: null,
     clearResults: mocks.clearResults,

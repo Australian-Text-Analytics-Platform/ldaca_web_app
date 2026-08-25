@@ -210,42 +210,207 @@ describe('useAnalysisFeature', () => {
     });
   });
 
-  it('releases a locally submitted Preview after successful Run All supersedes it', async () => {
-    mocks.session.analysis = analysis({
-      execution_scope: 'preview',
-      state: 'running',
-    });
+  it('keeps Run All active from click until the canonical forest adopts it', async () => {
+    let resolveSubmit: ((value: Analysis) => void) | null = null;
+    const submit = vi.fn(
+      () =>
+        new Promise<Analysis>((resolve) => {
+          resolveSubmit = resolve;
+        }),
+    );
     const initialConfig = {
       ...baseConfig(),
-      tabAnalysisIds: ['analysis-1'],
+      hydrationTaskId: null,
+      controlAnalysisId: null,
+      tabAnalysisIds: [],
     };
-    const { result, rerender } = renderHook(
-      ({ config }: { config: ReturnType<typeof baseConfig> & { tabAnalysisIds: string[] } }) =>
-        useAnalysisFeature(config),
-      {
-        initialProps: { config: initialConfig },
-        wrapper: createWrapper(),
-      },
-    );
-
-    act(() => {
-      result.current.setLocalTaskId('analysis-1');
-      result.current.setIsRunning(true);
+    const { result, rerender } = renderHook(({ config }) => useAnalysisFeature(config), {
+      initialProps: { config: initialConfig },
+      wrapper: createWrapper(),
     });
+
+    let runPromise: Promise<Analysis | null> | null = null;
+    act(() => {
+      runPromise = result.current.runAnalysis({
+        action: 'run_all',
+        submit,
+        onError: vi.fn(),
+      });
+    });
+    expect(result.current.isSubmittingRunAll).toBe(true);
     expect(result.current.isRunning).toBe(true);
+
+    await act(async () => {
+      expect(
+        await result.current.runAnalysis({
+          action: 'run_all',
+          submit,
+          onError: vi.fn(),
+        }),
+      ).toBeNull();
+    });
+    expect(submit).toHaveBeenCalledOnce();
+
+    await act(async () => {
+      resolveSubmit?.(
+        analysis({
+          id: 'run-all-1',
+          execution_scope: 'run_all',
+          state: 'queued',
+          started_at: null,
+          finished_at: null,
+        }),
+      );
+      await runPromise;
+    });
+    expect(result.current.isSubmittingRunAll).toBe(true);
 
     rerender({
       config: {
         ...initialConfig,
         hydrationTaskId: null,
         tabAnalysisIds: ['run-all-1'],
-        retiredAnalysisIds: ['analysis-1'],
       },
     });
 
     await waitFor(() => {
-      expect(result.current.request).toBeNull();
-      expect(result.current.isRunning).toBe(false);
+      expect(result.current.isSubmittingRunAll).toBe(false);
     });
+  });
+
+  it('keeps the previous canonical Preview when Run All submission fails', async () => {
+    const preview = analysis({ execution_scope: 'preview', state: 'succeeded' });
+    mocks.session.analysis = preview;
+    const onError = vi.fn();
+    const config = { ...baseConfig(), controlAnalysisId: null };
+    const { result } = renderHook(() => useAnalysisFeature(config), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.runAnalysis({
+        action: 'run_all',
+        submit: vi.fn().mockRejectedValue(new Error('rejected')),
+        onError,
+      });
+    });
+
+    expect(onError).toHaveBeenCalledOnce();
+    expect(result.current.isSubmittingRunAll).toBe(false);
+    expect(result.current.request).toBe(preview.request);
+  });
+
+  it('does not resurrect a Preview handoff after the canonical resource is removed', async () => {
+    const initialConfig = {
+      ...baseConfig(),
+      hydrationTaskId: null,
+      controlAnalysisId: null,
+      tabAnalysisIds: [],
+    };
+    const { result, rerender } = renderHook(({ config }) => useAnalysisFeature(config), {
+      initialProps: { config: initialConfig },
+      wrapper: createWrapper(),
+    });
+    const preview = analysis({
+      execution_scope: 'preview',
+      state: 'queued',
+      started_at: null,
+      finished_at: null,
+    });
+
+    await act(async () => {
+      await result.current.runAnalysis({
+        action: 'preview',
+        submit: vi.fn().mockResolvedValue(preview),
+        onError: vi.fn(),
+      });
+    });
+    expect(result.current.isRunning).toBe(true);
+
+    mocks.session.analysis = preview;
+    rerender({
+      config: {
+        ...initialConfig,
+        hydrationTaskId: preview.id,
+        tabAnalysisIds: [preview.id],
+      },
+    });
+    await waitFor(() => expect(result.current.isRunning).toBe(true));
+
+    mocks.session.analysis = null;
+    rerender({
+      config: {
+        ...initialConfig,
+        hydrationTaskId: null,
+        tabAnalysisIds: ['run-all-1'],
+        retiredAnalysisIds: [preview.id],
+      },
+    });
+    await waitFor(() => expect(result.current.isRunning).toBe(false));
+  });
+
+  it('does not release a new submission when the previous terminal handoff is adopted', async () => {
+    const initialConfig = {
+      ...baseConfig(),
+      hydrationTaskId: null,
+      controlAnalysisId: null,
+      tabAnalysisIds: [],
+    };
+    const { result, rerender } = renderHook(({ config }) => useAnalysisFeature(config), {
+      initialProps: { config: initialConfig },
+      wrapper: createWrapper(),
+    });
+    const preview = analysis({ execution_scope: 'preview', state: 'succeeded' });
+    await act(async () => {
+      await result.current.runAnalysis({
+        action: 'preview',
+        submit: vi.fn().mockResolvedValue(preview),
+        onError: vi.fn(),
+      });
+    });
+
+    let resolveRunAll: ((value: Analysis) => void) | null = null;
+    const submitRunAll = vi.fn(
+      () =>
+        new Promise<Analysis>((resolve) => {
+          resolveRunAll = resolve;
+        }),
+    );
+    let runPromise: Promise<Analysis | null> | null = null;
+    act(() => {
+      runPromise = result.current.runAnalysis({
+        action: 'run_all',
+        submit: submitRunAll,
+        onError: vi.fn(),
+      });
+    });
+    rerender({
+      config: {
+        ...initialConfig,
+        hydrationTaskId: preview.id,
+        tabAnalysisIds: [preview.id],
+      },
+    });
+
+    await act(async () => {
+      expect(
+        await result.current.runAnalysis({
+          action: 'run_all',
+          submit: submitRunAll,
+          onError: vi.fn(),
+        }),
+      ).toBeNull();
+      resolveRunAll?.(
+        analysis({
+          id: 'run-all-1',
+          execution_scope: 'run_all',
+          state: 'queued',
+          started_at: null,
+          finished_at: null,
+        }),
+      );
+      await runPromise;
+    });
+    expect(submitRunAll).toHaveBeenCalledOnce();
   });
 });

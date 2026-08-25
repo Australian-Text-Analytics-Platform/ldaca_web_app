@@ -201,7 +201,10 @@ callback stale.
 One Query owner reads each active Tab's complete Analysis forest. It polls while
 any member is active and derives newest Preview, newest Run All, active
 Analyses, parent/descendant relationships, and historical hydration candidates.
-Features do not keep a second Analysis identifier or lifecycle cache.
+Features do not keep a second durable Analysis identifier or lifecycle cache.
+The shared submission controller retains only the accepted Analysis ID and
+action while Query adopts the returned resource into that forest, then stops
+consulting the handoff.
 
 Every submission uses the generic Tab Analysis collection operation with an
 execution scope, complete immutable request, optional parent, and explicit
@@ -225,8 +228,10 @@ shared action tooltip on pointer hover or keyboard focus; features supply
 domain-specific reasons while the shared renderer owns the interaction.
 The labels are always **Preview**, **Run**, and **Run All**. The parameter panel
 locks from the local submission boundary until the active Preview or Run All
-finishes, then unlocks while the successful Result remains visible. Each action
-compares its complete current execution request with its own latest successful
+finishes, then unlocks while the successful Result remains visible. A local
+action flag covers only request submission; once the backend accepts an
+Analysis, its Query resource owns the handoff until the Tab forest adopts it.
+Each action compares its complete current execution request with its own latest successful
 request; an exact change enables that action and an exact revert disables it.
 Presentation-only controls do not participate. A failed or cancelled root
 unlocks parameters but disables every execution action in the Tab until

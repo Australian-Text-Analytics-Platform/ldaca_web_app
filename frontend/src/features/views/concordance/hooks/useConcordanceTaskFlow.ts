@@ -2,8 +2,8 @@ import type { Dispatch, SetStateAction } from 'react';
 import { toast } from 'sonner';
 import { submitTabAnalysis } from '@/api';
 import { type ConcordanceAnalysisRequest, type Analysis } from '@/api';
+import type { RunAnalysis } from '../../common/hooks/useAnalysisFeature';
 import type { NodeColumnSelection } from '../../common/nodeSelectionTypes';
-import { runAnalysisTaskEnvelope } from '../../common/tasks/runAnalysisTaskEnvelope';
 import type { NodePaginationState } from '../../common/tasks/types';
 
 export type PaginationState = Record<string, NodePaginationState>;
@@ -32,10 +32,7 @@ interface ConcordanceState {
 
 interface ConcordanceActions {
   setNodePagination: Dispatch<SetStateAction<PaginationState>>;
-  setIsSearching: (value: boolean) => void;
-  setLocalTaskId: (id: string | null) => void;
-  runningRef: { current: boolean };
-  onSubmitted: () => void;
+  runAnalysis: RunAnalysis;
   prepareBeforeRun?: () => Promise<void>;
 }
 
@@ -71,14 +68,7 @@ export function useConcordanceTaskFlow({
     caseSensitive,
     ignorePunctuation,
   },
-  actions: {
-    setNodePagination,
-    setIsSearching,
-    setLocalTaskId,
-    runningRef,
-    onSubmitted,
-    prepareBeforeRun,
-  },
+  actions: { setNodePagination, runAnalysis, prepareBeforeRun },
 }: Params) {
   /** Starts a fresh concordance analysis or targeted update while preserving the analysis lock. */
   /**
@@ -152,11 +142,8 @@ export function useConcordanceTaskFlow({
       search_mode: searchMode,
       node_tokenizer_models: nodeTokenizerModels,
     };
-    await runAnalysisTaskEnvelope<Analysis>({
-      runningRef,
-      setIsRunning: setIsSearching,
-      setLocalTaskId,
-      onSubmitted,
+    await runAnalysis<Analysis>({
+      action: 'preview',
       prepare: prepareBeforeRun,
       submit: async () => {
         const { data } = await submitTabAnalysis({

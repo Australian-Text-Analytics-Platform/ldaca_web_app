@@ -1,10 +1,21 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { Analysis } from '@/api';
+import type { RunAnalysisOptions } from '../../../common/hooks/useAnalysisFeature';
 import { useConcordanceTaskFlow } from '../useConcordanceTaskFlow';
 
 const submitTabAnalysis = vi.hoisted(() => vi.fn());
 vi.mock('@/api', async (importOriginal) => ({ ...(await importOriginal()), submitTabAnalysis }));
+
+const executeAnalysis = async <TAnalysis extends Analysis>(
+  options: RunAnalysisOptions<TAnalysis>,
+) => {
+  await options.prepare?.();
+  const response = await options.submit();
+  options.onSuccess?.(response);
+  return response;
+};
 
 describe('useConcordanceTaskFlow', () => {
   beforeEach(() => {
@@ -13,8 +24,7 @@ describe('useConcordanceTaskFlow', () => {
   });
 
   it('submits a canonical tab-owned concordance Analysis', async () => {
-    const onSubmitted = vi.fn();
-    const setIsSearching = vi.fn();
+    const runAnalysis = vi.fn(executeAnalysis);
     const { result } = renderHook(() =>
       useConcordanceTaskFlow({
         state: {
@@ -39,10 +49,7 @@ describe('useConcordanceTaskFlow', () => {
         },
         actions: {
           setNodePagination: vi.fn(),
-          setIsSearching,
-          setLocalTaskId: vi.fn(),
-          runningRef: { current: false },
-          onSubmitted,
+          runAnalysis,
         },
       }),
     );
@@ -67,8 +74,6 @@ describe('useConcordanceTaskFlow', () => {
       path: { workspace_id: 'workspace-1', tab_id: 'tab-1' },
       throwOnError: true,
     });
-    expect(onSubmitted).toHaveBeenCalledOnce();
-    expect(setIsSearching).toHaveBeenCalledTimes(1);
-    expect(setIsSearching).toHaveBeenCalledWith(true);
+    expect(runAnalysis).toHaveBeenCalledWith(expect.objectContaining({ action: 'preview' }));
   });
 });

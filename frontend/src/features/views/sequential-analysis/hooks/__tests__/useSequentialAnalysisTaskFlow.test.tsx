@@ -1,6 +1,9 @@
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
+import type { Analysis } from '@/api';
+import type { RunAnalysisOptions } from '../../../common/hooks/useAnalysisFeature';
+
 const submitTabAnalysis = vi.hoisted(() => vi.fn());
 vi.mock('@/api', async (importOriginal) => ({
   ...(await importOriginal()),
@@ -8,6 +11,14 @@ vi.mock('@/api', async (importOriginal) => ({
 }));
 
 import { useSequentialAnalysisTaskFlow } from '../useSequentialAnalysisTaskFlow';
+
+const executeAnalysis = async <TAnalysis extends Analysis>(
+  options: RunAnalysisOptions<TAnalysis>,
+) => {
+  const response = await options.submit();
+  options.onSuccess?.(response);
+  return response;
+};
 
 describe('useSequentialAnalysisTaskFlow', () => {
   it('keeps computed results empty while the submitted Analysis is queued', async () => {
@@ -17,8 +28,7 @@ describe('useSequentialAnalysisTaskFlow', () => {
         state: 'queued',
       },
     });
-    const setIsAnalyzing = vi.fn();
-    const onSubmitted = vi.fn();
+    const runAnalysis = vi.fn(executeAnalysis);
 
     const { result } = renderHook(() =>
       useSequentialAnalysisTaskFlow({
@@ -39,23 +49,18 @@ describe('useSequentialAnalysisTaskFlow', () => {
           caseSensitive: false,
         },
         actions: {
-          setIsAnalyzing,
+          runAnalysis,
           setChartType: vi.fn(),
-          setLocalTaskId: vi.fn(),
-          runningRef: { current: false },
           setNodeColumnSelections: vi.fn(),
           setTimeColumn: vi.fn(),
           lockCurrentSchema: vi.fn(),
           clearResults: vi.fn(async () => true),
-          onSubmitted,
         },
       }),
     );
 
     await act(async () => result.current.handleAnalyze());
 
-    expect(onSubmitted).toHaveBeenCalledOnce();
-    expect(setIsAnalyzing).toHaveBeenCalledTimes(1);
-    expect(setIsAnalyzing).toHaveBeenCalledWith(true);
+    expect(runAnalysis).toHaveBeenCalledWith(expect.objectContaining({ action: 'run_all' }));
   });
 });

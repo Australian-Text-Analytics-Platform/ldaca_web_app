@@ -2,11 +2,11 @@ import { useCallback, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { deleteTab, submitTabAnalysis } from '@/api';
 import type { Analysis, ConcordanceAnalysisRequest, TokenFrequencyRequest } from '@/api';
+import type { RunAnalysis } from '@/features/views/common/hooks/useAnalysisFeature';
 import type { NodeColumnSelection } from '@/features/views/common/nodeSelectionTypes';
 import { resolveTokenFrequencyNodeContext } from '@/features/views/token-frequency/tokenFrequencyHelpers';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import { ANALYSIS_TAB_GROUPS } from '../../common/analysisIds';
-import { runAnalysisTaskEnvelope } from '../../common/tasks/runAnalysisTaskEnvelope';
 import { useWorkspaceTabs } from '../../common/tabs/useWorkspaceTabs';
 import type { ViewType } from '@/features/views/viewIds';
 
@@ -22,12 +22,9 @@ interface AnalysisState {
 }
 
 interface AnalysisActions {
-  setLocalTaskId: (value: string | null) => void;
-  setIsRunning: (value: boolean) => void;
-  runningRef: React.RefObject<boolean>;
+  runAnalysis: RunAnalysis;
   setLastCompareNodeIds: React.Dispatch<React.SetStateAction<string[]>>;
   setStopWords: React.Dispatch<React.SetStateAction<string>>;
-  onSubmitted: () => void;
   prepareBeforeRun?: () => Promise<void>;
 }
 
@@ -59,15 +56,7 @@ export const useTokenFrequencyTaskFlow = ({
     stopWords,
     lastCompareNodeIds,
   },
-  actions: {
-    setLocalTaskId,
-    setIsRunning,
-    runningRef,
-    setLastCompareNodeIds,
-    setStopWords,
-    onSubmitted,
-    prepareBeforeRun,
-  },
+  actions: { runAnalysis, setLastCompareNodeIds, setStopWords, prepareBeforeRun },
   navigation: { setCurrentView, applyStopSetFromText },
 }: UseTokenFrequencyTaskFlowParams) => {
   // Concordance tab group handle, used by handleTokenClick to spawn a brand-new
@@ -88,8 +77,6 @@ export const useTokenFrequencyTaskFlow = ({
     if (!currentWorkspaceId || panelNodeIds.length === 0) {
       return;
     }
-    if (runningRef.current) return;
-
     const incompleteSelections = effectiveNodeColumnSelections.filter((sel) => !sel.column);
     if (incompleteSelections.length > 0) {
       toast.error('Please select a text column for all selected data blocks.');
@@ -119,11 +106,8 @@ export const useTokenFrequencyTaskFlow = ({
       ),
     };
 
-    await runAnalysisTaskEnvelope<Analysis>({
-      runningRef,
-      setIsRunning,
-      setLocalTaskId,
-      onSubmitted,
+    await runAnalysis<Analysis>({
+      action: 'run_all',
       prepare: prepareBeforeRun,
       submit: async () => {
         const { data: response } = await submitTabAnalysis({
@@ -141,7 +125,6 @@ export const useTokenFrequencyTaskFlow = ({
       },
       onError: (error) => {
         console.error('Error calculating token frequencies:', error);
-        setLocalTaskId(null);
       },
     });
   };

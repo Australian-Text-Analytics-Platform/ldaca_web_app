@@ -1,6 +1,8 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { Analysis } from '@/api';
+import type { RunAnalysisOptions } from '@/features/views/common/hooks/useAnalysisFeature';
 import type { ViewType } from '@/features/views/viewIds';
 import { useTokenFrequencyTaskFlow } from '../useTokenFrequencyTaskFlow';
 
@@ -22,6 +24,15 @@ vi.mock('@/features/views/common/tabs/useWorkspaceTabs', () => ({
   }),
 }));
 
+const executeAnalysis = async <TAnalysis extends Analysis>(
+  options: RunAnalysisOptions<TAnalysis>,
+) => {
+  await options.prepare?.();
+  const response = await options.submit();
+  options.onSuccess?.(response);
+  return response;
+};
+
 describe('useTokenFrequencyTaskFlow', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -38,9 +49,7 @@ describe('useTokenFrequencyTaskFlow', () => {
   });
 
   it('assigns the returned Analysis id without submitting the frontend Tab id in the body', async () => {
-    const setLocalTaskId = vi.fn();
-    const setIsRunning = vi.fn();
-    const onSubmitted = vi.fn();
+    const runAnalysis = vi.fn(executeAnalysis);
 
     const { result } = renderHook(() =>
       useTokenFrequencyTaskFlow({
@@ -55,12 +64,9 @@ describe('useTokenFrequencyTaskFlow', () => {
           lastCompareNodeIds: [],
         },
         actions: {
-          setLocalTaskId,
-          setIsRunning,
-          runningRef: { current: false },
+          runAnalysis,
           setLastCompareNodeIds: vi.fn(),
           setStopWords: vi.fn(),
-          onSubmitted,
         },
         navigation: {
           setCurrentView: vi.fn(),
@@ -89,8 +95,7 @@ describe('useTokenFrequencyTaskFlow', () => {
     );
     expect(submitTabAnalysisMock.mock.calls[0]?.[0].body.request).not.toHaveProperty('stop_words');
     expect(submitTabAnalysisMock.mock.calls[0]?.[0]?.body).not.toHaveProperty('tab_id');
-    expect(setLocalTaskId).toHaveBeenCalledWith('analysis-1');
-    expect(onSubmitted).toHaveBeenCalledOnce();
+    expect(runAnalysis).toHaveBeenCalledWith(expect.objectContaining({ action: 'run_all' }));
   });
 
   const renderTwoNodeFlow = (setCurrentView: (view: ViewType) => void = vi.fn()) =>
@@ -116,13 +121,10 @@ describe('useTokenFrequencyTaskFlow', () => {
           lastCompareNodeIds: ['node-1', 'node-2'],
         },
         actions: {
-          setLocalTaskId: vi.fn(),
-          setIsRunning: vi.fn(),
-          runningRef: { current: false },
+          runAnalysis: executeAnalysis,
           setLastCompareNodeIds: vi.fn(),
           setAppliedStopSet: vi.fn(),
           setStopWords: vi.fn(),
-          onSubmitted: vi.fn(),
         },
         navigation: {
           setCurrentView,

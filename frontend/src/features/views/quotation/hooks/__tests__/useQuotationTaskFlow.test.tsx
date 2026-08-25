@@ -2,10 +2,20 @@ import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { Analysis } from '@/api';
+import type { RunAnalysisOptions } from '../../../common/hooks/useAnalysisFeature';
 import { useQuotationTaskFlow } from '../useQuotationTaskFlow';
 
 const submitTabAnalysis = vi.hoisted(() => vi.fn());
 vi.mock('@/api', async (importOriginal) => ({ ...(await importOriginal()), submitTabAnalysis }));
+
+const executeAnalysis = async <TAnalysis extends Analysis>(
+  options: RunAnalysisOptions<TAnalysis>,
+) => {
+  options.resetBeforeRun?.();
+  const response = await options.submit();
+  options.onSuccess?.(response);
+  return response;
+};
 
 const queuedQuotationAnalysis = (): Analysis => ({
   cancellation_requested_at: null,
@@ -34,7 +44,7 @@ const queuedQuotationAnalysis = (): Analysis => ({
 describe('useQuotationTaskFlow', () => {
   it('submits the typed quotation request through the tab-owned analysis action', async () => {
     submitTabAnalysis.mockResolvedValueOnce({ data: queuedQuotationAnalysis() });
-    const onSubmitted = vi.fn();
+    const runAnalysis = vi.fn(executeAnalysis);
     const { result } = renderHook(() =>
       useQuotationTaskFlow({
         state: {
@@ -49,13 +59,10 @@ describe('useQuotationTaskFlow', () => {
           supersedesAnalysisIds: [],
         },
         actions: {
-          setIsLoadingQuotations: vi.fn(),
+          runAnalysis,
           showErrorDialog: vi.fn(),
           setResultQuery: vi.fn(),
           resetResultQuery: vi.fn(),
-          setLocalTaskId: vi.fn(),
-          runningRef: { current: false },
-          onSubmitted,
         },
       }),
     );
@@ -73,7 +80,7 @@ describe('useQuotationTaskFlow', () => {
       path: { workspace_id: 'workspace-1', tab_id: 'tab-1' },
       throwOnError: true,
     });
-    expect(onSubmitted).toHaveBeenCalledOnce();
+    expect(runAnalysis).toHaveBeenCalledWith(expect.objectContaining({ action: 'preview' }));
   });
 
   it('does not synthesize a Result while the submitted Analysis is queued', async () => {
@@ -94,13 +101,10 @@ describe('useQuotationTaskFlow', () => {
           supersedesAnalysisIds: [],
         },
         actions: {
-          setIsLoadingQuotations: vi.fn(),
+          runAnalysis: executeAnalysis,
           showErrorDialog: vi.fn(),
           setResultQuery,
           resetResultQuery,
-          setLocalTaskId: vi.fn(),
-          runningRef: { current: false },
-          onSubmitted: vi.fn(),
         },
       }),
     );
@@ -134,13 +138,10 @@ describe('useQuotationTaskFlow', () => {
           supersedesAnalysisIds: [],
         },
         actions: {
-          setIsLoadingQuotations: vi.fn(),
+          runAnalysis: executeAnalysis,
           showErrorDialog: vi.fn(),
           setResultQuery,
           resetResultQuery: vi.fn(),
-          setLocalTaskId: vi.fn(),
-          runningRef: { current: false },
-          onSubmitted: vi.fn(),
         },
       }),
     );

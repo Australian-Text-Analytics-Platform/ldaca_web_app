@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type {
   Analysis,
@@ -66,7 +66,6 @@ import {
   getAnalysisActionLifecycle,
   hasClearRequiredAnalysis,
 } from '../common/analysisActionLifecycle';
-import { runAnalysisTaskEnvelope } from '../common/tasks/runAnalysisTaskEnvelope';
 import { canAnnotate, canListModels, resolveAnnotationProviderConfiguration } from './aiProviders';
 import { AnnotationAiPreviewPanel } from './components/AnnotationAiPreviewPanel';
 import { AnnotationAiSettings } from './components/AnnotationAiSettings';
@@ -214,7 +213,6 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
   );
   const [isCreatingAnnotationColumn, setIsCreatingAnnotationColumn] = useState(false);
   const [isCreatingCorrectionColumn, setIsCreatingCorrectionColumn] = useState(false);
-  const [isSubmittingRunAll, setIsSubmittingRunAll] = useState(false);
   const [isStartingManualReview, setIsStartingManualReview] = useState(false);
   const [isCreatingClassTable, setIsCreatingClassTable] = useState(false);
   // Tab-persisted AI settings live in their own hook so this feature body can
@@ -298,7 +296,6 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
     {},
   );
   const { currentWorkspaceId, nodes } = useWorkspaceData();
-  const queryClient = useQueryClient();
   const {
     polarsExpressionApply,
     createSqlDataBlock,
@@ -693,10 +690,9 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
     request: serverAiRequest,
     result: aiResult,
     isRunning: isAiRunning,
+    isSubmittingRunAll,
     isStopping: isAiStopping,
-    setIsRunning: setIsAiRunning,
-    setLocalTaskId: setLocalAiTaskId,
-    runningRef: aiRunningRef,
+    runAnalysis,
     taskStatus: aiTaskStatus,
     banner: aiBanner,
     clearResults: clearAiResults,
@@ -859,12 +855,9 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
     isStartingManualReview;
 
   const runFreshAiAnalysis = async () => {
-    if (!currentAiRequest || !currentWorkspaceId || aiRunningRef.current) return;
-    await runAnalysisTaskEnvelope<Analysis>({
-      runningRef: aiRunningRef,
-      setIsRunning: setIsAiRunning,
-      setLocalTaskId: setLocalAiTaskId,
-      onSubmitted: refreshAnalyses,
+    if (!currentAiRequest || !currentWorkspaceId) return;
+    await runAnalysis<Analysis>({
+      action: 'preview',
       prepare: ensureNodeColors,
       submit: async () => {
         const { data } = await submitTabAnalysisWithProviderCredential({
@@ -892,27 +885,27 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
     ) {
       return;
     }
-    setIsSubmittingRunAll(true);
-    try {
-      await ensureNodeColors();
-      await submitAnnotationRunAllWithProviderCredential({
-        workspaceId: currentWorkspaceId,
-        tabId: host.tabId,
-        providerConfigurationId: selectedAiProvider.id,
-        source: currentAiRequest,
-        batchSize: aiBatchSize,
-        processingMode: aiProcessingMode,
-      });
-      refreshAnalyses();
-      void queryClient.invalidateQueries({
-        queryKey: queryKeys.workspaceAnalyses(currentWorkspaceId),
-      });
-      toast.success('Annotation Run All started.');
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Could not start Annotation Run All.');
-    } finally {
-      setIsSubmittingRunAll(false);
-    }
+    await runAnalysis<Analysis>({
+      action: 'run_all',
+      prepare: ensureNodeColors,
+      submit: async () => {
+        const { data } = await submitAnnotationRunAllWithProviderCredential({
+          workspaceId: currentWorkspaceId,
+          tabId: host.tabId,
+          providerConfigurationId: selectedAiProvider.id,
+          source: currentAiRequest,
+          batchSize: aiBatchSize,
+          processingMode: aiProcessingMode,
+        });
+        return data;
+      },
+      onSuccess: () => {
+        toast.success('Annotation Run All started.');
+      },
+      onError: (error) => {
+        toast.error(error instanceof Error ? error.message : 'Could not start Annotation Run All.');
+      },
+    });
   };
 
   const handleManualReviewToggle = async () => {

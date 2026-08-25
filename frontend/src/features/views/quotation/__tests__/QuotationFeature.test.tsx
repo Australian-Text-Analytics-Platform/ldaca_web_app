@@ -2,6 +2,21 @@ import { render } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Analysis } from '@/api';
+import type { RunAnalysisOptions } from '../../common/hooks/useAnalysisFeature';
+
+async function executeAnalysis<TAnalysis extends Analysis>(options: RunAnalysisOptions<TAnalysis>) {
+  try {
+    options.resetBeforeRun?.();
+    await options.prepare?.();
+    const response = await options.submit();
+    options.onSuccess?.(response);
+    return response;
+  } catch (error) {
+    options.onError(error);
+    return null;
+  }
+}
 
 vi.mock('@/features/guidance/useProgressiveContextualHints', () => ({
   useProgressiveContextualHints: vi.fn(),
@@ -76,10 +91,9 @@ vi.mock('../../common/hooks/useAnalysisFeature', () => ({
       analysisError: null,
       result: quotationHydrationMocks.result,
       isResultFetching: quotationHydrationMocks.isResultFetching,
-      setLocalTaskId: vi.fn(),
       isRunning: false,
-      setIsRunning: vi.fn(),
-      runningRef: { current: false },
+      isSubmittingRunAll: false,
+      runAnalysis: executeAnalysis,
       banner: null,
       taskStatus: { tasks: [] },
       clearResults: vi.fn(() => Promise.resolve(true)),

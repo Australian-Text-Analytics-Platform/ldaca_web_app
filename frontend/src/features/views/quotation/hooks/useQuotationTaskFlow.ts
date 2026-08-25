@@ -1,7 +1,7 @@
 import type { QuotationAnalysisRequest, QuotationResultQuery, Analysis } from '@/api';
 import { submitTabAnalysis } from '@/api';
+import type { RunAnalysis } from '../../common/hooks/useAnalysisFeature';
 import type { NodeColumnSelection } from '../../common/nodeSelectionTypes';
-import { runAnalysisTaskEnvelope } from '../../common/tasks/runAnalysisTaskEnvelope';
 import type { NodePaginationState } from '../../common/tasks/types';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import type { QuotationEngineRequestPayload } from './useQuotationEngineSettings';
@@ -46,13 +46,10 @@ interface QuotationState {
 }
 
 interface QuotationActions {
-  setIsLoadingQuotations: (value: boolean) => void;
+  runAnalysis: RunAnalysis;
   showErrorDialog: (message: string) => void;
   setResultQuery: (query: QuotationResultQuery) => void;
   resetResultQuery: () => void;
-  setLocalTaskId: (id: string | null) => void;
-  runningRef: { current: boolean };
-  onSubmitted: () => void;
 }
 
 interface Params {
@@ -78,15 +75,7 @@ export function useQuotationTaskFlow({
     buildEngineRequest,
     supersedesAnalysisIds,
   },
-  actions: {
-    setIsLoadingQuotations,
-    showErrorDialog,
-    setResultQuery,
-    resetResultQuery,
-    setLocalTaskId,
-    runningRef,
-    onSubmitted,
-  },
+  actions: { runAnalysis, showErrorDialog, setResultQuery, resetResultQuery },
 }: Params) {
   // Locates the locked node and column that should receive stored-result updates.
   /**
@@ -142,11 +131,8 @@ export function useQuotationTaskFlow({
           : { type: 'local' },
     };
 
-    const analysis = await runAnalysisTaskEnvelope<Analysis>({
-      runningRef,
-      setIsRunning: setIsLoadingQuotations,
-      setLocalTaskId,
-      onSubmitted,
+    const analysis = await runAnalysis<Analysis>({
+      action: 'preview',
       resetBeforeRun: () => {
         resetResultQuery();
       },

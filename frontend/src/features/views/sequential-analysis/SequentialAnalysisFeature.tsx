@@ -135,11 +135,9 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
 
   const {
     request: serverRequest,
-    setLocalTaskId,
     isRunning: isAnalyzing,
     isStopping,
-    setIsRunning: setIsAnalyzing,
-    runningRef,
+    runAnalysis,
     banner: sequentialWaitingBanner,
     taskStatus,
     clearResults,
@@ -312,17 +310,14 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
         caseSensitive,
       },
       actions: {
-        setIsAnalyzing,
+        runAnalysis,
         setChartType,
-        setLocalTaskId,
-        runningRef,
         setNodeColumnSelections: (selections) => {
           applyInputsFromSelections(selections);
         },
         setTimeColumn,
         lockCurrentSchema,
         clearResults,
-        onSubmitted: refreshAnalyses,
       },
     });
 

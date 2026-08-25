@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import type { Analysis } from '@/api';
+import type { RunAnalysisOptions } from '@/features/views/common/hooks/useAnalysisFeature';
+
 const submitTabAnalysis = vi.hoisted(() => vi.fn());
 vi.mock('@/api', async (importOriginal) => ({
   ...(await importOriginal()),
@@ -7,6 +10,15 @@ vi.mock('@/api', async (importOriginal) => ({
 }));
 
 import { useTopicModelingTaskFlow } from '../useTopicModelingTaskFlow';
+
+const executeAnalysis = async <TAnalysis extends Analysis>(
+  options: RunAnalysisOptions<TAnalysis>,
+) => {
+  options.resetBeforeRun?.();
+  const response = await options.submit();
+  options.onSuccess?.(response);
+  return response;
+};
 
 describe('useTopicModelingTaskFlow', () => {
   it('submits one canonical root analysis owned by the tab', async () => {
@@ -17,7 +29,7 @@ describe('useTopicModelingTaskFlow', () => {
         progress: { fraction: 0, message: 'Queued' },
       },
     });
-    const setLocalTaskId = vi.fn();
+    const runAnalysis = vi.fn(executeAnalysis);
     const flow = useTopicModelingTaskFlow({
       state: {
         currentWorkspaceId: 'workspace-1',
@@ -33,11 +45,8 @@ describe('useTopicModelingTaskFlow', () => {
         maxSegmentTokens: 64,
       },
       actions: {
-        setIsRunning: vi.fn(),
-        runningRef: { current: false },
+        runAnalysis,
         setError: vi.fn(),
-        setLocalTaskId,
-        onSubmitted: vi.fn(),
       },
     });
 
@@ -57,6 +66,6 @@ describe('useTopicModelingTaskFlow', () => {
         }),
       }),
     );
-    expect(setLocalTaskId).toHaveBeenCalledWith('analysis-1');
+    expect(runAnalysis).toHaveBeenCalledWith(expect.objectContaining({ action: 'run_all' }));
   });
 });

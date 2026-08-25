@@ -1,8 +1,8 @@
 import { toast } from 'sonner';
 import { submitTabAnalysis } from '@/api';
 import type { Analysis, SequentialAnalysisRequest } from '@/api';
+import type { RunAnalysis } from '../../common/hooks/useAnalysisFeature';
 import type { ArrowField } from '@/lib/arrow/arrowTable';
-import { runAnalysisTaskEnvelope } from '../../common/tasks/runAnalysisTaskEnvelope';
 import type { ChartTypeOption } from './sequentialChartModel';
 
 type SequentialFrequency = NonNullable<SequentialAnalysisRequest['frequency']>;
@@ -26,15 +26,12 @@ interface SequentialAnalysisState {
 }
 
 interface SequentialAnalysisActions {
-  setIsAnalyzing: (value: boolean) => void;
+  runAnalysis: RunAnalysis;
   setChartType: (value: ChartTypeOption) => void;
-  setLocalTaskId: (value: string | null) => void;
-  runningRef: { current: boolean };
   setNodeColumnSelections: (selections: { nodeId: string; column: string }[]) => void;
   setTimeColumn: (value: string) => void;
   lockCurrentSchema: (schema?: Record<string, ArrowField>) => void;
   clearResults: () => Promise<boolean>;
-  onSubmitted: () => void;
 }
 
 interface Params {
@@ -68,15 +65,12 @@ export function useSequentialAnalysisTaskFlow({
     caseSensitive,
   },
   actions: {
-    setIsAnalyzing,
+    runAnalysis,
     setChartType,
-    setLocalTaskId,
-    runningRef,
     setNodeColumnSelections,
     setTimeColumn,
     lockCurrentSchema,
     clearResults,
-    onSubmitted,
   },
 }: Params) {
   // Validates current parameters, submits the analysis request, and locks the selected node.
@@ -147,11 +141,8 @@ export function useSequentialAnalysisTaskFlow({
       case_sensitive: caseSensitive,
     };
 
-    await runAnalysisTaskEnvelope<Analysis>({
-      runningRef,
-      setIsRunning: setIsAnalyzing,
-      setLocalTaskId,
-      onSubmitted,
+    await runAnalysis<Analysis>({
+      action: 'run_all',
       submit: async () => {
         const { data } = await submitTabAnalysis({
           body: {
