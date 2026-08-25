@@ -42,7 +42,15 @@ import { useStackedSplits } from '@/components/layout/sidebar/useStackedSplits';
 import HelpIcon from '@/components/help/HelpIcon';
 import InfoIcon from '@/components/help/InfoIcon';
 import ReferenceIcon from '@/components/help/ReferenceIcon';
-import { BookOpen, Circle, Cog, MessageSquare, ChevronDown, Pencil } from 'lucide-react';
+import {
+  BookOpen,
+  ChevronDown,
+  ChevronRight,
+  Circle,
+  Cog,
+  MessageSquare,
+  Pencil,
+} from 'lucide-react';
 import { VIEW_DEFINITIONS, isWorkspaceRequired } from '@/features/views/viewRegistry';
 import type { ViewType } from '@/features/views/viewIds';
 import { useVisibleViews } from '@/features/views/useVisibleViews';
@@ -51,6 +59,7 @@ import {
   useUserPreferences,
 } from '@/features/preferences/useUserPreferences';
 import logo from '@/logo.png';
+import { ResizeHandle } from '@/components/layout/ResizeHandle';
 
 const SettingsDialog = React.lazy(() =>
   import('@/components/dialogs/SettingsDialog').then(({ SettingsDialog }) => ({
@@ -180,6 +189,7 @@ function Sidebar() {
     toggleSection,
     getSectionFlexStyle,
     assignSectionScrollRef,
+    resizingLowerKey,
     handleResizeStart,
   } = useStackedSplits<SectionKey>(SECTION_KEYS, {
     minSectionPx: MIN_SECTION_HEIGHT,
@@ -219,271 +229,298 @@ function Sidebar() {
     </SidebarMenu>
   );
   return (
-    <SidebarRoot className="@container/sidebar md:p-2! md:pr-1! **:data-[sidebar=sidebar]:rounded-xl **:data-[sidebar=sidebar]:border **:data-[sidebar=sidebar]:border-border/60 **:data-[sidebar=sidebar]:shadow-sm **:data-[sidebar=sidebar]:overflow-hidden">
-      <SidebarHeader className="px-3 py-2">
-        <div className="flex min-w-0 flex-col gap-2 w-full">
-          <div className="flex items-center gap-2 w-full">
-            <SidebarTrigger className="md:hidden" />
-            <img src={logo} alt="LDaCA Logo" className="w-full h-auto object-contain" />
-          </div>
-          <div className="flex items-center w-full">
-            <p className="text-xl font-semibold flex-1">Wordflow</p>
-            <InfoIcon
-              targetKey="general.overview"
-              label="About Wordflow"
-              className="h-5 w-5 text-blue-500"
-            />
-            <ReferenceIcon
-              targetKey="general.platform"
-              label="Cite LDaCA Wordflow"
-              className="h-5 w-5 text-emerald-600"
-            />
-            <Tooltip>
-              <TooltipTrigger asChild>
+    <SidebarRoot
+      data-testid="sidebar-container"
+      className="@container/sidebar pr-0! [&_[data-slot=sidebar-inner]]:overflow-hidden [&_[data-slot=sidebar-inner]]:rounded-xl [&_[data-slot=sidebar-inner]]:border [&_[data-slot=sidebar-inner]]:border-border/60 [&_[data-slot=sidebar-inner]]:bg-white [&_[data-slot=sidebar-inner]]:shadow-sm"
+    >
+      <div className="flex h-full min-h-0 w-full flex-col">
+        <SidebarHeader data-testid="sidebar-title" className="shrink-0 overflow-hidden px-3 py-2">
+          <div className="flex min-w-0 flex-col gap-2 w-full">
+            <div className="flex items-center gap-2 w-full">
+              <SidebarTrigger className="md:hidden" />
+              <img src={logo} alt="LDaCA Logo" className="w-full h-auto object-contain" />
+            </div>
+            <div className="flex items-center w-full">
+              <p className="text-xl font-semibold flex-1">Wordflow</p>
+              <InfoIcon
+                targetKey="general.overview"
+                label="About Wordflow"
+                className="h-5 w-5 text-blue-500"
+              />
+              <ReferenceIcon
+                targetKey="general.platform"
+                label="Cite LDaCA Wordflow"
+                className="h-5 w-5 text-emerald-600"
+              />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-muted-foreground"
+                    aria-label="Open settings"
+                    onClick={() => {
+                      setIsSettingsDialogOpen(true);
+                    }}
+                  >
+                    <Cog className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right">Settings</TooltipContent>
+              </Tooltip>
+            </div>
+            {isMultiUserMode && (
+              <div className="flex items-center justify-between w-full">
+                <p
+                  className="text-[11px] text-muted-foreground truncate"
+                  title={user?.name ?? 'Guest'}
+                >
+                  Welcome, {user?.name ?? 'Guest'}
+                </p>
                 <Button
-                  type="button"
                   variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 text-muted-foreground"
-                  aria-label="Open settings"
+                  size="sm"
+                  className="text-xs text-red-600 hover:text-red-700 shrink-0 h-auto py-0 px-1"
                   onClick={() => {
-                    setIsSettingsDialogOpen(true);
+                    void handleLogout();
                   }}
                 >
-                  <Cog className="h-4 w-4" />
+                  Logout
                 </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">Settings</TooltipContent>
-            </Tooltip>
+              </div>
+            )}
           </div>
-          {isMultiUserMode && (
-            <div className="flex items-center justify-between w-full">
-              <p
-                className="text-[11px] text-muted-foreground truncate"
-                title={user?.name ?? 'Guest'}
-              >
-                Welcome, {user?.name ?? 'Guest'}
-              </p>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-xs text-red-600 hover:text-red-700 shrink-0 h-auto py-0 px-1"
-                onClick={() => {
-                  void handleLogout();
-                }}
-              >
-                Logout
-              </Button>
-            </div>
-          )}
-        </div>
-      </SidebarHeader>
-      <SidebarContent className="flex-1 overflow-hidden">
-        <div ref={sectionsContainerRef} className="flex h-full flex-col gap-2 overflow-hidden">
-          {SECTION_KEYS.map((key, index) => {
-            const title = SECTION_TITLES[key];
-            const collapsed = isCollapsed(key);
-            const previousKey = SECTION_KEYS[index - 1];
-            return (
-              <div
-                key={key}
-                className="flex min-h-0 flex-col rounded-md border border-border/40 bg-background/40"
-                style={getSectionFlexStyle(key)}
-              >
-                <div className="relative">
+        </SidebarHeader>
+        <SidebarContent className="flex-1 overflow-hidden border-y border-border/60">
+          <div ref={sectionsContainerRef} className="flex h-full flex-col overflow-hidden">
+            {SECTION_KEYS.map((key, index) => {
+              const title = SECTION_TITLES[key];
+              const collapsed = isCollapsed(key);
+              const previousKey = SECTION_KEYS[index - 1];
+              const resizeDisabled = previousKey ? isCollapsed(previousKey) || collapsed : true;
+              const TwistieIcon = collapsed ? ChevronRight : ChevronDown;
+              return (
+                <div
+                  key={key}
+                  className={cn(
+                    'relative flex min-h-0 flex-col',
+                    index > 0 && 'border-t border-border/60',
+                  )}
+                  style={getSectionFlexStyle(key)}
+                >
                   {index > 0 && previousKey ? (
-                    <div
-                      className="absolute -top-1 left-0 right-0 h-2 cursor-row-resize"
-                      role="separator"
+                    <ResizeHandle
+                      orientation="horizontal"
+                      variant="line"
+                      isDragging={resizingLowerKey === key}
+                      disabled={resizeDisabled}
+                      className="absolute -top-1 right-0 left-0 z-10"
                       aria-label={`Resize ${title}`}
-                      onMouseDown={(event) => {
+                      onPointerDown={(event) => {
                         handleResizeStart(previousKey, key, event);
                       }}
+                      title="Drag to resize"
                     />
                   ) : null}
-                  <div className="flex items-center border-b border-border/40 bg-muted/40">
-                    <button
-                      type="button"
-                      data-guidance={key === 'nodes' ? 'data-blocks' : undefined}
-                      className="flex min-w-0 flex-1 items-center justify-between px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
-                      onClick={() => {
-                        toggleSection(key);
-                      }}
-                      aria-expanded={!collapsed}
-                    >
-                      <span className="flex items-center gap-1">{title}</span>
-                      <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                        {key === 'nodes' && (
-                          <span className="font-semibold text-foreground/80">
-                            {selectedCount > 0
-                              ? `${selectedCount.toString()}/${nodeCount.toString()}`
-                              : nodeCount.toString()}
-                          </span>
-                        )}
-                        {key === 'tasks' && (
-                          <Circle
-                            data-testid="tasks-connection-indicator"
-                            className={cn('h-3 w-3', {
-                              'text-green-500 fill-green-500': isConnected,
-                              'text-amber-500 fill-amber-500 animate-pulse': isConnecting,
-                              'text-muted-foreground fill-muted-foreground':
-                                !isConnected && !isConnecting && !connectionError,
-                              'text-red-500 fill-red-500': !!connectionError,
-                            })}
-                          />
-                        )}
-                        <ChevronDown
-                          className={cn(
-                            'h-3 w-3 transition-transform',
-                            collapsed ? '-rotate-90' : 'rotate-0',
-                          )}
-                        />
-                      </div>
-                    </button>
-                    <HelpIcon
-                      targetKey={SECTION_HELP_KEYS[key]}
-                      label={title}
-                      className="h-5 w-5 shrink-0 text-muted-foreground"
-                    />
-                    {key === 'views' && (
-                      <div className="pr-1.5">
-                        <DropdownMenu>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6 text-muted-foreground"
-                                  aria-label="Edit visible views"
-                                >
-                                  <Pencil className="h-3.5 w-3.5" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                            </TooltipTrigger>
-                            <TooltipContent side="right">Edit visible views</TooltipContent>
-                          </Tooltip>
-                          <DropdownMenuContent align="end" className="w-56">
-                            {VIEW_DEFINITIONS.filter(
-                              ({ requiresWorkspace }) => requiresWorkspace,
-                            ).map(({ id, label }) => {
-                              const checked = visibleViews.includes(id);
-                              return (
-                                <DropdownMenuCheckboxItem
-                                  key={id}
-                                  checked={checked}
-                                  onSelect={(event) => {
-                                    event.preventDefault();
-                                    setViewHidden(id, checked);
-                                  }}
-                                >
-                                  {label}
-                                </DropdownMenuCheckboxItem>
-                              );
-                            })}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div
-                  className={cn(
-                    'flex-1 overflow-hidden transition-[max-height] duration-200',
-                    collapsed ? 'max-h-0' : 'max-h-full',
-                  )}
-                >
-                  {!collapsed && (
-                    <div className="flex h-full flex-col overflow-hidden">
+                  <div
+                    data-sidebar-section={key}
+                    data-testid={`sidebar-section-${key}`}
+                    className="flex min-h-0 flex-1 flex-col overflow-hidden"
+                  >
+                    <div>
                       <div
-                        ref={(node) => {
-                          assignSectionScrollRef(key, node);
-                        }}
-                        className="flex h-full min-h-0 flex-col overflow-y-auto scrollbar-none px-2 py-2 text-sm"
+                        data-testid={`sidebar-section-header-${key}`}
+                        className="group/sidebar-section-header mx-1 flex items-center rounded-md transition-colors hover:bg-accent focus-within:bg-accent"
                       >
-                        {key === 'views' && renderViewsBody()}
-                        {key === 'nodes' && (
-                          <WorkspaceNodeList
-                            workspaceId={currentWorkspaceId}
-                            nodes={nodes}
-                            selectedNodeIds={selectedNodeIds}
-                            onToggleNodeSelection={toggleNode}
-                            renderPinnedRowAction={(node: WorkspaceGraphNode) => (
-                              <NodePinButton
-                                node={getToolbarNode(node)}
-                                isPinned={pinnedIdSet.has(node.id)}
-                                onTogglePin={togglePinnedNode}
+                        <button
+                          type="button"
+                          data-guidance={key === 'nodes' ? 'data-blocks' : undefined}
+                          className="flex min-w-0 flex-1 items-center justify-between px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                          onClick={() => {
+                            toggleSection(key);
+                          }}
+                          aria-expanded={!collapsed}
+                        >
+                          <span className="flex min-w-0 items-center gap-1">
+                            <TwistieIcon
+                              data-testid={`sidebar-section-twistie-${key}`}
+                              className="h-4 w-4 shrink-0"
+                              aria-hidden="true"
+                            />
+                            <span>{title}</span>
+                          </span>
+                          <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                            {key === 'nodes' && (
+                              <span className="font-semibold text-foreground/80">
+                                {selectedCount > 0
+                                  ? `${selectedCount.toString()}/${nodeCount.toString()}`
+                                  : nodeCount.toString()}
+                              </span>
+                            )}
+                            {key === 'tasks' && (
+                              <Circle
+                                data-testid="tasks-connection-indicator"
+                                className={cn('h-3 w-3', {
+                                  'text-green-500 fill-green-500': isConnected,
+                                  'text-amber-500 fill-amber-500 animate-pulse': isConnecting,
+                                  'text-muted-foreground fill-muted-foreground':
+                                    !isConnected && !isConnecting && !connectionError,
+                                  'text-red-500 fill-red-500': !!connectionError,
+                                })}
                               />
                             )}
-                            renderRowActions={(node: WorkspaceGraphNode) => (
-                              <NodeActionsToolbar
-                                node={getToolbarNode(node)}
-                                isPinned={pinnedIdSet.has(node.id)}
-                                onTogglePin={togglePinnedNode}
-                                onAddToSelection={handleAddToSelection}
-                                onRename={(id, newName) => {
-                                  void renameNode(id, newName);
-                                }}
-                                onClone={(id) => {
-                                  void copyNode(id);
-                                }}
-                                onDelete={(id) => {
-                                  void deleteNode(id);
-                                }}
-                              />
-                            )}
-                          />
-                        )}
-                        {key === 'tasks' && (
-                          <SidebarTasksSection
-                            tasks={tasks}
-                            isConnected={isConnected}
-                            isConnecting={isConnecting}
-                            connectionError={connectionError}
-                            onReconnect={reconnectTaskStream}
-                            onStopUserFileImport={stopUserFileImport}
-                            onClearUserFileImport={clearUserFileImport}
-                            stoppingImportId={stoppingImportId}
-                            clearingImportId={clearingImportId}
-                          />
+                          </div>
+                        </button>
+                        <HelpIcon
+                          targetKey={SECTION_HELP_KEYS[key]}
+                          label={title}
+                          className="h-5 w-5 shrink-0 text-muted-foreground"
+                        />
+                        {key === 'views' && (
+                          <div className="pr-1.5">
+                            <DropdownMenu>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-6 w-6 text-muted-foreground"
+                                      aria-label="Edit visible views"
+                                    >
+                                      <Pencil className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                </TooltipTrigger>
+                                <TooltipContent side="right">Edit visible views</TooltipContent>
+                              </Tooltip>
+                              <DropdownMenuContent align="end" className="w-56">
+                                {VIEW_DEFINITIONS.filter(
+                                  ({ requiresWorkspace }) => requiresWorkspace,
+                                ).map(({ id, label }) => {
+                                  const checked = visibleViews.includes(id);
+                                  return (
+                                    <DropdownMenuCheckboxItem
+                                      key={id}
+                                      checked={checked}
+                                      onSelect={(event) => {
+                                        event.preventDefault();
+                                        setViewHidden(id, checked);
+                                      }}
+                                    >
+                                      {label}
+                                    </DropdownMenuCheckboxItem>
+                                  );
+                                })}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
                         )}
                       </div>
                     </div>
-                  )}
+                    <div
+                      className={cn(
+                        'flex-1 overflow-hidden transition-[max-height] duration-200',
+                        collapsed ? 'max-h-0' : 'max-h-full',
+                      )}
+                    >
+                      {!collapsed && (
+                        <div className="flex h-full flex-col overflow-hidden">
+                          <div
+                            ref={(node) => {
+                              assignSectionScrollRef(key, node);
+                            }}
+                            className="flex h-full min-h-0 flex-col overflow-y-auto scrollbar-none px-2 py-2 text-sm"
+                          >
+                            {key === 'views' && renderViewsBody()}
+                            {key === 'nodes' && (
+                              <WorkspaceNodeList
+                                workspaceId={currentWorkspaceId}
+                                nodes={nodes}
+                                selectedNodeIds={selectedNodeIds}
+                                onToggleNodeSelection={toggleNode}
+                                renderPinnedRowAction={(node: WorkspaceGraphNode) => (
+                                  <NodePinButton
+                                    node={getToolbarNode(node)}
+                                    isPinned={pinnedIdSet.has(node.id)}
+                                    onTogglePin={togglePinnedNode}
+                                  />
+                                )}
+                                renderRowActions={(node: WorkspaceGraphNode) => (
+                                  <NodeActionsToolbar
+                                    node={getToolbarNode(node)}
+                                    isPinned={pinnedIdSet.has(node.id)}
+                                    onTogglePin={togglePinnedNode}
+                                    onAddToSelection={handleAddToSelection}
+                                    onRename={(id, newName) => {
+                                      void renameNode(id, newName);
+                                    }}
+                                    onClone={(id) => {
+                                      void copyNode(id);
+                                    }}
+                                    onDelete={(id) => {
+                                      void deleteNode(id);
+                                    }}
+                                  />
+                                )}
+                              />
+                            )}
+                            {key === 'tasks' && (
+                              <SidebarTasksSection
+                                tasks={tasks}
+                                isConnected={isConnected}
+                                isConnecting={isConnecting}
+                                connectionError={connectionError}
+                                onReconnect={reconnectTaskStream}
+                                onStopUserFileImport={stopUserFileImport}
+                                onClearUserFileImport={clearUserFileImport}
+                                stoppingImportId={stoppingImportId}
+                                clearingImportId={clearingImportId}
+                              />
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
-      </SidebarContent>
-
-      <SidebarFooter className="space-y-2 px-3 py-2">
-        <div className="flex items-center gap-2">
-          <div className="flex flex-1 flex-col gap-2 @min-[208px]/sidebar:flex-row">
-            <Button
-              variant="ghost"
-              className="flex-1 justify-center"
-              onClick={() => {
-                openDocument(tutorialIndexTarget);
-              }}
-            >
-              <BookOpen className="h-4 w-4" />
-              <span>Help</span>
-            </Button>
-            <Button
-              variant="ghost"
-              className="flex-1 justify-center"
-              onClick={() => {
-                openFeedback();
-              }}
-            >
-              <MessageSquare className="h-4 w-4" />
-              <span>Feedback</span>
-            </Button>
+              );
+            })}
           </div>
-        </div>
-      </SidebarFooter>
+        </SidebarContent>
+
+        <SidebarFooter
+          data-testid="sidebar-help-feedback"
+          className="shrink-0 space-y-2 overflow-hidden px-3 py-2"
+        >
+          <div className="flex items-center gap-2">
+            <div className="flex flex-1 flex-col gap-2 @min-[208px]/sidebar:flex-row">
+              <Button
+                variant="ghost"
+                className="flex-1 justify-center"
+                onClick={() => {
+                  openDocument(tutorialIndexTarget);
+                }}
+              >
+                <BookOpen className="h-4 w-4" />
+                <span>Help</span>
+              </Button>
+              <Button
+                variant="ghost"
+                className="flex-1 justify-center"
+                onClick={() => {
+                  openFeedback();
+                }}
+              >
+                <MessageSquare className="h-4 w-4" />
+                <span>Feedback</span>
+              </Button>
+            </div>
+          </div>
+        </SidebarFooter>
+      </div>
 
       {isSettingsDialogOpen ? (
         <React.Suspense fallback={null}>

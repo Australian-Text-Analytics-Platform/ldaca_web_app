@@ -294,6 +294,43 @@ describe('DataLoaderFeature citation UI', () => {
     };
   });
 
+  it('resizes the workspace cards without changing the files pane height', () => {
+    renderWithProviders(<DataLoaderFeature />);
+    const separator = screen.getByRole('separator', { name: 'Resize data loader sections' });
+    const splitContainer = screen.getByTestId('data-loader-split');
+    const workspacePane = screen.getByTestId('data-loader-workspace-pane');
+    const filesPane = screen.getByTestId('data-loader-files-pane');
+    vi.spyOn(splitContainer, 'getBoundingClientRect').mockReturnValue({
+      x: 0,
+      y: 0,
+      top: 0,
+      right: 1000,
+      bottom: 1000,
+      left: 0,
+      width: 1000,
+      height: 1000,
+      toJSON: () => ({}),
+    });
+    vi.spyOn(filesPane, 'getBoundingClientRect').mockReturnValue({
+      x: 0,
+      y: 408,
+      top: 408,
+      right: 1000,
+      bottom: 828,
+      left: 0,
+      width: 1000,
+      height: 420,
+      toJSON: () => ({}),
+    });
+
+    fireEvent.pointerDown(separator, { pointerId: 5, clientY: 400 });
+    fireEvent.pointerMove(window, { pointerId: 5, clientY: 600 });
+    fireEvent.pointerUp(window, { pointerId: 5, clientY: 600 });
+
+    expect(workspacePane.style.flexBasis).toBe('600px');
+    expect(filesPane.style.flexBasis).toBe('420px');
+  });
+
   it('keeps a stable file-list toolbar fallback for contextual guidance', () => {
     renderWithProviders(<DataLoaderFeature />);
 

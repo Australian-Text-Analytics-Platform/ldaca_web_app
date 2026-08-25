@@ -5,6 +5,7 @@ import { InsetCard } from './InsetCard';
 import { useResizableSplit } from '@/hooks/useResizableSplit';
 import { WorkspaceDataTableFeature } from '@/features/workspace/data-view';
 import { WorkspaceGraphFeature } from '@/features/workspace/graph-view';
+import { ResizeHandle } from './ResizeHandle';
 
 /**
  * Stacked workspace view used by the main app shell: graph above, data table
@@ -63,8 +64,8 @@ function WorkspaceView({
     <div className="flex flex-col h-full bg-transparent" ref={containerRef}>
       <InsetCard
         ref={topRef}
-        className="min-h-30 p-2 pb-1"
-        style={{ height: `calc(${String(ratio * 100)}% - 0.25rem)` }}
+        className="min-h-30 p-2 pb-0 pl-0 max-md:pl-2 @max-[639px]/workspace-shell:pl-2"
+        style={{ height: `calc(${String(ratio * 100)}% - 0.125rem)` }}
       >
         <div className="p-2 bg-muted border-b border-border shrink-0">
           <WorkspaceControls onToggleCollapse={onToggleCollapse} />
@@ -74,22 +75,18 @@ function WorkspaceView({
         </div>
       </InsetCard>
 
-      <div
-        className="h-2 shrink-0 cursor-row-resize relative group flex items-center justify-center"
+      <ResizeHandle
+        orientation="horizontal"
+        isDragging={isDragging}
+        className="-my-0.5 mr-2"
         aria-label="Resize graph and data panels"
         {...splitterProps}
-      >
-        <div
-          className={`pointer-events-none h-1 w-10 rounded-full transition-colors ${
-            isDragging ? 'bg-gray-500' : 'bg-gray-300 group-hover:bg-gray-500'
-          }`}
-        />
-      </div>
+      />
 
       <InsetCard
         ref={bottomRef}
-        className="min-h-30 p-2 pt-1"
-        style={{ height: `calc(${String((1 - ratio) * 100)}% - 0.25rem)` }}
+        className="min-h-30 p-2 pt-0 pl-0 max-md:pl-2 @max-[639px]/workspace-shell:pl-2"
+        style={{ height: `calc(${String((1 - ratio) * 100)}% - 0.125rem)` }}
       >
         <div className="flex-1 min-h-0">
           <WorkspaceDataTableFeature />

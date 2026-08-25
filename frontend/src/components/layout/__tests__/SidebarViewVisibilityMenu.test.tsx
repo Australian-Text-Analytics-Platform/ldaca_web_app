@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import userEvent from '@testing-library/user-event';
 import Sidebar from '../Sidebar';
-import { SidebarProvider } from '../../ui/sidebar';
+import { SidebarProvider, SidebarTrigger } from '../../ui/sidebar';
 import { useUIStore } from '@/stores/uiStore';
 import { useGuidanceAcknowledgmentsStore } from '@/features/guidance/acknowledgmentsStore';
 
@@ -95,6 +95,34 @@ const renderSidebar = () => {
   );
 };
 
+/** Renders the responsive Sheet branch and exposes an external opener for the test. */
+const renderMobileSidebar = () => {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: vi.fn().mockImplementation((query: string) => ({
+      matches: query.includes('max-width'),
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  });
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <SidebarProvider>
+        <SidebarTrigger aria-label="Open mobile sidebar" />
+        <Sidebar />
+      </SidebarProvider>
+    </QueryClientProvider>,
+  );
+};
+
 describe('Sidebar view visibility menu', () => {
   beforeEach(() => {
     authState.isMultiUserMode = false;
@@ -126,6 +154,63 @@ describe('Sidebar view visibility menu', () => {
     preferenceFixture.mutate.mockReset();
     useGuidanceAcknowledgmentsStore.setState({ byUser: {} });
     toastMock.mockReset();
+  });
+
+  it('renders one sidebar card with VS Code-style sections and disables collapsed boundaries', async () => {
+    const user = userEvent.setup();
+    renderSidebar();
+
+    expect(screen.queryAllByTestId(/^sidebar-card-/)).toHaveLength(0);
+    const sidebarContainer = screen.getByTestId('sidebar-container');
+    expect(sidebarContainer).toHaveClass(
+      'p-2',
+      'pr-0!',
+      '[&_[data-slot=sidebar-inner]]:rounded-xl',
+      '[&_[data-slot=sidebar-inner]]:border',
+      '[&_[data-slot=sidebar-inner]]:shadow-sm',
+    );
+    expect(screen.getByTestId('sidebar-title')).toBeInTheDocument();
+    expect(screen.getByTestId('sidebar-section-views')).toBeInTheDocument();
+    expect(screen.getByTestId('sidebar-section-nodes')).toBeInTheDocument();
+    expect(screen.getByTestId('sidebar-section-tasks')).toBeInTheDocument();
+    expect(screen.getByTestId('sidebar-help-feedback')).toBeInTheDocument();
+    const sectionSeparators = screen.getAllByRole('separator');
+    expect(sectionSeparators).toHaveLength(2);
+    for (const separator of sectionSeparators) {
+      expect(separator).toHaveAttribute('data-variant', 'line');
+      expect(within(separator).queryByTestId('resize-handle-grip')).not.toBeInTheDocument();
+    }
+
+    const viewsToggle = within(screen.getByTestId('sidebar-section-views')).getByRole('button', {
+      expanded: true,
+    });
+    expect(screen.getByTestId('sidebar-section-header-views')).toHaveClass(
+      'hover:bg-accent',
+      'focus-within:bg-accent',
+    );
+    expect(viewsToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId('sidebar-section-twistie-views')).toHaveClass('lucide-chevron-down');
+    await user.click(viewsToggle);
+
+    expect(screen.getByTestId('sidebar-section-twistie-views')).toHaveClass('lucide-chevron-right');
+    expect(screen.getByRole('separator', { name: 'Resize Data Blocks' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+  });
+
+  it('uses the same continuous section structure in the mobile sidebar sheet', async () => {
+    const user = userEvent.setup();
+    renderMobileSidebar();
+
+    await user.click(screen.getByRole('button', { name: 'Open mobile sidebar' }));
+
+    expect(screen.queryAllByTestId(/^sidebar-card-/)).toHaveLength(0);
+    expect(screen.getByTestId('sidebar-title')).toBeInTheDocument();
+    expect(screen.getByTestId('sidebar-section-views')).toBeInTheDocument();
+    expect(screen.getByTestId('sidebar-section-nodes')).toBeInTheDocument();
+    expect(screen.getByTestId('sidebar-section-tasks')).toBeInTheDocument();
+    expect(screen.getByTestId('sidebar-help-feedback')).toBeInTheDocument();
   });
 
   it('allows hiding and showing optional views from the views editor', async () => {

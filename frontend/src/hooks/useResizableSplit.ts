@@ -94,9 +94,6 @@ export interface ResizableSplitHandle {
     'aria-valuemax': number;
     tabIndex: 0;
     onPointerDown: (event: React.PointerEvent<HTMLDivElement>) => void;
-    onPointerMove: (event: React.PointerEvent<HTMLDivElement>) => void;
-    onPointerUp: (event: React.PointerEvent<HTMLDivElement>) => void;
-    onPointerCancel: (event: React.PointerEvent<HTMLDivElement>) => void;
     onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => void;
     onDoubleClick: () => void;
   };
@@ -134,7 +131,7 @@ const writePersisted = (key: string | undefined, value: number) => {
 /**
  * Used directly by: `WorkspaceView`, `DataLoaderFeature`, and the
  * `useRightPanelResize`/`useSidebarResize` layout wrappers.
- * Flow: initialize persisted split value, clamp pointer and keyboard updates, capture splitter events, then expose value, drag state, refs, and ARIA props.
+ * Flow: initialize persisted split value, clamp pointer and keyboard updates, track active pointers on the window, then expose value, drag state, refs, and ARIA props.
  */
 export function useResizableSplit({
   orientation = 'horizontal',
@@ -165,6 +162,7 @@ export function useResizableSplit({
   const [value, setValue] = useState(() => readPersisted(persistKey, defaultValue));
   const liveValueRef = useRef(value);
   const rafIdRef = useRef<number | null>(null);
+  const dragCleanupRef = useRef<(() => void) | null>(null);
   // Mirror the live callbacks into refs so the per-pointer-event closures
   // can read the latest version without listing them as deps (and
   // tripping react-hooks/immutability).
@@ -187,10 +185,11 @@ export function useResizableSplit({
     onDragEndRef.current = onDragEnd;
   }, [onLiveUpdate, onDragStart, onDragEnd]);
 
-  // Cancel any pending rAF on unmount so a stale handle doesn't fire after
-  // the component unmounts mid-drag.
+  // Cancel an active drag and any pending rAF on unmount so stale window
+  // listeners or handles cannot fire after the component disappears.
   useEffect(() => {
     return () => {
+      dragCleanupRef.current?.();
       if (rafIdRef.current !== null) cancelAnimationFrame(rafIdRef.current);
     };
   }, []);
@@ -240,62 +239,72 @@ export function useResizableSplit({
     [orientation, anchor, mode, clamp],
   );
 
-  /** Starts a drag interaction and captures the pointer for reliable splitter movement. */
+  /** Starts a drag interaction and tracks it on the window until release or cancellation. */
   const onPointerDown = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
       event.preventDefault();
+      dragCleanupRef.current?.();
       draggingRef.current = true;
       setIsDragging(true);
       liveValueRef.current = value;
       onDragStartRef.current?.();
+
+      const pointerId = event.pointerId;
+      const handle = event.currentTarget;
+
+      const handlePointerMove = (moveEvent: PointerEvent) => {
+        if (!draggingRef.current || moveEvent.pointerId !== pointerId) return;
+        const next = computeFromPointer(moveEvent);
+        if (next === null) return;
+        liveValueRef.current = next;
+
+        if (onLiveUpdateRef.current) {
+          if (rafIdRef.current !== null) cancelAnimationFrame(rafIdRef.current);
+          rafIdRef.current = requestAnimationFrame(() => {
+            onLiveUpdateRef.current?.(liveValueRef.current);
+          });
+        } else {
+          setValue(next);
+        }
+      };
+
+      const cleanup = () => {
+        window.removeEventListener('pointermove', handlePointerMove);
+        window.removeEventListener('pointerup', handlePointerEnd);
+        window.removeEventListener('pointercancel', handlePointerEnd);
+        if (dragCleanupRef.current === cleanup) dragCleanupRef.current = null;
+      };
+
+      const handlePointerEnd = (endEvent: PointerEvent) => {
+        if (!draggingRef.current || endEvent.pointerId !== pointerId) return;
+        draggingRef.current = false;
+        setIsDragging(false);
+        cleanup();
+        if (rafIdRef.current !== null) {
+          cancelAnimationFrame(rafIdRef.current);
+          rafIdRef.current = null;
+        }
+        setValue(liveValueRef.current);
+        onDragEndRef.current?.();
+        try {
+          handle.releasePointerCapture(pointerId);
+        } catch {
+          // ignore pointer capture errors
+        }
+      };
+
+      dragCleanupRef.current = cleanup;
+      window.addEventListener('pointermove', handlePointerMove);
+      window.addEventListener('pointerup', handlePointerEnd);
+      window.addEventListener('pointercancel', handlePointerEnd);
       try {
-        event.currentTarget.setPointerCapture(event.pointerId);
+        handle.setPointerCapture(pointerId);
       } catch {
         // ignore pointer capture errors
       }
     },
-    [value],
+    [computeFromPointer, value],
   );
-
-  /** Streams drag updates either through DOM-imperative callbacks or hook state. */
-  const onPointerMove = useCallback(
-    (event: React.PointerEvent<HTMLDivElement>) => {
-      if (!draggingRef.current) return;
-      const next = computeFromPointer(event);
-      if (next === null) return;
-      liveValueRef.current = next;
-
-      if (onLiveUpdateRef.current) {
-        // DOM-imperative mode: coalesce updates with rAF so we don't do
-        // more than one write per frame.
-        if (rafIdRef.current !== null) cancelAnimationFrame(rafIdRef.current);
-        rafIdRef.current = requestAnimationFrame(() => {
-          onLiveUpdateRef.current?.(liveValueRef.current);
-        });
-      } else {
-        setValue(next);
-      }
-    },
-    [computeFromPointer],
-  );
-
-  /** Commits the live drag value and releases pointer capture when resizing ends. */
-  const onPointerUp = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    if (!draggingRef.current) return;
-    draggingRef.current = false;
-    setIsDragging(false);
-    if (rafIdRef.current !== null) {
-      cancelAnimationFrame(rafIdRef.current);
-      rafIdRef.current = null;
-    }
-    setValue(liveValueRef.current);
-    onDragEndRef.current?.();
-    try {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    } catch {
-      // ignore pointer capture errors
-    }
-  }, []);
 
   /** Provides keyboard resizing semantics for accessible separator controls. */
   const onKeyDown = useCallback(
@@ -352,9 +361,6 @@ export function useResizableSplit({
     'aria-valuemax': Math.round(reportedMax),
     tabIndex: 0,
     onPointerDown,
-    onPointerMove,
-    onPointerUp,
-    onPointerCancel: onPointerUp,
     onKeyDown,
     onDoubleClick,
   };

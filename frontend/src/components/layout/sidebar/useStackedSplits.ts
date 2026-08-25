@@ -4,7 +4,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
-  type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
 } from 'react';
 
 interface UseStackedSplitsOptions {
@@ -35,15 +35,17 @@ export interface StackedSplitsApi<KeyT extends string> {
    * push overflow into the right pane when the cursor moves past min/max.
    */
   assignSectionScrollRef: (key: KeyT, node: HTMLDivElement | null) => void;
+  /** Lower section key for the boundary currently being dragged. */
+  resizingLowerKey: KeyT | null;
   /**
-   * Mousedown handler for the separator between `upperKey` (above) and
+   * Pointer-down handler for the separator between `upperKey` (above) and
    * `lowerKey` (below). Resizes the pair against each other; if the cursor
    * tries to push past either pane's min, the overflow scrolls that pane.
    */
   handleResizeStart: (
     upperKey: KeyT,
     lowerKey: KeyT,
-    event: ReactMouseEvent<HTMLDivElement>,
+    event: ReactPointerEvent<HTMLDivElement>,
   ) => void;
 }
 
@@ -82,6 +84,7 @@ export const useStackedSplits = <KeyT extends string>(
   const containerRef = useRef<HTMLDivElement | null>(null);
   const sectionScrollRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [containerHeight, setContainerHeight] = useState(0);
+  const [resizingLowerKey, setResizingLowerKey] = useState<KeyT | null>(null);
 
   useLayoutEffect(() => {
     const container = containerRef.current;
@@ -136,7 +139,7 @@ export const useStackedSplits = <KeyT extends string>(
   }, []);
 
   const handleResizeStart = useCallback(
-    (upperKey: KeyT, lowerKey: KeyT, event: ReactMouseEvent<HTMLDivElement>) => {
+    (upperKey: KeyT, lowerKey: KeyT, event: ReactPointerEvent<HTMLDivElement>) => {
       if (event.button !== 0) return;
       if (collapsedSections[upperKey] || collapsedSections[lowerKey]) return;
       const measuredHeight = containerRef.current?.getBoundingClientRect().height;
@@ -149,6 +152,8 @@ export const useStackedSplits = <KeyT extends string>(
       if (height <= 0) return;
 
       event.preventDefault();
+      const handle = event.currentTarget;
+      const pointerId = event.pointerId;
       const startY = event.clientY;
       const startUpper = sectionHeights[upperKey] ?? 0;
       const startLower = sectionHeights[lowerKey] ?? 0;
@@ -174,11 +179,19 @@ export const useStackedSplits = <KeyT extends string>(
         return;
       }
 
+      setResizingLowerKey(lowerKey);
+      try {
+        handle.setPointerCapture(pointerId);
+      } catch {
+        // Pointer capture is an enhancement; window listeners still own the drag.
+      }
+
       /**
-       * Called by the window mousemove listener installed below for this drag.
-       * Flow: convert mouse delta to section ratios, clamp the upper/lower pair, update heights, then scroll overflow when the drag hits a minimum bound.
+       * Called by the window pointermove listener installed below for this drag.
+       * Flow: convert pointer delta to section ratios, clamp the upper/lower pair, update heights, then scroll overflow when the drag hits a minimum bound.
        */
-      const onMove = (moveEvent: MouseEvent) => {
+      const onMove = (moveEvent: PointerEvent) => {
+        if (moveEvent.pointerId !== pointerId) return;
         const deltaY = moveEvent.clientY - startY;
         const deltaRatio = deltaY / height;
         const candidateUpper = startUpper + deltaRatio;
@@ -208,14 +221,23 @@ export const useStackedSplits = <KeyT extends string>(
         }
       };
 
-      /** Removes this drag's window listeners when the mouse is released. */
-      const onUp = () => {
-        window.removeEventListener('mousemove', onMove);
-        window.removeEventListener('mouseup', onUp);
+      /** Removes this drag's window listeners when the pointer ends or is cancelled. */
+      const onEnd = (endEvent: PointerEvent) => {
+        if (endEvent.pointerId !== pointerId) return;
+        window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('pointerup', onEnd);
+        window.removeEventListener('pointercancel', onEnd);
+        setResizingLowerKey(null);
+        try {
+          handle.releasePointerCapture(pointerId);
+        } catch {
+          // Ignore release failures when capture was unavailable or already lost.
+        }
       };
 
-      window.addEventListener('mousemove', onMove);
-      window.addEventListener('mouseup', onUp);
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onEnd);
+      window.addEventListener('pointercancel', onEnd);
     },
     [collapsedSections, containerHeight, sectionHeights, minSectionPx, sectionMinPx, scrollSection],
   );
@@ -226,6 +248,7 @@ export const useStackedSplits = <KeyT extends string>(
     toggleSection,
     getSectionFlexStyle,
     assignSectionScrollRef,
+    resizingLowerKey,
     handleResizeStart,
   };
 };

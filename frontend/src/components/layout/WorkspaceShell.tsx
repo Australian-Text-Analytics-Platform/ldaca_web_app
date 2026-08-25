@@ -16,6 +16,7 @@ import { ViewRouter } from '@/components/layout/ViewRouter';
 import { isTabbedMainView } from '@/features/views/viewRegistry';
 import { GuidanceProvider } from '@/features/guidance/GuidanceProvider';
 import { NodeInputPointerCarrier } from '@/components/layout/NodeInputPointerCarrier';
+import { ResizeHandle } from '@/components/layout/ResizeHandle';
 
 const WorkspaceView = lazy(() => import('@/components/layout/WorkspaceView'));
 
@@ -66,17 +67,13 @@ function WorkspaceShellContent() {
                 <Sidebar />
               </ErrorBoundary>
 
-              <div
-                className={`group relative hidden w-2 shrink-0 cursor-col-resize items-center justify-center md:flex ${isResizingSidebar ? 'z-20' : ''}`}
+              <ResizeHandle
+                orientation="vertical"
+                isDragging={isResizingSidebar}
+                className={`-mx-0.5 my-2 hidden md:flex ${isResizingSidebar ? 'z-20' : ''}`}
                 aria-label="Resize sidebar"
                 {...sidebarSplitterProps}
-              >
-                <div
-                  className={`pointer-events-none h-10 w-1 rounded-full transition-colors ${
-                    isResizingSidebar ? 'bg-gray-500' : 'bg-gray-300 group-hover:bg-gray-500'
-                  }`}
-                />
-              </div>
+              />
 
               <SidebarInset className="@container/workspace-shell flex h-full flex-1 flex-col overflow-hidden bg-transparent md:m-0! md:ml-0! md:rounded-none! md:shadow-none!">
                 <header className="border-border/40 border-b bg-white px-4 py-3 md:hidden">
@@ -94,7 +91,7 @@ function WorkspaceShellContent() {
                     <InsetCard
                       ref={mainRef}
                       role="main"
-                      className={`relative h-full p-2 pl-1 pr-1 max-md:h-auto max-md:min-h-[calc(100dvh-3.5rem)] max-md:w-full! max-md:min-w-0! @max-[639px]/workspace-shell:h-auto @max-[639px]/workspace-shell:min-h-[calc(100dvh-3.5rem)] @max-[639px]/workspace-shell:w-full! @max-[639px]/workspace-shell:min-w-0! ${
+                      className={`relative h-full p-2 pl-0 ${isRightCollapsed ? 'pr-2' : 'pr-0'} max-md:h-auto max-md:min-h-[calc(100dvh-3.5rem)] max-md:w-full! max-md:min-w-0! max-md:px-2 @max-[639px]/workspace-shell:h-auto @max-[639px]/workspace-shell:min-h-[calc(100dvh-3.5rem)] @max-[639px]/workspace-shell:w-full! @max-[639px]/workspace-shell:min-w-0! @max-[639px]/workspace-shell:px-2 ${
                         isResizing ? 'transition-none' : 'transition-all duration-300 ease-in-out'
                       }`}
                       style={{
@@ -119,17 +116,13 @@ function WorkspaceShellContent() {
                     </InsetCard>
 
                     {!isRightCollapsed && (
-                      <div
-                        className="group relative hidden w-2 shrink-0 cursor-col-resize items-center justify-center md:flex @max-[639px]/workspace-shell:hidden"
+                      <ResizeHandle
+                        orientation="vertical"
+                        isDragging={isResizing}
+                        className="-mx-0.5 my-2 hidden md:flex @max-[639px]/workspace-shell:hidden"
                         aria-label="Resize right panel"
                         {...rightPanelSplitterProps}
-                      >
-                        <div
-                          className={`pointer-events-none h-10 w-1 rounded-full transition-colors ${
-                            isResizing ? 'bg-gray-500' : 'bg-gray-300 group-hover:bg-gray-500'
-                          }`}
-                        />
-                      </div>
+                      />
                     )}
 
                     <aside

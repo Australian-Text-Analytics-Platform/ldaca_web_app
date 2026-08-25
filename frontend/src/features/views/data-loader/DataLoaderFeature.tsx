@@ -6,7 +6,7 @@ import {
   RefreshCcw,
   Upload,
 } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import HelpIcon from '@/components/help/HelpIcon';
 import InfoIcon from '@/components/help/InfoIcon';
@@ -20,6 +20,7 @@ import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspace
 import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
 import { useWorkspaceDownloads } from '@/features/workspace/workspace-downloads/WorkspaceDownloadsContext';
 import { useResizableSplit } from '@/hooks/useResizableSplit';
+import { ResizeHandle } from '@/components/layout/ResizeHandle';
 import {
   isPendingTaskState,
   isRunningTaskState,
@@ -129,13 +130,24 @@ function DataLoaderFeature() {
 
   const [previewFile, setPreviewFile] = useState<string | null>(null);
   const [addFileName, setAddFileName] = useState<string | null>(null);
+  const filesPaneRef = useRef<HTMLDivElement | null>(null);
+  const [filesPaneHeight, setFilesPaneHeight] = useState<number | null>(null);
   const {
     containerRef: splitContainerRef,
-    value: topRatio,
+    value: workspacePaneHeight,
+    isDragging,
     splitterProps,
   } = useResizableSplit({
-    defaultValue: 0.4,
-    persistKey: 'ldaca.layout.dataLoaderTopRatio',
+    mode: 'pixel',
+    defaultValue: 500,
+    min: 240,
+    max: 1200,
+    keyboardStep: 40,
+    persistKey: 'ldaca.layout.dataLoaderWorkspaceHeight',
+    onDragStart: () => {
+      const height = filesPaneRef.current?.getBoundingClientRect().height;
+      if (height && height > 0) setFilesPaneHeight(height);
+    },
   });
   const hasWorkspaceSelected = Boolean(currentWorkspaceId);
 
@@ -346,10 +358,15 @@ function DataLoaderFeature() {
         </div>
       </div>
 
-      <div ref={splitContainerRef} className="flex min-h-0 flex-1 flex-col">
+      <div
+        ref={splitContainerRef}
+        data-testid="data-loader-split"
+        className="flex min-h-0 flex-1 flex-col"
+      >
         <div
-          className="min-h-0 overflow-y-auto @min-[576px]/data-loader:overflow-hidden"
-          style={{ flexBasis: `${String(topRatio * 100)}%` }}
+          data-testid="data-loader-workspace-pane"
+          className="min-h-0 shrink-0 overflow-y-auto @min-[576px]/data-loader:overflow-hidden"
+          style={{ flexBasis: `${String(workspacePaneHeight)}px` }}
         >
           <div className="grid min-h-full gap-4 @min-[576px]/data-loader:h-full @min-[576px]/data-loader:min-h-0 @min-[576px]/data-loader:grid-cols-2">
             <ActiveWorkspaceCard
@@ -385,18 +402,22 @@ function DataLoaderFeature() {
           </div>
         </div>
 
-        <div
+        <ResizeHandle
+          orientation="horizontal"
+          isDragging={isDragging}
           {...splitterProps}
           aria-label="Resize data loader sections"
-          className="group focus-visible:ring-ring my-2 flex h-3 shrink-0 cursor-row-resize items-center justify-center rounded-md transition-colors focus-visible:ring-2 focus-visible:outline-none"
+          className="-my-0.5"
           title="Drag to resize. Double-click to reset."
-        >
-          <div className="bg-muted-foreground/30 group-hover:bg-primary/50 group-focus-visible:bg-primary/50 h-1 w-12 rounded-full transition-colors" />
-        </div>
+        />
 
         <div
-          className="flex min-h-0 flex-col overflow-hidden"
-          style={{ flexBasis: `${String((1 - topRatio) * 100)}%` }}
+          ref={filesPaneRef}
+          data-testid="data-loader-files-pane"
+          className="flex min-h-0 shrink-0 flex-col overflow-hidden"
+          style={{
+            flexBasis: filesPaneHeight === null ? 'auto' : `${String(filesPaneHeight)}px`,
+          }}
         >
           <Card className="flex h-full flex-col overflow-hidden">
             <CardHeader>
