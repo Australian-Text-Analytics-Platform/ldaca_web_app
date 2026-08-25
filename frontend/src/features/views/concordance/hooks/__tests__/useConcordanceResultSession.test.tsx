@@ -271,9 +271,7 @@ describe('useConcordanceResultSession', () => {
     );
 
     await waitFor(() => {
-      expect(hook.current.results?.data['node-1']?.data[0]?.[0]?.CONC_matched_text).toBe(
-        'Alpha',
-      );
+      expect(hook.current.results?.data['node-1']?.data[0]?.[0]?.CONC_matched_text).toBe('Alpha');
     });
 
     act(() => {
@@ -284,9 +282,7 @@ describe('useConcordanceResultSession', () => {
       expect(fetchArrowTablePageMock).toHaveBeenCalledTimes(2);
       expect(hook.current.nodeLoading['node-1']).toBe(true);
     });
-    expect(hook.current.results?.data['node-1']?.data[0]?.[0]?.CONC_matched_text).toBe(
-      'Alpha',
-    );
+    expect(hook.current.results?.data['node-1']?.data[0]?.[0]?.CONC_matched_text).toBe('Alpha');
 
     act(() => {
       nextPage.resolve(makeReviewPage('Beta'));
@@ -294,9 +290,7 @@ describe('useConcordanceResultSession', () => {
 
     await waitFor(() => {
       expect(hook.current.nodeLoading['node-1']).toBe(false);
-      expect(hook.current.results?.data['node-1']?.data[0]?.[0]?.CONC_matched_text).toBe(
-        'Beta',
-      );
+      expect(hook.current.results?.data['node-1']?.data[0]?.[0]?.CONC_matched_text).toBe('Beta');
     });
   });
 

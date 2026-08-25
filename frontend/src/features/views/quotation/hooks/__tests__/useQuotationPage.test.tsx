@@ -134,9 +134,7 @@ describe('useQuotationPage', () => {
 
   it('retains a Run All page while an uncached same-owner request is pending', async () => {
     const nextPage = deferred<ArrowTablePage>();
-    fetchArrowTablePage
-      .mockResolvedValueOnce(emptyPage())
-      .mockReturnValueOnce(nextPage.promise);
+    fetchArrowTablePage.mockResolvedValueOnce(emptyPage()).mockReturnValueOnce(nextPage.promise);
     let request = createNodeDataRequest({ page: 1, page_size: 20 });
     const { wrapper } = setup();
     const { result, rerender } = renderHook(() => useQuotationPage(runAllTarget, request), {
@@ -165,9 +163,7 @@ describe('useQuotationPage', () => {
 
   it('does not retain a page across Run All ownership changes', async () => {
     const nextPage = deferred<ArrowTablePage>();
-    fetchArrowTablePage
-      .mockResolvedValueOnce(emptyPage())
-      .mockReturnValueOnce(nextPage.promise);
+    fetchArrowTablePage.mockResolvedValueOnce(emptyPage()).mockReturnValueOnce(nextPage.promise);
     let target = runAllTarget;
     const request = createNodeDataRequest({ page: 1, page_size: 20 });
     const { wrapper } = setup();

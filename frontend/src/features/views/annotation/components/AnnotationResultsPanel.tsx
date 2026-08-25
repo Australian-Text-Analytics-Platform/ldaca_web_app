@@ -234,10 +234,7 @@ export function AnnotationResultsPanel({
     pageIndex: pagination.pageIndex,
     pageSize: pagination.pageSize,
     onPaginationChange: (next) => {
-      if (
-        next.pageIndex !== pagination.pageIndex ||
-        next.pageSize !== pagination.pageSize
-      ) {
+      if (next.pageIndex !== pagination.pageIndex || next.pageSize !== pagination.pageSize) {
         if (tableViewportRef.current) tableViewportRef.current.scrollTop = 0;
       }
       setPagination(next);

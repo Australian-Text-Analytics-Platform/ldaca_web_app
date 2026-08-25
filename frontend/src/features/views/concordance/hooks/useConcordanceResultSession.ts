@@ -199,8 +199,7 @@ const useConcordanceProjectionQuery = ({
     enabled: projection?.enabled ?? false,
     meta: { concordanceProjectionOwner: ownerIdentity },
     placeholderData: (previousData, previousQuery) =>
-      ownerIdentity &&
-      previousQuery?.meta?.concordanceProjectionOwner === ownerIdentity
+      ownerIdentity && previousQuery?.meta?.concordanceProjectionOwner === ownerIdentity
         ? previousData
         : undefined,
     queryFn: async (): Promise<ConcordanceAnalysisResponse> => {

@@ -81,9 +81,7 @@ describe('WorkspaceTable', () => {
         onPageChange={onPageChange}
       />,
     );
-    const viewport = container.querySelector<HTMLDivElement>(
-      '[data-slot="scroll-area-viewport"]',
-    );
+    const viewport = container.querySelector<HTMLDivElement>('[data-slot="scroll-area-viewport"]');
     expect(viewport).not.toBeNull();
     if (!viewport) return;
 
@@ -110,9 +108,7 @@ describe('WorkspaceTable', () => {
       data: [{ text: 'row' }],
     };
     const { container, rerender } = render(<WorkspaceTable {...props} nodeId="node-1" />);
-    const viewport = container.querySelector<HTMLDivElement>(
-      '[data-slot="scroll-area-viewport"]',
-    );
+    const viewport = container.querySelector<HTMLDivElement>('[data-slot="scroll-area-viewport"]');
     expect(viewport).not.toBeNull();
     if (!viewport) return;
     viewport.scrollLeft = 180;
