@@ -64,6 +64,25 @@ export function useSequentialChartControls() {
     });
   };
 
+  /** Replaces or extends the selected periods with a brushed inclusive range. */
+  const selectPeriodRange = (
+    startIndex: number,
+    endIndex: number,
+    shiftHeld: boolean,
+    chartDataLength: number,
+  ) => {
+    if (chartDataLength <= 0) return;
+    const lower = Math.max(0, Math.min(startIndex, endIndex));
+    const upper = Math.min(chartDataLength - 1, Math.max(startIndex, endIndex));
+    if (lower > upper) return;
+    setSelectedPeriodIndices((previous) => {
+      const next = shiftHeld ? new Set(previous) : new Set<number>();
+      for (let index = lower; index <= upper; index += 1) next.add(index);
+      return next;
+    });
+    lastClickedIndexRef.current = endIndex;
+  };
+
   /**
    * Clears selected chart periods and the anchor used for shift-click range
    * selection.
@@ -103,6 +122,7 @@ export function useSequentialChartControls() {
     selectedPeriodIndices,
     toggleKey,
     selectPeriod,
+    selectPeriodRange,
     clearPeriodSelection,
     resetResultSelection,
     resetAfterClear,

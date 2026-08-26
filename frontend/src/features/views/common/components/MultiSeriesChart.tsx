@@ -1,86 +1,52 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import { AlertTriangle } from 'lucide-react';
-import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  type BarShapeProps,
-  CartesianGrid,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Rectangle,
-  Tooltip as RechartsTooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
+import type { EChartsCoreOption } from 'echarts/core';
 
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-  type ChartConfig,
-} from '@/components/ui/chart';
+import { EChartsView } from './EChartsView';
 
 type MultiSeriesChartType = 'line' | 'bar' | 'area';
 
 export interface MultiSeriesChartSeries {
   /** Data key in each row of `data`. */
   key: string;
-  /** Stroke (line/area) or fill (bar/area) color, e.g. '#0284c7'. */
+  /** Stroke (line/area) or fill (bar/area) color. */
   color: string;
   /** Human-readable label; defaults to `key`. */
   label?: string;
-  /** Recharts `strokeDasharray` string, e.g. '6 4'. Undefined = solid. */
+  /** SVG dash pattern, e.g. '6 4'. Undefined = solid. */
   dash?: string;
-  /**
-   * When true, force a static dot to be rendered for every data point even
-   * when no selection is active. Useful when a series has only one point that
-   * would otherwise be invisible.
-   */
+  /** Show a point marker when this series contains a single point. */
   singlePoint?: boolean;
 }
 
 export interface MultiSeriesChartXAxisConfig {
-  /** Recharts axis scale type. Default 'category' (string keys, even spacing). */
+  /** Default 'category' (string keys, even spacing). */
   type?: 'category' | 'number';
   /** Only meaningful when type='number'. */
   domain?: [number | 'auto' | 'dataMin', number | 'auto' | 'dataMax'];
-  /** Fixed tick positions (number axis) or labels (category). */
+  /** Fixed numeric tick positions. */
   ticks?: readonly (number | string)[];
-  /**
-   * Target number of auto-generated ticks (number axis only). Recharts snaps
-   * to round-number positions, so the actual count may differ slightly. Has
-   * no effect when `ticks` is provided. Defaults to Recharts' built-in 5.
-   */
+  /** Target number of generated ticks on a numeric axis. */
   tickCount?: number;
   tickFormatter?: (value: never) => string;
   /** Tick rotation in degrees, e.g. -45. */
   angle?: number;
   /** Axis area height in pixels; needed when ticks are rotated. */
   height?: number;
-  /** Minimum gap in px between rendered ticks. */
+  /** Minimum gap in px between rendered labels. */
   minTickGap?: number;
 }
 
 interface MultiSeriesChartTooltipConfig {
-  /** If set, used as Recharts <Tooltip> content; overrides every other field. */
-  content?: React.ReactElement;
-  labelFormatter?: (label: never, payload?: never) => React.ReactNode;
-  /** Only used when `shadcn` is false (default). */
-  valueFormatter?: (value: never, name: never) => [React.ReactNode, React.ReactNode];
-  /** Use shadcn ChartTooltipContent. Default false (= plain Recharts Tooltip). */
-  shadcn?: boolean;
-  /** Only used with `shadcn=true`. */
+  labelFormatter?: (label: never) => unknown;
+  valueFormatter?: (value: never, name: never) => [unknown, unknown];
   indicator?: 'line' | 'dot';
-  /** Only used with `shadcn=true`. */
-  className?: string;
 }
 
 interface MultiSeriesChartSelectionConfig {
   selectedIndices: ReadonlySet<number>;
   onSelect: (index: number, shiftHeld: boolean) => void;
+  onSelectRange?: (startIndex: number, endIndex: number, shiftHeld: boolean) => void;
 }
 
 export interface MultiSeriesChartProps {
@@ -93,39 +59,65 @@ export interface MultiSeriesChartProps {
   xAxis?: MultiSeriesChartXAxisConfig;
   yAxis?: { allowDecimals?: boolean };
   tooltip?: MultiSeriesChartTooltipConfig;
-  /** Opt-in click-to-select. Triggers cell fading + selection-aware dots. */
   selection?: MultiSeriesChartSelectionConfig;
-  /** Container height. Number → pixels; string → CSS height value. */
-  height?: number | string;
+  /** Container height in pixels. */
+  height?: number;
   margin?: { top?: number; right?: number; bottom?: number; left?: number };
-  /** Forwarded to outer container — lets parents grab the SVG for download. */
-  containerRef?: React.RefObject<HTMLDivElement | null>;
+  /** Forwarded to the outer container so callers can locate the exported SVG. */
+  containerRef?: RefObject<HTMLDivElement | null>;
   className?: string;
-  /** Recharts `isAnimationActive`. Default true. */
+  /** Default true. */
   animate?: boolean;
-  /** Recharts `connectNulls` (line/area only). Default false. */
+  /** Connect missing values for line/area charts. Default false. */
   connectNulls?: boolean;
-  /** When true, the chart shows a pointer cursor (for clickable charts). */
+  /** When true, point and range selection controls are enabled. */
   interactive?: boolean;
-  /**
-   * Suppress the "too many data points for the current chart width" warning.
-   * Defaults to false (warning is shown when `data.length > pixelWidth`).
-   */
+  /** Suppress the narrow-width data-density warning. */
   suppressOverflowWarning?: boolean;
+  ariaLabel?: string;
+  dataResetKey?: string;
 }
 
-/** Default chart margins keep axes readable across compact analysis cards. */
 const DEFAULT_MARGIN = { top: 20, right: 30, left: 20, bottom: 20 } as const;
-/** Active-dot radius shared by selectable line and area chart variants. */
-const ACTIVE_DOT_RADIUS = 5;
-const RESPONSIVE_CHART_INITIAL_WIDTH = 800;
+const SELECTION_DIMENSION = '__wordflow_selected__';
 
-/**
- * Wraps the project's Recharts usage for analysis trend/result charts so line,
- * bar, area, tooltip, and point-selection behavior stay consistent.
- * Used by: concordance dispersion and sequential analysis chart panels.
- */
-export function MultiSeriesChart({
+interface TooltipParam {
+  value?: Record<string, unknown> | unknown[];
+}
+
+const axisBound = (value: number | 'auto' | 'dataMin' | 'dataMax' | undefined) =>
+  value === 'auto' ? undefined : value;
+
+const dashType = (dash: string | undefined): number[] | 'solid' => {
+  if (!dash) return 'solid';
+  const values = dash
+    .split(/\s+/)
+    .map(Number)
+    .filter((value) => Number.isFinite(value) && value > 0);
+  return values.length > 0 ? values : 'solid';
+};
+
+const tooltipValue = (value: Record<string, unknown> | unknown[] | undefined, key: string) => {
+  if (Array.isArray(value)) return undefined;
+  return value?.[key];
+};
+
+const displayChartValue = (value: unknown, fallback = '—'): string => {
+  if (value == null) return fallback;
+  if (
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'bigint' ||
+    typeof value === 'boolean'
+  ) {
+    return String(value);
+  }
+  return fallback;
+};
+
+/** Builds a serializable ECharts option from the canonical multi-series model. */
+// eslint-disable-next-line react-refresh/only-export-components -- pure option builder is exported for focused chart-contract tests.
+export const buildMultiSeriesChartOption = ({
   data,
   xKey,
   series,
@@ -134,254 +126,230 @@ export function MultiSeriesChart({
   yAxis,
   tooltip,
   selection,
-  height = 240,
   margin = DEFAULT_MARGIN,
-  containerRef,
-  className,
   animate = true,
   connectNulls = false,
-  interactive = false,
-  suppressOverflowWarning = false,
-}: MultiSeriesChartProps) {
-  const chartConfig = useMemo<ChartConfig>(() => {
-    const cfg: ChartConfig = {};
-    for (const s of series) {
-      cfg[s.key] = { label: s.label ?? s.key, color: s.color };
-    }
-    return cfg;
-  }, [series]);
+}: Pick<
+  MultiSeriesChartProps,
+  | 'data'
+  | 'xKey'
+  | 'series'
+  | 'chartType'
+  | 'xAxis'
+  | 'yAxis'
+  | 'tooltip'
+  | 'selection'
+  | 'margin'
+  | 'animate'
+  | 'connectNulls'
+>): EChartsCoreOption => {
+  const hasSelection = !!selection && selection.selectedIndices.size > 0;
+  const source = data.map((row, index) => ({
+    ...row,
+    [SELECTION_DIMENSION]: hasSelection && !selection.selectedIndices.has(index) ? 0 : 1,
+  }));
+  const xAxisType = xAxis?.type === 'number' ? 'value' : 'category';
+  const tickFormatter = xAxis?.tickFormatter;
+  const regularTickInterval =
+    xAxis?.ticks && xAxis.ticks.length > 1 && xAxis.ticks.every((tick) => typeof tick === 'number')
+      ? Number(xAxis.ticks[1]) - Number(xAxis.ticks[0])
+      : undefined;
+  const chartSeries = series.map((item) => {
+    const common = {
+      id: item.key,
+      name: item.label ?? item.key,
+      type: chartType === 'bar' ? ('bar' as const) : ('line' as const),
+      encode: { x: xKey, y: item.key, tooltip: [item.key] },
+      itemStyle: {
+        color: item.color,
+        borderRadius: chartType === 'bar' ? [6, 6, 0, 0] : undefined,
+      },
+      emphasis: { focus: 'series' as const },
+      animation: animate,
+    };
+    if (chartType === 'bar') return common;
+    return {
+      ...common,
+      smooth: 0.35,
+      connectNulls,
+      showSymbol: hasSelection || !!item.singlePoint,
+      symbolSize: (_value: unknown, params: { dataIndex?: number }) => {
+        if (!hasSelection) return item.singlePoint ? 8 : 0;
+        return selection.selectedIndices.has(params.dataIndex ?? -1) ? 10 : 6;
+      },
+      lineStyle: { color: item.color, width: 2, type: dashType(item.dash) },
+      areaStyle:
+        chartType === 'area'
+          ? { color: item.color, opacity: hasSelection ? 0.2 : 0.35 }
+          : undefined,
+      stack: chartType === 'area' ? 'wordflow-total' : undefined,
+    };
+  });
 
-  // Measure the plot's rendered width so we can warn when each data point
-  // gets less than ~1 px of horizontal real-estate — anything beyond that
-  // is invisible to the user and forces Recharts to render thousands of
-  // overlapping marks. Uses a ResizeObserver so resizing the panel keeps
-  // the warning in sync.
+  return {
+    animation: animate,
+    dataset: {
+      dimensions: [xKey, ...series.map((item) => item.key), SELECTION_DIMENSION],
+      source,
+    },
+    grid: {
+      containLabel: true,
+      top: margin.top ?? DEFAULT_MARGIN.top,
+      right: margin.right ?? DEFAULT_MARGIN.right,
+      left: margin.left ?? DEFAULT_MARGIN.left,
+      bottom: Math.max(margin.bottom ?? DEFAULT_MARGIN.bottom, (xAxis?.height ?? 42) + 34),
+    },
+    tooltip: tooltip
+      ? {
+          trigger: 'axis',
+          renderMode: 'richText',
+          confine: true,
+          axisPointer: { type: tooltip.indicator === 'line' ? 'line' : 'shadow' },
+          formatter: (rawParams: unknown) => {
+            const params = Array.isArray(rawParams) ? (rawParams as TooltipParam[]) : [];
+            const firstValue = Array.isArray(params[0]?.value) ? undefined : params[0]?.value;
+            const rawLabel = firstValue?.[xKey];
+            const label = tooltip.labelFormatter
+              ? tooltip.labelFormatter(rawLabel as never)
+              : rawLabel;
+            const lines = [displayChartValue(label, '')];
+            for (const item of series) {
+              const value = tooltipValue(firstValue, item.key);
+              const formatted = tooltip.valueFormatter
+                ? tooltip.valueFormatter(value as never, (item.label ?? item.key) as never)
+                : [value, item.label ?? item.key];
+              lines.push(
+                `${displayChartValue(formatted[1], item.label ?? item.key)}: ${displayChartValue(formatted[0])}`,
+              );
+            }
+            return lines.join('\n');
+          },
+        }
+      : undefined,
+    xAxis: {
+      type: xAxisType,
+      min: axisBound(xAxis?.domain?.[0]),
+      max: axisBound(xAxis?.domain?.[1]),
+      interval:
+        typeof regularTickInterval === 'number' && regularTickInterval > 0
+          ? regularTickInterval
+          : undefined,
+      splitNumber: xAxis?.tickCount,
+      axisLine: { lineStyle: { color: 'var(--vscode-charts-foreground)' } },
+      axisLabel: {
+        color: 'var(--vscode-charts-foreground)',
+        rotate: Math.abs(xAxis?.angle ?? 0),
+        hideOverlap: true,
+        margin: Math.max(8, xAxis?.minTickGap ?? 8),
+        formatter: tickFormatter
+          ? (value: string | number) => tickFormatter(value as never)
+          : undefined,
+      },
+      axisTick: { alignWithLabel: xAxisType === 'category' },
+    },
+    yAxis: {
+      type: 'value',
+      minInterval: yAxis?.allowDecimals === false ? 1 : undefined,
+      axisLine: { lineStyle: { color: 'var(--vscode-charts-foreground)' } },
+      axisLabel: { color: 'var(--vscode-charts-foreground)' },
+      splitLine: { lineStyle: { color: 'var(--vscode-charts-lines)', type: 'dashed' } },
+    },
+    // ECharts can map opacity per bar from the selection dimension. Applying
+    // that visual encoding to a line series also targets its stroke and emits
+    // a runtime warning because the selection flag is not an axis dimension;
+    // line and area modes retain the prior selection-aware symbol sizing.
+    ...(hasSelection && chartType === 'bar'
+      ? {
+          visualMap: {
+            type: 'piecewise',
+            show: false,
+            dimension: SELECTION_DIMENSION,
+            seriesIndex: chartSeries.map((_, index) => index),
+            pieces: [
+              { value: 1, opacity: 1 },
+              { value: 0, opacity: 0.25 },
+            ],
+          },
+        }
+      : {}),
+    series: chartSeries,
+  };
+};
+
+/** Shared ECharts renderer for Trends-style multi-series analysis charts. */
+export function MultiSeriesChart(props: MultiSeriesChartProps) {
+  const {
+    data,
+    xKey,
+    series,
+    selection,
+    height = 240,
+    containerRef,
+    className,
+    interactive = false,
+    suppressOverflowWarning = false,
+    ariaLabel = 'Interactive analysis chart',
+    dataResetKey = data.map((row) => displayChartValue(row[xKey], '')).join('|'),
+  } = props;
   const plotMeasureRef = useRef<HTMLDivElement | null>(null);
   const [chartPixelWidth, setChartPixelWidth] = useState(0);
+
   useEffect(() => {
-    const el = plotMeasureRef.current;
-    if (!el) return;
-    /** Called by: ResizeObserver and initial chart mount for overflow warnings. */
+    const element = plotMeasureRef.current;
+    if (!element) return;
     const update = () => {
-      setChartPixelWidth(el.clientWidth);
+      setChartPixelWidth(element.clientWidth);
     };
     update();
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
+    const observer = new ResizeObserver(update);
+    observer.observe(element);
     return () => {
-      ro.disconnect();
+      observer.disconnect();
     };
   }, []);
+
   const showOverflowWarning =
     !suppressOverflowWarning && chartPixelWidth > 0 && data.length > chartPixelWidth;
-
-  const xAxisType = xAxis?.type ?? 'category';
-  const hasSelection = !!selection && selection.selectedIndices.size > 0;
-
-  /** Converts Recharts click payloads into the index-selection API used by charts. */
-  const handleChartClick = selection
-    ? (
-        nextState: { activeTooltipIndex?: number | string } | null | undefined,
-        event: { shiftKey?: boolean },
-      ) => {
-        const raw = nextState?.activeTooltipIndex;
-        const shiftHeld = !!event.shiftKey;
-        if (typeof raw === 'number') {
-          selection.onSelect(raw, shiftHeld);
-          return;
-        }
-        if (typeof raw === 'string') {
-          const parsed = Number(raw);
-          if (Number.isInteger(parsed)) selection.onSelect(parsed, shiftHeld);
-        }
-      }
-    : undefined;
-
-  interface DotProps {
-    cx?: number;
-    cy?: number;
-    index?: number;
-  }
-
-  /**
-   * Called by: dotFor when line/area series need custom point rendering because selection state must alter point visibility without duplicating Recharts dot branches.
-   * Flow: reject incomplete Recharts point props, draw the single-point marker when no selection exists, then emphasize selected indices and fade other points.
-   */
-  const renderDot = (color: string, singlePoint: boolean) => (props: DotProps) => {
-    const { cx, cy, index } = props;
-    if (typeof cx !== 'number' || typeof cy !== 'number' || typeof index !== 'number') {
-      return null;
-    }
-    if (!hasSelection) {
-      return singlePoint ? <circle cx={cx} cy={cy} r={4} fill={color} /> : null;
-    }
-    if (selection.selectedIndices.has(index)) {
-      return <circle cx={cx} cy={cy} r={5} fill={color} stroke="white" strokeWidth={1.5} />;
-    }
-    return <circle cx={cx} cy={cy} r={3} fill={color} fillOpacity={0.25} />;
-  };
-
-  /** Called by: Recharts line and area series configuration. */
-  const dotFor = (s: MultiSeriesChartSeries) => {
-    if (!hasSelection && !s.singlePoint) return false;
-    return renderDot(s.color, !!s.singlePoint);
-  };
-
-  /** Builds the requested tooltip implementation once for the selected chart flavor. */
-  const tooltipElement = ((): React.ReactElement | null => {
-    if (!tooltip) return null;
-    if (tooltip.content) return <ChartTooltip content={tooltip.content} />;
-    if (tooltip.shadcn) {
-      return (
-        <ChartTooltip
-          content={
-            <ChartTooltipContent
-              className={tooltip.className}
-              indicator={tooltip.indicator}
-              labelFormatter={tooltip.labelFormatter as never}
-            />
-          }
-        />
-      );
-    }
-    return (
-      <RechartsTooltip
-        formatter={tooltip.valueFormatter as never}
-        labelFormatter={tooltip.labelFormatter as never}
-      />
+  const option = buildMultiSeriesChartOption(props);
+  const getPointSummary = (index: number) => {
+    const row = data[index];
+    if (!row) return `Point ${String(index + 1)}`;
+    const values = series.map(
+      (item) => `${item.label ?? item.key}: ${displayChartValue(row[item.key])}`,
     );
-  })();
-
-  const xAxisElement = (
-    <XAxis
-      stroke="var(--vscode-charts-foreground)"
-      dataKey={xKey}
-      type={xAxisType}
-      domain={xAxis?.domain}
-      ticks={xAxis?.ticks}
-      tickCount={xAxis?.tickCount}
-      tickFormatter={xAxis?.tickFormatter as never}
-      angle={xAxis?.angle}
-      textAnchor={xAxis?.angle != null ? 'end' : undefined}
-      height={xAxis?.height}
-      minTickGap={xAxis?.minTickGap}
-    />
-  );
-  const yAxisElement = (
-    <YAxis stroke="var(--vscode-charts-foreground)" allowDecimals={yAxis?.allowDecimals} />
-  );
-
-  const heightStyle = typeof height === 'number' ? { height: `${String(height)}px` } : { height };
-  const initialChartHeight = typeof height === 'number' ? height : 240;
-  const containerClass = ['w-full', interactive ? 'cursor-pointer' : null, className]
-    .filter(Boolean)
-    .join(' ');
+    return `${displayChartValue(row[xKey], `Point ${String(index + 1)}`)}. ${values.join(', ')}`;
+  };
 
   return (
     <div ref={containerRef}>
-      <ChartContainer config={chartConfig} className={containerClass}>
-        {showOverflowWarning && (
-          <div
-            className="mb-2 flex items-start gap-2 rounded-md border border-warning bg-warning-background px-3 py-2 text-label-secondary text-warning"
-            role="status"
-          >
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-            <span>
-              {data.length.toLocaleString()} data points but only {chartPixelWidth} px of chart
-              width — points will overlap and rendering may be slow. Consider increasing the bin
-              size or aggregation granularity for a clearer view.
-            </span>
-          </div>
-        )}
-        <div ref={plotMeasureRef} className="w-full" style={heightStyle}>
-          <ResponsiveContainer
-            width="100%"
-            height="100%"
-            minWidth={0}
-            initialDimension={{
-              width: RESPONSIVE_CHART_INITIAL_WIDTH,
-              height: initialChartHeight,
-            }}
-          >
-            {chartType === 'bar' ? (
-              <BarChart data={data as never} margin={margin} onClick={handleChartClick as never}>
-                <CartesianGrid stroke="var(--vscode-charts-lines)" strokeDasharray="3 3" />
-                {xAxisElement}
-                {yAxisElement}
-                {tooltipElement}
-                {series.map((s) => (
-                  <Bar
-                    key={s.key}
-                    dataKey={s.key}
-                    fill={s.color}
-                    radius={[6, 6, 0, 0]}
-                    name={s.label ?? s.key}
-                    isAnimationActive={animate}
-                    shape={(barProps: BarShapeProps) => (
-                      <Rectangle
-                        {...barProps}
-                        fillOpacity={
-                          !selection ||
-                          !hasSelection ||
-                          selection.selectedIndices.has(barProps.index)
-                            ? 1
-                            : 0.25
-                        }
-                      />
-                    )}
-                  />
-                ))}
-              </BarChart>
-            ) : chartType === 'area' ? (
-              <AreaChart data={data as never} margin={margin} onClick={handleChartClick as never}>
-                <CartesianGrid stroke="var(--vscode-charts-lines)" strokeDasharray="3 3" />
-                {xAxisElement}
-                {yAxisElement}
-                {tooltipElement}
-                {series.map((s) => (
-                  <Area
-                    key={s.key}
-                    type="monotone"
-                    dataKey={s.key}
-                    stackId="1"
-                    stroke={s.color}
-                    strokeDasharray={s.dash}
-                    fill={s.color}
-                    fillOpacity={hasSelection ? 0.2 : 0.35}
-                    dot={dotFor(s)}
-                    activeDot={{ r: ACTIVE_DOT_RADIUS }}
-                    name={s.label ?? s.key}
-                    isAnimationActive={animate}
-                    connectNulls={connectNulls}
-                  />
-                ))}
-              </AreaChart>
-            ) : (
-              <LineChart data={data as never} margin={margin} onClick={handleChartClick as never}>
-                <CartesianGrid stroke="var(--vscode-charts-lines)" strokeDasharray="3 3" />
-                {xAxisElement}
-                {yAxisElement}
-                {tooltipElement}
-                {series.map((s) => (
-                  <Line
-                    key={s.key}
-                    type="monotone"
-                    dataKey={s.key}
-                    stroke={s.color}
-                    strokeDasharray={s.dash}
-                    strokeWidth={2}
-                    dot={dotFor(s)}
-                    activeDot={{ r: ACTIVE_DOT_RADIUS }}
-                    name={s.label ?? s.key}
-                    isAnimationActive={animate}
-                    connectNulls={connectNulls}
-                  />
-                ))}
-              </LineChart>
-            )}
-          </ResponsiveContainer>
+      {showOverflowWarning ? (
+        <div
+          className="mb-2 flex items-start gap-2 rounded-md border border-warning bg-warning-background px-3 py-2 text-label-secondary text-warning"
+          role="status"
+        >
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>
+            {data.length.toLocaleString()} data points but only {chartPixelWidth} px of chart width
+            — points will overlap and rendering may be slow. Consider increasing the bin size or
+            aggregation granularity for a clearer view.
+          </span>
         </div>
-      </ChartContainer>
+      ) : null}
+      <div ref={plotMeasureRef} className="w-full">
+        <EChartsView
+          option={option}
+          height={height}
+          pointCount={data.length}
+          dataResetKey={dataResetKey}
+          ariaLabel={ariaLabel}
+          selectedIndices={selection?.selectedIndices}
+          onSelect={interactive ? selection?.onSelect : undefined}
+          onSelectRange={interactive ? selection?.onSelectRange : undefined}
+          getPointSummary={getPointSummary}
+          className={className}
+          testId="multi-series-chart"
+        />
+      </div>
     </div>
   );
 }

@@ -48,6 +48,21 @@ describe('useSequentialChartControls', () => {
     expect(result.current.selectedPeriodIndices.size).toBe(0);
   });
 
+  it('replaces or extends selection with a brushed period range', () => {
+    const { result } = renderHook(() => useSequentialChartControls());
+
+    act(() => {
+      result.current.selectPeriod(0, false, 6);
+      result.current.selectPeriodRange(2, 4, false, 6);
+    });
+    expect(Array.from(result.current.selectedPeriodIndices).sort()).toEqual([2, 3, 4]);
+
+    act(() => {
+      result.current.selectPeriodRange(0, 1, true, 6);
+    });
+    expect(Array.from(result.current.selectedPeriodIndices).sort()).toEqual([0, 1, 2, 3, 4]);
+  });
+
   it('resets result selection independently from hidden keys', () => {
     const { result } = renderHook(() => useSequentialChartControls());
 

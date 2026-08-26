@@ -100,7 +100,7 @@ export interface BuildDispersionBinsOptions {
 
 /**
  * Make sure every bin has an explicit entry for every series key encountered.
- * Recharts' default behaviour treats missing keys as null, so a line with gaps
+ * Chart renderers treat missing keys as null, so a line with gaps
  * would visually skip empty bins instead of dropping to zero.
  */
 /**

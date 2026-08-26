@@ -151,7 +151,7 @@ The project uses React Compiler. Manual memoization is reserved for
 identity-sensitive boundaries such as contexts, effects, React Flow, tables,
 and external-library adapters rather than routine render optimization.
 
-Live UI chrome, CodeMirror, React Flow, Recharts, Sonner, Joyride, Markdown,
+Live UI chrome, CodeMirror, React Flow, Apache ECharts, Sonner, Joyride, Markdown,
 and OAuth presentation consume the semantic VS Code variables. Persisted Data
 Block and series colors retain identity across themes. Chart and image export
 renderers deliberately keep a white canvas and their stable export palette;

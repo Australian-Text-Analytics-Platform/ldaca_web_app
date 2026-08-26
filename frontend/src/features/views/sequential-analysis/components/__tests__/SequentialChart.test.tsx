@@ -5,6 +5,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SequentialChart } from '../SequentialChart';
 import { buildSequentialChartModel } from '../../hooks/sequentialChartModel';
 
+vi.mock('@/features/views/common/components/EChartsView', () => ({
+  EChartsView: () => <div data-testid="echarts-view" />,
+}));
+
 const model = buildSequentialChartModel({
   results: {
     data: [
@@ -70,9 +74,9 @@ describe('SequentialChart', () => {
     render(
       <SequentialChart
         model={model}
-        isAddingToWorkspace={false}
         onToggleKey={vi.fn()}
         onPeriodClick={vi.fn()}
+        onPeriodRangeSelect={vi.fn()}
         onClearSelection={vi.fn()}
         containerRef={containerRef}
       />,

@@ -28,6 +28,7 @@ export interface SequentialAnalysisResultsPanelProps {
 
   onToggleKey: (key: string) => void;
   onPeriodClick: (index: number, shiftHeld: boolean) => void;
+  onPeriodRangeSelect: (startIndex: number, endIndex: number, shiftHeld: boolean) => void;
   onClearSelection: () => void;
   containerRef: React.RefObject<HTMLDivElement | null>;
 }
@@ -46,6 +47,7 @@ export function SequentialAnalysisResultsPanel({
   onDownloadClick,
   onToggleKey,
   onPeriodClick,
+  onPeriodRangeSelect,
   onClearSelection,
   containerRef,
 }: SequentialAnalysisResultsPanelProps) {
@@ -175,6 +177,7 @@ export function SequentialAnalysisResultsPanel({
           model={model}
           onToggleKey={onToggleKey}
           onPeriodClick={onPeriodClick}
+          onPeriodRangeSelect={onPeriodRangeSelect}
           onClearSelection={onClearSelection}
           containerRef={containerRef}
         />

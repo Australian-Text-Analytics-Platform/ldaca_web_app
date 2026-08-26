@@ -501,6 +501,14 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
           onPeriodClick={(index, shiftHeld) => {
             chartControls.selectPeriod(index, shiftHeld, chartModel.chartData.length);
           }}
+          onPeriodRangeSelect={(startIndex, endIndex, shiftHeld) => {
+            chartControls.selectPeriodRange(
+              startIndex,
+              endIndex,
+              shiftHeld,
+              chartModel.chartData.length,
+            );
+          }}
           onClearSelection={chartControls.clearPeriodSelection}
           containerRef={chartContainerRef}
         />

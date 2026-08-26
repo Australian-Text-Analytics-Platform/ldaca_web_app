@@ -8,6 +8,7 @@ interface SequentialChartProps {
   model: SequentialChartModel;
   onToggleKey: (key: string) => void;
   onPeriodClick: (index: number, shiftHeld: boolean) => void;
+  onPeriodRangeSelect: (startIndex: number, endIndex: number, shiftHeld: boolean) => void;
   onClearSelection: () => void;
   containerRef?: React.RefObject<HTMLDivElement | null>;
 }
@@ -18,13 +19,14 @@ const CHART_HEIGHT_PX = 400;
  * Renders the chart and interaction controls from a canonical Sequential model.
  *
  * Rendered by: `SequentialAnalysisResultsPanel`. The pure model already owns
- * row/axis/series/legend shaping; this component only binds Recharts selection,
+ * row/axis/series/legend shaping; this component only binds ECharts selection,
  * legend clicks, resize container identity, and chart selection controls.
  */
 export function SequentialChart({
   model,
   onToggleKey,
   onPeriodClick,
+  onPeriodRangeSelect,
   onClearSelection,
   containerRef,
 }: SequentialChartProps) {
@@ -59,12 +61,18 @@ export function SequentialChart({
         margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
         height={CHART_HEIGHT_PX}
         tooltip={{
-          shadcn: true,
-          className: 'min-w-50',
           indicator: model.tooltip.indicator,
-          labelFormatter: model.tooltip.labelFormatter as never,
+          labelFormatter: model.tooltip.labelFormatter,
         }}
-        selection={{ selectedIndices: model.selection.selectedIndices, onSelect: onPeriodClick }}
+        selection={{
+          selectedIndices: model.selection.selectedIndices,
+          onSelect: onPeriodClick,
+          onSelectRange: onPeriodRangeSelect,
+        }}
+        ariaLabel="Trends and Sequence chart"
+        dataResetKey={model.chartData
+          .map((row) => (typeof row.__period_key__ === 'string' ? row.__period_key__ : ''))
+          .join('|')}
         interactive
       />
       <div className="mt-4 flex flex-wrap items-center justify-center gap-4 px-4">
