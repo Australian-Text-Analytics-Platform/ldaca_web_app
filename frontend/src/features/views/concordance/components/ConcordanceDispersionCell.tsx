@@ -1,16 +1,12 @@
 type ConcordanceGroupedRow = Record<string, unknown>[];
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { CONCORDANCE_COLUMN_KEYS } from '../../common/generatedColumns';
-import { getConcordanceSourceColor } from '../concordanceSourceDomain';
 import { toCellText } from '../concordanceTableDomain';
 
 interface Props {
   hits: ConcordanceGroupedRow;
   textLength?: number;
   barWidthPercent?: number;
-  sourceColor?: string;
-  sourceColorMap?: Record<string, string>;
-  defaultPalette?: string[];
   termColors?: Record<string, string>;
 }
 
@@ -35,9 +31,6 @@ export function ConcordanceDispersionCell({
   hits,
   textLength,
   barWidthPercent = 100,
-  sourceColor = DEFAULT_BAR_COLOR,
-  sourceColorMap = {},
-  defaultPalette = [],
   termColors = {},
 }: Props) {
   const fallbackLength = hits.reduce((max, hit) => {
@@ -46,7 +39,6 @@ export function ConcordanceDispersionCell({
   }, 0);
   const domain = Math.max(textLength ?? 0, fallbackLength, 1);
   const widthPercent = Math.max(0, Math.min(barWidthPercent, 100));
-  const hasSourcePalette = Object.keys(sourceColorMap).length > 0 || defaultPalette.length > 0;
 
   return (
     <TooltipProvider delayDuration={120} skipDelayDuration={0}>
@@ -64,12 +56,7 @@ export function ConcordanceDispersionCell({
             }
             const rawText = toCellText(hit[CONCORDANCE_COLUMN_KEYS.matchedText]);
             const leftPercent = Math.min(100, (startIndex / domain) * 100);
-            const hitSource = hit.__source_node;
-            const matchColor =
-              termColors[rawText] ??
-              (hitSource && hasSourcePalette
-                ? getConcordanceSourceColor(hitSource, sourceColorMap, defaultPalette)
-                : sourceColor);
+            const matchColor = termColors[rawText] ?? DEFAULT_BAR_COLOR;
             const leftContext = toCellText(hit[CONCORDANCE_COLUMN_KEYS.leftContext]);
             const rightContext = toCellText(hit[CONCORDANCE_COLUMN_KEYS.rightContext]);
             return (

@@ -26,9 +26,6 @@ interface Props {
   dispersionColumnStyle: CSSProperties | undefined;
   metadataColumnStyle: CSSProperties | undefined;
   proportionalDispersionBars: boolean;
-  sourceColor?: string;
-  sourceColorMap?: Record<string, string>;
-  defaultPalette?: string[];
   termColors?: Record<string, string>;
   getRowClassName: (row: ConcordanceDispersionRow, index: number) => string;
   getRowStyle?: (row: ConcordanceDispersionRow, index: number) => CSSProperties | undefined;
@@ -52,9 +49,6 @@ export function ConcordanceDispersionRowsTable({
   dispersionColumnStyle,
   metadataColumnStyle,
   proportionalDispersionBars,
-  sourceColor,
-  sourceColorMap,
-  defaultPalette,
   termColors,
   getRowClassName,
   getRowStyle,
@@ -118,9 +112,6 @@ export function ConcordanceDispersionRowsTable({
                           ? getDispersionBarWidthPercent(row, textColumn, longestTextLength)
                           : 100
                       }
-                      sourceColor={sourceColor}
-                      sourceColorMap={sourceColorMap}
-                      defaultPalette={defaultPalette}
                       termColors={termColors}
                     />
                   ) : (

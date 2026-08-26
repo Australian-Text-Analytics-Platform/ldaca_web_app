@@ -155,3 +155,9 @@ Block and series colors retain identity across themes. Chart and image export
 renderers deliberately keep a white canvas and their stable export palette;
 brand and provider assets are likewise raw-color exceptions rather than theme
 tokens.
+
+Concordance Dispersion keeps source and match identity separate. A Data Block's
+persisted color owns the separated-result header, combined-result source chips,
+and combined-row tint. Matched-term colors independently own hit markers, chart
+series, and their legend, so a source color never changes the meaning of a
+searched term.

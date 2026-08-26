@@ -37,28 +37,26 @@ describe('ConcordanceDispersionCell', () => {
     unmount();
   });
 
-  it('uses the source Data Block color for every match marker', () => {
+  it('uses matched-term colors independently of the source Data Block', () => {
     render(
       <ConcordanceDispersionCell
         hits={hits}
         textLength={16}
-        sourceColorMap={{ corpus: '#123456' }}
-        defaultPalette={['#abcdef']}
+        termColors={{ alpha: '#123456', beta: '#abcdef' }}
       />,
     );
 
     const markers = screen.getAllByTestId('concordance-match-marker');
     expect(markers).toHaveLength(2);
-    for (const marker of markers) {
-      expect(marker).toHaveStyle({ backgroundColor: '#123456' });
-    }
+    expect(markers[0]).toHaveStyle({ backgroundColor: '#123456' });
+    expect(markers[1]).toHaveStyle({ backgroundColor: '#abcdef' });
   });
 
-  it('uses the current Data Block color when no combined-source palette is needed', () => {
-    render(<ConcordanceDispersionCell hits={hits} textLength={16} sourceColor="#654321" />);
+  it('uses the stable match fallback when no term color is assigned', () => {
+    render(<ConcordanceDispersionCell hits={hits} textLength={16} />);
 
     for (const marker of screen.getAllByTestId('concordance-match-marker')) {
-      expect(marker).toHaveStyle({ backgroundColor: '#654321' });
+      expect(marker).toHaveStyle({ backgroundColor: '#0284c7' });
     }
   });
 });

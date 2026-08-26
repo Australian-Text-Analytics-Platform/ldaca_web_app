@@ -241,7 +241,7 @@ describe('ConcordanceDispersionSummary', () => {
     },
   );
 
-  it('uses the source color as a card edge without repeating the source description', () => {
+  it('keeps the chart card neutral without repeating the source description', () => {
     render(
       <ConcordanceDispersionSummary
         rows={baseRows}
@@ -250,7 +250,6 @@ describe('ConcordanceDispersionSummary', () => {
         splitBySource={false}
         dataBlockLabel="Corpus"
         searchWord="alpha"
-        sourceColor="#2563eb"
         densitySeries={[{ label: 'alpha', counts: Array.from({ length: 100 }, () => 1) }]}
       />,
     );
@@ -260,10 +259,10 @@ describe('ConcordanceDispersionSummary', () => {
         'Corpus: exact-term matches at relative locations across the entire Result',
       ),
     ).not.toBeInTheDocument();
-    expect(screen.getByTestId('concordance-dispersion-chart')).toHaveStyle({
-      borderLeftWidth: '3px',
-      borderLeftColor: '#2563eb',
-    });
+    const chart = screen.getByTestId('concordance-dispersion-chart');
+    expect(chart.style.borderLeftWidth).toBe('');
+    expect(chart.style.borderLeftColor).toBe('');
+    expect(chart).not.toHaveClass('mt-4');
   });
 
   it('keeps hidden exact terms in the interactive legend with selected-bin counts', () => {

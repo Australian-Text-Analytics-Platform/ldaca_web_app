@@ -71,8 +71,6 @@ interface Props {
   onChartModeChange?: (value: ConcordanceDispersionChartMode) => void;
   /** Change handler for the bin-count selector in the header. */
   onBinCountChange?: (value: DispersionDisplayBinCount) => void;
-  /** Effective Node.color for a single-source aggregate chart. */
-  sourceColor?: string;
   /** Click-to-select bins. Omitted = selection disabled. */
   selection?: {
     selectedIndices: ReadonlySet<number>;
@@ -205,7 +203,6 @@ export function ConcordanceDispersionSummary({
   chartMode = 'density-line',
   onChartModeChange,
   onBinCountChange,
-  sourceColor,
   selection,
   densitySeries,
   termColors = {},
@@ -261,7 +258,6 @@ export function ConcordanceDispersionSummary({
           color:
             termColors[matchedTexts[0] ?? matchedText] ??
             VIZ_PALETTE[index % VIZ_PALETTE.length] ??
-            sourceColor ??
             AGGREGATE_DEFAULT_COLOR,
           label: matchedText,
           hidden: matchedTexts.every((value) => excludedMatchedTexts.has(value)),
@@ -277,7 +273,6 @@ export function ConcordanceDispersionSummary({
     labelsByKey,
     matchedTextsByKey,
     selection?.selectedIndices,
-    sourceColor,
     termColors,
     totalsByKey,
   ]);
@@ -567,11 +562,7 @@ export function ConcordanceDispersionSummary({
   };
 
   return (
-    <Card
-      data-testid="concordance-dispersion-chart"
-      className="mt-4"
-      style={sourceColor ? { borderLeftWidth: '3px', borderLeftColor: sourceColor } : undefined}
-    >
+    <Card data-testid="concordance-dispersion-chart">
       <CardHeader className="gap-3 pb-2 md:flex-row md:items-start md:justify-between">
         <CardTitle className="text-body">{chartTitle}</CardTitle>
         <div className="flex flex-wrap items-center justify-end gap-3">
