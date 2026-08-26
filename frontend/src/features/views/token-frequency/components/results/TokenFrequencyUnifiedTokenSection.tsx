@@ -242,9 +242,38 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
       ),
     );
 
+  if (view === 'list') {
+    return (
+      <div className="space-y-3">
+        {Array.isArray(statistics) && statistics.length > 0
+          ? (() => {
+              // lastCompareNodeIds is ordered [reference, study]; the
+              // task-flow request builder puts the study data block last
+              // (the user picks it via the radio in the parameter panel)
+              // and the non-selected block becomes the reference at [0].
+              const referenceId = lastCompareNodeIds[0] ?? null;
+              const studyId = lastCompareNodeIds[1] ?? null;
+              return (
+                <TokenFrequencyStatisticsTable
+                  statistics={filteredStatistics}
+                  onDownloadFrequencyCsv={onDownloadFrequencyCsv}
+                  onTokenClick={onTokenClick}
+                  tokenFilter={tokenFilter}
+                  referenceNodeName={referenceId ? computeDisplayName(referenceId) : null}
+                  referenceColor={referenceId ? getColorForNode(referenceId, 0) : null}
+                  studyNodeName={studyId ? computeDisplayName(studyId) : null}
+                  studyColor={studyId ? getColorForNode(studyId, 1) : null}
+                />
+              );
+            })()
+          : null}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-3">
-      <Card className={view === 'cloud' ? undefined : 'hidden'}>
+      <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-baseline gap-2">
@@ -394,31 +423,6 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
           </div>
         </CardContent>
       </Card>
-
-      {Array.isArray(statistics) && statistics.length > 0 && (
-        <div className={view === 'list' ? undefined : 'hidden'}>
-          {(() => {
-            // lastCompareNodeIds is ordered [reference, study]; the
-            // task-flow request builder puts the study data block last
-            // (the user picks it via the radio in the parameter panel)
-            // and the non-selected block becomes the reference at [0].
-            const referenceId = lastCompareNodeIds[0] ?? null;
-            const studyId = lastCompareNodeIds[1] ?? null;
-            return (
-              <TokenFrequencyStatisticsTable
-                statistics={filteredStatistics}
-                onDownloadFrequencyCsv={onDownloadFrequencyCsv}
-                onTokenClick={onTokenClick}
-                tokenFilter={tokenFilter}
-                referenceNodeName={referenceId ? computeDisplayName(referenceId) : null}
-                referenceColor={referenceId ? getColorForNode(referenceId, 0) : null}
-                studyNodeName={studyId ? computeDisplayName(studyId) : null}
-                studyColor={studyId ? getColorForNode(studyId, 1) : null}
-              />
-            );
-          })()}
-        </div>
-      )}
     </div>
   );
 };
