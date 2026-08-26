@@ -28,15 +28,10 @@ import {
   usePreprocessingInputsStore,
 } from '@/stores/preprocessingInputsStore';
 import { AggregateSubTab } from './aggregate/AggregateSubTab';
-import { PreprocessingApplyModeControl } from './components/PreprocessingApplyModeControl';
 import { ConcatSubTab } from './concat/ConcatSubTab';
 import { FilterSubTab } from './filter/FilterSubTab';
 import { JoinSubTab } from './join/JoinSubTab';
-import {
-  CREATE_DATA_BLOCK_MODE,
-  EDITABLE_PREPROCESSING_TABS,
-  type PreprocessingApplyMode,
-} from './preprocessingApplyMode';
+import { CREATE_DATA_BLOCK_MODE, type PreprocessingApplyMode } from './preprocessingApplyMode';
 import { ReplaceSubTab } from './replace/ReplaceSubTab';
 import { SliceSubTab } from './slice/SliceSubTab';
 import { MAX_CONCAT_NODES, MAX_JOIN_NODES } from './types';
@@ -185,7 +180,6 @@ function DataPreprocessingFeature() {
   });
   const applyMode =
     applyModeState.scope === applyModeScope ? applyModeState.value : CREATE_DATA_BLOCK_MODE;
-  const supportsUpdateMode = EDITABLE_PREPROCESSING_TABS.some((subtab) => subtab === activeSubtab);
   const setApplyMode = (value: PreprocessingApplyMode) => {
     setApplyModeState({ scope: applyModeScope, value });
   };
@@ -362,10 +356,6 @@ function DataPreprocessingFeature() {
           }}
         />
 
-        {supportsUpdateMode && (
-          <PreprocessingApplyModeControl value={applyMode} onChange={setApplyMode} />
-        )}
-
         <TabsContent
           id="preprocessing-panel-filter"
           aria-labelledby="preprocessing-tab-filter"
@@ -383,6 +373,7 @@ function DataPreprocessingFeature() {
             isLoading={isLoading}
             onAlert={handleAlert}
             applyMode={applyMode}
+            onApplyModeChange={setApplyMode}
           />
         </TabsContent>
 
@@ -464,6 +455,7 @@ function DataPreprocessingFeature() {
             replaceText={guidedReplaceText}
             refreshNodeSchema={refreshNodeSchema}
             applyMode={applyMode}
+            onApplyModeChange={setApplyMode}
           />
         </TabsContent>
 
@@ -484,6 +476,7 @@ function DataPreprocessingFeature() {
             polarsExpressionApply={guidedExpressionApply}
             refreshNodeSchema={refreshNodeSchema}
             applyMode={applyMode}
+            onApplyModeChange={setApplyMode}
           />
         </TabsContent>
 
@@ -504,6 +497,7 @@ function DataPreprocessingFeature() {
               polarsExpressionApply={guidedExpressionApply}
               refreshNodeSchema={refreshNodeSchema}
               applyMode={applyMode}
+              onApplyModeChange={setApplyMode}
             />
           </Suspense>
         </TabsContent>

@@ -3,18 +3,20 @@ import { Calculator, Loader2, X } from 'lucide-react';
 
 import HelpIcon from '@/components/help/HelpIcon';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { cn } from '@/lib/utils';
 import { takeMostRecent } from '@/features/workspace/common/utils/selectionUtils';
 import { PreviewTable } from '../components/PreviewTable';
+import { PreprocessingApplyBar } from '../components/PreprocessingApplyBar';
 import { SubTabActivityTag } from '../components/SubTabActivityTag';
 import { OperationPopover } from './components/OperationPopover';
 import { useAggregateSubTab, type AggregateSubTabProps } from './hooks/useAggregateSubTab';
 
 type AggregateSubTabComponentProps = AggregateSubTabProps & {
   renderNodeInputsPanel?: () => ReactNode;
+  onApplyModeChange: (value: AggregateSubTabProps['applyMode']) => void;
 };
 
 /**
@@ -48,7 +50,7 @@ const getAggregateSelectionKey = (props: AggregateSubTabComponentProps): string 
  * visual-builder modes, and keep table/apply controls tied to hook state.
  */
 function AggregateSubTabContent(props: AggregateSubTabComponentProps) {
-  const { applyMode, isLoading } = props;
+  const { applyMode, isLoading, onApplyModeChange } = props;
   const { renderNodeInputsPanel } = props;
   const { activeNode, expression, basicBuilder, preview, apply, dropZoneRef } =
     useAggregateSubTab(props);
@@ -307,7 +309,7 @@ function AggregateSubTabContent(props: AggregateSubTabComponentProps) {
           </div>
         </CardContent>
 
-        <CardFooter className="flex items-center gap-3 border-t border-surface-border bg-panel/20 py-4">
+        <PreprocessingApplyBar value={applyMode} onChange={onApplyModeChange}>
           <div className="flex flex-1 items-center gap-2">
             <span className="shrink-0 text-body font-medium text-foreground">New column name</span>
             <HelpIcon
@@ -350,7 +352,7 @@ function AggregateSubTabContent(props: AggregateSubTabComponentProps) {
             </Button>
           </DisabledReasonTooltip>
           <HelpIcon targetKey="preprocessing.common.apply-button" label="Apply action" />
-        </CardFooter>
+        </PreprocessingApplyBar>
       </Card>
 
       <PreviewTable

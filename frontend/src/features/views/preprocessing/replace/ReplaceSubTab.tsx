@@ -3,7 +3,7 @@ import { Search } from 'lucide-react';
 
 import HelpIcon from '@/components/help/HelpIcon';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -15,12 +15,14 @@ import {
 } from '@/components/ui/select';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { PreviewTable } from '../components/PreviewTable';
+import { PreprocessingApplyBar } from '../components/PreprocessingApplyBar';
 import { SubTabActivityTag } from '../components/SubTabActivityTag';
 import { acceptPlaceholderOnTab } from '@/features/views/common/placeholderTabFill';
 import { useReplaceSubTab, type ReplaceSubTabProps } from './hooks/useReplaceSubTab';
 
 type ReplaceSubTabComponentProps = ReplaceSubTabProps & {
   renderNodeInputsPanel?: () => ReactNode;
+  onApplyModeChange: (value: ReplaceSubTabProps['applyMode']) => void;
 };
 
 /**
@@ -31,7 +33,7 @@ type ReplaceSubTabComponentProps = ReplaceSubTabProps & {
  * apply/preview actions to the replace hook.
  */
 export function ReplaceSubTab(props: ReplaceSubTabComponentProps) {
-  const { applyMode, renderNodeInputsPanel } = props;
+  const { applyMode, onApplyModeChange, renderNodeInputsPanel } = props;
   const {
     hasSelection,
     effectiveNodes,
@@ -168,7 +170,7 @@ export function ReplaceSubTab(props: ReplaceSubTabComponentProps) {
             )}
           </div>
         </CardContent>
-        <CardFooter className="flex items-center gap-3 border-t border-surface-border bg-panel/20 py-4">
+        <PreprocessingApplyBar value={applyMode} onChange={onApplyModeChange}>
           <div className="flex flex-1 items-center gap-2">
             <Label htmlFor="replace-output-column" className="shrink-0">
               Output column name
@@ -209,7 +211,7 @@ export function ReplaceSubTab(props: ReplaceSubTabComponentProps) {
             </Button>
           </DisabledReasonTooltip>
           <HelpIcon targetKey="preprocessing.common.apply-button" label="Apply action" />
-        </CardFooter>
+        </PreprocessingApplyBar>
       </Card>
 
       <PreviewTable

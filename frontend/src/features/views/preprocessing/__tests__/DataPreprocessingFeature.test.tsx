@@ -89,7 +89,7 @@ const renderPreprocessingFeature = () => {
 const waitForFilterSchema = async () => {
   const filterPanel = screen.getByRole('tabpanel', { name: 'Filter' });
   await waitFor(() => {
-    expect(within(filterPanel).getAllByRole('combobox')[0]).toBeEnabled();
+    expect(within(filterPanel).getByRole('combobox', { name: 'Filter column' })).toBeEnabled();
   });
   return filterPanel;
 };
@@ -200,6 +200,9 @@ vi.mock('@/components/help/InfoIcon', () => ({
 describe('DataPreprocessingFeature replace tab', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.HTMLElement.prototype.hasPointerCapture = vi.fn();
+    window.HTMLElement.prototype.setPointerCapture = vi.fn();
+    window.HTMLElement.prototype.releasePointerCapture = vi.fn();
     mockGetNodeDataByWorkspaceId.mockResolvedValue({
       data: {
         columns: ['Body', 'Count'],
@@ -337,7 +340,9 @@ describe('DataPreprocessingFeature replace tab', () => {
         ),
       ).not.toBeInTheDocument();
     });
-    expect(within(filterPanel).getAllByRole('combobox').length).toBeGreaterThan(0);
+    expect(
+      within(filterPanel).getByRole('combobox', { name: 'Filter column' }),
+    ).toBeInTheDocument();
     expect(
       mockGetNodeDataByWorkspaceId.mock.calls.some(
         ([options]) =>
@@ -493,7 +498,7 @@ describe('DataPreprocessingFeature replace tab', () => {
     renderPreprocessingFeature();
 
     const filterPanel = await waitForFilterSchema();
-    const [columnSelect] = within(filterPanel).getAllByRole('combobox');
+    const columnSelect = within(filterPanel).getByRole('combobox', { name: 'Filter column' });
     columnSelect!.focus();
     await user.keyboard('{ArrowDown}{Enter}');
 
@@ -555,7 +560,7 @@ describe('DataPreprocessingFeature replace tab', () => {
     renderPreprocessingFeature();
 
     const filterPanel = await waitForFilterSchema();
-    const [columnSelect] = within(filterPanel).getAllByRole('combobox');
+    const columnSelect = within(filterPanel).getByRole('combobox', { name: 'Filter column' });
     columnSelect!.focus();
     await user.keyboard('{ArrowDown}{Enter}');
 
@@ -583,7 +588,7 @@ describe('DataPreprocessingFeature replace tab', () => {
     renderPreprocessingFeature();
 
     const filterPanel = await waitForFilterSchema();
-    const [columnSelect] = within(filterPanel).getAllByRole('combobox');
+    const columnSelect = within(filterPanel).getByRole('combobox', { name: 'Filter column' });
     columnSelect!.focus();
     await user.keyboard('{ArrowDown}{Enter}');
 
@@ -625,7 +630,7 @@ describe('DataPreprocessingFeature replace tab', () => {
     const filterPanel = await waitForFilterSchema();
     expect(getAddButton()).toBeDisabled();
 
-    const [columnSelect] = within(filterPanel).getAllByRole('combobox');
+    const columnSelect = within(filterPanel).getByRole('combobox', { name: 'Filter column' });
     columnSelect!.focus();
     await user.keyboard('{ArrowDown}{Enter}');
 
@@ -661,22 +666,20 @@ describe('DataPreprocessingFeature replace tab', () => {
     const user = userEvent.setup();
     renderPreprocessingFeature();
 
-    const createMode = screen.getByRole('button', { name: 'Create new Data Block' });
-    const updateMode = screen.getByRole('button', { name: 'Update selected Data Block' });
-    expect(createMode).toHaveAttribute('aria-pressed', 'true');
-    expect(updateMode).toHaveAttribute('aria-pressed', 'false');
+    const applyBar = screen.getByRole('group', { name: 'Apply result as' });
+    const applyMode = within(applyBar).getByRole('combobox', { name: 'Apply result as' });
+    expect(applyMode).toHaveTextContent('New Data Block');
+    expect(within(applyBar).getByLabelText('New data block name')).toBeInTheDocument();
+    expect(within(applyBar).getByRole('button', { name: 'Create Data Block' })).toBeInTheDocument();
 
-    await user.click(updateMode);
-    expect(screen.getByRole('button', { name: 'Update selected Data Block' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
+    await user.click(applyMode);
+    await user.click(screen.getByRole('option', { name: 'Selected Data Block' }));
+    expect(applyMode).toHaveTextContent('Selected Data Block');
     expect(screen.queryByLabelText('New data block name')).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('tab', { name: 'Find' }));
-    expect(screen.getByRole('button', { name: 'Create new Data Block' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
+    expect(screen.getByRole('combobox', { name: 'Apply result as' })).toHaveTextContent(
+      'New Data Block',
     );
 
     await user.click(screen.getByRole('tab', { name: 'Sample' }));
@@ -687,9 +690,10 @@ describe('DataPreprocessingFeature replace tab', () => {
     const user = userEvent.setup();
     renderPreprocessingFeature();
 
-    await user.click(screen.getByRole('button', { name: 'Update selected Data Block' }));
+    await user.click(screen.getByRole('combobox', { name: 'Apply result as' }));
+    await user.click(screen.getByRole('option', { name: 'Selected Data Block' }));
     const filterPanel = await waitForFilterSchema();
-    const [columnSelect] = within(filterPanel).getAllByRole('combobox');
+    const columnSelect = within(filterPanel).getByRole('combobox', { name: 'Filter column' });
     columnSelect!.focus();
     await user.keyboard('{ArrowDown}{Enter}');
     fireEvent.change(await screen.findByPlaceholderText('Enter value'), {

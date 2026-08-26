@@ -4,13 +4,14 @@ import { Code2, Loader2, Play, Plus, Trash2 } from 'lucide-react';
 import { TypedExpressionEditor } from './TypedExpressionEditor';
 import HelpIcon from '@/components/help/HelpIcon';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { PreviewTable } from '../components/PreviewTable';
+import { PreprocessingApplyBar } from '../components/PreprocessingApplyBar';
 import { SubTabActivityTag } from '../components/SubTabActivityTag';
 import { acceptPlaceholderOnTab } from '@/features/views/common/placeholderTabFill';
 import {
@@ -20,6 +21,7 @@ import {
 
 type TypedExpressionSubTabComponentProps = TypedExpressionSubTabProps & {
   renderNodeInputsPanel?: () => ReactNode;
+  onApplyModeChange: (value: TypedExpressionSubTabProps['applyMode']) => void;
 };
 
 const CONTEXT_LABELS: Record<string, string> = {
@@ -122,7 +124,7 @@ function ExpressionListEditor({
  * expressions for preview, and apply column/sort/group operations through hook actions.
  */
 export function TypedExpressionSubTab(props: TypedExpressionSubTabComponentProps) {
-  const { applyMode, isLoading } = props;
+  const { applyMode, isLoading, onApplyModeChange } = props;
   const { renderNodeInputsPanel } = props;
   const {
     effectiveNode,
@@ -389,7 +391,7 @@ export function TypedExpressionSubTab(props: TypedExpressionSubTabComponentProps
           )}
         </CardContent>
 
-        <CardFooter className="flex items-center gap-3 border-t pt-4">
+        <PreprocessingApplyBar value={applyMode} onChange={onApplyModeChange}>
           {applyMode === 'create' && (
             <div className="flex flex-1 items-center gap-2">
               <Label htmlFor="polars-new-node-name" className="shrink-0">
@@ -433,7 +435,7 @@ export function TypedExpressionSubTab(props: TypedExpressionSubTabComponentProps
             </Button>
           </DisabledReasonTooltip>
           <HelpIcon targetKey="preprocessing.common.apply-button" label="Apply action" />
-        </CardFooter>
+        </PreprocessingApplyBar>
       </Card>
 
       <PreviewTable

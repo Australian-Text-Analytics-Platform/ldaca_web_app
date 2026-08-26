@@ -1,11 +1,12 @@
 import type { ReactNode } from 'react';
 import { Filter, Loader2, Plus } from 'lucide-react';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import HelpIcon from '@/components/help/HelpIcon';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { ConditionBuilder } from '../components/condition-builder';
 import { PreviewTable } from '../components/PreviewTable';
+import { PreprocessingApplyBar } from '../components/PreprocessingApplyBar';
 import { SubTabActivityTag } from '../components/SubTabActivityTag';
 import { acceptPlaceholderOnTab } from '@/features/views/common/placeholderTabFill';
 import { useFilterSubTabSections, type FilterSubTabProps } from './hooks/useFilterSubTabSections';
@@ -13,6 +14,7 @@ import type { FilterConditionWithId } from '../types';
 
 type FilterSubTabComponentProps = FilterSubTabProps & {
   renderNodeInputsPanel?: () => ReactNode;
+  onApplyModeChange: (value: FilterSubTabProps['applyMode']) => void;
 };
 
 /**
@@ -23,7 +25,7 @@ type FilterSubTabComponentProps = FilterSubTabProps & {
  * condition edits/apply requests through hook actions.
  */
 export function FilterSubTab(props: FilterSubTabComponentProps) {
-  const { applyMode, renderNodeInputsPanel } = props;
+  const { applyMode, onApplyModeChange, renderNodeInputsPanel } = props;
   const {
     schemaState,
     conditionBuilder,
@@ -95,7 +97,7 @@ export function FilterSubTab(props: FilterSubTabComponentProps) {
           />
         </CardContent>
 
-        <CardFooter className="flex items-center gap-3 border-t border-surface-border bg-panel/20 py-4">
+        <PreprocessingApplyBar value={applyMode} onChange={onApplyModeChange}>
           {applyMode === 'create' && (
             <div className="flex flex-1 items-center gap-2">
               <label
@@ -148,7 +150,7 @@ export function FilterSubTab(props: FilterSubTabComponentProps) {
             </Button>
           </DisabledReasonTooltip>
           <HelpIcon targetKey="preprocessing.common.apply-button" label="Apply action" />
-        </CardFooter>
+        </PreprocessingApplyBar>
       </Card>
 
       <PreviewTable
