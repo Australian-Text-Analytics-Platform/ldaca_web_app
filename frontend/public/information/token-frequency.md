@@ -21,6 +21,7 @@ The frequency list that you can download includes the raw/absolute frequencies f
 - Can I change any of the settings/parameters?
   Yes. You can change the word cloud so that it displays more than just the top 25 tokens, although there is an upper limit of 100 tokens.
   You can also adjust the token frequency list by using stop words – words that will not be included. You can do this manually (by writing your own stop words or by right-clicking a word in the list to add it as a stop word) or by filling a default stop list matched to the saved language of the selected column.
+  Use the result-level token filter to narrow every cloud, frequency list, and two-block Keyword Analysis result with wildcard patterns. The same filter is applied to result downloads.
   When doing a keywords analysis, you can change the order in which keywords appear by sorting them differently. [anything else you can change?]
 
 - Where can I read more about this method?

@@ -110,7 +110,6 @@ const baseUnifiedSectionProps = {
   onDownloadFrequencyCsv: vi.fn(),
   view: 'cloud' as const,
   tokenFilter: '',
-  onTokenFilterChange: vi.fn(),
 };
 
 describe('Token frequency result layouts', () => {
@@ -223,7 +222,7 @@ describe('Token frequency result layouts', () => {
     expect(colorScale.getByLabelText('Study: Study Data Block')).toBeInTheDocument();
   });
 
-  it('keeps the token filter and compact corpus legend inside the statistics card', async () => {
+  it('keeps the compact corpus legend in the statistics card without duplicating the filter', async () => {
     const user = userEvent.setup();
     const nodeA = buildNodeResult({ nodeId: 'node-a', displayName: 'Reference Data Block' });
     const nodeB = buildNodeResult({ nodeId: 'node-b', displayName: 'Study Data Block' });
@@ -246,10 +245,7 @@ describe('Token frequency result layouts', () => {
       name: 'Keyword Analysis statistics',
     });
 
-    expect(within(statisticsCard).getByRole('textbox')).toHaveAttribute(
-      'placeholder',
-      'Filter tokens (use * as wildcard, e.g. pre* or *ing)',
-    );
+    expect(within(statisticsCard).queryByText('Filter tokens')).not.toBeInTheDocument();
     expect(
       within(statisticsCard).getByLabelText('Reference: Reference Data Block'),
     ).toBeInTheDocument();
@@ -260,6 +256,132 @@ describe('Token frequency result layouts', () => {
     expect(screen.getByRole('tooltip')).toHaveTextContent('Reference Data Block');
 
     expect(within(statisticsCard).getByLabelText('Study: Study Data Block')).toBeInTheDocument();
+  });
+
+  it('filters the full vocabulary before list and cloud limits and exports every match', async () => {
+    const user = userEvent.setup();
+    const onDownloadFrequencyCsv = vi.fn();
+    const rows = [
+      { token: 'first', frequency: 50 },
+      { token: 'second', frequency: 40 },
+      { token: 'target-tail', frequency: 30 },
+      { token: 'target-last', frequency: 20 },
+    ];
+    const result = buildNodeResult({
+      rows,
+      filteredRows: rows,
+      displayRows: rows.slice(0, 2),
+      appliedDisplayLimit: 2,
+    });
+
+    const { rerender } = render(
+      <TokenFrequencySingleTokenSection
+        {...baseSingleSectionProps}
+        nodeDisplayResults={[result]}
+        view="list"
+        tokenFilter="target*"
+        listLimit={1}
+        onDownloadFrequencyCsv={onDownloadFrequencyCsv}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'target-tail' })).toBeInTheDocument();
+    expect(screen.getByText('3.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'target-last' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Download frequencies' }));
+    expect(onDownloadFrequencyCsv).toHaveBeenCalledWith('Node 1', [rows[2], rows[3]]);
+
+    rerender(
+      <TokenFrequencySingleTokenSection
+        {...baseSingleSectionProps}
+        nodeDisplayResults={[result]}
+        tokenFilter="target*"
+      />,
+    );
+
+    expect(screen.getByLabelText('target-tail: 30, target-last: 20')).toBeInTheDocument();
+    expect(screen.queryByLabelText(/first: 50/)).not.toBeInTheDocument();
+  });
+
+  it('filters the Juxtorpus cloud and Keyword Analysis CSV from one shared value', async () => {
+    const user = userEvent.setup();
+    const onDownloadFrequencyCsv = vi.fn();
+    const nodeA = buildNodeResult({ nodeId: 'node-a', displayName: 'Reference Data Block' });
+    const nodeB = buildNodeResult({ nodeId: 'node-b', displayName: 'Study Data Block' });
+    const statistics = [
+      buildStatistic({ token: 'keep-token', freq_reference: 20, freq_study: 12 }),
+      buildStatistic({ token: 'drop-token', freq_reference: 18, freq_study: 14 }),
+    ];
+
+    const { rerender } = render(
+      <TokenFrequencyUnifiedTokenSection
+        {...baseUnifiedSectionProps}
+        normalizedNodeResults={[nodeA, nodeB]}
+        nodeDisplayResults={[nodeA, nodeB]}
+        lastCompareNodeIds={['node-a', 'node-b']}
+        statistics={statistics}
+        tokenFilter="keep*"
+        onDownloadFrequencyCsv={onDownloadFrequencyCsv}
+      />,
+    );
+
+    const cloud = screen.getByTestId('mock-wordcloud');
+    expect(within(cloud).getByText('keep-token')).toBeInTheDocument();
+    expect(within(cloud).queryByText('drop-token')).not.toBeInTheDocument();
+
+    rerender(
+      <TokenFrequencyUnifiedTokenSection
+        {...baseUnifiedSectionProps}
+        normalizedNodeResults={[nodeA, nodeB]}
+        nodeDisplayResults={[nodeA, nodeB]}
+        lastCompareNodeIds={['node-a', 'node-b']}
+        statistics={statistics}
+        tokenFilter="keep*"
+        onDownloadFrequencyCsv={onDownloadFrequencyCsv}
+        view="list"
+      />,
+    );
+
+    const statisticsCard = screen.getByRole('region', { name: 'Keyword Analysis statistics' });
+    expect(within(statisticsCard).getByText('1 match of 2')).toBeInTheDocument();
+    expect(within(statisticsCard).getByText('keep-token')).toBeInTheDocument();
+    expect(within(statisticsCard).queryByText('drop-token')).not.toBeInTheDocument();
+
+    await user.click(within(statisticsCard).getByRole('button', { name: 'Download frequencies' }));
+    expect(onDownloadFrequencyCsv).toHaveBeenCalledWith(
+      'token-keyness',
+      expect.arrayContaining([expect.objectContaining({ token: 'keep-token' })]),
+    );
+    expect(onDownloadFrequencyCsv.mock.calls.at(-1)?.[1]).toHaveLength(1);
+
+    rerender(
+      <TokenFrequencyUnifiedTokenSection
+        {...baseUnifiedSectionProps}
+        normalizedNodeResults={[nodeA, nodeB]}
+        nodeDisplayResults={[nodeA, nodeB]}
+        lastCompareNodeIds={['node-a', 'node-b']}
+        statistics={statistics}
+        tokenFilter="missing*"
+      />,
+    );
+    expect(screen.queryByTestId('mock-wordcloud')).not.toBeInTheDocument();
+    expect(screen.getByText('No tokens match the active filter.')).toBeInTheDocument();
+
+    rerender(
+      <TokenFrequencyUnifiedTokenSection
+        {...baseUnifiedSectionProps}
+        normalizedNodeResults={[nodeA, nodeB]}
+        nodeDisplayResults={[nodeA, nodeB]}
+        lastCompareNodeIds={['node-a', 'node-b']}
+        statistics={statistics}
+        tokenFilter="missing*"
+        view="list"
+      />,
+    );
+    expect(screen.getByText('0 matches of 2')).toBeInTheDocument();
+    expect(screen.queryByText('keep-token')).not.toBeInTheDocument();
+    expect(screen.queryByText('drop-token')).not.toBeInTheDocument();
   });
 
   it.each([

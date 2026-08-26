@@ -1,5 +1,5 @@
 import type { NodeResultView } from '../../tokenFrequencyAdapters';
-import { wildcardToRegExp } from '../../tokenFrequencyAdapters';
+import { createTokenFilterMatcher } from '../../tokenFrequencyAdapters';
 import { memo, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,8 +18,8 @@ interface TokenFrequencySingleTokenSectionProps {
   /** Which sub-view the parent results panel is showing. */
   view: 'cloud' | 'list';
   /**
-   * Optional wildcard filter applied to bar list rows in list view. Empty
-   * string means "no filter". Cloud rendering is unaffected.
+   * Optional wildcard filter applied to every per-node result and export.
+   * Empty string means "no filter".
    */
   tokenFilter?: string;
   /**
@@ -128,28 +128,13 @@ const TokenFrequencySingleTokenSectionInner = ({
       ? 'grid grid-cols-1 gap-4'
       : 'grid grid-cols-1 gap-4 lg:grid-cols-2';
 
-  // Width (in ch) of the rank gutter inside each list card. Sized to the
-  // largest *original* list length (after stop-word filtering, capped by the
-  // list display limit) across cards so ranks don't shift when filtering.
-  const tokenFilterTrimmed = tokenFilter.trim();
-  const tokenFilterRegex = tokenFilterTrimmed ? wildcardToRegExp(tokenFilterTrimmed) : null;
-  /** Used by: TokenFrequencySingleTokenSectionInner list rows to test visibility under the current filter. */
-  const matchesTokenFilter = (token: string): boolean => {
-    if (!tokenFilterTrimmed) return true;
-    if (!tokenFilterRegex) {
-      return token.toLowerCase().includes(tokenFilterTrimmed.toLowerCase());
-    }
-    return tokenFilterRegex.test(token);
-  };
-  const listSliceCapForGutter =
-    typeof listLimit === 'number' && Number.isFinite(listLimit) && listLimit > 0
-      ? Math.floor(listLimit)
-      : Number.POSITIVE_INFINITY;
+  const matchesTokenFilter = createTokenFilterMatcher(tokenFilter);
+  // Size the rank gutter to the full stop-word-filtered vocabulary so a match
+  // beyond the display limit still has room for its original frequency rank.
   const maxRowCount = nodeDisplayResults.reduce((acc, item) => {
     const filtered = Array.isArray(item.filteredRows) ? item.filteredRows : [];
-    const listed = Math.min(filtered.length, listSliceCapForGutter);
     const fallback = Array.isArray(item.displayRows) ? item.displayRows.length : 0;
-    return Math.max(acc, listed > 0 ? listed : fallback);
+    return Math.max(acc, filtered.length > 0 ? filtered.length : fallback);
   }, 0);
   const rankWidthCh = Math.max(2, String(maxRowCount).length + 1);
 
@@ -169,18 +154,22 @@ const TokenFrequencySingleTokenSectionInner = ({
           typeof listLimit === 'number' && Number.isFinite(listLimit) && listLimit > 0
             ? Math.floor(listLimit)
             : displayRows.length;
-        const listSourceRows = filteredRowsAll.slice(0, listSliceCap);
-        // Then apply the wildcard filter for list view; cloud view stays unaffected.
-        // Preserve each row's original 1-based rank so filtering doesn't renumber rows.
-        const filteredListRows: { row: (typeof listSourceRows)[number]; rank: number }[] =
-          listSourceRows
-            .map((row, rowIndex) => ({ row, rank: rowIndex + 1 }))
-            .filter(({ row }) => matchesTokenFilter(row.token));
+        // Filter the full vocabulary before either display limit so tail
+        // matches remain discoverable. Preserve each row's original rank.
+        const matchingRankedRows = filteredRowsAll
+          .map((row, rowIndex) => ({ row, rank: rowIndex + 1 }))
+          .filter(({ row }) => matchesTokenFilter(row.token));
+        const filteredListRows = matchingRankedRows.slice(0, listSliceCap);
+        const matchingRows = matchingRankedRows.map(({ row }) => row);
+        // displayRows already embodies the cloud-side limit. Reuse its length
+        // after filtering the full vocabulary so matching tail rows can fill
+        // the same number of cloud slots.
+        const cloudRows = matchingRows.slice(0, displayRows.length);
         const listMaxFrequency = Math.max(
           1,
           ...filteredListRows.map(({ row }) => row.frequency || 0),
         );
-        const words = displayRows.map((item) => ({
+        const words = cloudRows.map((item) => ({
           text: item.token,
           value: item.frequency || 0,
         }));
@@ -216,10 +205,7 @@ const TokenFrequencySingleTokenSectionInner = ({
                       aria-label="Download frequencies"
                       title="Download frequencies"
                       onClick={() => {
-                        onDownloadFrequencyCsv(
-                          result.displayName,
-                          Array.isArray(result.filteredRows) ? result.filteredRows : result.rows,
-                        );
+                        onDownloadFrequencyCsv(result.displayName, matchingRows);
                       }}
                     >
                       <Download className="h-4 w-4" />

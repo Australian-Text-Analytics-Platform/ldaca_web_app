@@ -13,15 +13,15 @@ import {
   type SortingState,
   useTable,
 } from '@tanstack/react-table';
-import { ArrowDown, ArrowUp, ArrowUpDown, Download, Search } from 'lucide-react';
-import { startTransition, useDeferredValue, useMemo, useState } from 'react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Download } from 'lucide-react';
+import { startTransition, useMemo, useState } from 'react';
 import HelpIcon from '@/components/help/HelpIcon';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { TokenFrequencyStatisticsEntry } from '../../tokenFrequencyAdapters';
-import { wildcardToRegExp } from '../../tokenFrequencyAdapters';
+import { createTokenFilterMatcher } from '../../tokenFrequencyAdapters';
 
 export type EnhancedStatisticsRow = TokenFrequencyStatisticsEntry & {
   overuse: boolean;
@@ -50,11 +50,8 @@ interface Props {
    * both compared corpora (no per-node scoping).
    */
   onTokenClick?: (token: string) => void;
-  /**
-   * Optional controlled wildcard filter shared with the two frequency lists.
-   */
+  /** Controlled wildcard filter shared by every result surface. */
   tokenFilter?: string;
-  onTokenFilterChange?: (value: string) => void;
   /**
    * Display name + colour for the reference and study Data Blocks.
    */
@@ -112,11 +109,7 @@ const tokenWildcardFilter: FilterFn<typeof tokenStatisticsTableFeatures, Enhance
   filterValue,
 ) => {
   const pattern = String(filterValue ?? '').trim();
-  if (!pattern) return true;
-  const regex = wildcardToRegExp(pattern);
-  const token = row.original.sort_token;
-  if (!regex) return token.toLowerCase().includes(pattern.toLowerCase());
-  return regex.test(token);
+  return createTokenFilterMatcher(pattern)(row.original.sort_token);
 };
 
 const columnHelper = createColumnHelper<
@@ -344,7 +337,6 @@ export const TokenFrequencyStatisticsTable = ({
   onDownloadFrequencyCsv,
   onTokenClick,
   tokenFilter: tokenFilterProp,
-  onTokenFilterChange,
   referenceNodeName,
   referenceColor,
   studyNodeName,
@@ -358,15 +350,18 @@ export const TokenFrequencyStatisticsTable = ({
 
   const [sorting, setSorting] = useState<SortingState>([{ id: 'log_likelihood_llv', desc: true }]);
   const tokenFilter = tokenFilterProp ?? '';
-  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
-  const deferredTokenFilter = useDeferredValue(tokenFilter);
-  const updateTokenFilter = (value: string) => {
-    setPagination((prev) => (prev.pageIndex === 0 ? prev : { ...prev, pageIndex: 0 }));
-    onTokenFilterChange?.(value);
-  };
+  const [paginationState, setPaginationState] = useState({
+    pageIndex: 0,
+    pageSize: 50,
+    tokenFilter,
+  });
+  const pagination =
+    paginationState.tokenFilter === tokenFilter
+      ? paginationState
+      : { pageIndex: 0, pageSize: paginationState.pageSize, tokenFilter };
   const columnFilters = useMemo(
-    () => (deferredTokenFilter.trim() ? [{ id: 'token', value: deferredTokenFilter }] : []),
-    [deferredTokenFilter],
+    () => (tokenFilter.trim() ? [{ id: 'token', value: tokenFilter }] : []),
+    [tokenFilter],
   );
 
   const table = useTable({
@@ -380,7 +375,16 @@ export const TokenFrequencyStatisticsTable = ({
         setSorting(updater);
       });
     },
-    onPaginationChange: setPagination,
+    onPaginationChange: (updater) => {
+      setPaginationState((previous) => {
+        const current =
+          previous.tokenFilter === tokenFilter
+            ? previous
+            : { pageIndex: 0, pageSize: previous.pageSize, tokenFilter };
+        const next = typeof updater === 'function' ? updater(current) : updater;
+        return { ...next, tokenFilter };
+      });
+    },
     enableMultiSort: false,
   });
 
@@ -470,45 +474,6 @@ export const TokenFrequencyStatisticsTable = ({
             <Download className="h-4 w-4" />
           </Button>
         </div>
-
-        {onTokenFilterChange ? (
-          <div className="flex flex-col gap-2 rounded-md border bg-panel/20 p-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-2">
-              <Label htmlFor="stats-token-filter" className="font-semibold">
-                Filter tokens
-              </Label>
-              <HelpIcon
-                targetKey="analysis.token-frequency.token-filter"
-                label="Token filter"
-                tooltip="Filter the list views and statistics table by token. Use * as a wildcard (e.g. pre* or *ing). Does not affect the word cloud view."
-              />
-            </div>
-            <div className="flex flex-1 items-center gap-2 sm:max-w-md">
-              <Search className="h-4 w-4 text-description" />
-              <Input
-                id="stats-token-filter"
-                placeholder="Filter tokens (use * as wildcard, e.g. pre* or *ing)"
-                value={tokenFilter}
-                onChange={(event) => {
-                  updateTokenFilter(event.target.value);
-                }}
-                className="h-8"
-              />
-              {tokenFilter ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    updateTokenFilter('');
-                  }}
-                >
-                  Clear
-                </Button>
-              ) : null}
-            </div>
-          </div>
-        ) : null}
 
         {tokenFilter ? (
           <p className="text-label-secondary text-description">
