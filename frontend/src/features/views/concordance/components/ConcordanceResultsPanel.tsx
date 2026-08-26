@@ -1,22 +1,25 @@
-import { type Dispatch, type SetStateAction, type RefObject } from 'react';
+import { Loader2 } from 'lucide-react';
+import { type Dispatch, type RefObject, type SetStateAction } from 'react';
+import type { ConcordanceAnalysisResponse, ConcordanceDensityResult } from '@/api';
+import HelpIcon from '@/components/help/HelpIcon';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2 } from 'lucide-react';
-import HelpIcon from '@/components/help/HelpIcon';
-import type { ConcordanceAnalysisResponse, ConcordanceDensityResult } from '@/api';
-import type { NodeColumnSelection } from '../../common/nodeSelectionTypes';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import { MetadataColumnSelector } from '../../common/components/MetadataColumnSelector';
+import { CONCORDANCE_COLUMN_KEYS } from '../../common/generatedColumns';
+import type { NodeColumnSelection } from '../../common/nodeSelectionTypes';
 import type {
   ConcordanceDispersionChartMode,
   DispersionDisplayBinCount,
 } from '../concordanceDispersionDomain';
-import { resolveConcordanceResultBlock } from '../concordanceSourceDomain';
+import {
+  getConcordanceSourceColor,
+  resolveConcordanceResultBlock,
+} from '../concordanceSourceDomain';
 import { CONCORDANCE_COMBINED_NODE_KEY } from '../concordanceTableDomain';
 import type { PaginationState } from '../hooks/useConcordanceTaskFlow';
-import { ConcordanceTableNodeBlock } from './ConcordanceTableNodeBlock';
 import { ConcordanceDispersionNodeBlock } from './ConcordanceDispersionNodeBlock';
-import { CONCORDANCE_COLUMN_KEYS } from '../../common/generatedColumns';
+import { ConcordanceTableNodeBlock } from './ConcordanceTableNodeBlock';
 
 interface Section {
   columns: string[];
@@ -103,31 +106,63 @@ interface ConcordanceSourceSummary {
   sourceDocumentCount: number;
 }
 
+interface ConcordanceSourceSummariesProps {
+  summaries: ConcordanceSourceSummary[];
+  sources: WorkspaceNodeMetadata[];
+  sourceColorMap: Record<string, string>;
+  defaultPalette: string[];
+  identifySources: boolean;
+}
+
 /** Displays one immutable Run All coverage line for each source Data Block. */
-function ConcordanceSourceSummaries({ summaries }: { summaries: ConcordanceSourceSummary[] }) {
+export function ConcordanceSourceSummaries({
+  summaries,
+  sources,
+  sourceColorMap,
+  defaultPalette,
+  identifySources,
+}: ConcordanceSourceSummariesProps) {
   return (
     <div className="divide-y divide-border">
-      {summaries.map(({ nodeId, matchCount, documentCount, sourceDocumentCount }) => (
-        <p
-          key={nodeId}
-          aria-label="Concordance result summary"
-          className="px-4 py-2.5 text-sm leading-5 text-muted-foreground"
-        >
-          <span>Found </span>
-          <span className="font-semibold tabular-nums text-foreground">
-            {matchCount.toLocaleString()} {matchCount === 1 ? 'match' : 'matches'}
-          </span>
-          <span> in </span>
-          <span className="font-semibold tabular-nums text-foreground">
-            {documentCount.toLocaleString()} {documentCount === 1 ? 'document' : 'documents'}
-          </span>
-          <span> out of </span>
-          <span className="font-semibold tabular-nums text-foreground">
-            {sourceDocumentCount.toLocaleString()}{' '}
-            {sourceDocumentCount === 1 ? 'document' : 'documents'}.
-          </span>
-        </p>
-      ))}
+      {summaries.map(({ nodeId, matchCount, documentCount, sourceDocumentCount }) => {
+        const sourceName = sources.find((source) => source.id === nodeId)?.name ?? nodeId;
+        const sourceColor = getConcordanceSourceColor(nodeId, sourceColorMap, defaultPalette);
+
+        return (
+          <p
+            key={nodeId}
+            aria-label={
+              identifySources
+                ? `Concordance result summary for ${sourceName}`
+                : 'Concordance result summary'
+            }
+            className="px-4 py-2.5 text-sm leading-5 text-muted-foreground"
+            style={
+              identifySources ? { borderLeftWidth: '3px', borderLeftColor: sourceColor } : undefined
+            }
+          >
+            {identifySources ? (
+              <>
+                <span className="font-semibold text-foreground">{sourceName}</span>
+                <span>: </span>
+              </>
+            ) : null}
+            <span>Found </span>
+            <span className="font-semibold tabular-nums text-foreground">
+              {matchCount.toLocaleString()} {matchCount === 1 ? 'match' : 'matches'}
+            </span>
+            <span> in </span>
+            <span className="font-semibold tabular-nums text-foreground">
+              {documentCount.toLocaleString()} {documentCount === 1 ? 'document' : 'documents'}
+            </span>
+            <span> out of </span>
+            <span className="font-semibold tabular-nums text-foreground">
+              {sourceDocumentCount.toLocaleString()}{' '}
+              {sourceDocumentCount === 1 ? 'document' : 'documents'}.
+            </span>
+          </p>
+        );
+      })}
     </div>
   );
 }
@@ -429,7 +464,13 @@ export function ConcordanceResultsPanel({
                     termColors,
                     resultSummary:
                       blockSummaries.length > 0 ? (
-                        <ConcordanceSourceSummaries summaries={blockSummaries} />
+                        <ConcordanceSourceSummaries
+                          summaries={blockSummaries}
+                          sources={panelSelectedNodes}
+                          sourceColorMap={sourceColorMap}
+                          defaultPalette={defaultPalette}
+                          identifySources={nodeName === CONCORDANCE_COMBINED_NODE_KEY}
+                        />
                       ) : undefined,
                     densitySeries: isReview
                       ? nodeName === CONCORDANCE_COMBINED_NODE_KEY
