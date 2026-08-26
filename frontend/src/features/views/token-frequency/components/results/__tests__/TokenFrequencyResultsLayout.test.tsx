@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -113,6 +113,17 @@ const baseUnifiedSectionProps = {
   onTokenFilterChange: vi.fn(),
 };
 
+/** Supplies the layout boundary that JSDOM omits so TanStack Virtual can determine a visible range. */
+const mockVirtualListViewport = () => {
+  const offsetHeight = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(400);
+  const offsetWidth = vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(800);
+
+  return () => {
+    offsetHeight.mockRestore();
+    offsetWidth.mockRestore();
+  };
+};
+
 describe('Token frequency result layouts', () => {
   it('renders all configured tokens instead of truncating after thirty', () => {
     const displayRows = Array.from({ length: 50 }, (_, index) => ({
@@ -135,6 +146,298 @@ describe('Token frequency result layouts', () => {
 
     expect(screen.getAllByText('token-1').length).toBeGreaterThan(0);
     expect(screen.getAllByText('token-50').length).toBeGreaterThan(0);
+  });
+
+  it('does not mount list rows while the cloud view is active', () => {
+    const displayRows = Array.from({ length: 50 }, (_, index) => ({
+      token: `token-${String(index + 1)}`,
+      frequency: 50 - index,
+    }));
+
+    render(
+      <TokenFrequencySingleTokenSection
+        {...baseSingleSectionProps}
+        nodeDisplayResults={[
+          buildNodeResult({
+            displayRows,
+            filteredRows: displayRows,
+            rows: displayRows,
+          }),
+        ]}
+      />,
+    );
+
+    expect(
+      screen.queryAllByTitle('Click to inspect in concordance. Right-click to add to stop words.'),
+    ).toHaveLength(0);
+    expect(screen.getByRole('button', { name: 'Download word cloud' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Download frequencies' })).not.toBeInTheDocument();
+  });
+
+  it('keeps full-vocabulary list DOM bounded to the visible window', async () => {
+    const restoreViewport = mockVirtualListViewport();
+    const fullVocabulary = Array.from({ length: 5_068 }, (_, index) => ({
+      token: `token-${String(index + 1)}`,
+      frequency: 5_068 - index,
+    }));
+    const cloudRows = fullVocabulary.slice(0, 25);
+
+    try {
+      render(
+        <TokenFrequencySingleTokenSection
+          {...baseSingleSectionProps}
+          view="list"
+          listLimit={5_068}
+          nodeDisplayResults={[
+            buildNodeResult({
+              nodeId: 'node-a',
+              displayName: 'Data Block A',
+              rows: fullVocabulary,
+              filteredRows: fullVocabulary,
+              displayRows: cloudRows,
+            }),
+            buildNodeResult({
+              nodeId: 'node-b',
+              displayName: 'Data Block B',
+              rows: fullVocabulary,
+              filteredRows: fullVocabulary,
+              displayRows: cloudRows,
+            }),
+          ]}
+        />,
+      );
+
+      const mountedTokenRows = await screen.findAllByTitle(
+        'Click to inspect in concordance. Right-click to add to stop words.',
+      );
+      expect(mountedTokenRows.length).toBeGreaterThan(0);
+      expect(mountedTokenRows.length).toBeLessThan(100);
+      expect(screen.queryByText('token-5068')).not.toBeInTheDocument();
+    } finally {
+      restoreViewport();
+    }
+  });
+
+  it('scrolls to the final token and keeps paired full-vocabulary lists aligned', async () => {
+    const restoreViewport = mockVirtualListViewport();
+    const fullVocabulary = Array.from({ length: 5_068 }, (_, index) => ({
+      token: `token-${String(index + 1)}`,
+      frequency: 5_068 - index,
+    }));
+
+    try {
+      render(
+        <TokenFrequencySingleTokenSection
+          {...baseSingleSectionProps}
+          view="list"
+          listLimit={5_068}
+          nodeDisplayResults={[
+            buildNodeResult({
+              nodeId: 'node-a',
+              displayName: 'Data Block A',
+              rows: fullVocabulary,
+              filteredRows: fullVocabulary,
+              displayRows: fullVocabulary.slice(0, 25),
+            }),
+            buildNodeResult({
+              nodeId: 'node-b',
+              displayName: 'Data Block B',
+              rows: fullVocabulary,
+              filteredRows: fullVocabulary,
+              displayRows: fullVocabulary.slice(0, 25),
+            }),
+          ]}
+        />,
+      );
+
+      const lists = screen.getAllByRole('list');
+      const bottomOffset = 5_068 * 40 - 400;
+      lists[0].scrollTop = bottomOffset;
+      fireEvent.scroll(lists[0]);
+
+      await waitFor(() => {
+        expect(screen.getAllByText('token-5068').length).toBeGreaterThan(0);
+      });
+      expect(lists[1].scrollTop).toBe(bottomOffset);
+    } finally {
+      restoreViewport();
+    }
+  });
+
+  it('preserves actions and full CSV exports on virtualized rows', async () => {
+    const restoreViewport = mockVirtualListViewport();
+    const user = userEvent.setup();
+    const onTokenClick = vi.fn();
+    const onTokenRightClick = vi.fn();
+    const onDownloadFrequencyCsv = vi.fn();
+    const fullVocabulary = Array.from({ length: 100 }, (_, index) => ({
+      token: `token-${String(index + 1)}`,
+      frequency: 100 - index,
+    }));
+
+    try {
+      render(
+        <TokenFrequencySingleTokenSection
+          {...baseSingleSectionProps}
+          view="list"
+          listLimit={100}
+          nodeDisplayResults={[
+            buildNodeResult({
+              rows: fullVocabulary,
+              filteredRows: fullVocabulary,
+              displayRows: fullVocabulary.slice(0, 25),
+            }),
+          ]}
+          onTokenClick={onTokenClick}
+          onTokenRightClick={onTokenRightClick}
+          onDownloadFrequencyCsv={onDownloadFrequencyCsv}
+        />,
+      );
+
+      const firstToken = await screen.findByText('token-1');
+      await user.click(firstToken);
+      fireEvent.contextMenu(firstToken);
+      await user.click(screen.getByRole('button', { name: 'Download frequencies' }));
+
+      expect(onTokenClick).toHaveBeenCalledWith('token-1');
+      expect(onTokenRightClick).toHaveBeenCalledWith('token-1', expect.anything());
+      expect(onDownloadFrequencyCsv).toHaveBeenCalledWith('Node 1', fullVocabulary);
+    } finally {
+      restoreViewport();
+    }
+  });
+
+  it('preserves cloud downloads and SVG ref registration across view toggles', async () => {
+    const user = userEvent.setup();
+    const onDownloadWordCloud = vi.fn();
+    const registerWordCloudRef = vi.fn();
+    const nodeDisplayResults = [buildNodeResult()];
+    const { rerender } = render(
+      <TokenFrequencySingleTokenSection
+        {...baseSingleSectionProps}
+        nodeDisplayResults={nodeDisplayResults}
+        onDownloadWordCloud={onDownloadWordCloud}
+        registerWordCloudRef={registerWordCloudRef}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Download word cloud' }));
+    expect(onDownloadWordCloud).toHaveBeenCalledWith('node-1', 'Node 1');
+    expect(registerWordCloudRef).toHaveBeenCalledWith('node-1', expect.any(SVGSVGElement));
+
+    rerender(
+      <TokenFrequencySingleTokenSection
+        {...baseSingleSectionProps}
+        view="list"
+        nodeDisplayResults={nodeDisplayResults}
+        onDownloadWordCloud={onDownloadWordCloud}
+        registerWordCloudRef={registerWordCloudRef}
+      />,
+    );
+
+    expect(registerWordCloudRef).toHaveBeenCalledWith('node-1', null);
+    expect(screen.queryByRole('button', { name: 'Download word cloud' })).not.toBeInTheDocument();
+  });
+
+  it('keeps original ranks and resets scrolling when the list filter changes', async () => {
+    const restoreViewport = mockVirtualListViewport();
+    const fullVocabulary = Array.from({ length: 100 }, (_, index) => ({
+      token: `token-${String(index + 1)}`,
+      frequency: 100 - index,
+    }));
+    const nodeDisplayResults = [
+      buildNodeResult({
+        rows: fullVocabulary,
+        filteredRows: fullVocabulary,
+        displayRows: fullVocabulary.slice(0, 25),
+      }),
+    ];
+
+    try {
+      const { rerender } = render(
+        <TokenFrequencySingleTokenSection
+          {...baseSingleSectionProps}
+          view="list"
+          listLimit={100}
+          nodeDisplayResults={nodeDisplayResults}
+        />,
+      );
+      const list = screen.getByRole('list');
+      list.scrollTop = 660;
+      fireEvent.scroll(list);
+
+      rerender(
+        <TokenFrequencySingleTokenSection
+          {...baseSingleSectionProps}
+          view="list"
+          listLimit={100}
+          tokenFilter="token-50"
+          nodeDisplayResults={nodeDisplayResults}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(list.scrollTop).toBe(0);
+        expect(screen.getByText('token-50')).toBeInTheDocument();
+      });
+      expect(screen.getByText('50.')).toBeInTheDocument();
+    } finally {
+      restoreViewport();
+    }
+  });
+
+  it('retains the shared list offset across Cloud and List toggles', async () => {
+    const restoreViewport = mockVirtualListViewport();
+    const fullVocabulary = Array.from({ length: 100 }, (_, index) => ({
+      token: `token-${String(index + 1)}`,
+      frequency: 100 - index,
+    }));
+    const nodeDisplayResults = [
+      buildNodeResult({
+        rows: fullVocabulary,
+        filteredRows: fullVocabulary,
+        displayRows: fullVocabulary.slice(0, 25),
+      }),
+    ];
+
+    try {
+      const { rerender } = render(
+        <TokenFrequencySingleTokenSection
+          {...baseSingleSectionProps}
+          view="list"
+          listLimit={100}
+          nodeDisplayResults={nodeDisplayResults}
+        />,
+      );
+      const list = screen.getByRole('list');
+      list.scrollTop = 660;
+      fireEvent.scroll(list);
+
+      rerender(
+        <TokenFrequencySingleTokenSection
+          {...baseSingleSectionProps}
+          view="cloud"
+          listLimit={100}
+          nodeDisplayResults={nodeDisplayResults}
+        />,
+      );
+      expect(screen.queryByRole('list')).not.toBeInTheDocument();
+
+      rerender(
+        <TokenFrequencySingleTokenSection
+          {...baseSingleSectionProps}
+          view="list"
+          listLimit={100}
+          nodeDisplayResults={nodeDisplayResults}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(screen.getByRole('list').scrollTop).toBe(660);
+      });
+    } finally {
+      restoreViewport();
+    }
   });
 
   it('shows the unified card only when two node results are available', async () => {
@@ -176,6 +479,33 @@ describe('Token frequency result layouts', () => {
 
     await user.hover(referenceTrigger);
     expect(screen.getByRole('tooltip')).toHaveTextContent('Reference Data Block');
+  });
+
+  it('mounts only the active Juxtorpus or statistics surface', () => {
+    const nodeA = buildNodeResult({ nodeId: 'node-a', displayName: 'Reference Data Block' });
+    const nodeB = buildNodeResult({ nodeId: 'node-b', displayName: 'Study Data Block' });
+    const comparativeProps = {
+      ...baseUnifiedSectionProps,
+      normalizedNodeResults: [nodeA, nodeB],
+      nodeDisplayResults: [nodeA, nodeB],
+      lastCompareNodeIds: ['node-a', 'node-b'],
+      statistics: [buildStatistic()],
+    };
+    const { rerender } = render(
+      <TokenFrequencyUnifiedTokenSection {...comparativeProps} view="list" />,
+    );
+
+    expect(screen.getByRole('region', { name: 'Keyword Analysis statistics' })).toBeInTheDocument();
+    expect(screen.queryByText('Juxtorpus')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('mock-wordcloud')).not.toBeInTheDocument();
+
+    rerender(<TokenFrequencyUnifiedTokenSection {...comparativeProps} view="cloud" />);
+
+    expect(screen.getByText('Juxtorpus')).toBeInTheDocument();
+    expect(screen.getByTestId('mock-wordcloud')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('region', { name: 'Keyword Analysis statistics' }),
+    ).not.toBeInTheDocument();
   });
 
   it('shows the Study Data Block name from the combined Study legend trigger', async () => {
