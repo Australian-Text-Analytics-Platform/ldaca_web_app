@@ -218,7 +218,9 @@ Run All parent. Concordance Match Data Block Creation emits selected flat match
 columns. Concordance Document Data Block Creation emits the required document
 and newline-joined `CONC_extraction` plus optional metadata after applying the
 Review term/bin filter. Checked sources, including empty ones, are committed
-atomically. Run All itself never changes the Workspace graph.
+atomically. Every created Data Block starts without a persisted color and
+therefore renders with the default grey instead of inheriting its source Data
+Block's analysis color. Run All itself never changes the Workspace graph.
 
 ## Other Analysis Kinds
 

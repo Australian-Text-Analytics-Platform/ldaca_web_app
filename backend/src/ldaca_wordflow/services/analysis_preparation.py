@@ -412,22 +412,6 @@ class AnalysisExecutionPreparer:
                     "request_payload": request.model_dump(mode="json"),
                     "result_paths": result_paths,
                     "document_columns": document_columns,
-                    "source_colors": {
-                        str(selection.source_node_id): descriptors[
-                            selection.source_node_id
-                        ].color
-                        for selection in selections
-                    }
-                    if isinstance(
-                        request,
-                        (
-                            ConcordanceMatchDataBlockCreationAnalysisRequest,
-                            ConcordanceDocumentDataBlockCreationAnalysisRequest,
-                        ),
-                    )
-                    else {
-                        str(selections[0].source_node_id): stored.source.color
-                    },
                 },
             )
         if isinstance(request, ConcordanceRunAllAnalysisRequest):

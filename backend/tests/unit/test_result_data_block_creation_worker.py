@@ -63,11 +63,11 @@ def test_document_data_block_creation_keeps_source_rows_and_joins_filtered_extra
         },
         result_paths={str(source_id): str(source_path)},
         document_columns={str(source_id): "text"},
-        source_colors={str(source_id): "#123456"},
     )
     output = result["outputs"][0]["data"]
     frame = pl.read_parquet(output_dir / output["parquet_path"])
 
+    assert output["data_block"]["color"] is None
     assert frame.columns == ["text", "CONC_extraction", "author"]
     assert frame.height == 2
     assert frame["author"].to_list() == ["first", "second"]
@@ -115,7 +115,6 @@ def test_document_data_block_creation_allows_schema_only_output(tmp_path: Path) 
         },
         result_paths={str(source_id): str(source_path)},
         document_columns={str(source_id): "text"},
-        source_colors={str(source_id): None},
     )
     output = result["outputs"][0]["data"]
     frame = pl.read_parquet(output_dir / output["parquet_path"])
