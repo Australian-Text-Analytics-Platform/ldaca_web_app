@@ -243,11 +243,11 @@ export const deriveNodeDisplayResults = (
   });
 };
 
-/** Converts user wildcard syntax into a token filter regular expression for list views. */
+/** Converts user wildcard syntax into a token filter regular expression. */
 /**
- * Used by: TokenFrequencySingleTokenSection.tsx, TokenFrequencyStatisticsTable.tsx.
+ * Used by: createTokenFilterMatcher and token-frequency adapter tests.
  */
-export const wildcardToRegExp = (pattern: string): RegExp | null => {
+const wildcardToRegExp = (pattern: string): RegExp | null => {
   const trimmed = pattern.trim();
   if (!trimmed) return null;
   // Escape regex special chars except * and ?
@@ -257,4 +257,16 @@ export const wildcardToRegExp = (pattern: string): RegExp | null => {
     .replace(/\*/g, '.*')
     .replace(/\?/g, '.');
   return new RegExp(`^${escaped}$`, 'i');
+};
+
+/** Builds the shared case-insensitive token predicate used by every result surface and export. */
+export const createTokenFilterMatcher = (pattern: string): ((token: string) => boolean) => {
+  const trimmed = pattern.trim();
+  if (!trimmed) return () => true;
+  const regex = wildcardToRegExp(trimmed);
+  if (!regex) {
+    const normalizedPattern = trimmed.toLowerCase();
+    return (token) => token.toLowerCase().includes(normalizedPattern);
+  }
+  return (token) => regex.test(token);
 };

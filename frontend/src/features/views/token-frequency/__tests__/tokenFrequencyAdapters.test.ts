@@ -1,9 +1,26 @@
 import { describe, expect, it } from 'vitest';
 import {
+  createTokenFilterMatcher,
   deriveNodeDisplayResults,
   deriveResultDisplayNodeIds,
   type NormalizedNodeResult,
 } from '../tokenFrequencyAdapters';
+
+describe('createTokenFilterMatcher', () => {
+  it.each([
+    ['', 'anything', true],
+    ['ALPHA', 'alpha', true],
+    ['alpha', 'alphabet', false],
+    ['pre*', 'prefix', true],
+    ['*ing', 'testing', true],
+    ['*ation*', 'international', true],
+    ['t?st', 'test', true],
+    ['a.b', 'a.b', true],
+    ['a.b', 'axb', false],
+  ])('matches pattern %j against %j as %s', (pattern, token, expected) => {
+    expect(createTokenFilterMatcher(pattern)(token)).toBe(expected);
+  });
+});
 
 /** Builds descending token-frequency rows for adapter boundary tests. */
 const buildRows = (tokens: string[]) =>

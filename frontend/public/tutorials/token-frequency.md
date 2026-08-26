@@ -48,7 +48,7 @@ Cloud/List display limits change only the presentation and do not enable Run.
 
 <h2 id="help-token-frequency-results">Result panel</h2>
 
-The results panel shows controls for stop words and display limits at the top, followed by a **Cloud view / List view** tab to switch between the two output modes. The stopword switch resets off whenever a Result is loaded; re-enabling immediately applies the saved Tab list.
+The results panel shows controls for stop words and display limits at the top, followed by a shared **Filter tokens** card and the **Cloud view / List view** selector. The stopword switch resets off whenever a Result is loaded; re-enabling immediately applies the saved Tab list.
 
 <h3 id="help-token-frequency-token-limit">Cloud display limit</h3>
 
@@ -58,11 +58,21 @@ The **Cloud display limit** (range 10–100, default 50) sets the maximum number
 
 The **List display limit** (range 10 – vocabulary size) sets the maximum number of tokens shown in the ranked frequency lists. Values up to 100 stay in sync with the Cloud display limit; setting the list limit above 100 lets you see a longer tail in list view while the cloud remains capped at 100.
 
+<h3 id="help-token-frequency-token-filter">Filter tokens</h3>
+
+The result-level **Filter tokens** input remains active in both Cloud and List views, with either one or two data blocks. Type a pattern to narrow every frequency cloud, frequency list, Juxtorpus cloud, and Keyword Analysis table simultaneously. Filtering searches the full stopword-filtered vocabulary before applying the Cloud or List display limit, so matches outside the original top results remain discoverable. Use `*` as a wildcard:
+
+- `pre*` — all tokens starting with _pre_
+- `*ing` — all tokens ending in _ing_
+- `*ation*` — all tokens containing _ation_
+
+Click **Clear** to remove the filter. Downloads also follow the active filter: frequency and Keyword Analysis CSVs contain all matching rows, while cloud image exports capture the filtered cloud.
+
 <h2 id="help-token-frequency-cloud-view">Cloud view</h2>
 
 ![Cloud view screenshot](tutorials/assets/token_frequency/cloud_view.png)
 
-Cloud view shows a word cloud for each selected data block, followed by the Juxtorpus cloud when two blocks are selected.
+Cloud view shows a word cloud for each selected data block, followed by the Juxtorpus cloud when two blocks are selected. The shared token filter applies before the cloud display limit.
 
 Word size in each per-block cloud corresponds to frequency. Interaction:
 
@@ -83,21 +93,11 @@ When two data blocks are selected, the Juxtorpus cloud appears below the per-blo
 
 ![List view screenshot](tutorials/assets/token_frequency/list_view.png)
 
-List view shows a ranked horizontal bar chart for each selected data block, with the statistics table below when two blocks are compared.
+List view shows a ranked horizontal bar chart for each selected data block, with the statistics table below when two blocks are compared. The shared token filter applies to the full vocabulary before the list display limit.
 
 **Word ranking**
 
 Tokens are listed in descending order of frequency. The bar length for each token is proportional to its count relative to the most frequent token in that block. When two data blocks are shown side by side, the blocks are scrolled **synchronously** — scrolling one list scrolls the other to the same position, making it easy to compare the same rank across both corpora.
-
-<h3 id="help-token-frequency-token-filter">Filter tokens</h3>
-
-A **Filter tokens** input appears at the bottom of the results when List view is active. Type a pattern to narrow both frequency lists and the statistics table simultaneously. Use `*` as a wildcard:
-
-- `pre*` — all tokens starting with _pre_
-- `*ing` — all tokens ending in _ing_
-- `*ation*` — all tokens containing _ation_
-
-Click **Clear** to remove the filter. The word clouds are not affected by the token filter.
 
 <h3 id="help-token-frequency-statistical-measures">Keyword Analysis</h3>
 
@@ -120,7 +120,7 @@ The **Keyword Analysis** table summarises token-level differences between the tw
 
 Use the **Head / Tail Rows (N)** control to show the first and last N rows of the sorted table. Sorting always applies to the full dataset before trimming.
 
-The full table can be downloaded as a CSV file. For further reading on keyword analysis methodology, see the [Lancaster corpus linguistics resource](https://www.lancaster.ac.uk/fss/courses/ling/corpus/blue/l03_2.htm).
+The full table can be downloaded as a CSV file; when the shared token filter is active, the download contains all matching rows. For further reading on keyword analysis methodology, see the [Lancaster corpus linguistics resource](https://www.lancaster.ac.uk/fss/courses/ling/corpus/blue/l03_2.htm).
 
 <h3 id="help-token-frequency-clear-results">Clear results</h3>
 
@@ -149,6 +149,7 @@ until you choose Clear Results.
 | Tokenizer model      | Saved Data Block preference or none | Required for each selected block; the submitted Analysis freezes the exact mapping                                                |
 | Corpus role switches | First selected block is Study Corpus | Changes O1/O2 assignment in the statistics table                                                                                  |
 | Stop words           | Empty                | Click **Fill Default** for language-matched default stop words                                                                                |
+| Token filter         | Empty                | Applies to every Cloud/List result and download; `*` matches any sequence of characters                                                      |
 | Cloud display limit  | 50                   | Range 10–100; mirrors to list limit                                                                                                           |
 | List display limit   | 50                   | Range 10 – vocabulary size; values > 100 diverge from cloud                                                                                   |
 
@@ -158,7 +159,7 @@ until you choose Clear Results.
 2. Click **Fill Default** to apply language-matched default stop words, then **Apply Stop Words** and compare the top tokens.
 3. Right-click one of the remaining high-frequency words in the cloud to add it as a custom stop word. Confirm it appears at the start of the stop-word list.
 4. Select a second data block. Use the card-level **Study Corpus / Reference Corpus** switches to set which block is the baseline, then choose **Run** again.
-5. Switch to **List view** and use **Filter tokens** with a wildcard pattern (e.g. `*ing`) to find all gerund-form tokens.
+5. Use **Filter tokens** with a wildcard pattern (e.g. `*ing`) and confirm that Cloud view, List view, and their downloads remain filtered while switching views.
 6. In **List view**, scroll one frequency list and observe that the other list scrolls in sync.
 7. Sort the statistics table by **LogRatio** to find the words most distinctively associated with each data block.
 8. Left-click one of the top distinctive words to jump to Concordance and inspect it in context.

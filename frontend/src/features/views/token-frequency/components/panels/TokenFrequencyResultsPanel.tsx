@@ -14,6 +14,7 @@ import { TokenFrequencySingleTokenSection } from '../results/TokenFrequencySingl
 import { TokenFrequencyUnifiedTokenSection } from '../results/TokenFrequencyUnifiedTokenSection';
 import { useTokenFrequencyListLimit } from '../../hooks/useTokenFrequencyListLimit';
 import { StopWordsEnabledSwitch } from '@/features/views/common/components/StopWordsEnabledSwitch';
+import { TokenFrequencyTokenFilterCard } from './TokenFrequencyTokenFilterCard';
 
 type ResultsView = 'cloud' | 'list';
 
@@ -114,10 +115,10 @@ export const TokenFrequencyResultsPanel = ({
   const isRunningState = isRunning;
   const isSuccessfulState = Boolean(results) && !isRunningState;
   const [resultsView, setResultsView] = React.useState<ResultsView>('cloud');
-  // Token wildcard filter (list view only). Lives here so it applies to all
-  // three list-view cards (left list, right list, and the statistics table)
-  // simultaneously.
-  const [listTokenFilter, setListTokenFilter] = React.useState<string>('');
+  const [tokenFilter, setTokenFilter] = React.useState<string>('');
+  // Word-cloud layout is expensive, so keep the input immediate while all
+  // result surfaces move together through one deferred projection.
+  const deferredTokenFilter = React.useDeferredValue(tokenFilter);
   const {
     globalMaxVocab,
     listLimit,
@@ -307,6 +308,8 @@ export const TokenFrequencyResultsPanel = ({
             </div>
           </div>
 
+          <TokenFrequencyTokenFilterCard value={tokenFilter} onChange={setTokenFilter} />
+
           <Tabs
             value={resultsView}
             onValueChange={(value) => {
@@ -329,7 +332,7 @@ export const TokenFrequencyResultsPanel = ({
             onDownloadWordCloud={onDownloadWordCloud}
             registerWordCloudRef={registerWordCloudRef}
             view={resultsView}
-            tokenFilter={listTokenFilter}
+            tokenFilter={deferredTokenFilter}
             listLimit={listLimit}
           />
 
@@ -352,8 +355,7 @@ export const TokenFrequencyResultsPanel = ({
             registerWordCloudRef={registerWordCloudRef}
             onDownloadFrequencyCsv={onDownloadFrequencyCsv}
             view={resultsView}
-            tokenFilter={listTokenFilter}
-            onTokenFilterChange={setListTokenFilter}
+            tokenFilter={deferredTokenFilter}
           />
         </div>
       ) : null}
