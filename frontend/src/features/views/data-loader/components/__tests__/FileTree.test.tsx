@@ -1,8 +1,12 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FileTree } from '../FileTree';
 
 describe('FileTree workspace routing', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('keeps the responsive Add action disabled when no workspace is selected', () => {
     const onAddFile = vi.fn();
     render(
@@ -34,8 +38,44 @@ describe('FileTree workspace routing', () => {
     );
     expect(screen.getByRole('button', { name: 'Download records.csv' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Delete records.csv' })).toBeInTheDocument();
+    const fileDetails = screen.getByTestId('file-details');
+    expect(fileDetails).toHaveClass('whitespace-nowrap');
+    expect(screen.getByTestId('file-details-separator')).toHaveTextContent('|');
+    expect(screen.getByTestId('file-size')).toHaveTextContent('10 B');
+    expect(screen.getByTestId('file-name-viewport')).not.toHaveAttribute('title');
     fireEvent.click(addButton);
     expect(onAddFile).not.toHaveBeenCalled();
+  });
+
+  it('fades an overflowing file name and exposes its full value on hover', async () => {
+    vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockReturnValue(240);
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(120);
+    const longName = 'a-very-long-file-name-that-does-not-fit.csv';
+
+    render(
+      <FileTree
+        nodes={[{ type: 'file', name: longName, path: longName, size: 1024 }]}
+        selectedFile={null}
+        loadingFiles={false}
+        hasWorkspaceSelected
+        workspaceId="workspace-1"
+        onPreviewFile={vi.fn()}
+        onAddFile={vi.fn()}
+        onSelectFile={vi.fn()}
+        onDownloadFile={vi.fn()}
+        onDeleteFile={vi.fn()}
+        onCreateFolderInside={vi.fn()}
+        onOpenCitation={vi.fn()}
+        onMoveFile={vi.fn()}
+      />,
+    );
+
+    const fileNameViewport = screen.getByTestId('file-name-viewport');
+    await waitFor(() => expect(fileNameViewport).toHaveAttribute('title', longName));
+    expect(fileNameViewport).toHaveStyle({
+      maskImage: 'linear-gradient(to right, black calc(100% - 2rem), transparent)',
+    });
+    expect(fileNameViewport).toHaveClass('overflow-hidden', 'whitespace-nowrap');
   });
 
   it('exposes enabled Add actions as guidance anchors when a workspace is selected', () => {

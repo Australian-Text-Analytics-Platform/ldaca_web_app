@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ChevronRightIcon,
   Download as DownloadIcon,
@@ -53,6 +53,66 @@ const directoryPathsIn = (nodes: FileTreeNode[]): string[] =>
   nodes.flatMap((node) =>
     node.type === 'directory' ? [node.path, ...directoryPathsIn(node.children)] : [],
   );
+
+function FileNameWithSize({ name, size }: { name: string; size: number }) {
+  const viewportRef = useRef<HTMLSpanElement>(null);
+  const contentRef = useRef<HTMLSpanElement>(null);
+  const [isOverflowing, setIsOverflowing] = useState(false);
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    const content = contentRef.current;
+    if (!viewport || !content) return;
+
+    const measure = () => {
+      setIsOverflowing(content.scrollWidth > viewport.clientWidth + 1);
+    };
+
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+
+    const observer = new ResizeObserver(measure);
+    observer.observe(viewport);
+    observer.observe(content);
+    return () => {
+      observer.disconnect();
+    };
+  }, [name]);
+
+  const fadeMask = 'linear-gradient(to right, black calc(100% - 2rem), transparent)';
+
+  return (
+    <div
+      data-testid="file-details"
+      className="flex min-w-0 flex-[1_1_14rem] items-baseline gap-1.5 overflow-hidden whitespace-nowrap"
+    >
+      <span
+        ref={viewportRef}
+        data-testid="file-name-viewport"
+        className="block min-w-0 flex-[0_1_auto] overflow-hidden whitespace-nowrap"
+        style={isOverflowing ? { maskImage: fadeMask, WebkitMaskImage: fadeMask } : undefined}
+        title={isOverflowing ? name : undefined}
+      >
+        <span
+          ref={contentRef}
+          className="block w-max whitespace-nowrap text-body font-medium text-foreground"
+        >
+          {name}
+        </span>
+      </span>
+      <span
+        aria-hidden="true"
+        data-testid="file-details-separator"
+        className="shrink-0 text-label-secondary text-description"
+      >
+        |
+      </span>
+      <span data-testid="file-size" className="shrink-0 text-label-secondary text-description">
+        {formatBytes(size)}
+      </span>
+    </div>
+  );
+}
 
 export interface FileTreeProps {
   nodes: FileTreeNode[];
@@ -300,14 +360,7 @@ function FileTreeContent({
     >
       <FileIcon className="h-4 w-4 shrink-0 text-description" />
       <div className="@container/file-row flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
-        <div className="min-w-0 flex-[1_1_14rem]">
-          <div className="flex items-center gap-1.5">
-            <span className="truncate text-body font-medium text-foreground">{file.name}</span>
-          </div>
-          <div className="flex items-center gap-2 text-label-secondary text-description">
-            <span>{formatBytes(file.size)}</span>
-          </div>
-        </div>
+        <FileNameWithSize name={file.name} size={file.size} />
         <div className="flex shrink-0 items-center gap-1">
           <Button
             size="sm"
