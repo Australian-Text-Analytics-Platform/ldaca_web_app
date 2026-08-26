@@ -169,6 +169,13 @@ filter shown in **All Topics**; use **Clear filter** in the graph toolbar to
 remove that accumulated filter without changing manually selected Topics.
 Search further narrows the filtered list. Choose **Add to Workspace** to publish
 manually selected topic data and linked topic meanings as Derived Data Blocks.
+For a two-source result, **Sync columns** applies exact, case-sensitive shared
+source-column selections to both checked Data Blocks. Enabling it combines the
+currently selected shared names; individual choices and **Select all** or
+**Select none** then update both sources. Source-only columns are disabled while
+sync is active, and an unchecked source keeps its independent selection.
+`TOPIC_top1` remains required and is not synchronized. If fewer than two sources
+remain checked, Sync columns turns off automatically.
 
 The download control exports the current panned and zoomed graph viewport. Its
 header records Data Block, cluster count, Top topics per document, random seed, and
