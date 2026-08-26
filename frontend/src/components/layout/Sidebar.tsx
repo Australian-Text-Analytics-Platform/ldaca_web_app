@@ -47,6 +47,7 @@ import {
   ChevronDown,
   ChevronRight,
   Circle,
+  CircleOff,
   Cog,
   MessageSquare,
   Pencil,
@@ -149,7 +150,7 @@ function Sidebar() {
 
   const { workspaceGraph } = useWorkspaceData();
   const { selectedNodeIds } = useWorkspaceSelection();
-  const { toggleNode, deleteNode, copyNode, renameNode } = useWorkspaceActions();
+  const { toggleNode, clearSelection, deleteNode, copyNode, renameNode } = useWorkspaceActions();
   const requestNodeInputAdd = useNodeInputRequestsStore((state) => state.requestAdd);
   const pinnedNodeIds = usePinnedNodesStore((state) => state.pinnedNodeIds);
   const togglePinnedNode = usePinnedNodesStore((state) => state.togglePinnedNode);
@@ -347,15 +348,8 @@ function Sidebar() {
                             />
                             <span>{title}</span>
                           </span>
-                          <div className="flex items-center gap-2 text-[11px] text-description">
-                            {key === 'nodes' && (
-                              <span className="font-semibold text-foreground/80">
-                                {selectedCount > 0
-                                  ? `${selectedCount.toString()}/${nodeCount.toString()}`
-                                  : nodeCount.toString()}
-                              </span>
-                            )}
-                            {key === 'tasks' && (
+                          {key === 'tasks' && (
+                            <div className="flex items-center gap-2 text-[11px] text-description">
                               <Circle
                                 data-testid="tasks-connection-indicator"
                                 className={cn('h-3 w-3', {
@@ -367,9 +361,38 @@ function Sidebar() {
                                   'fill-error text-error': !!connectionError,
                                 })}
                               />
-                            )}
-                          </div>
+                            </div>
+                          )}
                         </button>
+                        {key === 'nodes' && (
+                          <div className="flex items-center gap-2 text-[11px] text-description">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 text-description"
+                                  aria-label="Clear selection"
+                                  disabled={selectedCount === 0}
+                                  onClick={clearSelection}
+                                >
+                                  <CircleOff
+                                    data-testid="clear-selection-icon"
+                                    className="h-3.5 w-3.5"
+                                    aria-hidden="true"
+                                  />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="right">Clear</TooltipContent>
+                            </Tooltip>
+                            <span className="font-semibold text-foreground/80">
+                              {selectedCount > 0
+                                ? `${selectedCount.toString()}/${nodeCount.toString()}`
+                                : nodeCount.toString()}
+                            </span>
+                          </div>
+                        )}
                         <HelpIcon
                           targetKey={SECTION_HELP_KEYS[key]}
                           label={title}
