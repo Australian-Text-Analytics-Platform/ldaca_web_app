@@ -98,7 +98,9 @@ describe('TokenFrequencyResultsPanel stop words', () => {
 
     expect(filterCard.compareDocumentPosition(viewTabs)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     expect(screen.getAllByText('Filter tokens')).toHaveLength(1);
-    expect(screen.getByTestId('token-frequency-token-filter-card-content')).toHaveClass('flex-wrap');
+    expect(screen.getByTestId('token-frequency-token-filter-card-content')).toHaveClass(
+      'flex-wrap',
+    );
 
     await user.type(filterInput, 'pre*');
     await waitFor(() => {

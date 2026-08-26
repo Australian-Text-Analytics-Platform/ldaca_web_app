@@ -247,7 +247,7 @@ export const deriveNodeDisplayResults = (
 /**
  * Used by: createTokenFilterMatcher and token-frequency adapter tests.
  */
-export const wildcardToRegExp = (pattern: string): RegExp | null => {
+const wildcardToRegExp = (pattern: string): RegExp | null => {
   const trimmed = pattern.trim();
   if (!trimmed) return null;
   // Escape regex special chars except * and ?
