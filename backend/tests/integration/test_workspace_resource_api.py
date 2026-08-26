@@ -141,6 +141,90 @@ def test_workspace_resource_uses_explicit_open_and_server_ordered_mutations(
         ] == "workspace_not_open"
 
 
+def test_workspace_in_use_preserves_current_open_workspace(tmp_path: Path) -> None:
+    with _client(tmp_path) as holder, _client(tmp_path) as contender:
+        holder_headers = _unsafe_headers(holder)
+        contender_headers = _unsafe_headers(contender)
+        target = holder.post(
+            "/api/workspaces",
+            json={"name": "Externally open"},
+            headers=holder_headers,
+        ).json()
+        current = contender.post(
+            "/api/workspaces",
+            json={"name": "Locally open"},
+            headers=contender_headers,
+        ).json()
+        assert holder.put(
+            f"/api/workspaces/{target['id']}/open",
+            headers=holder_headers,
+        ).status_code == 200
+        assert contender.put(
+            f"/api/workspaces/{current['id']}/open",
+            headers=contender_headers,
+        ).status_code == 200
+
+        conflict = contender.put(
+            f"/api/workspaces/{target['id']}/open",
+            headers=contender_headers,
+        )
+
+        assert conflict.status_code == 409
+        assert conflict.json()["code"] == "workspace_in_use"
+        assert conflict.json()["message"] == (
+            "Workspace is open in another Wordflow backend process"
+        )
+        assert contender.get(f"/api/workspaces/{current['id']}").json()[
+            "runtime_state"
+        ] == "open"
+        delete_conflict = contender.delete(
+            f"/api/workspaces/{target['id']}",
+            headers=contender_headers,
+        )
+        assert delete_conflict.status_code == 409
+        assert delete_conflict.json()["code"] == "workspace_in_use"
+
+        assert holder.delete(
+            f"/api/workspaces/{target['id']}/open",
+            headers=holder_headers,
+        ).status_code == 204
+        assert contender.put(
+            f"/api/workspaces/{target['id']}/open",
+            headers=contender_headers,
+        ).status_code == 200
+        assert contender.get(f"/api/workspaces/{current['id']}").json()[
+            "runtime_state"
+        ] == "closed"
+
+
+def test_unsafe_workspace_lock_entry_has_distinct_safe_error(tmp_path: Path) -> None:
+    with _client(tmp_path) as client:
+        unsafe = _unsafe_headers(client)
+        workspace_id = client.post(
+            "/api/workspaces",
+            json={"name": "Unsafe registry"},
+            headers=unsafe,
+        ).json()["id"]
+        outside = tmp_path / "outside.txt"
+        outside.write_text("do not modify", encoding="utf-8")
+        lock_path = tmp_path / "workspaces" / ".locks" / f"{workspace_id}.lock"
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            lock_path.symlink_to(outside)
+        except OSError as exc:
+            pytest.skip(f"symlinks are unavailable: {exc}")
+
+        response = client.put(
+            f"/api/workspaces/{workspace_id}/open",
+            headers=unsafe,
+        )
+
+        assert response.status_code == 500
+        assert response.json()["code"] == "workspace_lock_unavailable"
+        assert response.json()["message"] == "Workspace locking is unavailable"
+        assert outside.read_text(encoding="utf-8") == "do not modify"
+
+
 def test_workspace_names_are_display_labels_and_storage_remains_uuid_keyed(
     tmp_path: Path,
 ) -> None:

@@ -44,21 +44,22 @@ class WorkspaceLifecycleService:
         """
 
         async with self._user_gate(user_id):
-            await self._workspaces.get_workspace(user_id, workspace_id)
-            siblings = await self._workspaces.list_workspaces(user_id)
-            for sibling in siblings:
-                if (
-                    not isinstance(sibling, WorkspaceRecord)
-                    or sibling.id == workspace_id
-                    or sibling.runtime_state != "open"
-                ):
-                    continue
-                await self._workspaces.request_close(
-                    user_id,
-                    sibling.id,
-                    self._analyses.has_workspace_work,
-                )
-            return await self._workspaces.open_workspace(user_id, workspace_id)
+            async with self._workspaces.reserve_open(user_id, workspace_id):
+                await self._workspaces.get_workspace(user_id, workspace_id)
+                siblings = await self._workspaces.list_workspaces(user_id)
+                for sibling in siblings:
+                    if (
+                        not isinstance(sibling, WorkspaceRecord)
+                        or sibling.id == workspace_id
+                        or sibling.runtime_state != "open"
+                    ):
+                        continue
+                    await self._workspaces.request_close(
+                        user_id,
+                        sibling.id,
+                        self._analyses.has_workspace_work,
+                    )
+                return await self._workspaces.open_workspace(user_id, workspace_id)
 
     async def request_close(
         self,

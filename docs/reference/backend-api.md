@@ -168,6 +168,14 @@ closing target makes it the sole open resource. If opening fails after a sibling
 transition, the response reports the real error and subsequent collection reads
 expose the resulting backend state.
 
+Opening or deleting a Workspace already owned by another Wordflow backend
+returns HTTP 409 `workspace_in_use` with the safe message `Workspace is open in
+another Wordflow backend process`. Target ownership is attempted before an open
+command closes the current Workspace. An unsafe or inaccessible per-Workspace
+lock registry returns `workspace_lock_unavailable` rather than claiming another
+process owns the Workspace. Listing and archive reads do not acquire this lock,
+and `WorkspaceResource.runtime_state` remains process-local.
+
 `GET /api/workspaces` returns a discriminated `WorkspaceListItem` collection.
 An `available` item contains every `WorkspaceResource` field. An `unavailable`
 item contains only `availability`, canonical `id`, safe `message`, and `reason`:

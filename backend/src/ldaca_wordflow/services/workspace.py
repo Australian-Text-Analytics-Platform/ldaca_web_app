@@ -46,6 +46,12 @@ from ..infrastructure.storage.workspace_access import (
     read_workspace_owner,
     write_workspace_owner,
 )
+from ..infrastructure.storage.workspace_lock import (
+    WorkspaceLockContendedError,
+    WorkspaceLockStorageError,
+    WorkspaceProcessLock,
+    acquire_workspace_lock,
+)
 
 from ..shared.errors import (
     BackendCapacityExceededError,
@@ -57,6 +63,8 @@ from ..shared.errors import (
     WorkspaceConflictError,
     WorkspaceClosingError,
     WorkspaceCorruptError,
+    WorkspaceInUseError,
+    WorkspaceLockUnavailableError,
     WorkspaceNotFoundError,
     WorkspaceNotOpenError,
 )
@@ -76,6 +84,7 @@ from ..infrastructure.storage.layout import (
     validate_workspace_name,
     workspace_staging_root,
     workspace_trash_root,
+    workspace_locks_root,
     workspaces_root,
 )
 from ..infrastructure.storage.durable_fs import (
@@ -152,6 +161,7 @@ class _WorkspaceSlot:
     serialized_bytes: int = 0
     serialized_entries: int = 0
     closing: bool = False
+    process_lock: WorkspaceProcessLock | None = None
 
 
 @dataclass(slots=True)
@@ -375,7 +385,12 @@ class WorkspaceService:
         finally:
             async with self._slot_registry_lock:
                 slot.users -= 1
-                if slot.users == 0 and slot.workspace is None and not slot.closing:
+                if (
+                    slot.users == 0
+                    and slot.workspace is None
+                    and not slot.closing
+                    and slot.process_lock is None
+                ):
                     self._slots.pop(workspace_id, None)
 
     @staticmethod
@@ -407,13 +422,30 @@ class WorkspaceService:
         """Release one loaded aggregate while its gate is held."""
 
         released = slot.serialized_bytes
+        process_lock = slot.process_lock
         slot.workspace = None
         slot.path = None
         slot.revision = 0
         slot.serialized_bytes = 0
         slot.serialized_entries = 0
         slot.closing = False
-        await self._release_open_capacity(released)
+        slot.process_lock = None
+        with anyio.CancelScope(shield=True):
+            await self._release_open_capacity(released)
+            if process_lock is not None:
+                await self._run_io(process_lock.close)
+
+    async def _acquire_process_lock(self, workspace_id: str) -> WorkspaceProcessLock:
+        try:
+            return await self._run_io(
+                acquire_workspace_lock,
+                workspace_locks_root(self.settings),
+                workspace_id,
+            )
+        except WorkspaceLockContendedError as exc:
+            raise WorkspaceInUseError() from exc
+        except WorkspaceLockStorageError as exc:
+            raise WorkspaceLockUnavailableError() from exc
 
     @staticmethod
     def _snapshot_entry_count(
@@ -1510,6 +1542,34 @@ class WorkspaceService:
                 details={"workspace_id": path.name},
             ) from exc
 
+    @asynccontextmanager
+    async def reserve_open(
+        self,
+        user_id: str,
+        workspace_id: str,
+    ) -> AsyncIterator[None]:
+        """Reserve cross-process ownership before local sibling transitions."""
+
+        if not self._accepting_mutations:
+            raise WorkspaceConflictError("Workspace service is shutting down")
+        async with self._slot(workspace_id) as slot:
+            path = await self._path(user_id, workspace_id)
+            if path is None:
+                raise WorkspaceNotFoundError("Workspace not found")
+            if slot.workspace is not None:
+                if slot.path != path:
+                    await self._clear_slot(slot)
+                    raise WorkspaceNotFoundError("Workspace not found")
+            elif slot.process_lock is None:
+                slot.process_lock = await self._acquire_process_lock(workspace_id)
+        try:
+            yield
+        finally:
+            with anyio.CancelScope(shield=True):
+                async with self._slot(workspace_id) as slot:
+                    if slot.workspace is None:
+                        await self._clear_slot(slot)
+
     async def open_workspace(
         self,
         user_id: str,
@@ -1535,10 +1595,13 @@ class WorkspaceService:
                     "open",
                 )
             else:
-                snapshot = await self._run_io(self._inspect_sync, path)
-                reserved_bytes = snapshot.serialized_bytes
-                await self._reserve_open_capacity(reserved_bytes)
+                if slot.process_lock is None:
+                    slot.process_lock = await self._acquire_process_lock(workspace_id)
                 try:
+                    snapshot = await self._run_io(self._inspect_sync, path)
+                    reserved_bytes = snapshot.serialized_bytes
+                    await self._reserve_open_capacity(reserved_bytes)
+                    slot.serialized_bytes = reserved_bytes
                     workspace, revision, serialized_bytes = await self._run_io(
                         self._load_sync,
                         path,
@@ -1548,16 +1611,20 @@ class WorkspaceService:
                             serialized_bytes - reserved_bytes
                         )
                         reserved_bytes = serialized_bytes
+                        slot.serialized_bytes = reserved_bytes
                     elif serialized_bytes < reserved_bytes:
                         await self._release_open_capacity(
                             reserved_bytes - serialized_bytes
                         )
                         reserved_bytes = serialized_bytes
+                        slot.serialized_bytes = reserved_bytes
                 except BaseException:
-                    await self._release_open_capacity(reserved_bytes)
+                    with anyio.CancelScope(shield=True):
+                        await self._clear_slot(slot)
                     raise
                 if revision != snapshot.revision:
-                    await self._release_open_capacity(reserved_bytes)
+                    with anyio.CancelScope(shield=True):
+                        await self._clear_slot(slot)
                     raise WorkspaceCorruptError(
                         "Workspace changed while it was opening",
                         details={"workspace_id": workspace_id},
@@ -1710,21 +1777,29 @@ class WorkspaceService:
             path = await self._path(user_id, workspace_id)
             if path is None:
                 raise WorkspaceNotFoundError("Workspace not found")
-            yield
-            await self._run_io(
-                self._delete_sync,
-                path,
-                workspace_trash_root(self.settings),
-            )
-            revision = slot.revision or None
-            await self._clear_slot(slot)
-            await self._publish_removed(
-                user_id,
-                EventResourceType.WORKSPACE,
-                uuid.UUID(workspace_id),
-                workspace_id=uuid.UUID(workspace_id),
-                revision=revision,
-            )
+            acquired_for_delete = slot.process_lock is None
+            if acquired_for_delete:
+                slot.process_lock = await self._acquire_process_lock(workspace_id)
+            try:
+                yield
+                await self._run_io(
+                    self._delete_sync,
+                    path,
+                    workspace_trash_root(self.settings),
+                )
+                revision = slot.revision or None
+                await self._clear_slot(slot)
+                await self._publish_removed(
+                    user_id,
+                    EventResourceType.WORKSPACE,
+                    uuid.UUID(workspace_id),
+                    workspace_id=uuid.UUID(workspace_id),
+                    revision=revision,
+                )
+            finally:
+                if acquired_for_delete and slot.workspace is None:
+                    with anyio.CancelScope(shield=True):
+                        await self._clear_slot(slot)
 
     @staticmethod
     def _delete_sync(path: Path, trash_root: Path) -> None:
@@ -1907,6 +1982,25 @@ class WorkspaceService:
                         "Durable Workspace reconciliation must run before serving"
                     )
                 try:
+                    if slot.process_lock is None:
+                        slot.process_lock = await self._acquire_process_lock(path.name)
+                except WorkspaceInUseError:
+                    logger.info(
+                        "Skipping startup reconciliation for a Workspace open "
+                        "in another backend workspace_id=%s owner_id=%s",
+                        path.name,
+                        owner_id,
+                    )
+                    continue
+                except WorkspaceLockUnavailableError:
+                    logger.exception(
+                        "Workspace lock unavailable during startup reconciliation "
+                        "workspace_id=%s owner_id=%s",
+                        path.name,
+                        owner_id,
+                    )
+                    continue
+                try:
                     workspace, revision, _serialized_bytes = await self._run_io(
                         self._load_sync,
                         path,
@@ -1932,3 +2026,6 @@ class WorkspaceService:
                         path.name,
                         owner_id,
                     )
+                finally:
+                    with anyio.CancelScope(shield=True):
+                        await self._clear_slot(slot)
