@@ -7,10 +7,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useElementWidth } from '@/lib/useElementWidth';
-import type {
-  NodeResultView,
-  NormalizedNodeResult,
-  TokenFrequencyStatisticsEntry,
+import {
+  createTokenFilterMatcher,
+  type NodeResultView,
+  type NormalizedNodeResult,
+  type TokenFrequencyStatisticsEntry,
 } from '../../tokenFrequencyAdapters';
 import { TokenFrequencyStatisticsTable } from './TokenFrequencyStatisticsTable';
 
@@ -52,11 +53,10 @@ interface TokenFrequencyUnifiedTokenSectionProps {
   /** Active sub-view from the parent results panel. */
   view: 'cloud' | 'list';
   /**
-   * Optional wildcard filter (lifted to the parent panel) applied to the
-   * statistics table when in list view. Cloud rendering is unaffected.
+   * Optional wildcard filter lifted to the parent result panel and applied to
+   * the Juxtorpus cloud, statistics table, and their exports.
    */
   tokenFilter?: string;
-  onTokenFilterChange?: (value: string) => void;
 }
 
 /** Used by: TokenFrequencyUnifiedTokenSectionInner to parse backend statistic values for unified-cloud scoring. */
@@ -90,7 +90,6 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
   onDownloadFrequencyCsv,
   view,
   tokenFilter = '',
-  onTokenFilterChange,
 }: TokenFrequencyUnifiedTokenSectionProps) => {
   // Hook must come before any early return so React sees a stable call order
   // across renders, regardless of whether the comparative panel is showing.
@@ -99,6 +98,10 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
     () => (statistics ?? []).filter((entry) => !appliedStopSet.has(entry.token.toLowerCase())),
     [appliedStopSet, statistics],
   );
+  const tokenFilteredStatistics = useMemo(() => {
+    const matchesTokenFilter = createTokenFilterMatcher(tokenFilter);
+    return filteredStatistics.filter((entry) => matchesTokenFilter(entry.token));
+  }, [filteredStatistics, tokenFilter]);
 
   const hasMultipleNodes =
     normalizedNodeResults.length >= 2 ||
@@ -121,7 +124,7 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
   const nodeAColor = getColorForNode(nodeAId || nodeAName, 0);
   const nodeBColor = getColorForNode(nodeBId || nodeBName, 1);
 
-  const cloudStats = filteredStatistics
+  const cloudStats = tokenFilteredStatistics
     .map((s) => ({
       token: s.token,
       o1: Number(s.freq_reference ?? 0),
@@ -383,8 +386,9 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
               </div>
             ) : (
               <p className="text-body text-description">
-                Unified cloud appears when two data block results and comparative statistics are
-                available.
+                {tokenFilter.trim() && tokenFilteredStatistics.length === 0
+                  ? 'No tokens match the active filter.'
+                  : 'Unified cloud appears when two data block results and comparative statistics are available.'}
               </p>
             )}
           </div>
@@ -406,7 +410,6 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
                 onDownloadFrequencyCsv={onDownloadFrequencyCsv}
                 onTokenClick={onTokenClick}
                 tokenFilter={tokenFilter}
-                onTokenFilterChange={onTokenFilterChange}
                 referenceNodeName={referenceId ? computeDisplayName(referenceId) : null}
                 referenceColor={referenceId ? getColorForNode(referenceId, 0) : null}
                 studyNodeName={studyId ? computeDisplayName(studyId) : null}
