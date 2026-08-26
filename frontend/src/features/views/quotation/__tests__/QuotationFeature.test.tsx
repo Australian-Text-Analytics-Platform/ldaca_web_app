@@ -127,14 +127,9 @@ vi.mock('../hooks/useQuotationContextPreference', () => ({
   }),
 }));
 
-vi.mock('../hooks/useQuotationRowDetail', () => ({
-  useQuotationRowDetail: () => ({
-    detailPayload: null,
-    detailOpen: false,
-    setDetailOpen: vi.fn(),
-    quotationCustomization: null,
-    handleRowClick: vi.fn(),
-  }),
+vi.mock('../quotationRowDetail', () => ({
+  buildQuotationRowDetailPayload: vi.fn(),
+  buildQuotationRowDetailCustomization: vi.fn(),
 }));
 
 vi.mock('../hooks/useQuotationPage', () => ({

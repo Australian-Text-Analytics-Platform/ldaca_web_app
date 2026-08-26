@@ -21,12 +21,9 @@ import {
   ConcordanceCombinedResultHeader,
   ConcordanceSourceResultHeader,
 } from './ConcordanceResultCardHeader';
-import {
-  buildConcordanceTableModel,
-  type ConcordanceGroupedRow,
-  type ConcordanceRow,
-} from './concordanceTableModel';
+import { buildConcordanceTableModel, type ConcordanceRow } from './concordanceTableModel';
 import { SortableHeader } from './SortableHeader';
+import { ConcordanceRowDetailController } from './ConcordanceRowDetailController';
 
 export interface ConcordanceTableNodeBlockProps {
   nodeKey: string;
@@ -42,6 +39,7 @@ export interface ConcordanceTableNodeBlockProps {
 
   // Search + display
   searchWord: string;
+  caseSensitive: boolean;
   showMetadata: boolean;
   selectedMetadataColumns: string[];
   reviewRowUnit: 'documents' | 'matches' | null;
@@ -68,12 +66,6 @@ export interface ConcordanceTableNodeBlockProps {
   // Handlers
   handleSort: (columnKey: string, paginationKey: string, requestNodeId: string) => void;
   handlePageChange: (newPage: number, paginationKey: string, requestNodeId: string) => void;
-  handleRowClick: (
-    row: Record<string, unknown>,
-    nodeId: string,
-    column: string,
-    groupedHits?: ConcordanceGroupedRow,
-  ) => void;
   setCombinedPage: (page: number) => void;
 }
 
@@ -104,6 +96,7 @@ export function ConcordanceTableNodeBlock(props: ConcordanceTableNodeBlockProps)
 function CombinedConcordanceTable({
   nodeData,
   searchWord,
+  caseSensitive,
   showMetadata,
   selectedMetadataColumns,
   effectiveNodeColumnSelections,
@@ -114,7 +107,6 @@ function CombinedConcordanceTable({
   globalPageSize,
   onPageSizeChange,
   combinedLoading,
-  handleRowClick,
   setCombinedPage,
   reviewRowUnit,
   highlightL1R1,
@@ -149,6 +141,19 @@ function CombinedConcordanceTable({
         setCombinedPage(newPage);
       }
     },
+  });
+  const detailItems = rows.map((row) => {
+    const sourceNode = row.__source_node
+      ? findConcordanceSourceNode(panelSelectedNodes, row.__source_node)
+      : null;
+    const selection = sourceNode
+      ? effectiveNodeColumnSelections.find((entry) => entry.nodeId === sourceNode.id)
+      : null;
+    return {
+      row,
+      nodeId: sourceNode?.id ?? '',
+      column: selection?.column ?? '',
+    };
   });
 
   const combinedPageSizeSummary = (
@@ -185,54 +190,68 @@ function CombinedConcordanceTable({
   );
 
   return (
-    <Card data-testid="concordance-table-combined-card" className="mb-6 overflow-hidden">
-      <ConcordanceCombinedResultHeader
-        nodes={panelSelectedNodes}
-        sourceColorMap={sourceColorMap}
-        defaultPalette={defaultPalette}
-        testId="concordance-table-combined-header"
-      />
-      <CardContent className="bg-panel/20 p-3">
-        <AnalysisTableFrame
-          maxHeightClass="max-h-100"
-          belowTable={combinedBelowTable}
-          viewportRef={viewportRef}
-        >
-          <ConcordanceRowsTable
-            table={table}
-            rows={rows}
-            tableColumns={tableColumns}
-            searchWord={searchWord}
-            loading={combinedLoading}
-            highlightL1R1={highlightL1R1}
-            getSourceColor={(row) => {
-              if (!row.__source_node) return defaultPalette[0] ?? GREY;
-              return getConcordanceSourceColor(row.__source_node, sourceColorMap, defaultPalette);
-            }}
-            renderHeader={(header) => <ConcordancePlainHeader key={header.id} header={header} />}
-            getRowClassName={() => 'cursor-pointer'}
-            getRowStyle={(row) => {
-              const color = getConcordanceSourceColor(
-                row.__source_node,
-                sourceColorMap,
-                defaultPalette,
-              );
-              return { backgroundColor: `${color}20` };
-            }}
-            onRowClick={(row) => {
-              const rawSrc = row.__source_node;
-              if (!rawSrc) return;
-              const nodeObj = findConcordanceSourceNode(panelSelectedNodes, rawSrc);
-              const sel =
-                nodeObj && effectiveNodeColumnSelections.find((s) => s.nodeId === nodeObj.id);
-              if (nodeObj && sel?.column) {
-                handleRowClick(row, nodeObj.id, sel.column);
-              }
-            }}
+    <ConcordanceRowDetailController
+      sequenceKey={`${CONCORDANCE_COMBINED_NODE_KEY}\0table\0${reviewRowUnit ?? 'preview'}\0${String(globalPageSize)}`}
+      items={detailItems}
+      page={nodeData.pagination.page}
+      hasPreviousPage={nodeData.pagination.has_prev}
+      hasNextPage={nodeData.pagination.has_next}
+      loading={combinedLoading}
+      onPageChange={setCombinedPage}
+      searchWord={searchWord}
+      caseSensitive={caseSensitive}
+    >
+      {(openDetailAt) => (
+        <Card data-testid="concordance-table-combined-card" className="mb-6 overflow-hidden">
+          <ConcordanceCombinedResultHeader
+            nodes={panelSelectedNodes}
+            sourceColorMap={sourceColorMap}
+            defaultPalette={defaultPalette}
+            testId="concordance-table-combined-header"
           />
-        </AnalysisTableFrame>
-      </CardContent>
-    </Card>
+          <CardContent className="bg-panel/20 p-3">
+            <AnalysisTableFrame
+              maxHeightClass="max-h-100"
+              belowTable={combinedBelowTable}
+              viewportRef={viewportRef}
+            >
+              <ConcordanceRowsTable
+                table={table}
+                rows={rows}
+                tableColumns={tableColumns}
+                searchWord={searchWord}
+                loading={combinedLoading}
+                highlightL1R1={highlightL1R1}
+                getSourceColor={(row) => {
+                  if (!row.__source_node) return defaultPalette[0] ?? GREY;
+                  return getConcordanceSourceColor(
+                    row.__source_node,
+                    sourceColorMap,
+                    defaultPalette,
+                  );
+                }}
+                renderHeader={(header) => (
+                  <ConcordancePlainHeader key={header.id} header={header} />
+                )}
+                getRowClassName={() => 'cursor-pointer'}
+                getRowStyle={(row) => {
+                  const color = getConcordanceSourceColor(
+                    row.__source_node,
+                    sourceColorMap,
+                    defaultPalette,
+                  );
+                  return { backgroundColor: `${color}20` };
+                }}
+                onRowClick={(_row, index) => {
+                  const item = detailItems[index];
+                  if (item?.nodeId && item.column) openDetailAt(index);
+                }}
+              />
+            </AnalysisTableFrame>
+          </CardContent>
+        </Card>
+      )}
+    </ConcordanceRowDetailController>
   );
 }
 
@@ -250,6 +269,7 @@ function PerNodeConcordanceTable({
   nodeData,
   context,
   searchWord,
+  caseSensitive,
   showMetadata,
   selectedMetadataColumns,
   panelSelectedNodes,
@@ -259,7 +279,6 @@ function PerNodeConcordanceTable({
   nodeLoading,
   handleSort,
   handlePageChange,
-  handleRowClick,
   reviewRowUnit,
   highlightL1R1,
   resultSummary,
@@ -314,6 +333,11 @@ function PerNodeConcordanceTable({
       }
     },
   });
+  const detailItems = rows.map((row) => ({
+    row,
+    nodeId: actualNodeId,
+    column,
+  }));
 
   // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty-string display name must fall back to the node key
   const dataBlockLabel = context.displayName || nodeKey;
@@ -352,55 +376,73 @@ function PerNodeConcordanceTable({
   );
 
   return (
-    <Card data-testid="concordance-table-source-card" className="mb-6 overflow-hidden">
-      <ConcordanceSourceResultHeader
-        name={dataBlockLabel}
-        color={sourceColor}
-        testId="concordance-table-source-header"
-      />
-      <CardContent className="bg-panel/20 p-3">
-        <AnalysisTableFrame
-          maxHeightClass="max-h-100"
-          belowTable={belowTable}
-          viewportRef={viewportRef}
-        >
-          <ConcordanceRowsTable
-            table={table}
-            rows={rows}
-            tableColumns={tableColumns}
-            searchWord={searchWord}
-            loading={nodeIsLoading}
-            highlightL1R1={highlightL1R1}
-            getSourceColor={() => sourceColor}
-            renderHeader={(header) => {
-              const mode = headerMode(header.column.id);
-              return mode === 'sortable' ? (
-                <SortableHeader
-                  key={header.id}
-                  columnKey={header.column.id}
-                  label={header.column.id}
-                  paginationKey={paginationKey}
-                  requestNodeId={requestNodeId}
-                  nodePagination={nodePagination}
-                  onSort={handleEligibleSort}
-                />
-              ) : (
-                <ConcordancePlainHeader
-                  key={header.id}
-                  header={header}
-                  hint={mode === 'preview-review-hint' ? 'Run All to enable sorting' : undefined}
-                />
-              );
-            }}
-            getRowClassName={(_row, index) =>
-              `cursor-pointer ${index % 2 === 0 ? 'bg-surface' : 'bg-panel'}`
-            }
-            onRowClick={(row) => {
-              if (actualNodeId && column) handleRowClick(row, actualNodeId, column);
-            }}
+    <ConcordanceRowDetailController
+      sequenceKey={`${nodeKey}\0table\0${reviewRowUnit ?? 'preview'}\0${String(globalPageSize)}\0${currentNodePagination?.sortBy ?? ''}\0${String(currentNodePagination?.descending ?? false)}`}
+      items={detailItems}
+      page={nodeData.pagination.page}
+      hasPreviousPage={nodeData.pagination.has_prev}
+      hasNextPage={nodeData.pagination.has_next}
+      loading={nodeIsLoading}
+      onPageChange={(nextPage) => {
+        handlePageChange(nextPage, paginationKey, requestNodeId);
+      }}
+      searchWord={searchWord}
+      caseSensitive={caseSensitive}
+    >
+      {(openDetailAt) => (
+        <Card data-testid="concordance-table-source-card" className="mb-6 overflow-hidden">
+          <ConcordanceSourceResultHeader
+            name={dataBlockLabel}
+            color={sourceColor}
+            testId="concordance-table-source-header"
           />
-        </AnalysisTableFrame>
-      </CardContent>
-    </Card>
+          <CardContent className="bg-panel/20 p-3">
+            <AnalysisTableFrame
+              maxHeightClass="max-h-100"
+              belowTable={belowTable}
+              viewportRef={viewportRef}
+            >
+              <ConcordanceRowsTable
+                table={table}
+                rows={rows}
+                tableColumns={tableColumns}
+                searchWord={searchWord}
+                loading={nodeIsLoading}
+                highlightL1R1={highlightL1R1}
+                getSourceColor={() => sourceColor}
+                renderHeader={(header) => {
+                  const mode = headerMode(header.column.id);
+                  return mode === 'sortable' ? (
+                    <SortableHeader
+                      key={header.id}
+                      columnKey={header.column.id}
+                      label={header.column.id}
+                      paginationKey={paginationKey}
+                      requestNodeId={requestNodeId}
+                      nodePagination={nodePagination}
+                      onSort={handleEligibleSort}
+                    />
+                  ) : (
+                    <ConcordancePlainHeader
+                      key={header.id}
+                      header={header}
+                      hint={
+                        mode === 'preview-review-hint' ? 'Run All to enable sorting' : undefined
+                      }
+                    />
+                  );
+                }}
+                getRowClassName={(_row, index) =>
+                  `cursor-pointer ${index % 2 === 0 ? 'bg-surface' : 'bg-panel'}`
+                }
+                onRowClick={(_row, index) => {
+                  if (actualNodeId && column) openDetailAt(index);
+                }}
+              />
+            </AnalysisTableFrame>
+          </CardContent>
+        </Card>
+      )}
+    </ConcordanceRowDetailController>
   );
 }

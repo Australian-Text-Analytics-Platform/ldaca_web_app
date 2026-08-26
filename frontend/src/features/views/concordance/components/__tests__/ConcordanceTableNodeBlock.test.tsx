@@ -1,5 +1,5 @@
 /* eslint-disable testing-library/no-container, testing-library/no-node-access -- Radix exposes the imperative viewport only as an internal DOM slot. */
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -91,6 +91,7 @@ const buildProps = (handleSort: ConcordanceTableNodeBlockProps['handleSort']) =>
       nodeColor: '#2563eb',
     },
     searchWord: 'alpha',
+    caseSensitive: false,
     showMetadata: true,
     selectedMetadataColumns: ['speaker'],
     panelSelectedNodes: [{ id: 'node-1', name: 'Documents' } as WorkspaceNodeMetadata],
@@ -107,7 +108,6 @@ const buildProps = (handleSort: ConcordanceTableNodeBlockProps['handleSort']) =>
     highlightL1R1: true,
     handleSort,
     handlePageChange: vi.fn(),
-    handleRowClick: vi.fn(),
     setCombinedPage: vi.fn(),
   }) satisfies ConcordanceTableNodeBlockProps;
 
@@ -119,6 +119,17 @@ const cellFor = (columnName: string): HTMLTableCellElement => {
 };
 
 describe('ConcordanceTableNodeBlock', () => {
+  it('opens specialized row details with shared navigation controls', async () => {
+    const user = userEvent.setup();
+    render(<ConcordanceTableNodeBlock {...buildProps(vi.fn())} />);
+
+    await user.click(screen.getByText('alpha'));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Row Details (Concordance)')).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Previous row' })).toBeDisabled();
+    expect(within(dialog).getByRole('button', { name: 'Next row' })).toBeDisabled();
+  });
+
   it('uses a saturated source header above a neutral table body', () => {
     const longName = 'qldelection2020_candidate_tweets_filtered_by_username_in_AnnastaciaMP';
     const props = buildProps(vi.fn());

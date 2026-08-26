@@ -46,7 +46,7 @@ export interface QuotationNodeBlockProps {
   /** Requests a different server page size. */
   onPageSizeChange: (pageSize: number) => void;
   /** Opens the row detail panel for a clicked row. */
-  onRowClick: (row: QuotationResultRow) => void;
+  onRowClick: (rowIndex: number) => void;
   /** Page-size options for the footer selector. */
   pageSizeOptions: number[];
   /** Summary rendered beside the page-size selector. */
@@ -242,7 +242,7 @@ function QuotationNodeBlockContent({
                   key={row.id}
                   className="border-b border-surface-border/60 last:border-b-0 hover:bg-panel/40 cursor-pointer"
                   onClick={() => {
-                    onRowClick(row.original);
+                    onRowClick(row.index);
                   }}
                 >
                   {row.getVisibleCells().map((cell) => (

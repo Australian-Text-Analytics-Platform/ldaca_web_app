@@ -373,6 +373,7 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
     columnFields: nodeData.columnFields,
     loading: nodeDataQuery.isLoading,
     fetching: nodeDataQuery.isFetching,
+    pageError: nodeDataQuery.error,
     workspaceId: currentWorkspaceId ?? undefined,
     nodeId: selectedNode?.id,
     documentColumn: selectedNode?.document ?? undefined,
