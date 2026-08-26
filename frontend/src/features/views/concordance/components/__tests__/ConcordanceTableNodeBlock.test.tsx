@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { ConcordanceNodeResult } from '@/api';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
-import { toBgColor } from '@/features/views/common/vizPalette';
+import { GREY, foregroundForVizColor, toBgColor } from '@/features/views/common/vizPalette';
 import {
   ConcordanceTableNodeBlock,
   type ConcordanceTableNodeBlockProps,
@@ -119,6 +119,40 @@ const cellFor = (columnName: string): HTMLTableCellElement => {
 };
 
 describe('ConcordanceTableNodeBlock', () => {
+  it('uses a saturated source header above a neutral table body', () => {
+    const longName = 'qldelection2020_candidate_tweets_filtered_by_username_in_AnnastaciaMP';
+    const props = buildProps(vi.fn());
+    render(
+      <ConcordanceTableNodeBlock
+        {...props}
+        context={{ ...props.context, displayName: longName }}
+      />,
+    );
+
+    const header = screen.getByTestId('concordance-table-source-header');
+    expect(header).toHaveStyle({
+      backgroundColor: '#2563eb',
+      color: foregroundForVizColor('#2563eb'),
+    });
+    expect(header).toContainElement(screen.getByTitle(longName));
+    expect(screen.getByTestId('analysis-table-scroll-area').style.borderLeftWidth).toBe('');
+  });
+
+  it('falls back to the established neutral header color for invalid source metadata', () => {
+    const props = buildProps(vi.fn());
+    render(
+      <ConcordanceTableNodeBlock
+        {...props}
+        context={{ ...props.context, nodeColor: 'not-a-color' }}
+      />,
+    );
+
+    expect(screen.getByTestId('concordance-table-source-header')).toHaveStyle({
+      backgroundColor: GREY,
+      color: foregroundForVizColor(GREY),
+    });
+  });
+
   it('keeps generated Preview headers plain with a Run All hint while metadata sorts', async () => {
     const user = userEvent.setup();
     const handleSort = vi.fn();
@@ -231,10 +265,25 @@ describe('ConcordanceTableNodeBlock', () => {
         {...buildProps(vi.fn())}
         nodeKey={CONCORDANCE_COMBINED_NODE_KEY}
         nodeData={combinedData}
+        panelSelectedNodes={[
+          { id: 'node-1', name: 'Documents 1' } as WorkspaceNodeMetadata,
+          { id: 'node-2', name: 'Documents 2' } as WorkspaceNodeMetadata,
+        ]}
+        sourceColorMap={{ 'node-1': '#2563eb', 'node-2': '#dc2626' }}
         defaultPalette={['#dc2626']}
       />,
     );
 
+    const header = screen.getByTestId('concordance-table-combined-header');
+    expect(header.style.backgroundColor).toBe('');
+    expect(screen.getByTestId('concordance-source-chip-node-1')).toHaveStyle({
+      backgroundColor: '#2563eb',
+      color: foregroundForVizColor('#2563eb'),
+    });
+    expect(screen.getByTestId('concordance-source-chip-node-2')).toHaveStyle({
+      backgroundColor: '#dc2626',
+      color: foregroundForVizColor('#dc2626'),
+    });
     expect(screen.getByText('alpha', { selector: 'td' })).toHaveStyle({
       backgroundColor: toBgColor('#dc2626', 0.24),
     });

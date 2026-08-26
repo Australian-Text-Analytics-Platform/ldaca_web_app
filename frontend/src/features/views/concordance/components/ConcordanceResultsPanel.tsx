@@ -357,9 +357,7 @@ export function ConcordanceResultsPanel({
       <CardContent>
         <div ref={resultsViewportRef} className="space-y-4">
           {Object.keys(results.data).length > 0 ? (
-            <div
-              className={`grid gap-4 ${viewMode === 'combined' ? 'grid-cols-1' : 'grid-cols-1'}`}
-            >
+            <div className="grid grid-cols-1 gap-4">
               {Object.entries(results.data)
                 .filter(([k]) =>
                   viewMode === 'combined'

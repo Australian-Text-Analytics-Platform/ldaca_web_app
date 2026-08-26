@@ -19,8 +19,7 @@ import {
 } from 'recharts';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChartImageDownloadDialog } from '@/components/ui/ChartImageDownloadDialog';
 import {
   ChartContainer,
@@ -56,6 +55,10 @@ import {
   type DispersionDisplayBinCount,
   type ConcordanceDensitySeriesInput,
 } from '../concordanceDispersionDomain';
+import {
+  ConcordanceDispersionMatchControls,
+  type ConcordanceDispersionLegendItem,
+} from './ConcordanceDispersionMatchControls';
 
 interface Props {
   rows: ConcordanceDispersionRow[];
@@ -84,20 +87,15 @@ interface Props {
   uncasedMatchedTexts?: boolean;
   onUncasedMatchedTextsChange?: (value: boolean) => void;
   onToggleMatchedTexts?: (matchedTexts: readonly string[]) => void;
+  /** Keeps the shared match controls mounted when the optional density chart is hidden. */
+  showChart?: boolean;
 }
 
-interface DispersionChartSeries {
-  /** Data key in each row of the chart payload. */
-  key: string;
-  /** Stroke color, usually from matched-text color or Node.color. */
-  color: string;
+interface DispersionChartSeries extends ConcordanceDispersionLegendItem {
   /** Human-readable label for tooltip/export display. */
   label?: string;
   /** Recharts `strokeDasharray` string. Undefined = solid. */
   dash?: string;
-  matchedTexts: string[];
-  hidden: boolean;
-  countLabel: string;
 }
 
 interface ChartPointerState {
@@ -210,6 +208,7 @@ export function ConcordanceDispersionSummary({
   uncasedMatchedTexts = false,
   onUncasedMatchedTextsChange,
   onToggleMatchedTexts,
+  showChart = true,
 }: Props) {
   const controlId = useId();
   const chartContainerRef = useRef<HTMLDivElement | null>(null);
@@ -562,201 +561,174 @@ export function ConcordanceDispersionSummary({
   };
 
   return (
-    <Card data-testid="concordance-dispersion-chart">
-      <CardHeader className="gap-3 pb-2 md:flex-row md:items-start md:justify-between">
-        <CardTitle className="text-body">{chartTitle}</CardTitle>
-        <div className="flex flex-wrap items-center justify-end gap-3">
-          {selection && selection.selectedIndices.size > 0 && (
-            <Button type="button" variant="outline" size="sm" onClick={selection.onClear}>
-              Clear Selection ({selection.selectedIndices.size})
-            </Button>
-          )}
-          {onBinCountChange && (
-            <div className="flex items-center gap-2 text-body text-foreground">
-              <span id={`${controlId}-bin-count`}>Bin No.</span>
-              <Select
-                value={String(binCount)}
-                onValueChange={(value) => {
-                  const parsed = Number.parseInt(value, 10) as DispersionDisplayBinCount;
-                  if ((DISPERSION_DISPLAY_BIN_COUNTS as readonly number[]).includes(parsed)) {
-                    onBinCountChange(parsed);
-                  }
-                }}
-              >
-                <SelectTrigger
-                  aria-labelledby={`${controlId}-bin-count`}
-                  className="h-8 w-24 px-2 py-1"
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {DISPERSION_DISPLAY_BIN_COUNTS.map((value) => (
-                      <SelectItem key={value} value={String(value)}>
-                        {value}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-          {onChartModeChange && (
-            <div className="flex items-center gap-2 text-body text-foreground">
-              <span id={`${controlId}-chart-mode`}>Chart</span>
-              <Popover
-                open={chartMenuOpen}
-                onOpenChange={(open) => {
-                  setChartMenuOpen(open);
-                  if (!open) setCumulativeOptionOpen(false);
-                }}
-              >
-                <PopoverTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    role="combobox"
-                    aria-labelledby={`${controlId}-chart-mode`}
-                    aria-expanded={chartMenuOpen}
-                    className="h-8 w-36 justify-between px-2 py-1 font-normal"
-                  >
-                    <span className="truncate">{CHART_MODE_LABELS[chartMode]}</span>
-                    <ChevronDown className="size-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent align="end" className="w-44 p-1">
-                  <div className="space-y-0.5">
-                    {CONCORDANCE_DISPERSION_CHART_MODES.filter(
-                      (value) => value !== 'cumulative',
-                    ).map((value) => (
-                      <button
-                        key={value}
-                        type="button"
-                        className="flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-left text-body hover:bg-list-hover hover:text-foreground focus-visible:bg-list-hover focus-visible:text-foreground focus-visible:outline-hidden"
-                        onClick={() => {
-                          onChartModeChange(value);
-                          setChartMenuOpen(false);
-                        }}
-                      >
-                        {CHART_MODE_LABELS[value]}
-                        {chartMode === value && <Check className="size-4" />}
-                      </button>
-                    ))}
-                    <Collapsible open={cumulativeOptionOpen} onOpenChange={setCumulativeOptionOpen}>
-                      <CollapsibleTrigger className="group flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-body text-description hover:bg-list-hover hover:text-foreground focus-visible:bg-list-hover focus-visible:text-foreground focus-visible:outline-hidden">
-                        More
-                        <ChevronRight className="size-4 transition-transform group-data-[state=open]:rotate-90" />
-                      </CollapsibleTrigger>
-                      <CollapsibleContent className="pt-0.5">
-                        <button
-                          type="button"
-                          className="flex w-full items-center justify-between rounded-sm py-1.5 pr-2 pl-5 text-left text-body hover:bg-list-hover hover:text-foreground focus-visible:bg-list-hover focus-visible:text-foreground focus-visible:outline-hidden"
-                          onClick={() => {
-                            onChartModeChange('cumulative');
-                            setChartMenuOpen(false);
-                          }}
-                        >
-                          Cumulative
-                          {chartMode === 'cumulative' && <Check className="size-4" />}
-                        </button>
-                      </CollapsibleContent>
-                    </Collapsible>
-                  </div>
-                </PopoverContent>
-              </Popover>
-            </div>
-          )}
-          <Button
-            variant="outline"
-            size="icon"
-            aria-label="Download dispersion summary"
-            onClick={() => {
-              setDownloadDialogOpen(true);
-            }}
-            disabled={series.length === 0}
-          >
-            <Download className="h-4 w-4" />
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent ref={chartContainerRef} className="pb-2">
-        <ChartContainer
-          config={chartConfig}
-          className={selection ? 'h-[240px] w-full cursor-pointer' : 'h-[240px] w-full'}
-        >
-          <ResponsiveContainer
-            width="100%"
-            height="100%"
-            minWidth={0}
-            initialDimension={{
-              width: RESPONSIVE_CHART_INITIAL_WIDTH,
-              height: CHART_HEIGHT,
-            }}
-          >
-            {chartMode === 'density-bar' ? (
-              <BarChart
-                {...chartProps}
-                barGap={usesGroupedBars ? 1 : 0}
-                barCategoryGap={usesGroupedBars ? '8%' : '4%'}
-              >
-                {chartContents}
-              </BarChart>
-            ) : chartMode === 'density-area' ? (
-              <AreaChart {...chartProps}>{chartContents}</AreaChart>
-            ) : (
-              <LineChart {...chartProps}>{chartContents}</LineChart>
-            )}
-          </ResponsiveContainer>
-        </ChartContainer>
-      </CardContent>
-      <CardFooter className="flex flex-wrap items-center justify-between gap-2 text-body text-description">
-        <div className="flex flex-wrap items-center gap-3 text-label-secondary text-description">
-          {allSeries.map((item) => (
-            <button
-              key={item.key}
-              type="button"
-              className={`flex items-center gap-2 rounded-sm px-1 py-0.5 ${
-                item.hidden ? 'opacity-50 line-through' : ''
-              }`}
-              disabled={!onToggleMatchedTexts}
-              aria-pressed={item.hidden}
-              onClick={() => {
-                onToggleMatchedTexts?.(item.matchedTexts);
-              }}
-            >
-              <span
-                className="inline-block h-0.5 w-5"
-                style={{ backgroundColor: item.color }}
-                aria-hidden="true"
-              />
-              <span>{item.countLabel}</span>
-            </button>
-          ))}
-        </div>
-        {onUncasedMatchedTextsChange ? (
-          <label
-            htmlFor={`${controlId}-uncased`}
-            className="flex items-center gap-2 text-label-secondary text-foreground"
-          >
-            <Checkbox
-              id={`${controlId}-uncased`}
-              checked={uncasedMatchedTexts}
-              onCheckedChange={(checked) => {
-                onUncasedMatchedTextsChange(checked === true);
-              }}
-            />
-            <span>Uncased</span>
-          </label>
-        ) : null}
-      </CardFooter>
-      <ChartImageDownloadDialog
-        open={downloadDialogOpen}
-        onOpenChange={setDownloadDialogOpen}
-        title="Download dispersion summary"
-        onConfirm={(format) => {
-          void handleDownload(format);
-        }}
+    <>
+      <ConcordanceDispersionMatchControls
+        items={allSeries}
+        uncasedMatchedTexts={uncasedMatchedTexts}
+        onUncasedMatchedTextsChange={onUncasedMatchedTextsChange}
+        onToggleMatchedTexts={onToggleMatchedTexts}
       />
-    </Card>
+      {showChart ? (
+        <Card data-testid="concordance-dispersion-chart">
+          <CardHeader className="gap-3 pb-2 md:flex-row md:items-start md:justify-between">
+            <CardTitle className="text-body">{chartTitle}</CardTitle>
+            <div className="flex flex-wrap items-center justify-end gap-3">
+              {selection && selection.selectedIndices.size > 0 && (
+                <Button type="button" variant="outline" size="sm" onClick={selection.onClear}>
+                  Clear Selection ({selection.selectedIndices.size})
+                </Button>
+              )}
+              {onBinCountChange && (
+                <div className="flex items-center gap-2 text-body text-foreground">
+                  <span id={`${controlId}-bin-count`}>Bin No.</span>
+                  <Select
+                    value={String(binCount)}
+                    onValueChange={(value) => {
+                      const parsed = Number.parseInt(value, 10) as DispersionDisplayBinCount;
+                      if ((DISPERSION_DISPLAY_BIN_COUNTS as readonly number[]).includes(parsed)) {
+                        onBinCountChange(parsed);
+                      }
+                    }}
+                  >
+                    <SelectTrigger
+                      aria-labelledby={`${controlId}-bin-count`}
+                      className="h-8 w-24 px-2 py-1"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {DISPERSION_DISPLAY_BIN_COUNTS.map((value) => (
+                          <SelectItem key={value} value={String(value)}>
+                            {value}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              {onChartModeChange && (
+                <div className="flex items-center gap-2 text-body text-foreground">
+                  <span id={`${controlId}-chart-mode`}>Chart</span>
+                  <Popover
+                    open={chartMenuOpen}
+                    onOpenChange={(open) => {
+                      setChartMenuOpen(open);
+                      if (!open) setCumulativeOptionOpen(false);
+                    }}
+                  >
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        role="combobox"
+                        aria-labelledby={`${controlId}-chart-mode`}
+                        aria-expanded={chartMenuOpen}
+                        className="h-8 w-36 justify-between px-2 py-1 font-normal"
+                      >
+                        <span className="truncate">{CHART_MODE_LABELS[chartMode]}</span>
+                        <ChevronDown className="size-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="end" className="w-44 p-1">
+                      <div className="space-y-0.5">
+                        {CONCORDANCE_DISPERSION_CHART_MODES.filter(
+                          (value) => value !== 'cumulative',
+                        ).map((value) => (
+                          <button
+                            key={value}
+                            type="button"
+                            className="flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-left text-body hover:bg-list-hover hover:text-foreground focus-visible:bg-list-hover focus-visible:text-foreground focus-visible:outline-hidden"
+                            onClick={() => {
+                              onChartModeChange(value);
+                              setChartMenuOpen(false);
+                            }}
+                          >
+                            {CHART_MODE_LABELS[value]}
+                            {chartMode === value && <Check className="size-4" />}
+                          </button>
+                        ))}
+                        <Collapsible
+                          open={cumulativeOptionOpen}
+                          onOpenChange={setCumulativeOptionOpen}
+                        >
+                          <CollapsibleTrigger className="group flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-body text-description hover:bg-list-hover hover:text-foreground focus-visible:bg-list-hover focus-visible:text-foreground focus-visible:outline-hidden">
+                            More
+                            <ChevronRight className="size-4 transition-transform group-data-[state=open]:rotate-90" />
+                          </CollapsibleTrigger>
+                          <CollapsibleContent className="pt-0.5">
+                            <button
+                              type="button"
+                              className="flex w-full items-center justify-between rounded-sm py-1.5 pr-2 pl-5 text-left text-body hover:bg-list-hover hover:text-foreground focus-visible:bg-list-hover focus-visible:text-foreground focus-visible:outline-hidden"
+                              onClick={() => {
+                                onChartModeChange('cumulative');
+                                setChartMenuOpen(false);
+                              }}
+                            >
+                              Cumulative
+                              {chartMode === 'cumulative' && <Check className="size-4" />}
+                            </button>
+                          </CollapsibleContent>
+                        </Collapsible>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              )}
+              <Button
+                variant="outline"
+                size="icon"
+                aria-label="Download dispersion summary"
+                onClick={() => {
+                  setDownloadDialogOpen(true);
+                }}
+                disabled={series.length === 0}
+              >
+                <Download className="h-4 w-4" />
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent ref={chartContainerRef} className="pb-2">
+            <ChartContainer
+              config={chartConfig}
+              className={selection ? 'h-[240px] w-full cursor-pointer' : 'h-[240px] w-full'}
+            >
+              <ResponsiveContainer
+                width="100%"
+                height="100%"
+                minWidth={0}
+                initialDimension={{
+                  width: RESPONSIVE_CHART_INITIAL_WIDTH,
+                  height: CHART_HEIGHT,
+                }}
+              >
+                {chartMode === 'density-bar' ? (
+                  <BarChart
+                    {...chartProps}
+                    barGap={usesGroupedBars ? 1 : 0}
+                    barCategoryGap={usesGroupedBars ? '8%' : '4%'}
+                  >
+                    {chartContents}
+                  </BarChart>
+                ) : chartMode === 'density-area' ? (
+                  <AreaChart {...chartProps}>{chartContents}</AreaChart>
+                ) : (
+                  <LineChart {...chartProps}>{chartContents}</LineChart>
+                )}
+              </ResponsiveContainer>
+            </ChartContainer>
+          </CardContent>
+          <ChartImageDownloadDialog
+            open={downloadDialogOpen}
+            onOpenChange={setDownloadDialogOpen}
+            title="Download dispersion summary"
+            onConfirm={(format) => {
+              void handleDownload(format);
+            }}
+          />
+        </Card>
+      ) : null}
+    </>
   );
 }

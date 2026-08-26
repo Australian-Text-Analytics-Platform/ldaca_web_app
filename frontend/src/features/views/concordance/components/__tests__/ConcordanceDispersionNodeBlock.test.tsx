@@ -54,8 +54,19 @@ vi.mock('../ConcordanceDispersionRowsTable', () => ({
 }));
 
 vi.mock('../ConcordanceDispersionSummary', () => ({
-  ConcordanceDispersionSummary: ({ termColors }: { termColors?: Record<string, string> }) => (
-    <div data-testid="dispersion-summary" data-term-color={termColors?.alpha ?? ''} />
+  ConcordanceDispersionSummary: ({
+    termColors,
+    showChart,
+  }: {
+    termColors?: Record<string, string>;
+    showChart?: boolean;
+  }) => (
+    <>
+      <div data-testid="dispersion-match-controls" />
+      {showChart === false ? null : (
+        <div data-testid="dispersion-summary" data-term-color={termColors?.alpha ?? ''} />
+      )}
+    </>
   ),
 }));
 
@@ -153,6 +164,11 @@ describe('ConcordanceDispersionNodeBlock', () => {
     });
     expect(within(header).getByTitle(longName)).toBeInTheDocument();
     expect(within(card).getByTestId('dispersion-table-card').style.borderLeftWidth).toBe('');
+    const table = within(card).getByTestId('dispersion-table-card');
+    const controls = within(card).getByTestId('dispersion-match-controls');
+    const plot = within(card).getByTestId('dispersion-summary');
+    expect(table.compareDocumentPosition(controls) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(controls.compareDocumentPosition(plot) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(within(card).getByTestId('dispersion-summary')).toHaveAttribute(
       'data-term-color',
       '#123456',
@@ -175,6 +191,13 @@ describe('ConcordanceDispersionNodeBlock', () => {
       backgroundColor: GREY,
       color: foregroundForVizColor(GREY),
     });
+  });
+
+  it('retains the shared match controls when proportional bars hide the plot', () => {
+    render(<ConcordanceDispersionNodeBlock {...baseProps} proportionalDispersionBars />);
+
+    expect(screen.getByTestId('dispersion-match-controls')).toBeInTheDocument();
+    expect(screen.queryByTestId('dispersion-summary')).not.toBeInTheDocument();
   });
 
   it('uses a neutral combined header with colored source chips and source-tinted rows', () => {

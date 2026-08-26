@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { ConcordanceNodeResult as ConcordanceResultEntry } from '@/api';
 import type { ReactNode } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
 import { AnalysisTableFrame } from '@/features/views/common/components/AnalysisTableScrollArea';
 import { ServerPaginationFooter } from '@/features/views/common/components/ServerPaginationFooter';
 import { useServerTable } from '@/features/views/common/hooks/useServerTable';
@@ -14,7 +15,12 @@ import { CONCORDANCE_COMBINED_NODE_KEY } from '../concordanceTableDomain';
 import type { PaginationState } from '../hooks/useConcordanceTaskFlow';
 import { concordanceHeaderMode } from '../concordanceTablePresentation';
 import { GREY } from '../../common/vizPalette';
+import { normalizeNodeAccentColor } from '@/lib/nodeColor';
 import { ConcordancePlainHeader, ConcordanceRowsTable } from './ConcordanceRowsTable';
+import {
+  ConcordanceCombinedResultHeader,
+  ConcordanceSourceResultHeader,
+} from './ConcordanceResultCardHeader';
 import {
   buildConcordanceTableModel,
   type ConcordanceGroupedRow,
@@ -179,54 +185,54 @@ function CombinedConcordanceTable({
   );
 
   return (
-    <div className="mb-6">
-      <div className="flex items-center mb-4">
-        <h3 className="text-heading-3 font-semibold text-foreground">Combined Results</h3>
-        <div className="ml-auto flex items-center">
-          <span className="text-label-secondary text-description">
-            Rows colored by source data block
-          </span>
-        </div>
-      </div>
-      <AnalysisTableFrame
-        maxHeightClass="max-h-100"
-        belowTable={combinedBelowTable}
-        viewportRef={viewportRef}
-      >
-        <ConcordanceRowsTable
-          table={table}
-          rows={rows}
-          tableColumns={tableColumns}
-          searchWord={searchWord}
-          loading={combinedLoading}
-          highlightL1R1={highlightL1R1}
-          getSourceColor={(row) => {
-            if (!row.__source_node) return defaultPalette[0] ?? GREY;
-            return getConcordanceSourceColor(row.__source_node, sourceColorMap, defaultPalette);
-          }}
-          renderHeader={(header) => <ConcordancePlainHeader key={header.id} header={header} />}
-          getRowClassName={() => 'cursor-pointer'}
-          getRowStyle={(row) => {
-            const color = getConcordanceSourceColor(
-              row.__source_node,
-              sourceColorMap,
-              defaultPalette,
-            );
-            return { backgroundColor: `${color}20` };
-          }}
-          onRowClick={(row) => {
-            const rawSrc = row.__source_node;
-            if (!rawSrc) return;
-            const nodeObj = findConcordanceSourceNode(panelSelectedNodes, rawSrc);
-            const sel =
-              nodeObj && effectiveNodeColumnSelections.find((s) => s.nodeId === nodeObj.id);
-            if (nodeObj && sel?.column) {
-              handleRowClick(row, nodeObj.id, sel.column);
-            }
-          }}
-        />
-      </AnalysisTableFrame>
-    </div>
+    <Card data-testid="concordance-table-combined-card" className="mb-6 overflow-hidden">
+      <ConcordanceCombinedResultHeader
+        nodes={panelSelectedNodes}
+        sourceColorMap={sourceColorMap}
+        defaultPalette={defaultPalette}
+        testId="concordance-table-combined-header"
+      />
+      <CardContent className="bg-panel/20 p-3">
+        <AnalysisTableFrame
+          maxHeightClass="max-h-100"
+          belowTable={combinedBelowTable}
+          viewportRef={viewportRef}
+        >
+          <ConcordanceRowsTable
+            table={table}
+            rows={rows}
+            tableColumns={tableColumns}
+            searchWord={searchWord}
+            loading={combinedLoading}
+            highlightL1R1={highlightL1R1}
+            getSourceColor={(row) => {
+              if (!row.__source_node) return defaultPalette[0] ?? GREY;
+              return getConcordanceSourceColor(row.__source_node, sourceColorMap, defaultPalette);
+            }}
+            renderHeader={(header) => <ConcordancePlainHeader key={header.id} header={header} />}
+            getRowClassName={() => 'cursor-pointer'}
+            getRowStyle={(row) => {
+              const color = getConcordanceSourceColor(
+                row.__source_node,
+                sourceColorMap,
+                defaultPalette,
+              );
+              return { backgroundColor: `${color}20` };
+            }}
+            onRowClick={(row) => {
+              const rawSrc = row.__source_node;
+              if (!rawSrc) return;
+              const nodeObj = findConcordanceSourceNode(panelSelectedNodes, rawSrc);
+              const sel =
+                nodeObj && effectiveNodeColumnSelections.find((s) => s.nodeId === nodeObj.id);
+              if (nodeObj && sel?.column) {
+                handleRowClick(row, nodeObj.id, sel.column);
+              }
+            }}
+          />
+        </AnalysisTableFrame>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -247,7 +253,6 @@ function PerNodeConcordanceTable({
   showMetadata,
   selectedMetadataColumns,
   panelSelectedNodes,
-  defaultPalette,
   nodePagination,
   globalPageSize,
   onPageSizeChange,
@@ -274,7 +279,6 @@ function PerNodeConcordanceTable({
   const currentNodePagination = nodePagination[paginationKey];
   const currentPage = currentNodePagination?.currentPage ?? 1;
   const nodeIsLoading = Boolean(nodeLoading[paginationKey]);
-  const fallbackSourceColor = defaultPalette.find((color) => color.length > 0) ?? GREY;
   const isReview = reviewRowUnit !== null;
   const headerMode = (columnKey: string) =>
     concordanceHeaderMode({
@@ -311,7 +315,9 @@ function PerNodeConcordanceTable({
     },
   });
 
-  const showNodeIndicator = panelSelectedNodes.length > 1 && context.nodeColor;
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty-string display name must fall back to the node key
+  const dataBlockLabel = context.displayName || nodeKey;
+  const sourceColor = normalizeNodeAccentColor(context.nodeColor) ?? GREY;
   const pageSizeSummary = (
     <GroupedResultsPageSizeSummary
       groups={nodeData.data}
@@ -346,65 +352,55 @@ function PerNodeConcordanceTable({
   );
 
   return (
-    <div className="mb-6">
-      {showNodeIndicator && (
-        <div className="mb-2 flex items-center gap-2">
-          <span
-            className="inline-block h-3 w-3 shrink-0 rounded-full"
-            style={{ backgroundColor: context.nodeColor }}
+    <Card data-testid="concordance-table-source-card" className="mb-6 overflow-hidden">
+      <ConcordanceSourceResultHeader
+        name={dataBlockLabel}
+        color={sourceColor}
+        testId="concordance-table-source-header"
+      />
+      <CardContent className="bg-panel/20 p-3">
+        <AnalysisTableFrame
+          maxHeightClass="max-h-100"
+          belowTable={belowTable}
+          viewportRef={viewportRef}
+        >
+          <ConcordanceRowsTable
+            table={table}
+            rows={rows}
+            tableColumns={tableColumns}
+            searchWord={searchWord}
+            loading={nodeIsLoading}
+            highlightL1R1={highlightL1R1}
+            getSourceColor={() => sourceColor}
+            renderHeader={(header) => {
+              const mode = headerMode(header.column.id);
+              return mode === 'sortable' ? (
+                <SortableHeader
+                  key={header.id}
+                  columnKey={header.column.id}
+                  label={header.column.id}
+                  paginationKey={paginationKey}
+                  requestNodeId={requestNodeId}
+                  nodePagination={nodePagination}
+                  onSort={handleEligibleSort}
+                />
+              ) : (
+                <ConcordancePlainHeader
+                  key={header.id}
+                  header={header}
+                  hint={mode === 'preview-review-hint' ? 'Run All to enable sorting' : undefined}
+                />
+              );
+            }}
+            getRowClassName={(_row, index) =>
+              `cursor-pointer ${index % 2 === 0 ? 'bg-surface' : 'bg-panel'}`
+            }
+            onRowClick={(row) => {
+              if (actualNodeId && column) handleRowClick(row, actualNodeId, column);
+            }}
           />
-          <h3 className="text-body font-medium text-foreground">
-            {/* eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty-string display name must fall back to the node key */}
-            {context.displayName || nodeKey}
-          </h3>
-        </div>
-      )}
-      <AnalysisTableFrame
-        maxHeightClass="max-h-100"
-        belowTable={belowTable}
-        viewportRef={viewportRef}
-        style={
-          showNodeIndicator
-            ? { borderLeftWidth: '3px', borderLeftColor: context.nodeColor }
-            : undefined
-        }
-      >
-        <ConcordanceRowsTable
-          table={table}
-          rows={rows}
-          tableColumns={tableColumns}
-          searchWord={searchWord}
-          loading={nodeIsLoading}
-          highlightL1R1={highlightL1R1}
-          getSourceColor={() => context.nodeColor ?? fallbackSourceColor}
-          renderHeader={(header) => {
-            const mode = headerMode(header.column.id);
-            return mode === 'sortable' ? (
-              <SortableHeader
-                key={header.id}
-                columnKey={header.column.id}
-                label={header.column.id}
-                paginationKey={paginationKey}
-                requestNodeId={requestNodeId}
-                nodePagination={nodePagination}
-                onSort={handleEligibleSort}
-              />
-            ) : (
-              <ConcordancePlainHeader
-                key={header.id}
-                header={header}
-                hint={mode === 'preview-review-hint' ? 'Run All to enable sorting' : undefined}
-              />
-            );
-          }}
-          getRowClassName={(_row, index) =>
-            `cursor-pointer ${index % 2 === 0 ? 'bg-surface' : 'bg-panel'}`
-          }
-          onRowClick={(row) => {
-            if (actualNodeId && column) handleRowClick(row, actualNodeId, column);
-          }}
-        />
-      </AnalysisTableFrame>
-    </div>
+        </AnalysisTableFrame>
+      </CardContent>
+    </Card>
   );
 }

@@ -156,8 +156,12 @@ renderers deliberately keep a white canvas and their stable export palette;
 brand and provider assets are likewise raw-color exceptions rather than theme
 tokens.
 
-Concordance Dispersion keeps source and match identity separate. A Data Block's
-persisted color owns the separated-result header, combined-result source chips,
-and combined-row tint. Matched-term colors independently own hit markers, chart
-series, and their legend, so a source color never changes the meaning of a
-searched term.
+Concordance result cards keep source and match identity separate. A Data Block's
+persisted color owns separated-result headers in Table and Dispersion views,
+combined-result source chips, and combined-row tint. Matched-term colors
+independently own dispersion hit markers, chart series, and their legend, so a
+source color never changes the meaning of a searched term. The matched-term
+legend and Uncased control live in a shared card between the dispersion table
+and optional plot because both surfaces consume that state. The shared controls
+remain available when proportional document-length bars hide the plot; plot-only
+controls remain in the plot header.

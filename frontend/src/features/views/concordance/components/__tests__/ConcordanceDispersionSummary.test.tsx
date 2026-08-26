@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import type React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -265,6 +265,27 @@ describe('ConcordanceDispersionSummary', () => {
     expect(chart).not.toHaveClass('mt-4');
   });
 
+  it('keeps match controls available when the optional chart is hidden', () => {
+    render(
+      <ConcordanceDispersionSummary
+        rows={baseRows}
+        textColumn="text"
+        binCount={20}
+        splitBySource={false}
+        dataBlockLabel="Corpus"
+        searchWord="alpha"
+        showChart={false}
+        onUncasedMatchedTextsChange={vi.fn()}
+        onToggleMatchedTexts={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId('concordance-dispersion-match-controls')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'alpha (1)' })).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Uncased' })).toBeInTheDocument();
+    expect(screen.queryByTestId('concordance-dispersion-chart')).not.toBeInTheDocument();
+  });
+
   it('keeps hidden exact terms in the interactive legend with selected-bin counts', () => {
     const alphaCounts = Array.from({ length: 100 }, () => 0);
     alphaCounts[0] = 2;
@@ -294,11 +315,15 @@ describe('ConcordanceDispersionSummary', () => {
       />,
     );
 
-    expect(screen.getByRole('button', { name: 'Alpha (2/2)' })).toHaveAttribute(
+    const controls = screen.getByTestId('concordance-dispersion-match-controls');
+    const chart = screen.getByTestId('concordance-dispersion-chart');
+    expect(controls.compareDocumentPosition(chart) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(chart).queryByRole('button', { name: 'Alpha (2/2)' })).not.toBeInTheDocument();
+    expect(within(controls).getByRole('button', { name: 'Alpha (2/2)' })).toHaveAttribute(
       'aria-pressed',
       'false',
     );
-    const hidden = screen.getByRole('button', { name: 'alpha (1/1)' });
+    const hidden = within(controls).getByRole('button', { name: 'alpha (1/1)' });
     expect(hidden).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getAllByTestId('line')).toHaveLength(1);
     fireEvent.click(hidden);
@@ -389,7 +414,10 @@ describe('ConcordanceDispersionSummary', () => {
     fireEvent.click(groupedLegend);
     expect(onToggle).toHaveBeenCalledWith(['jobs', 'Jobs']);
 
-    const uncased = screen.getByRole('checkbox', { name: 'Uncased' });
+    const controls = screen.getByTestId('concordance-dispersion-match-controls');
+    const chart = screen.getByTestId('concordance-dispersion-chart');
+    const uncased = within(controls).getByRole('checkbox', { name: 'Uncased' });
+    expect(within(chart).queryByRole('checkbox', { name: 'Uncased' })).not.toBeInTheDocument();
     expect(uncased).toBeChecked();
     fireEvent.click(uncased);
     expect(onUncasedChange).toHaveBeenCalledWith(false);

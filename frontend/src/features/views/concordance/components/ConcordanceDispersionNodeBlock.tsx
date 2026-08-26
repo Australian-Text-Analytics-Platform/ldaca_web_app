@@ -1,13 +1,10 @@
 import { useEffect, useRef } from 'react';
 import type { ConcordanceNodeResult as ConcordanceResultEntry } from '@/api';
 import type { ReactNode } from 'react';
-import { DataBlockName } from '@/components/DataBlockName';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { AnalysisTableFrame } from '@/features/views/common/components/AnalysisTableScrollArea';
 import { ServerPaginationFooter } from '@/features/views/common/components/ServerPaginationFooter';
 import { type ServerColumnDef, useServerTable } from '@/features/views/common/hooks/useServerTable';
-import { GREY, foregroundForVizColor } from '@/features/views/common/vizPalette';
-import { normalizeNodeAccentColor } from '@/lib/nodeColor';
 import { GroupedResultsPageSizeSummary } from '../../common/components/GroupedResultsPageSizeSummary';
 import { PAGE_SIZE_OPTIONS_DEFAULT } from '../../common/constants';
 import type { NodeColumnSelection } from '../../common/nodeSelectionTypes';
@@ -24,6 +21,10 @@ import { findConcordanceSourceNode, getConcordanceSourceColor } from '../concord
 import { CONCORDANCE_COMBINED_NODE_KEY } from '../concordanceTableDomain';
 import { ConcordanceDispersionSummary } from './ConcordanceDispersionSummary';
 import { ConcordanceDispersionRowsTable } from './ConcordanceDispersionRowsTable';
+import {
+  ConcordanceCombinedResultHeader,
+  ConcordanceSourceResultHeader,
+} from './ConcordanceResultCardHeader';
 import { buildConcordanceDispersionTableModel } from './concordanceDispersionTableModel';
 type ConcordanceGroupedRow = Record<string, unknown>[];
 
@@ -237,43 +238,12 @@ export function ConcordanceDispersionNodeBlock({
         data-testid="concordance-dispersion-combined-card"
         className="mb-6 overflow-hidden"
       >
-        <CardHeader
-          data-testid="concordance-dispersion-combined-header"
-          className="gap-2 space-y-0 border-b border-surface-border bg-panel"
-        >
-          <CardTitle className="text-heading-3 text-foreground">Combined Results</CardTitle>
-          <div
-            role="list"
-            aria-label="Source Data Blocks"
-            className="flex flex-wrap items-center gap-2"
-          >
-            {panelSelectedNodes.map((node, index) => {
-              const mappedColor =
-                sourceColorMap[node.id.toLowerCase()] ??
-                sourceColorMap[node.name.toLowerCase()] ??
-                defaultPalette[index % defaultPalette.length];
-              const color = normalizeNodeAccentColor(mappedColor) ?? GREY;
-              return (
-                <div
-                  key={node.id}
-                  role="listitem"
-                  data-testid={`concordance-source-chip-${node.id}`}
-                  className="flex min-w-0 max-w-80 items-center rounded-sm px-2 py-1"
-                  style={{ backgroundColor: color, color: foregroundForVizColor(color) }}
-                >
-                  <DataBlockName
-                    name={node.name}
-                    backgroundColor={color}
-                    maxLines={1}
-                    fadeEdge="head"
-                    className="text-label-secondary font-semibold leading-snug"
-                    title={node.name}
-                  />
-                </div>
-              );
-            })}
-          </div>
-        </CardHeader>
+        <ConcordanceCombinedResultHeader
+          nodes={panelSelectedNodes}
+          sourceColorMap={sourceColorMap}
+          defaultPalette={defaultPalette}
+          testId="concordance-dispersion-combined-header"
+        />
         <CardContent className="space-y-4 bg-panel/20 p-3">
           <AnalysisTableFrame
             maxHeightClass="max-h-100"
@@ -313,52 +283,51 @@ export function ConcordanceDispersionNodeBlock({
               }}
             />
           </AnalysisTableFrame>
-          {!proportionalDispersionBars ? (
-            <ConcordanceDispersionSummary
-              rows={rows}
-              textColumn={column}
-              binCount={binCount}
-              splitBySource
-              dataBlockLabel={dataBlockLabel}
-              searchWord={searchWord}
-              chartMode={dispersionChartMode}
-              onChartModeChange={onDispersionChartModeChange}
-              onBinCountChange={onBinCountChange}
-              selection={
-                interactiveFilters
-                  ? {
-                      selectedIndices:
-                        (selectedBinIndices[CONCORDANCE_COMBINED_NODE_KEY] as
-                          | ReadonlySet<number>
-                          | undefined) ?? EMPTY_BIN_SELECTION,
-                      /** Used by: ConcordanceDispersionSummary selection prop to route combined chart bin selection. */
-                      onSelect: (index, shiftHeld) => {
-                        onBinSelect(CONCORDANCE_COMBINED_NODE_KEY, index, shiftHeld);
-                      },
-                      /** Used by: ConcordanceDispersionSummary selection prop to route combined chart drag ranges because callers need one state update for the full selected bin span. */
-                      onSelectRange: (startIndex, endIndex, shiftHeld) => {
-                        onBinRangeSelect(
-                          CONCORDANCE_COMBINED_NODE_KEY,
-                          startIndex,
-                          endIndex,
-                          shiftHeld,
-                        );
-                      },
-                      /** Used by: ConcordanceDispersionSummary selection prop to clear combined transient bin selection. */
-                      onClear: () => {
-                        onClearBinSelection(CONCORDANCE_COMBINED_NODE_KEY);
-                      },
-                    }
-                  : undefined
-              }
-              densitySeries={densitySeries}
-              termColors={termColors}
-              excludedMatchedTexts={excludedMatchedTexts}
-              uncasedMatchedTexts={uncasedMatchedTexts}
-              onUncasedMatchedTextsChange={onUncasedMatchedTextsChange}
-              onToggleMatchedTexts={interactiveFilters ? onToggleMatchedTexts : undefined}
-            />
-          ) : null}
+          <ConcordanceDispersionSummary
+            rows={rows}
+            textColumn={column}
+            binCount={binCount}
+            splitBySource
+            dataBlockLabel={dataBlockLabel}
+            searchWord={searchWord}
+            chartMode={dispersionChartMode}
+            onChartModeChange={onDispersionChartModeChange}
+            onBinCountChange={onBinCountChange}
+            selection={
+              interactiveFilters
+                ? {
+                    selectedIndices:
+                      (selectedBinIndices[CONCORDANCE_COMBINED_NODE_KEY] as
+                        | ReadonlySet<number>
+                        | undefined) ?? EMPTY_BIN_SELECTION,
+                    /** Used by: ConcordanceDispersionSummary selection prop to route combined chart bin selection. */
+                    onSelect: (index, shiftHeld) => {
+                      onBinSelect(CONCORDANCE_COMBINED_NODE_KEY, index, shiftHeld);
+                    },
+                    /** Used by: ConcordanceDispersionSummary selection prop to route combined chart drag ranges because callers need one state update for the full selected bin span. */
+                    onSelectRange: (startIndex, endIndex, shiftHeld) => {
+                      onBinRangeSelect(
+                        CONCORDANCE_COMBINED_NODE_KEY,
+                        startIndex,
+                        endIndex,
+                        shiftHeld,
+                      );
+                    },
+                    /** Used by: ConcordanceDispersionSummary selection prop to clear combined transient bin selection. */
+                    onClear: () => {
+                      onClearBinSelection(CONCORDANCE_COMBINED_NODE_KEY);
+                    },
+                  }
+                : undefined
+            }
+            densitySeries={densitySeries}
+            termColors={termColors}
+            excludedMatchedTexts={excludedMatchedTexts}
+            uncasedMatchedTexts={uncasedMatchedTexts}
+            onUncasedMatchedTextsChange={onUncasedMatchedTextsChange}
+            onToggleMatchedTexts={interactiveFilters ? onToggleMatchedTexts : undefined}
+            showChart={!proportionalDispersionBars}
+          />
         </CardContent>
       </Card>
     );
@@ -378,8 +347,6 @@ export function ConcordanceDispersionNodeBlock({
   const nodeIsLoading = Boolean(nodeLoading[paginationKey]);
   // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty-string display name must fall back to the node key
   const dataBlockLabel = context.displayName || nodeKey;
-  const sourceColor = normalizeNodeAccentColor(context.nodeColor) ?? GREY;
-  const sourceForeground = foregroundForVizColor(sourceColor);
   // Mirror the table block by summarizing the current page groups together
   // with the source documents considered for this page.
   const pageSizeSummary = (
@@ -421,22 +388,11 @@ export function ConcordanceDispersionNodeBlock({
       data-testid="concordance-dispersion-source-card"
       className="mb-6 overflow-hidden"
     >
-      <CardHeader
-        data-testid="concordance-dispersion-source-header"
-        className="space-y-0 px-4 py-3"
-        style={{ backgroundColor: sourceColor, color: sourceForeground }}
-      >
-        <CardTitle className="min-w-0 text-body">
-          <DataBlockName
-            name={dataBlockLabel}
-            backgroundColor={sourceColor}
-            maxLines={2}
-            fadeEdge="head"
-            className="font-semibold leading-snug"
-            title={dataBlockLabel}
-          />
-        </CardTitle>
-      </CardHeader>
+      <ConcordanceSourceResultHeader
+        name={dataBlockLabel}
+        color={context.nodeColor}
+        testId="concordance-dispersion-source-header"
+      />
       <CardContent className="space-y-4 bg-panel/20 p-3">
         <AnalysisTableFrame
           maxHeightClass="max-h-100"
@@ -463,46 +419,45 @@ export function ConcordanceDispersionNodeBlock({
             }}
           />
         </AnalysisTableFrame>
-        {!proportionalDispersionBars ? (
-          <ConcordanceDispersionSummary
-            rows={rows}
-            textColumn={column}
-            binCount={binCount}
-            splitBySource={false}
-            dataBlockLabel={dataBlockLabel}
-            searchWord={searchWord}
-            chartMode={dispersionChartMode}
-            onChartModeChange={onDispersionChartModeChange}
-            onBinCountChange={onBinCountChange}
-            selection={
-              interactiveFilters
-                ? {
-                    selectedIndices:
-                      (selectedBinIndices[nodeKey] as ReadonlySet<number> | undefined) ??
-                      EMPTY_BIN_SELECTION,
-                    /** Used by: ConcordanceDispersionSummary selection prop to route per-node chart bin selection. */
-                    onSelect: (index, shiftHeld) => {
-                      onBinSelect(nodeKey, index, shiftHeld);
-                    },
-                    /** Used by: ConcordanceDispersionSummary selection prop to route per-node chart drag ranges because callers need one state update for the full selected bin span. */
-                    onSelectRange: (startIndex, endIndex, shiftHeld) => {
-                      onBinRangeSelect(nodeKey, startIndex, endIndex, shiftHeld);
-                    },
-                    /** Used by: ConcordanceDispersionSummary selection prop to clear the active node's bin selection. */
-                    onClear: () => {
-                      onClearBinSelection(nodeKey);
-                    },
-                  }
-                : undefined
-            }
-            densitySeries={densitySeries}
-            termColors={termColors}
-            excludedMatchedTexts={excludedMatchedTexts}
-            uncasedMatchedTexts={uncasedMatchedTexts}
-            onUncasedMatchedTextsChange={onUncasedMatchedTextsChange}
-            onToggleMatchedTexts={interactiveFilters ? onToggleMatchedTexts : undefined}
-          />
-        ) : null}
+        <ConcordanceDispersionSummary
+          rows={rows}
+          textColumn={column}
+          binCount={binCount}
+          splitBySource={false}
+          dataBlockLabel={dataBlockLabel}
+          searchWord={searchWord}
+          chartMode={dispersionChartMode}
+          onChartModeChange={onDispersionChartModeChange}
+          onBinCountChange={onBinCountChange}
+          selection={
+            interactiveFilters
+              ? {
+                  selectedIndices:
+                    (selectedBinIndices[nodeKey] as ReadonlySet<number> | undefined) ??
+                    EMPTY_BIN_SELECTION,
+                  /** Used by: ConcordanceDispersionSummary selection prop to route per-node chart bin selection. */
+                  onSelect: (index, shiftHeld) => {
+                    onBinSelect(nodeKey, index, shiftHeld);
+                  },
+                  /** Used by: ConcordanceDispersionSummary selection prop to route per-node chart drag ranges because callers need one state update for the full selected bin span. */
+                  onSelectRange: (startIndex, endIndex, shiftHeld) => {
+                    onBinRangeSelect(nodeKey, startIndex, endIndex, shiftHeld);
+                  },
+                  /** Used by: ConcordanceDispersionSummary selection prop to clear the active node's bin selection. */
+                  onClear: () => {
+                    onClearBinSelection(nodeKey);
+                  },
+                }
+              : undefined
+          }
+          densitySeries={densitySeries}
+          termColors={termColors}
+          excludedMatchedTexts={excludedMatchedTexts}
+          uncasedMatchedTexts={uncasedMatchedTexts}
+          onUncasedMatchedTextsChange={onUncasedMatchedTextsChange}
+          onToggleMatchedTexts={interactiveFilters ? onToggleMatchedTexts : undefined}
+          showChart={!proportionalDispersionBars}
+        />
       </CardContent>
     </Card>
   );
