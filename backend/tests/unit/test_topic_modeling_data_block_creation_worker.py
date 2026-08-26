@@ -153,3 +153,5 @@ def test_topic_modeling_data_block_creation_publishes_ordered_data_and_meanings(
         "cluster_count": 2,
         "top_n_topics": 2,
     }
+    assert first["topic_data"]["data_block"]["color"] is None
+    assert first["topic_meanings"]["data_block"]["color"] is None

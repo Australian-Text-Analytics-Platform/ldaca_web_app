@@ -17,7 +17,6 @@ def run_result_data_block_creation(
     request_payload: dict[str, Any],
     result_paths: dict[str, str],
     document_columns: dict[str, str],
-    source_colors: dict[str, str | None],
     progress_callback: Callable[[float, str], None] | None = None,
 ) -> dict[str, Any]:
     """Create private output files for one atomic Data Block Creation."""
@@ -153,7 +152,6 @@ def run_result_data_block_creation(
                     ],
                 ),
                 document=document_column,
-                color=source_colors.get(source_id),
             )
             outputs.append(
                 {

@@ -40,6 +40,7 @@ def _data_block_creation_fixture(
     *,
     invalid_meanings_count: bool = False,
     invalid_top_n_provenance: bool = False,
+    output_color: str | None = None,
 ) -> tuple[Workspace, AnalysisRecord, TopicModelingDataBlockCreationWorkerResult, uuid.UUID]:
     source_id = uuid.uuid4()
     workspace = Workspace(name="topic Data Block Creation")
@@ -148,7 +149,7 @@ def _data_block_creation_fixture(
                         name="Topic data",
                         provenance=topic_provenance,
                         document="text",
-                        color="#112233",
+                        color=output_color,
                     ),
                     "parquet_path": str(topic_path),
                     "output_columns": [
@@ -163,7 +164,7 @@ def _data_block_creation_fixture(
                         id=meanings_id,
                         name="Topic data topic meanings",
                         provenance=meanings_provenance,
-                        color="#112233",
+                        color=output_color,
                     ),
                     "parquet_path": str(meanings_path),
                     "output_columns": ["TOPIC_topic", "TOPIC_topic_meaning"],
@@ -202,6 +203,8 @@ def test_topic_modeling_data_block_creation_preserves_semantic_pair_and_parent_o
     assert workspace.nodes[
         str(semantic.topic_meanings_node_id)
     ].parents[0].id == str(semantic.topic_data_node_id)
+    assert workspace.nodes[str(semantic.topic_data_node_id)].color is None
+    assert workspace.nodes[str(semantic.topic_meanings_node_id)].color is None
 
     topic_data = workspace.nodes[str(semantic.topic_data_node_id)]
     page = _query_page(
@@ -248,6 +251,25 @@ def test_topic_modeling_data_block_creation_rejects_mismatched_top_n_provenance(
     )
 
     with pytest.raises(ValueError, match="provenance"):
+        _publish_topic_modeling_data_blocks(
+            tmp_path / "analyses" / str(child.id),
+            workspace,
+            tmp_path,
+            child,
+            result,
+            10_000_000,
+        )
+
+
+def test_topic_modeling_data_block_creation_rejects_inherited_source_color(
+    tmp_path: Path,
+) -> None:
+    workspace, child, result, _source_id = _data_block_creation_fixture(
+        tmp_path,
+        output_color="#112233",
+    )
+
+    with pytest.raises(ValueError, match="metadata"):
         _publish_topic_modeling_data_blocks(
             tmp_path / "analyses" / str(child.id),
             workspace,
