@@ -1,7 +1,17 @@
 /* eslint-disable testing-library/no-container, testing-library/no-node-access -- Radix exposes the imperative viewport only as an internal DOM slot. */
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Field, Int64, LargeList, Utf8, Utf8View } from 'apache-arrow';
+import {
+  Dictionary,
+  Field,
+  Float64,
+  Int64,
+  LargeList,
+  TimestampMicrosecond,
+  Uint32,
+  Utf8,
+  Utf8View,
+} from 'apache-arrow';
 import { describe, expect, it, vi } from 'vitest';
 
 import { WorkspaceTable } from '../WorkspaceTable';
@@ -25,6 +35,55 @@ describe('WorkspaceTable', () => {
       screen.getByRole('button', { name: 'Change data type for column representative_words' }),
     ).toHaveTextContent('LargeList<Utf8View>');
     expect(screen.queryByText('string-list')).not.toBeInTheDocument();
+  });
+
+  it('shows canonical type labels once in the data type menu', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <WorkspaceTable
+        columns={['text', 'category', 'count', 'score', 'created_at']}
+        columnFields={{
+          text: new Field('text', new Utf8View()),
+          category: new Field('category', new Dictionary(new Utf8View(), new Uint32())),
+          count: new Field('count', new Int64()),
+          score: new Field('score', new Float64()),
+          created_at: new Field('created_at', new TimestampMicrosecond('UTC')),
+        }}
+        data={[
+          {
+            text: 'alpha',
+            category: 'group-a',
+            count: 1,
+            score: 0.5,
+            created_at: '2026-08-26T00:00:00.000Z',
+          },
+        ]}
+        onCast={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByRole('button', { name: 'Change data type for column text' }),
+    ).toHaveTextContent('string');
+    expect(
+      screen.getByRole('button', { name: 'Change data type for column category' }),
+    ).toHaveTextContent('categorical');
+    expect(
+      screen.getByRole('button', { name: 'Change data type for column count' }),
+    ).toHaveTextContent('integer');
+    expect(
+      screen.getByRole('button', { name: 'Change data type for column score' }),
+    ).toHaveTextContent('float');
+    expect(
+      screen.getByRole('button', { name: 'Change data type for column created_at' }),
+    ).toHaveTextContent('datetime');
+
+    await user.click(screen.getByRole('button', { name: 'Change data type for column category' }));
+
+    expect(
+      within(screen.getByRole('menu')).getAllByRole('menuitemradio', { name: 'categorical' }),
+    ).toHaveLength(1);
   });
 
   it('shows the document column in the detail panel and excludes it from metadata', async () => {

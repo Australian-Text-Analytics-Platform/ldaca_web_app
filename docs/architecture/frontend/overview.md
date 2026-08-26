@@ -49,7 +49,9 @@ flowchart LR
   `VITE_BACKEND_API_BASE` override exists only for split Vite development and
   cannot define a distributable build's backend location.
 - `src/lib/arrow/` owns official Apache Arrow IPC decoding and lossless field
-  inspection; it does not maintain a parallel column-kind naming registry.
+  inspection. Feature behavior retains exact fields and extension identities;
+  visible labels may use a small exact-match map for Wordflow's canonical
+  physical types, while unknown native spellings remain unchanged.
   `src/api/tableApi.ts` is the narrow
   generated-client adapter for binary row pages.
 - `src/features/` owns user workflows; `views/` contains sidebar features and

@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/select';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
+import { arrowTypeDisplayName } from '@/lib/arrow/arrowTable';
 import { type ConditionColumnOption } from '../../types';
 
 export interface ConditionBuilderItem {
@@ -154,7 +155,7 @@ export function ConditionBuilder<Condition extends ConditionBuilderItem>(
                       value={condition.column}
                       options={availableColumns.map((col) => ({
                         value: col.name,
-                        label: `${col.label ?? col.name} (${col.typeName})`,
+                        label: `${col.label ?? col.name} (${arrowTypeDisplayName(col.field)})`,
                       }))}
                       onChange={(value) => {
                         onConditionChange(

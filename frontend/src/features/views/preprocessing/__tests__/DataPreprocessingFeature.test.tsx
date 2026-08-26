@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Field, Int64, Utf8 } from 'apache-arrow';
+import { Field, Int64, Utf8View } from 'apache-arrow';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as SdkGen from '@/api';
 
@@ -169,7 +169,7 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceStatus', () => ({
 vi.mock('@/features/workspace/common/hooks/useNodeColumnInfos', () => ({
   default: () => ({
     getColumnInfos: () => [
-      { name: 'Body', typeName: 'Utf8', field: new Field('Body', new Utf8()) },
+      { name: 'Body', typeName: 'Utf8View', field: new Field('Body', new Utf8View()) },
       { name: 'Count', typeName: 'Int64', field: new Field('Count', new Int64()) },
     ],
     columnInfoCache: {},
@@ -178,7 +178,7 @@ vi.mock('@/features/workspace/common/hooks/useNodeColumnInfos', () => ({
   }),
   useNodeColumnInfos: () => ({
     getColumnInfos: () => [
-      { name: 'Body', typeName: 'Utf8', field: new Field('Body', new Utf8()) },
+      { name: 'Body', typeName: 'Utf8View', field: new Field('Body', new Utf8View()) },
       { name: 'Count', typeName: 'Int64', field: new Field('Count', new Int64()) },
     ],
     columnInfoCache: {},
@@ -351,6 +351,19 @@ describe('DataPreprocessingFeature replace tab', () => {
           options?.query?.page_size === 1,
       ),
     ).toBe(false);
+  });
+
+  it('shows friendly canonical Arrow types in the filter column selector', async () => {
+    const user = userEvent.setup();
+    renderPreprocessingFeature();
+
+    const filterPanel = await waitForFilterSchema();
+    await user.click(within(filterPanel).getByRole('combobox', { name: 'Filter column' }));
+
+    expect(screen.getByText('Body (string)')).toBeInTheDocument();
+    expect(screen.getByText('Count (integer)')).toBeInTheDocument();
+    expect(screen.queryByText('Body (Utf8View)')).not.toBeInTheDocument();
+    expect(screen.queryByText('Count (Int64)')).not.toBeInTheDocument();
   });
 
   it('uses the exact two-node join and six-node stack input caps', async () => {

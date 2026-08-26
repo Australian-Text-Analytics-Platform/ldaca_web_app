@@ -1,13 +1,17 @@
 import {
+  Dictionary,
   Field,
   FixedSizeList,
   Float64,
+  Int32,
   Int64,
   LargeList,
   Schema,
   Struct,
   Table,
   TimestampMicrosecond,
+  TimestampNanosecond,
+  Uint32,
   Utf8,
   Utf8View,
   tableFromArrays,
@@ -18,6 +22,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   arrowExtensionName,
+  arrowTypeDisplayName,
   arrowTypeName,
   decodeArrowPage,
   decodeArrowTable,
@@ -34,6 +39,49 @@ afterEach(() => {
 });
 
 describe('Arrow table transport', () => {
+  it('uses friendly labels only for the five canonical physical types', () => {
+    const fields = [
+      new Field('text', new Utf8View()),
+      new Field('category', new Dictionary(new Utf8View(), new Uint32())),
+      new Field('count', new Int64()),
+      new Field('score', new Float64()),
+      new Field('created_at', new TimestampMicrosecond('UTC')),
+    ];
+
+    expect(fields.map((field) => arrowTypeDisplayName(field))).toEqual([
+      'string',
+      'categorical',
+      'integer',
+      'float',
+      'datetime',
+    ]);
+    expect(fields.map((field) => arrowTypeName(field))).toEqual([
+      'Utf8View',
+      'Dictionary<Uint32, Utf8View>',
+      'Int64',
+      'Float64',
+      'Timestamp<MICROSECOND, UTC>',
+    ]);
+  });
+
+  it('keeps alternate, nested, and extension type names unchanged', () => {
+    const fields = [
+      new Field('alternate_text', new Utf8()),
+      new Field('alternate_category', new Dictionary(new Utf8View(), new Int32())),
+      new Field('alternate_timestamp', new TimestampNanosecond('UTC')),
+      new Field('words', new LargeList(new Field('item', new Utf8View()))),
+      new Field('extension', new Int64(), true, new Map([['ARROW:extension:name', 'Int64']])),
+    ];
+
+    expect(fields.map((field) => arrowTypeDisplayName(field))).toEqual([
+      'Utf8',
+      'Dictionary<Int32, Utf8View>',
+      'Timestamp<NANOSECOND, UTC>',
+      'LargeList<Utf8View>',
+      'Int64',
+    ]);
+  });
+
   it('decodes one self-contained IPC stream into UI rows and schema metadata', async () => {
     const source = new Table({
       token: vectorFromArray(['one', 'two'], new Utf8()),

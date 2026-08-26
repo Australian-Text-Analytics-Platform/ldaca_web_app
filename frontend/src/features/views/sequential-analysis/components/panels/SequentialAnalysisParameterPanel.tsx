@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/select';
 
 import type { SequentialAnalysisRequest } from '@/api';
+import { arrowTypeDisplayName, type ArrowField } from '@/lib/arrow/arrowTable';
 import { UniqueValueCount } from '../UniqueValueCount';
 
 type SequentialFrequency = NonNullable<SequentialAnalysisRequest['frequency']>;
@@ -23,6 +24,7 @@ type SequentialCustomIntervalUnit = NonNullable<SequentialAnalysisRequest['custo
 interface ColumnLike {
   name: string;
   typeName: string;
+  field: ArrowField;
 }
 
 const FREQUENCY_LABELS: Record<SequentialFrequency, string> = {
@@ -290,7 +292,7 @@ export function SequentialAnalysisParameterPanel({
                 <SelectContent>
                   {availableColumns.map((col) => (
                     <SelectItem key={col.name} value={col.name}>
-                      {col.name} ({col.typeName})
+                      {col.name} ({arrowTypeDisplayName(col.field)})
                     </SelectItem>
                   ))}
                 </SelectContent>

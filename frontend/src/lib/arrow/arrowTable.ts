@@ -10,6 +10,13 @@ import { getApiBase } from '@/lib/backend/env';
 
 const ARROW_STREAM_MEDIA_TYPE = 'application/vnd.apache.arrow.stream';
 const ARROW_EXTENSION_NAME = 'ARROW:extension:name';
+const COMMON_ARROW_TYPE_DISPLAY_NAMES = new Map<string, string>([
+  ['Utf8View', 'string'],
+  ['Dictionary<Uint32, Utf8View>', 'categorical'],
+  ['Int64', 'integer'],
+  ['Float64', 'float'],
+  ['Timestamp<MICROSECOND, UTC>', 'datetime'],
+]);
 
 /** Every concrete Arrow type supplies its native schema spelling via `toString`. */
 export type ArrowDataType = DataType<Type, TypeMap> & { toString(): string };
@@ -55,6 +62,18 @@ export const arrowExtensionName = (field: ArrowField): string | null =>
  */
 export const arrowTypeName = (field: ArrowField): string =>
   arrowExtensionName(field) ?? field.type.toString();
+
+/**
+ * Provides friendly labels for Wordflow's canonical physical Arrow types.
+ * Extension identities and unrecognized native spellings remain exact so the
+ * UI never hides a distinct type that may need explicit normalization.
+ */
+export const arrowTypeDisplayName = (field: ArrowField): string => {
+  const extensionName = arrowExtensionName(field);
+  if (extensionName !== null) return extensionName;
+  const nativeTypeName = field.type.toString();
+  return COMMON_ARROW_TYPE_DISPLAY_NAMES.get(nativeTypeName) ?? nativeTypeName;
+};
 
 /** Native Arrow predicates used by feature-specific behavior at its call site. */
 export const isArrowStringField = (field: ArrowField): boolean => isArrowStringType(field.type);

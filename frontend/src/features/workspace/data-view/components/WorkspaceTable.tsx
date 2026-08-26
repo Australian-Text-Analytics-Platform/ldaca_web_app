@@ -217,7 +217,7 @@ export function WorkspaceTable({
     const displayLabel = getTypeDisplayName(currentField);
     const availableTypes = [
       { value: currentType, label: displayLabel },
-      ...DATA_TYPES.filter((t) => t.value !== currentType),
+      ...DATA_TYPES.filter((t) => t.value !== currentType && t.label !== displayLabel),
     ];
     const isWideColumn = wideColumns.has(column);
     const isExpandedColumn = expandedColumns[column] === true;

@@ -1,4 +1,4 @@
-import { arrowTypeName, type ArrowColumn, type ArrowField } from '@/lib/arrow/arrowTable';
+import { arrowTypeDisplayName, type ArrowColumn, type ArrowField } from '@/lib/arrow/arrowTable';
 
 export const DATA_TYPES = [
   { value: 'string', label: 'string' },
@@ -23,8 +23,8 @@ export const extractColumnFields = (
   Object.fromEntries((schema ?? []).map((column) => [column.name, column.field]));
 
 /**
- * Displays the exact extension identity or native Arrow type carried by IPC.
- * Used by WorkspaceTable's column header cast menu.
+ * Displays a friendly label for canonical physical Arrow types while keeping
+ * unknown types and extension identities exact.
  */
 export const getTypeDisplayName = (field: ArrowField | undefined): string =>
-  field ? arrowTypeName(field) : 'unknown';
+  field ? arrowTypeDisplayName(field) : 'unknown';
