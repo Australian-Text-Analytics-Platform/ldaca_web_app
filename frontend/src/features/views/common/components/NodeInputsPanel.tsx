@@ -1,5 +1,5 @@
-import { Bookmark, ListPlus, OctagonX, Plus, Search, Trash2, X } from 'lucide-react';
-import { type ReactNode, useMemo, useState } from 'react';
+import { ListPlus, OctagonX, Plus, Search, Trash2, X } from 'lucide-react';
+import { type ReactNode, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,7 +10,6 @@ import { cn } from '@/lib/utils';
 import { useUIStore } from '@/stores';
 import { useNodeInputRequestsStore } from '@/stores/nodeInputRequestsStore';
 import type { NodeAddRejection, ResolvedNodeInput } from '../nodeInputs/nodeInputsCore';
-import type { ResolvedPreset } from '../nodeInputs/useTabNodeInputs';
 import { VIZ_PALETTE } from '../vizPalette';
 import { NodeColorPicker } from './NodeColorPicker';
 import { NodeColumnSelector } from './NodeColumnSelector';
@@ -38,10 +37,6 @@ export interface NodeInputsPanelProps {
   inputOrder?: string[];
   /** Live workspace nodes not yet added — the Add dropdown's candidate list. */
   availableNodes: WorkspaceNodeMetadata[];
-  /** Node ids currently selected in the graph (source for "Add preset" → current selection). */
-  graphSelectedIds?: string[];
-  /** Recently-used node groups for the "Add preset" list. */
-  recentPresets?: ResolvedPreset[];
   /** Whether another node may be added (max-nodes gate). */
   canAddMore: boolean;
   /** Show one action that adds every currently available Data Block. */
@@ -52,8 +47,6 @@ export interface NodeInputsPanelProps {
   maxVisibleCards?: number;
   /** Append nodes by id; returns rejections so the panel can surface reasons. */
   onAddNodes: (ids: string[]) => NodeAddRejection[];
-  /** Per-candidate structural add-eligibility reason (null = addable). */
-  getAddRejection: (id: string) => string | null;
   /** Remove one node. */
   onRemoveNode: (id: string) => void;
   /** Clear all inputs. */
@@ -67,19 +60,11 @@ export interface NodeInputsPanelProps {
   /** Optional persisted colour change handler rendered inside selected-node cards. */
   onNodeColorChange?: (nodeId: string, color: string) => void;
   showColumnPicker?: boolean;
-  showAddControls?: boolean;
-  showRemoveButtons?: boolean;
   columnLabel?: ReactNode | ((args: NodeSelectionRenderArgs) => ReactNode);
   title?: string;
   /** Optional compact header anchor for Contextual Hints. */
   guidanceTarget?: string;
-  className?: string;
-  originalCount?: number;
   emptyMessage?: React.ReactNode;
-  statusMessage?: React.ReactNode;
-  statusVariant?: 'info' | 'warning' | 'error';
-  headerAddon?: React.ReactNode;
-  renderNodeMeta?: (args: NodeSelectionRenderArgs) => React.ReactNode;
   renderExtraNodeContent?: (args: NodeInputColumnAddonArgs) => React.ReactNode;
   /** Disable all mutation controls (e.g. while a run is in flight). */
   disabled?: boolean;
@@ -92,8 +77,7 @@ export interface NodeInputsPanelProps {
 /**
  * Node-input selection panel for the add-node-as-needed model.
  *
- * Owns the Add control (graph selection + per-node dropdown, structurally
- * invalid candidates greyed with a reason), per-node remove (x), and Clear all,
+ * Owns the searchable Add control, per-node remove (x), and Clear all,
  * on top of the existing column picker rendered via NodeSelectionList.
  *
  * Used by: every analysis *Feature and preprocessing subtab through their
@@ -113,14 +97,11 @@ export function NodeInputsPanel({
   unavailableNodes = [],
   inputOrder,
   availableNodes,
-  graphSelectedIds = [],
-  recentPresets = [],
   canAddMore,
   showAddAll = false,
   maxNodes,
   maxVisibleCards,
   onAddNodes,
-  getAddRejection,
   onRemoveNode,
   onClear,
   onColumnChange,
@@ -128,18 +109,10 @@ export function NodeInputsPanel({
   nodeColors,
   onNodeColorChange,
   showColumnPicker = true,
-  showAddControls = true,
-  showRemoveButtons = true,
   columnLabel = 'Text Column:',
   title = 'Selected Data Blocks',
   guidanceTarget,
-  className,
-  originalCount,
   emptyMessage,
-  statusMessage,
-  statusVariant = 'warning',
-  headerAddon,
-  renderNodeMeta,
   renderExtraNodeContent,
   disabled = false,
   renderColumnAddon,
@@ -169,7 +142,6 @@ export function NodeInputsPanel({
   const columnByNode = new Map(resolvedNodes.map((r) => [r.id, r]));
   const [blockSearch, setBlockSearch] = useState('');
   const [blockOpen, setBlockOpen] = useState(false);
-  const [presetOpen, setPresetOpen] = useState(false);
 
   /** Adds ids and reports any rejection reasons as a single toast. */
   const handleAdd = (ids: string[]) => {
@@ -184,23 +156,11 @@ export function NodeInputsPanel({
     return rejections.length === 0;
   };
 
-  /** Graph-selected ids that aren't already inputs — the "current selection" preset. */
-  const addableGraphIds = graphSelectedIds.filter((id) => !nodeIds.includes(id));
-
   /** Available nodes filtered by the search box (case-insensitive name match). */
-  const filteredAvailableNodes = useMemo(() => {
-    const q = blockSearch.trim().toLowerCase();
-    if (!q) return availableNodes;
-    return availableNodes.filter((node) => node.name.toLowerCase().includes(q));
-  }, [availableNodes, blockSearch]);
-
-  /** Resolves graph-selected addable ids to display names for the preset entry. */
-  const graphSelectionLabels = useMemo(() => {
-    const byId = new Map(availableNodes.map((node) => [node.id, node.name]));
-    return addableGraphIds.map((id) => byId.get(id) ?? id);
-  }, [availableNodes, addableGraphIds]);
-
-  const hasPresets = addableGraphIds.length > 0 || recentPresets.length > 0;
+  const normalizedBlockSearch = blockSearch.trim().toLowerCase();
+  const filteredAvailableNodes = normalizedBlockSearch
+    ? availableNodes.filter((node) => node.name.toLowerCase().includes(normalizedBlockSearch))
+    : availableNodes;
 
   /** Renders the per-node column picker body inside each card. */
   const renderColumnBody = (args: NodeSelectionRenderArgs) => {
@@ -286,19 +246,14 @@ export function NodeInputsPanel({
       }
     : undefined;
 
-  const count = originalCount ?? selectionItems.length;
+  const count = selectionItems.length;
   const countLabel = maxNodes != null ? `${String(count)}/${String(maxNodes)}` : String(count);
-  const showInputRequestTarget = showAddControls && pendingInputRequest !== undefined;
+  const showInputRequestTarget = pendingInputRequest !== undefined;
   const inputRequestTargetFilled = !canAddMore;
   const inputRequestTargetDisabled = disabled || !canAddMore;
-  const statusVariantClass = {
-    info: 'border-info bg-info-background text-foreground',
-    warning: 'border-warning/60 bg-warning-background/60 text-warning',
-    error: 'border-error/50 bg-error/10 text-error',
-  }[statusVariant];
 
   return (
-    <div className={cn('@container/node-inputs relative flex flex-col gap-2', className)}>
+    <div className="@container/node-inputs relative flex flex-col gap-2">
       <div
         data-guidance={guidanceTarget}
         role="group"
@@ -309,206 +264,116 @@ export function NodeInputsPanel({
           <label className="block text-body font-medium text-description">
             {title} ({countLabel})
           </label>
-          {headerAddon}
         </div>
-        {showAddControls && (
-          <div
-            data-testid="node-inputs-actions"
-            className="ml-auto flex flex-wrap items-center justify-end gap-1.5 @max-[430px]/node-inputs:ml-0 @max-[430px]/node-inputs:basis-full @max-[430px]/node-inputs:justify-start"
-          >
-            {selectionItems.length > 0 && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-7 px-2 text-label-secondary text-description"
-                onClick={onClear}
-                disabled={disabled}
-              >
-                <Trash2 className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
-                Clear all
-              </Button>
-            )}
+        <div
+          data-testid="node-inputs-actions"
+          className="ml-auto flex flex-wrap items-center justify-end gap-1.5 @max-[430px]/node-inputs:ml-0 @max-[430px]/node-inputs:basis-full @max-[430px]/node-inputs:justify-start"
+        >
+          {selectionItems.length > 0 && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-label-secondary text-description"
+              onClick={onClear}
+              disabled={disabled}
+            >
+              <Trash2 className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
+              Clear all
+            </Button>
+          )}
 
-            {showAddAll && (
+          {showAddAll && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 px-2 text-label-secondary"
+              disabled={disabled || !canAddMore || availableNodes.length === 0}
+              onClick={() => {
+                handleAdd(availableNodes.map((node) => node.id));
+              }}
+            >
+              <ListPlus className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
+              Add All
+            </Button>
+          )}
+
+          {/* Add data block: searchable list of addable workspace nodes. */}
+          <Popover
+            open={blockOpen}
+            onOpenChange={(open) => {
+              setBlockOpen(open);
+              if (!open) setBlockSearch('');
+            }}
+          >
+            <PopoverTrigger asChild>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 className="h-7 px-2 text-label-secondary"
                 disabled={disabled || !canAddMore || availableNodes.length === 0}
-                onClick={() => {
-                  handleAdd(availableNodes.map((node) => node.id));
-                }}
               >
-                <ListPlus className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
-                Add All
+                <Plus className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
+                Add data block
               </Button>
-            )}
-
-            {/* Add preset: current graph selection + recently-used groups. */}
-            <Popover open={presetOpen} onOpenChange={setPresetOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-7 px-2 text-label-secondary"
-                  disabled={disabled || !canAddMore || !hasPresets}
-                >
-                  <Bookmark className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
-                  Add preset
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent align="end" className="w-72 p-0">
-                <div className="max-h-72 overflow-y-auto py-1">
-                  {addableGraphIds.length > 0 && (
-                    <>
-                      <div className="px-3 pb-1 pt-2 text-[11px] font-medium uppercase tracking-wide text-description">
-                        Current graph selection
-                      </div>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-72 p-0">
+              <div className="border-b p-2">
+                <div className="relative">
+                  <Search
+                    className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-description"
+                    aria-hidden="true"
+                  />
+                  <Input
+                    autoFocus
+                    value={blockSearch}
+                    onChange={(e) => {
+                      setBlockSearch(e.target.value);
+                    }}
+                    placeholder="Search data blocks…"
+                    className="h-8 pl-7 text-body"
+                  />
+                </div>
+              </div>
+              <div className="max-h-64 overflow-y-auto py-1">
+                {filteredAvailableNodes.length === 0 ? (
+                  <div className="px-3 py-3 text-center text-label-secondary text-description">
+                    No matching data blocks
+                  </div>
+                ) : (
+                  filteredAvailableNodes.map((node) => {
+                    const id = node.id;
+                    return (
                       <button
+                        key={id}
                         type="button"
-                        className="flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-body hover:bg-panel/60"
+                        className="flex w-full items-start px-3 py-2 text-left text-body hover:bg-panel/60"
                         onClick={() => {
-                          handleAdd(addableGraphIds);
-                          setPresetOpen(false);
+                          handleAdd([id]);
+                          setBlockOpen(false);
+                          setBlockSearch('');
                         }}
                       >
-                        <span className="truncate font-medium">
-                          Current selection ({addableGraphIds.length})
-                        </span>
-                        <span className="truncate text-[11px] text-description">
-                          {graphSelectionLabels.join(', ')}
-                        </span>
+                        <span className="truncate">{node.name}</span>
                       </button>
-                    </>
-                  )}
-                  {recentPresets.length > 0 && (
-                    <>
-                      <div className="px-3 pb-1 pt-2 text-[11px] font-medium uppercase tracking-wide text-description">
-                        Recent
-                      </div>
-                      {recentPresets.map((preset, idx) => (
-                        <button
-                          key={`${preset.ids.join('|')}-${String(idx)}`}
-                          type="button"
-                          disabled={preset.addableIds.length === 0}
-                          title={
-                            preset.addableIds.length === 0
-                              ? 'All of these are already added or unavailable'
-                              : undefined
-                          }
-                          className="flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-body hover:bg-panel/60 disabled:cursor-not-allowed disabled:opacity-50"
-                          onClick={() => {
-                            handleAdd(preset.addableIds);
-                            setPresetOpen(false);
-                          }}
-                        >
-                          <span className="truncate">{preset.labels.join(', ')}</span>
-                        </button>
-                      ))}
-                    </>
-                  )}
-                </div>
-              </PopoverContent>
-            </Popover>
-
-            {/* Add data block: searchable list of addable workspace nodes. */}
-            <Popover
-              open={blockOpen}
-              onOpenChange={(open) => {
-                setBlockOpen(open);
-                if (!open) setBlockSearch('');
-              }}
-            >
-              <PopoverTrigger asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-7 px-2 text-label-secondary"
-                  disabled={disabled || !canAddMore || availableNodes.length === 0}
-                >
-                  <Plus className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
-                  Add data block
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent align="end" className="w-72 p-0">
-                <div className="border-b p-2">
-                  <div className="relative">
-                    <Search
-                      className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-description"
-                      aria-hidden="true"
-                    />
-                    <Input
-                      autoFocus
-                      value={blockSearch}
-                      onChange={(e) => {
-                        setBlockSearch(e.target.value);
-                      }}
-                      placeholder="Search data blocks…"
-                      className="h-8 pl-7 text-body"
-                    />
-                  </div>
-                </div>
-                <div className="max-h-64 overflow-y-auto py-1">
-                  {filteredAvailableNodes.length === 0 ? (
-                    <div className="px-3 py-3 text-center text-label-secondary text-description">
-                      No matching data blocks
-                    </div>
-                  ) : (
-                    filteredAvailableNodes.map((node) => {
-                      const id = node.id;
-                      const reason = getAddRejection(id);
-                      return (
-                        <button
-                          key={id}
-                          type="button"
-                          disabled={Boolean(reason)}
-                          title={reason ?? undefined}
-                          className="flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-body hover:bg-panel/60 disabled:cursor-not-allowed disabled:opacity-50"
-                          onClick={() => {
-                            handleAdd([id]);
-                            setBlockOpen(false);
-                            setBlockSearch('');
-                          }}
-                        >
-                          <span className="truncate">{node.name}</span>
-                          {reason && <span className="text-badge text-description">{reason}</span>}
-                        </button>
-                      );
-                    })
-                  )}
-                </div>
-              </PopoverContent>
-            </Popover>
-          </div>
-        )}
-      </div>
-
-      {statusMessage && (
-        <div className="px-3">
-          <div
-            className={cn(
-              'rounded-md border px-3 py-2 text-label-secondary leading-snug',
-              statusVariantClass,
-            )}
-          >
-            {statusMessage}
-          </div>
+                    );
+                  })
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
-      )}
+      </div>
 
       {selectionItems.length === 0 ? (
         <div className="mx-3 rounded-md border border-dashed border-surface-border-foreground/40 bg-panel/40 p-3 text-body italic text-description">
           {emptyMessage ?? (
             <>
               No data blocks selected. Use{' '}
-              <span className="font-medium not-italic">Add data block</span> or{' '}
-              <span className="font-medium not-italic">Add preset</span>, or select node(s) in the
-              workspace graph and add them from a node&apos;s <span className="not-italic">+</span>{' '}
-              button.
+              <span className="font-medium not-italic">Add data block</span>, or carry one here from
+              a Data Block&apos;s <span className="not-italic">+</span> button.
             </>
           )}
         </div>
@@ -518,8 +383,7 @@ export function NodeInputsPanel({
           palette={defaultPalette}
           nodeColors={nodeColors}
           maxCompare={maxVisibleCards ?? maxNodes ?? selectionItems.length}
-          onRemoveNode={showRemoveButtons && !disabled ? onRemoveNode : undefined}
-          renderNodeMeta={renderNodeMeta}
+          onRemoveNode={!disabled ? onRemoveNode : undefined}
           renderNodeBody={showColumnPicker ? renderColumnBody : undefined}
           renderExtraNodeContent={renderExtraNodeBody}
         />

@@ -295,10 +295,10 @@ def test_transient_provider_secrets_are_write_only_and_absent_from_resources() -
 
 
 def test_spa_runtime_config_contains_only_the_reverse_proxy_base_path() -> None:
-    script = _runtime_config_js("/wordflow/")
+    script = _runtime_config_js("/user/example/proxy/3000/")
     prefix = "window.__WORDFLOW_CONFIG__ = "
     assert script.startswith(prefix)
     assert script.endswith(";")
     assert json.loads(script.removeprefix(prefix).removesuffix(";")) == {
-        "basePath": "/wordflow",
+        "basePath": "/user/example/proxy/3000",
     }

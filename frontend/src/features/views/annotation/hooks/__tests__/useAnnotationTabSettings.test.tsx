@@ -2,40 +2,53 @@ import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { useAnnotationTabSettings } from '../useAnnotationTabSettings';
+import {
+  ANNOTATION_TAB_SETTINGS_KEY,
+  DEFAULT_ANNOTATION_TAB_SETTINGS,
+} from '../../annotationTabSettings';
+
+const storedSettings = (
+  values: Partial<typeof DEFAULT_ANNOTATION_TAB_SETTINGS>,
+): Record<string, string> => ({
+  [ANNOTATION_TAB_SETTINGS_KEY]: JSON.stringify({
+    ...DEFAULT_ANNOTATION_TAB_SETTINGS,
+    ...values,
+  }),
+});
 
 describe('useAnnotationTabSettings', () => {
   it('hydrates AI settings from persisted tab strings', () => {
     const { result } = renderHook(() =>
       useAnnotationTabSettings({
         onTabSettingChange: vi.fn(),
-        tabSettings: {
+        tabSettings: storedSettings({
           annotationMode: 'ai',
           aiProviderConfigurationId: '8a342ceb-1ed6-433a-bc3f-75b6fd5dba38',
           aiProviderType: 'openai',
-          aiProviderModels: JSON.stringify({
+          aiProviderModels: {
             '8a342ceb-1ed6-433a-bc3f-75b6fd5dba38': 'gpt-4o',
-          }),
+          },
           aiPrompt: 'Classify stance.',
-          aiTemperature: '0.7',
-          aiMaxRetriesPerBatch: '4',
-          aiMaxExamplesPerClass: '7',
+          aiTemperature: 0.7,
+          aiMaxRetriesPerBatch: 4,
+          aiMaxExamplesPerClass: 7,
           aiExampleSamplingMethod: 'last_n',
-          aiExampleRandomSeed: '42',
-          aiBatchSize: '17',
+          aiExampleRandomSeed: 42,
+          aiBatchSize: 17,
           aiProcessingMode: 'fill_missing',
-          aiReasoningEnabled: 'true',
+          aiReasoningEnabled: true,
           aiReasoningEffort: 'high',
-          annotationTargets: JSON.stringify({ 'source-node': 'annotation' }),
-          annotationComparisonColumns: JSON.stringify({
+          annotationTargets: { 'source-node': 'annotation' },
+          annotationComparisonColumns: {
             'source-node': ['reviewer_one', 'reviewer_two'],
-          }),
-          annotationReliabilityMetrics: JSON.stringify({
+          },
+          annotationReliabilityMetrics: {
             'source-node': 'krippendorffs_alpha',
-          }),
-          annotationMetadataColumns: JSON.stringify({
+          },
+          annotationMetadataColumns: {
             'source-node': ['username', 'reviewer_two', 'created_at'],
-          }),
-        },
+          },
+        }),
       }),
     );
 
@@ -103,57 +116,46 @@ describe('useAnnotationTabSettings', () => {
       result.current.setAnnotationMetadataColumns('source-node', ['username', 'created_at']);
     });
 
-    expect(onTabSettingChange).toHaveBeenCalledWith('annotationMode', 'ai');
-    expect(onTabSettingChange).toHaveBeenCalledWith(
-      'aiProviderConfigurationId',
-      '74a93227-c081-4db9-af2e-ad357b62278d',
-    );
-    expect(onTabSettingChange).toHaveBeenCalledWith('aiProviderType', 'openrouter');
-    expect(onTabSettingChange).toHaveBeenCalledWith(
-      'aiProviderModels',
-      JSON.stringify({ '74a93227-c081-4db9-af2e-ad357b62278d': 'openai/gpt-4o' }),
-    );
-    expect(onTabSettingChange).toHaveBeenCalledWith('aiPrompt', 'Use concise labels.');
-    expect(onTabSettingChange).toHaveBeenCalledWith('aiTemperature', '0.3');
-    expect(onTabSettingChange).toHaveBeenCalledWith('aiMaxRetriesPerBatch', '2');
-    expect(onTabSettingChange).toHaveBeenCalledWith('aiMaxExamplesPerClass', '12');
-    expect(onTabSettingChange).toHaveBeenCalledWith('aiExampleSamplingMethod', 'first_n');
-    expect(onTabSettingChange).toHaveBeenCalledWith('aiExampleRandomSeed', '9');
-    expect(onTabSettingChange).toHaveBeenCalledWith('aiBatchSize', '25');
-    expect(onTabSettingChange).toHaveBeenCalledWith('aiProcessingMode', 'fill_missing');
-    expect(onTabSettingChange).toHaveBeenCalledWith('aiReasoningEnabled', 'true');
-    expect(onTabSettingChange).toHaveBeenCalledWith('aiReasoningEffort', 'low');
-    expect(onTabSettingChange).toHaveBeenCalledWith(
-      'annotationTargets',
-      JSON.stringify({ 'source-node': 'existing_annotation' }),
-    );
-    expect(onTabSettingChange).toHaveBeenCalledWith(
-      'annotationComparisonColumns',
-      JSON.stringify({ 'source-node': ['reviewer_one', 'reviewer_two'] }),
-    );
-    expect(onTabSettingChange).toHaveBeenCalledWith(
-      'annotationReliabilityMetrics',
-      JSON.stringify({ 'source-node': 'percent_agreement' }),
-    );
-    expect(onTabSettingChange).toHaveBeenCalledWith(
-      'annotationMetadataColumns',
-      JSON.stringify({ 'source-node': ['username', 'created_at'] }),
-    );
+    expect(
+      onTabSettingChange.mock.calls.every(([key]) => key === ANNOTATION_TAB_SETTINGS_KEY),
+    ).toBe(true);
+    expect(JSON.parse(onTabSettingChange.mock.lastCall?.[1] ?? '{}')).toMatchObject({
+      annotationMode: 'ai',
+      aiProviderConfigurationId: '74a93227-c081-4db9-af2e-ad357b62278d',
+      aiProviderType: 'openrouter',
+      aiProviderModels: {
+        '74a93227-c081-4db9-af2e-ad357b62278d': 'openai/gpt-4o',
+      },
+      aiPrompt: 'Use concise labels.',
+      aiTemperature: 0.3,
+      aiMaxRetriesPerBatch: 2,
+      aiMaxExamplesPerClass: 12,
+      aiExampleSamplingMethod: 'first_n',
+      aiExampleRandomSeed: 9,
+      aiBatchSize: 25,
+      aiProcessingMode: 'fill_missing',
+      aiReasoningEnabled: true,
+      aiReasoningEffort: 'low',
+      annotationTargets: { 'source-node': 'existing_annotation' },
+      annotationComparisonColumns: { 'source-node': ['reviewer_one', 'reviewer_two'] },
+      annotationReliabilityMetrics: { 'source-node': 'percent_agreement' },
+      annotationMetadataColumns: { 'source-node': ['username', 'created_at'] },
+    });
   });
 
-  it('gives Compare To precedence when legacy settings overlap', () => {
+  it('gives Compare To precedence when saved settings overlap', () => {
     const onTabSettingChange = vi.fn();
     const { result } = renderHook(() =>
       useAnnotationTabSettings({
         onTabSettingChange,
-        tabSettings: {
-          annotationComparisonColumns: JSON.stringify({
+        tabSettings: storedSettings({
+          annotationComparisonColumns: {
             'source-node': ['reviewer_one'],
-          }),
-          annotationMetadataColumns: JSON.stringify({
+          },
+          annotationMetadataColumns: {
             'source-node': ['reviewer_one', 'username'],
-          }),
-        },
+          },
+        }),
       }),
     );
 
@@ -170,14 +172,14 @@ describe('useAnnotationTabSettings', () => {
       useAnnotationTabSettings({
         onTabSettingChange: vi.fn(),
         excludedRoleColumns: { 'source-node': 'correction' },
-        tabSettings: {
-          annotationComparisonColumns: JSON.stringify({
+        tabSettings: storedSettings({
+          annotationComparisonColumns: {
             'source-node': ['reviewer_one', 'correction'],
-          }),
-          annotationMetadataColumns: JSON.stringify({
+          },
+          annotationMetadataColumns: {
             'source-node': ['username', 'correction'],
-          }),
-        },
+          },
+        }),
       }),
     );
 
@@ -230,13 +232,11 @@ describe('useAnnotationTabSettings', () => {
       'source-one': 'label_one',
       'source-two': 'label_two',
     });
-    expect(onTabSettingChange).toHaveBeenLastCalledWith(
-      'annotationTargets',
-      JSON.stringify({
-        'source-one': 'label_one',
-        'source-two': 'label_two',
-      }),
-    );
+    expect(onTabSettingChange.mock.lastCall?.[0]).toBe(ANNOTATION_TAB_SETTINGS_KEY);
+    expect(JSON.parse(onTabSettingChange.mock.lastCall?.[1] ?? '{}').annotationTargets).toEqual({
+      'source-one': 'label_one',
+      'source-two': 'label_two',
+    });
   });
 
   it('ignores malformed persisted provider-model maps', () => {
@@ -245,18 +245,14 @@ describe('useAnnotationTabSettings', () => {
     const { result } = renderHook(() =>
       useAnnotationTabSettings({
         onTabSettingChange: vi.fn(),
-        tabSettings: {
-          aiProviderConfigurationId: '74a93227-c081-4db9-af2e-ad357b62278d',
-          aiProviderType: 'openrouter',
-          aiProviderModels: '{broken',
-        },
+        tabSettings: { [ANNOTATION_TAB_SETTINGS_KEY]: '{broken' },
       }),
     );
 
     expect(result.current.aiProviderModels).toEqual({});
     expect(result.current.aiModel).toBe('');
     expect(warnSpy).toHaveBeenCalledWith(
-      '[annotation] Ignoring malformed AI provider model setting:',
+      '[annotation] Ignoring malformed tab settings:',
       expect.any(SyntaxError),
     );
 
@@ -268,10 +264,10 @@ describe('useAnnotationTabSettings', () => {
     const { result } = renderHook(() =>
       useAnnotationTabSettings({
         onTabSettingChange,
-        tabSettings: {
+        tabSettings: storedSettings({
           aiProviderConfigurationId: '74a93227-c081-4db9-af2e-ad357b62278d',
           aiProviderType: 'openrouter',
-        },
+        }),
       }),
     );
 
@@ -282,7 +278,9 @@ describe('useAnnotationTabSettings', () => {
     expect(result.current.aiProviderConfigurationId).toBeNull();
     expect(result.current.aiProviderType).toBeNull();
     expect(result.current.aiModel).toBe('');
-    expect(onTabSettingChange).toHaveBeenCalledWith('aiProviderConfigurationId', '');
-    expect(onTabSettingChange).toHaveBeenCalledWith('aiProviderType', '');
+    expect(JSON.parse(onTabSettingChange.mock.lastCall?.[1] ?? '{}')).toMatchObject({
+      aiProviderConfigurationId: null,
+      aiProviderType: null,
+    });
   });
 });

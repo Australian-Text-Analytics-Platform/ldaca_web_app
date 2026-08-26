@@ -1,11 +1,6 @@
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
-import type {
-  TopicModelingAnalysisRequest,
-  TopicModelingResponse,
-  TopicModelingResultQuery,
-  TopicModelingTopic,
-} from '@/api';
+import type { TopicModelingResponse, TopicModelingResultQuery, TopicModelingTopic } from '@/api';
 import { CONTEXTUAL_HINT_IDS } from '@/features/guidance/registry';
 import { useProgressiveContextualHints } from '@/features/guidance/useProgressiveContextualHints';
 import type { AnalysisTabFeatureProps } from '@/features/views/common/tabs/AnalysisTabsHost';
@@ -15,14 +10,13 @@ import { isArrowStringField } from '@/lib/arrow/arrowTable';
 import { hasClearRequiredAnalysis } from '../common/analysisActionLifecycle';
 import { getAnalysisResultResource } from '../common/analysisApi';
 import { ANALYSIS_TASK_TYPES } from '../common/analysisIds';
-import { useAnalysisFeature } from '../common/hooks/useAnalysisFeature';
+import { type AnalysisRequestOfKind, useAnalysisFeature } from '../common/hooks/useAnalysisFeature';
 import { useNodeColorControls } from '../common/hooks/useNodeColorControls';
 import { usePersistNodeDocumentColumn } from '../common/hooks/usePersistNodeDocumentColumn';
 import { useTabNodeInputs } from '../common/nodeInputs';
 import { hasParameterDiff } from '../common/parameterComparison';
 import { getRerunActionState } from '../common/rerunActionState';
 import { DEFAULT_TAB_INPUT_SET_ID } from '../common/tabs/tabStateOps';
-import { analysisInputsFromRequest } from '../common/utils';
 import { TopicModelingParameterPanel } from './components/panels/TopicModelingParameterPanel';
 import { TopicModelingResultsPanel } from './components/panels/TopicModelingResultsPanel';
 import {
@@ -85,7 +79,6 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
     .slice(0, 2)
     .map((node) => node.id)
     .filter((id): id is string => Boolean(id));
-  const panelNodeIdsKey = panelNodeIds.join('|');
   const persistDocumentColumn = usePersistNodeDocumentColumn({
     workspaceId: currentWorkspaceId,
   });
@@ -107,11 +100,8 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
     sampleFractionsForRequest,
     hasAnySampling,
     hydrateParameters,
-    resetAfterClear,
   } = useTopicModelingParameters({
-    panelSelectedNodes,
     panelNodeIds,
-    panelNodeIdsKey,
     nodeInfoById: nodeInputs.nodeInfoById,
   });
   const restoredProjectionSelection =
@@ -161,7 +151,7 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
     isResultFetching,
     isResultPlaceholderData,
     resultError,
-  } = useAnalysisFeature<TopicModelingResponse, TopicModelingAnalysisRequest>({
+  } = useAnalysisFeature<TopicModelingResponse, AnalysisRequestOfKind<'topic_modeling'>>({
     taskType: ANALYSIS_TASK_TYPES.topicModeling,
     workspaceId: currentWorkspaceId,
     tabId: host.tabId,
@@ -184,10 +174,15 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
       );
     },
     // Called by useAnalysisFeature hydration to restore parameters from the stored request envelope.
-    onRequest: (requestPayload) => {
-      const req = requestPayload as unknown as Record<string, unknown>;
-      onTabInputSetChange(DEFAULT_TAB_INPUT_SET_ID, analysisInputsFromRequest(req, 2));
-      hydrateParameters(req);
+    onRequest: (request) => {
+      onTabInputSetChange(
+        DEFAULT_TAB_INPUT_SET_ID,
+        request.node_ids.slice(0, 2).map((nodeId) => ({
+          node_id: nodeId,
+          column: request.node_columns[nodeId] ?? '',
+        })),
+      );
+      hydrateParameters(request);
     },
     // Called by useAnalysisFeature after shared result deletion completes.
     onCleared: () => {
@@ -196,16 +191,6 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
       refreshAnalyses();
     },
   });
-  const typedServerRequest = serverRequest as {
-    node_ids?: string[];
-    node_columns?: Record<string, string>;
-    min_cluster_size?: number;
-    random_seed?: number;
-    sample_fractions?: (number | null)[];
-    segmentation_method?: 'automatic' | 'paragraph' | 'sentence';
-    max_segment_tokens?: number;
-  } | null;
-
   /**
    * Clears live topic results and result-view controls while preserving explicitly tuned parameters.
    * Used by: TopicModelingParameterPanel's Clear action.
@@ -215,7 +200,6 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
     await clearResults();
     handleClearTopicSelection();
     setTopicSearchQuery('');
-    resetAfterClear();
     setIsClearing(false);
   };
 
@@ -230,17 +214,15 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
     persistNodeColor,
   });
 
-  const effectiveNodeColumnSelections = nodeColumnSelections;
-
   const panelHasMissingColumns = panelNodeIds.some((nodeId) => {
-    const selection = effectiveNodeColumnSelections.find((sel) => sel.nodeId === nodeId);
+    const selection = nodeColumnSelections.find((sel) => sel.nodeId === nodeId);
     return !selection?.column;
   });
 
   const currentTopicParams = {
     node_ids: panelNodeIds,
     node_columns: Object.fromEntries(
-      effectiveNodeColumnSelections
+      nodeColumnSelections
         .filter((selection) => panelNodeIds.includes(selection.nodeId) && selection.column)
         .map((selection) => [selection.nodeId, selection.column]),
     ),
@@ -250,25 +232,24 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
     segmentation_method: segmentationMethod,
     max_segment_tokens: maxSegmentTokens,
   };
-  const serverTopicParams = (request: Record<string, unknown>) => ({
-    node_ids: Array.isArray(request.node_ids) ? request.node_ids : [],
-    node_columns:
-      request.node_columns && typeof request.node_columns === 'object' ? request.node_columns : {},
-    min_cluster_size: Number(request.min_cluster_size ?? DEFAULT_MIN_CLUSTER_SIZE),
-    random_seed: Number(request.random_seed),
+  const serverTopicParams = (request: AnalysisRequestOfKind<'topic_modeling'>) => ({
+    node_ids: request.node_ids,
+    node_columns: request.node_columns,
+    min_cluster_size: request.min_cluster_size ?? DEFAULT_MIN_CLUSTER_SIZE,
+    random_seed: request.random_seed ?? 0,
     sample_fractions: normalizeTopicSampleFractions(
-      (request as unknown as { sample_fractions?: unknown }).sample_fractions,
-      Array.isArray(request.node_ids) ? request.node_ids.length : 0,
+      request.sample_fractions,
+      request.node_ids.length,
     ),
     segmentation_method:
       request.segmentation_method === 'paragraph' || request.segmentation_method === 'sentence'
         ? request.segmentation_method
         : 'automatic',
-    max_segment_tokens: Number(request.max_segment_tokens ?? DEFAULT_MAX_SEGMENT_TOKENS),
+    max_segment_tokens: request.max_segment_tokens ?? DEFAULT_MAX_SEGMENT_TOKENS,
   });
-  const hasTopicChanges = !typedServerRequest
+  const hasTopicChanges = !serverRequest
     ? true
-    : hasParameterDiff(currentTopicParams, serverTopicParams(typedServerRequest));
+    : hasParameterDiff(currentTopicParams, serverTopicParams(serverRequest));
 
   const parametersLocked = isRunning || Boolean(activeAnalysis);
   const requiresClear = hasClearRequiredAnalysis(analyses);
@@ -299,7 +280,7 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
   const resultNodeIds =
     resultSources.length > 0
       ? resultSources.map((source) => source.node_id)
-      : (typedServerRequest?.node_ids ?? panelNodeIds);
+      : (serverRequest?.node_ids ?? panelNodeIds);
   const resultNodeNames =
     result?.data.meta.node_names && result.data.meta.node_names.length > 0
       ? result.data.meta.node_names
@@ -307,11 +288,11 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
         ? resultSources.map((source) => source.node_name)
         : panelSelectedNodes.map((node) => node.name);
   const resultRandomSeed =
-    result?.data.meta.random_state ?? typedServerRequest?.random_seed ?? randomSeed;
-  const resultMaxSegmentTokens = typedServerRequest?.max_segment_tokens ?? maxSegmentTokens;
+    result?.data.meta.random_state ?? serverRequest?.random_seed ?? randomSeed;
+  const resultMaxSegmentTokens = serverRequest?.max_segment_tokens ?? maxSegmentTokens;
   const firstResultNodeId = resultNodeIds[0] ?? null;
   const firstResultColumn = firstResultNodeId
-    ? (typedServerRequest?.node_columns?.[firstResultNodeId] ??
+    ? (serverRequest?.node_columns[firstResultNodeId] ??
       resultSources.find((source) => source.node_id === firstResultNodeId)?.text_column ??
       null)
     : null;
@@ -387,7 +368,7 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
       tabId: host.tabId,
       panelNodeIds,
       panelHasMissingColumns,
-      effectiveNodeColumnSelections,
+      effectiveNodeColumnSelections: nodeColumnSelections,
       minClusterSize,
       randomSeed,
       sampleFractions: hasAnySampling ? sampleFractionsForRequest : null,
@@ -490,7 +471,6 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
         }
         onClear={handleClear}
         hasMissingColumns={panelHasMissingColumns}
-        hasResult={Boolean(result ?? analysisError ?? error)}
         nodeColors={nodeColors}
         onNodeColorChange={(nodeId, color) => {
           setNodeColor(nodeId, color);

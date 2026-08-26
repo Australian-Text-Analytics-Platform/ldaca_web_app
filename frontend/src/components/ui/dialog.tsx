@@ -1,5 +1,5 @@
 import * as React from 'react';
-import * as DialogPrimitive from '@radix-ui/react-dialog';
+import { Dialog as DialogPrimitive } from 'radix-ui';
 import { cn } from '@/lib/utils';
 import { X } from 'lucide-react';
 import { ModalLayerRegistration } from '@/features/guidance/ModalLayerRegistration';
@@ -17,10 +17,11 @@ const DialogPortal = DialogPrimitive.Portal;
 const DialogClose = DialogPrimitive.Close;
 
 /** Shared modal backdrop used by `DialogContent` for app dialogs. */
-const DialogOverlay = React.forwardRef<
-  React.ComponentRef<typeof DialogPrimitive.Overlay>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>
->(({ className, ...props }, ref) => (
+const DialogOverlay = ({
+  className,
+  ref,
+  ...props
+}: React.ComponentProps<typeof DialogPrimitive.Overlay>) => (
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
@@ -29,14 +30,15 @@ const DialogOverlay = React.forwardRef<
     )}
     {...props}
   />
-));
-DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
+);
 
 /** Centered modal content wrapper used by panels and document modals. */
-const DialogContent = React.forwardRef<
-  React.ComponentRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
+const DialogContent = ({
+  className,
+  children,
+  ref,
+  ...props
+}: React.ComponentProps<typeof DialogPrimitive.Content>) => (
   <DialogPortal>
     <DialogOverlay />
     <ModalLayerRegistration>
@@ -56,8 +58,7 @@ const DialogContent = React.forwardRef<
       </DialogPrimitive.Content>
     </ModalLayerRegistration>
   </DialogPortal>
-));
-DialogContent.displayName = DialogPrimitive.Content.displayName;
+);
 
 /**
  * Header layout helper used by dialogs for title/description grouping.
@@ -79,30 +80,30 @@ const DialogFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivEleme
 DialogFooter.displayName = 'DialogFooter';
 
 /** Accessible dialog title primitive consumed by modal content. */
-const DialogTitle = React.forwardRef<
-  React.ComponentRef<typeof DialogPrimitive.Title>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Title>
->(({ className, ...props }, ref) => (
+const DialogTitle = ({
+  className,
+  ref,
+  ...props
+}: React.ComponentProps<typeof DialogPrimitive.Title>) => (
   <DialogPrimitive.Title
     ref={ref}
     className={cn('text-heading-3 font-semibold leading-tight', className)}
     {...props}
   />
-));
-DialogTitle.displayName = DialogPrimitive.Title.displayName;
+);
 
 /** Accessible dialog description primitive consumed by modal content. */
-const DialogDescription = React.forwardRef<
-  React.ComponentRef<typeof DialogPrimitive.Description>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Description>
->(({ className, ...props }, ref) => (
+const DialogDescription = ({
+  className,
+  ref,
+  ...props
+}: React.ComponentProps<typeof DialogPrimitive.Description>) => (
   <DialogPrimitive.Description
     ref={ref}
     className={cn('text-body-secondary text-description', className)}
     {...props}
   />
-));
-DialogDescription.displayName = DialogPrimitive.Description.displayName;
+);
 
 export {
   Dialog,

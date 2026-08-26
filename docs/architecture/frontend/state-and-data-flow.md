@@ -220,6 +220,13 @@ Preview request, or from a standalone Run All request's embedded source when no
 Preview exists. Historical values win over mutable Data Block preferences.
 Resource events invalidate the forest and exact Result keys.
 
+Analysis and preprocessing input panels derive their candidates directly from
+the current Workspace graph and expose one searchable Add action; there is no
+second recent-selection or preset-input catalogue. Graph and sidebar Add
+requests are consumed immediately when a view has one placement target. Views
+with multiple input roles retain the request only until the user chooses the
+target role.
+
 Preview, Run All, Stop, and Clear use shared lifecycle controls where those
 operations exist. Full-only functions render no Preview control. Preview
 replacement submits with explicit supersession and does not clear first.
@@ -308,6 +315,11 @@ Tab, quotation context length, token-frequency token limits, and
 sequential chart state. These values can be lost without changing the durable
 Analysis or Result and are not exported with a Workspace.
 
+Each Annotation Tab persists its presentation fields as one validated
+`annotation.settings` JSON record. The presentation store performs a one-time
+version 3 to version 4 migration that consolidates the former per-field strings
+and removes the old browser key after a successful copy.
+
 Stopword lists for Token Frequency and Topic Modelling, the Topic Modelling
 Words-per-topic cap, and its last successfully applied non-default Topic
 projection `(Analysis, cluster count, Top N)` are backend-owned Tab presentation settings. Features patch
@@ -345,7 +357,7 @@ Image export serializes the shared bubble model through the current viewport
 rather than screenshotting React Flow's HTML controls.
 
 Hydration and deletion prune device-only references to missing Workspaces,
-Tabs, Data Blocks, file paths, presets, and preprocessing inputs. Pruning never
+Tabs, Data Blocks, file paths, and preprocessing inputs. Pruning never
 creates or selects a backend resource.
 
 Action availability follows the applicable Analysis scope, not Result

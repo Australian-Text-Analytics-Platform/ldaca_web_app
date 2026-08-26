@@ -29,7 +29,7 @@ export const fetchNodeSchema = async ({
   if (force) {
     queryClient.removeQueries({ queryKey: queryKeys.nodeSchema(workspaceId, nodeId) });
   }
-  return queryClient.fetchQuery(nodeSchemaQueryOptions({ workspaceId, nodeId }));
+  return queryClient.query(nodeSchemaQueryOptions({ workspaceId, nodeId }));
 };
 
 export const invalidateNodeSchemaQuery = (

@@ -4,7 +4,7 @@ import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { defineConfig, type ServerOptions } from 'vite';
+import { defineConfig } from 'vite';
 import react, { reactCompilerPreset } from '@vitejs/plugin-react';
 import babel from '@rolldown/plugin-babel';
 import tailwindcss from '@tailwindcss/postcss';
@@ -50,15 +50,6 @@ process.env.VITE_APP_BUILD_DATE ??= (() => {
   return `${day}/${month}/${String(now.getFullYear())}`;
 })();
 
-const serverConfig = {
-  port: Number(process.env.FRONTEND_PORT ?? 3000),
-  host: '0.0.0.0',
-  forwardConsole: {
-    unhandledErrors: true,
-    logLevels: ['warn', 'error'],
-  },
-} satisfies ServerOptions;
-
 export default defineConfig({
   base: './',
   plugins: [
@@ -80,20 +71,21 @@ export default defineConfig({
   },
   build: {
     target: 'esnext',
-    // Distributable web/backend/Tauri artifacts omit source maps because no
-    // release upload pipeline consumes them; this keeps sources out of shipped bundles.
-    sourcemap: false,
     outDir: 'build',
-    emptyOutDir: true,
   },
-  server: serverConfig,
+  server: {
+    port: Number(process.env.FRONTEND_PORT ?? 3000),
+    host: '0.0.0.0',
+    forwardConsole: {
+      unhandledErrors: true,
+      logLevels: ['warn', 'error'],
+    },
+  },
   preview: {
     port: Number(process.env.FRONTEND_PORT ?? 3002),
   },
-  envPrefix: 'VITE_', // Vite standard environment variable prefix
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
-    reporters: ['default'],
   },
 });

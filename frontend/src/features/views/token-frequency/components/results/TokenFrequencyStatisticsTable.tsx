@@ -1,16 +1,20 @@
 import {
+  columnFilteringFeature,
+  columnVisibilityFeature,
+  createFilteredRowModel,
+  createPaginatedRowModel,
+  createSortedRowModel,
   createColumnHelper,
-  type FilterFn,
   flexRender,
-  getCoreRowModel,
-  getFilteredRowModel,
-  getPaginationRowModel,
-  getSortedRowModel,
+  rowPaginationFeature,
+  rowSortingFeature,
+  tableFeatures,
+  type FilterFn,
   type SortingState,
-  useReactTable,
+  useTable,
 } from '@tanstack/react-table';
 import { ArrowDown, ArrowUp, ArrowUpDown, Download, Search } from 'lucide-react';
-import { startTransition, useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { startTransition, useDeferredValue, useMemo, useState } from 'react';
 import HelpIcon from '@/components/help/HelpIcon';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -91,8 +95,22 @@ const formatSignedLL = (value: number): string => {
 /** Used by: enhanceRows to convert significance stars into an ordinal sort key. */
 const significanceRank = (sig: string | undefined): number => (sig ?? '').length;
 
+const tokenStatisticsTableFeatures = tableFeatures({
+  columnFilteringFeature,
+  columnVisibilityFeature,
+  filteredRowModel: createFilteredRowModel(),
+  rowSortingFeature,
+  sortedRowModel: createSortedRowModel(),
+  rowPaginationFeature,
+  paginatedRowModel: createPaginatedRowModel(),
+});
+
 /** Used by: TokenFrequencyStatisticsTable column definitions as the parent-controlled wildcard token filter. */
-const tokenWildcardFilter: FilterFn<EnhancedStatisticsRow> = (row, _columnId, filterValue) => {
+const tokenWildcardFilter: FilterFn<typeof tokenStatisticsTableFeatures, EnhancedStatisticsRow> = (
+  row,
+  _columnId,
+  filterValue,
+) => {
   const pattern = String(filterValue ?? '').trim();
   if (!pattern) return true;
   const regex = wildcardToRegExp(pattern);
@@ -101,7 +119,10 @@ const tokenWildcardFilter: FilterFn<EnhancedStatisticsRow> = (row, _columnId, fi
   return regex.test(token);
 };
 
-const columnHelper = createColumnHelper<EnhancedStatisticsRow>();
+const columnHelper = createColumnHelper<
+  typeof tokenStatisticsTableFeatures,
+  EnhancedStatisticsRow
+>();
 
 const STATISTICS_COLUMN_TOOLTIPS: Record<string, string> = {
   token: 'The token being compared across the Reference and Study Data Blocks.',
@@ -138,148 +159,150 @@ const buildColumns = (
   onTokenClick?: (token: string) => void,
   referenceColor?: string | null,
   studyColor?: string | null,
-) => [
-  columnHelper.accessor('sort_token', {
-    id: 'token',
-    header: 'Token',
-    /** Used by: TanStack Table token column to render the original backend token label, optionally as a concordance-launching button,. */
-    cell: (info) => {
-      const token = info.row.original.token;
-      if (!onTokenClick) {
-        return <span className="font-medium">{token}</span>;
-      }
-      return (
-        <button
-          type="button"
-          className="cursor-pointer font-medium text-left underline-offset-2 hover:underline focus-visible:underline"
-          onClick={() => {
-            onTokenClick(token);
-          }}
-          title="Click to inspect in concordance across both corpora."
-        >
-          {token}
-        </button>
-      );
-    },
-    filterFn: tokenWildcardFilter,
-  }),
-  columnHelper.accessor('sort_freq_reference', {
-    id: 'freq_reference',
-    header: 'OR',
-    /** Used by: TanStack Table OR column to render observed reference frequency as an integer count. */
-    cell: (info) => formatNumber(info.row.original.freq_reference, { decimals: 0 }),
-  }),
-  columnHelper.accessor('sort_percent_reference', {
-    id: 'percent_reference',
-    header: '%R',
-    /** Used by: TanStack Table %R column to render reference percentage with a percent suffix. */
-    cell: (info) => formatNumber(info.row.original.percent_reference, { decimals: 2, suffix: '%' }),
-  }),
-  columnHelper.accessor('sort_freq_study', {
-    id: 'freq_study',
-    header: 'OS',
-    /** Used by: TanStack Table OS column to render observed study frequency as an integer count. */
-    cell: (info) => formatNumber(info.row.original.freq_study, { decimals: 0 }),
-  }),
-  columnHelper.accessor('sort_percent_study', {
-    id: 'percent_study',
-    header: '%S',
-    /** Used by: TanStack Table %S column to render study percentage with a percent suffix. */
-    cell: (info) => formatNumber(info.row.original.percent_study, { decimals: 2, suffix: '%' }),
-  }),
-  columnHelper.accessor('sort_log_likelihood_llv', {
-    id: 'log_likelihood_llv',
-    header: 'LL',
-    /** Used by: TanStack Table LL column to render log-likelihood for the comparative token row. */
-    cell: (info) => formatNumber(info.row.original.log_likelihood_llv, { decimals: 2 }),
-  }),
-  columnHelper.accessor('overuse', {
-    header: 'Overuse',
-    /** Used by: TanStack Table Overuse column to identify the Data Block with the higher observed frequency. */
-    cell: (info) => {
-      const isOveruse = info.getValue();
-      const directionColor = isOveruse ? studyColor : referenceColor;
-      const fallbackClass = isOveruse
-        ? 'bg-[color-mix(in_srgb,var(--vscode-charts-green)_12%,transparent)] text-foreground'
-        : 'bg-rose-100 text-rose-800';
-      return (
-        <span
-          className={`inline-flex rounded-full px-2 py-0.5 text-label-secondary font-semibold ${directionColor ? 'text-button-foreground' : fallbackClass}`}
-          style={{ backgroundColor: directionColor ?? undefined }}
-        >
-          {isOveruse ? 'Study' : 'Reference'}
-        </span>
-      );
-    },
-  }),
-  columnHelper.accessor('signed_ll', {
-    header: 'Signed LL',
-    /** Used by: TanStack Table Signed LL column after overuse direction has been applied. */
-    cell: (info) => <span className="tabular-nums">{formatSignedLL(info.getValue())}</span>,
-  }),
-  columnHelper.accessor('sort_percent_diff', {
-    id: 'percent_diff',
-    header: '%DIFF',
-    /** Used by: TanStack Table %DIFF column to render percent difference as a percentage value. */
-    cell: (info) =>
-      formatNumber(info.row.original.percent_diff, { decimals: 2, suffix: '%', multiplier: 100 }),
-  }),
-  columnHelper.accessor('sort_bayes_factor_bic', {
-    id: 'bayes_factor_bic',
-    header: 'Bayes',
-    /** Used by: TanStack Table Bayes column to render the Bayes factor statistic. */
-    cell: (info) => formatNumber(info.row.original.bayes_factor_bic, { decimals: 2 }),
-  }),
-  columnHelper.accessor('sort_effect_size_ell', {
-    id: 'effect_size_ell',
-    header: 'ELL',
-    /** Used by: TanStack Table ELL column to render the effect-size estimate with extra precision. */
-    cell: (info) => formatNumber(info.row.original.effect_size_ell, { decimals: 4 }),
-  }),
-  columnHelper.accessor('sort_relative_risk', {
-    id: 'relative_risk',
-    header: 'RRisk',
-    /** Used by: TanStack Table RRisk column to render relative risk for the token comparison. */
-    cell: (info) => formatNumber(info.row.original.relative_risk, { decimals: 2 }),
-  }),
-  columnHelper.accessor('sort_log_ratio', {
-    id: 'log_ratio',
-    header: 'LogRatio',
-    /** Used by: TanStack Table LogRatio column to render precision suitable for directional comparison. */
-    cell: (info) => formatNumber(info.row.original.log_ratio, { decimals: 4 }),
-  }),
-  columnHelper.accessor('sort_odds_ratio', {
-    id: 'odds_ratio',
-    header: 'OddsRatio',
-    /** Used by: TanStack Table OddsRatio column to render export-parity odds ratio values. */
-    cell: (info) => formatNumber(info.row.original.odds_ratio, { decimals: 2 }),
-  }),
-  columnHelper.accessor('sort_significance', {
-    id: 'significance',
-    header: 'Significance',
-    /** Used by: TanStack Table Significance column to render stars as an accessibility-friendly badge. */
-    cell: (info) => {
-      const significance = info.row.original.significance;
-      const badgeClass =
-        significance === '****'
-          ? 'bg-error-background text-error'
-          : significance === '***'
-            ? 'bg-orange-100 text-orange-800'
-            : significance === '**'
-              ? 'bg-[var(--vscode-editor-findMatchHighlightBackground)] text-foreground'
-              : significance === '*'
-                ? 'bg-[color-mix(in_srgb,var(--vscode-charts-green)_12%,transparent)] text-foreground'
-                : 'bg-panel text-description';
-      return (
-        <span
-          className={`inline-flex rounded-full px-2 py-0.5 text-label-secondary font-semibold ${badgeClass}`}
-        >
-          {significance ?? 'n.s.'}
-        </span>
-      );
-    },
-  }),
-];
+) =>
+  columnHelper.columns([
+    columnHelper.accessor('sort_token', {
+      id: 'token',
+      header: 'Token',
+      /** Used by: TanStack Table token column to render the original backend token label, optionally as a concordance-launching button,. */
+      cell: (info) => {
+        const token = info.row.original.token;
+        if (!onTokenClick) {
+          return <span className="font-medium">{token}</span>;
+        }
+        return (
+          <button
+            type="button"
+            className="cursor-pointer font-medium text-left underline-offset-2 hover:underline focus-visible:underline"
+            onClick={() => {
+              onTokenClick(token);
+            }}
+            title="Click to inspect in concordance across both corpora."
+          >
+            {token}
+          </button>
+        );
+      },
+      filterFn: tokenWildcardFilter,
+    }),
+    columnHelper.accessor('sort_freq_reference', {
+      id: 'freq_reference',
+      header: 'OR',
+      /** Used by: TanStack Table OR column to render observed reference frequency as an integer count. */
+      cell: (info) => formatNumber(info.row.original.freq_reference, { decimals: 0 }),
+    }),
+    columnHelper.accessor('sort_percent_reference', {
+      id: 'percent_reference',
+      header: '%R',
+      /** Used by: TanStack Table %R column to render reference percentage with a percent suffix. */
+      cell: (info) =>
+        formatNumber(info.row.original.percent_reference, { decimals: 2, suffix: '%' }),
+    }),
+    columnHelper.accessor('sort_freq_study', {
+      id: 'freq_study',
+      header: 'OS',
+      /** Used by: TanStack Table OS column to render observed study frequency as an integer count. */
+      cell: (info) => formatNumber(info.row.original.freq_study, { decimals: 0 }),
+    }),
+    columnHelper.accessor('sort_percent_study', {
+      id: 'percent_study',
+      header: '%S',
+      /** Used by: TanStack Table %S column to render study percentage with a percent suffix. */
+      cell: (info) => formatNumber(info.row.original.percent_study, { decimals: 2, suffix: '%' }),
+    }),
+    columnHelper.accessor('sort_log_likelihood_llv', {
+      id: 'log_likelihood_llv',
+      header: 'LL',
+      /** Used by: TanStack Table LL column to render log-likelihood for the comparative token row. */
+      cell: (info) => formatNumber(info.row.original.log_likelihood_llv, { decimals: 2 }),
+    }),
+    columnHelper.accessor('overuse', {
+      header: 'Overuse',
+      /** Used by: TanStack Table Overuse column to identify the Data Block with the higher observed frequency. */
+      cell: (info) => {
+        const isOveruse = info.getValue();
+        const directionColor = isOveruse ? studyColor : referenceColor;
+        const fallbackClass = isOveruse
+          ? 'bg-[color-mix(in_srgb,var(--vscode-charts-green)_12%,transparent)] text-foreground'
+          : 'bg-rose-100 text-rose-800';
+        return (
+          <span
+            className={`inline-flex rounded-full px-2 py-0.5 text-label-secondary font-semibold ${directionColor ? 'text-button-foreground' : fallbackClass}`}
+            style={{ backgroundColor: directionColor ?? undefined }}
+          >
+            {isOveruse ? 'Study' : 'Reference'}
+          </span>
+        );
+      },
+    }),
+    columnHelper.accessor('signed_ll', {
+      header: 'Signed LL',
+      /** Used by: TanStack Table Signed LL column after overuse direction has been applied. */
+      cell: (info) => <span className="tabular-nums">{formatSignedLL(info.getValue())}</span>,
+    }),
+    columnHelper.accessor('sort_percent_diff', {
+      id: 'percent_diff',
+      header: '%DIFF',
+      /** Used by: TanStack Table %DIFF column to render percent difference as a percentage value. */
+      cell: (info) =>
+        formatNumber(info.row.original.percent_diff, { decimals: 2, suffix: '%', multiplier: 100 }),
+    }),
+    columnHelper.accessor('sort_bayes_factor_bic', {
+      id: 'bayes_factor_bic',
+      header: 'Bayes',
+      /** Used by: TanStack Table Bayes column to render the Bayes factor statistic. */
+      cell: (info) => formatNumber(info.row.original.bayes_factor_bic, { decimals: 2 }),
+    }),
+    columnHelper.accessor('sort_effect_size_ell', {
+      id: 'effect_size_ell',
+      header: 'ELL',
+      /** Used by: TanStack Table ELL column to render the effect-size estimate with extra precision. */
+      cell: (info) => formatNumber(info.row.original.effect_size_ell, { decimals: 4 }),
+    }),
+    columnHelper.accessor('sort_relative_risk', {
+      id: 'relative_risk',
+      header: 'RRisk',
+      /** Used by: TanStack Table RRisk column to render relative risk for the token comparison. */
+      cell: (info) => formatNumber(info.row.original.relative_risk, { decimals: 2 }),
+    }),
+    columnHelper.accessor('sort_log_ratio', {
+      id: 'log_ratio',
+      header: 'LogRatio',
+      /** Used by: TanStack Table LogRatio column to render precision suitable for directional comparison. */
+      cell: (info) => formatNumber(info.row.original.log_ratio, { decimals: 4 }),
+    }),
+    columnHelper.accessor('sort_odds_ratio', {
+      id: 'odds_ratio',
+      header: 'OddsRatio',
+      /** Used by: TanStack Table OddsRatio column to render export-parity odds ratio values. */
+      cell: (info) => formatNumber(info.row.original.odds_ratio, { decimals: 2 }),
+    }),
+    columnHelper.accessor('sort_significance', {
+      id: 'significance',
+      header: 'Significance',
+      /** Used by: TanStack Table Significance column to render stars as an accessibility-friendly badge. */
+      cell: (info) => {
+        const significance = info.row.original.significance;
+        const badgeClass =
+          significance === '****'
+            ? 'bg-error-background text-error'
+            : significance === '***'
+              ? 'bg-orange-100 text-orange-800'
+              : significance === '**'
+                ? 'bg-[var(--vscode-editor-findMatchHighlightBackground)] text-foreground'
+                : significance === '*'
+                  ? 'bg-[color-mix(in_srgb,var(--vscode-charts-green)_12%,transparent)] text-foreground'
+                  : 'bg-panel text-description';
+        return (
+          <span
+            className={`inline-flex rounded-full px-2 py-0.5 text-label-secondary font-semibold ${badgeClass}`}
+          >
+            {significance ?? 'n.s.'}
+          </span>
+        );
+      },
+    }),
+  ]);
 
 /**
  * Used by: TokenFrequencyStatisticsTable to enrich backend statistics with sort keys and derived overuse direction.
@@ -337,17 +360,17 @@ export const TokenFrequencyStatisticsTable = ({
   const tokenFilter = tokenFilterProp ?? '';
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
   const deferredTokenFilter = useDeferredValue(tokenFilter);
-  // Reset to first page whenever the (parent-controlled) filter changes.
-  useEffect(() => {
+  const updateTokenFilter = (value: string) => {
     setPagination((prev) => (prev.pageIndex === 0 ? prev : { ...prev, pageIndex: 0 }));
-  }, [tokenFilter]);
+    onTokenFilterChange?.(value);
+  };
   const columnFilters = useMemo(
     () => (deferredTokenFilter.trim() ? [{ id: 'token', value: deferredTokenFilter }] : []),
     [deferredTokenFilter],
   );
 
-  // eslint-disable-next-line react-hooks/incompatible-library
-  const table = useReactTable({
+  const table = useTable({
+    features: tokenStatisticsTableFeatures,
     data,
     columns,
     state: { sorting, pagination, columnFilters },
@@ -358,10 +381,6 @@ export const TokenFrequencyStatisticsTable = ({
       });
     },
     onPaginationChange: setPagination,
-    getCoreRowModel: getCoreRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
     enableMultiSort: false,
   });
 
@@ -370,18 +389,15 @@ export const TokenFrequencyStatisticsTable = ({
    * Flow: choose sorted rows, filtered rows, or full data based on table state and token filter, then delegate CSV download with the keyness label.
    */
   const handleDownload = () => {
-    const rows = table
-      .getSortedRowModel()
-      .rows.filter((row) => row.getIsAllParentsExpanded())
-      .map((row) => row.original);
+    const rows = table.getSortedRowModel().rows.map((row) => row.original);
     const effectiveRows = table.getFilteredRowModel().rows.map((row) => row.original);
     const downloadRows = tokenFilter.trim() ? effectiveRows : rows.length > 0 ? rows : data;
     onDownloadFrequencyCsv('token-keyness', downloadRows);
   };
 
   const pageCount = table.getPageCount() || 1;
-  const pageIndex = table.getState().pagination.pageIndex;
-  const pageSize = table.getState().pagination.pageSize;
+  const pageIndex = table.state.pagination.pageIndex;
+  const pageSize = table.state.pagination.pageSize;
   const filteredCount = table.getFilteredRowModel().rows.length;
   const totalCount = data.length;
 
@@ -474,7 +490,7 @@ export const TokenFrequencyStatisticsTable = ({
                 placeholder="Filter tokens (use * as wildcard, e.g. pre* or *ing)"
                 value={tokenFilter}
                 onChange={(event) => {
-                  onTokenFilterChange(event.target.value);
+                  updateTokenFilter(event.target.value);
                 }}
                 className="h-8"
               />
@@ -484,7 +500,7 @@ export const TokenFrequencyStatisticsTable = ({
                   variant="ghost"
                   size="sm"
                   onClick={() => {
-                    onTokenFilterChange('');
+                    updateTokenFilter('');
                   }}
                 >
                   Clear

@@ -19,19 +19,15 @@ import { NodeInputsPanel } from '@/features/views/common/components/NodeInputsPa
 import type { NodeInput } from '@/features/views/common/nodeInputs/nodeInputsCore';
 import { useNodeInputs } from '@/features/views/common/nodeInputs/useNodeInputs';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
-import { useWorkspaceSelection } from '@/features/workspace/common/hooks/useWorkspaceSelection';
 import { projectWorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import {
   DATA_BLOCK_EXPORT_FORMATS,
   downloadDataBlocks,
 } from '@/features/workspace/common/dataBlockExport';
-import { saveBlob } from '@/lib/download';
+import { safeDownloadStem, saveBlob } from '@/lib/download';
 import { toast } from 'sonner';
 
 const EXPORT_CONSTRAINTS = {};
-
-const safeStem = (value: string, fallback: string) =>
-  (value.trim() || fallback).replace(/[^a-zA-Z0-9_-]+/g, '_').replace(/^_+|_+$/g, '') || fallback;
 
 interface ExportSelection {
   workspaceId: string | null;
@@ -42,7 +38,6 @@ interface ExportSelection {
 function ExportFeature() {
   const { reachContextualHint } = useGuidance();
   const { currentWorkspaceId, currentWorkspace, nodes } = useWorkspaceData();
-  const { selectedNodeIds } = useWorkspaceSelection();
   const [selection, setSelection] = useState<ExportSelection>({
     workspaceId: currentWorkspaceId,
     inputs: [],
@@ -94,7 +89,10 @@ function ExportFeature() {
         path: { workspace_id: currentWorkspaceId },
         throwOnError: true,
       });
-      await saveBlob(data, `${safeStem(currentWorkspace?.name ?? '', currentWorkspaceId)}.zip`);
+      await saveBlob(
+        data,
+        `${safeDownloadStem(currentWorkspace?.name ?? '', currentWorkspaceId)}.zip`,
+      );
       reachContextualHint(CONTEXTUAL_HINT_IDS.export.workspaceSuccess);
       toast.success('Workspace archive exported');
     } catch (error) {
@@ -132,12 +130,10 @@ function ExportFeature() {
             guidanceTarget="export-inputs"
             resolvedNodes={nodeInputs.resolvedNodes}
             availableNodes={nodeInputs.availableNodes}
-            graphSelectedIds={selectedNodeIds}
             canAddMore={nodeInputs.canAddMore}
             showAddAll
             maxVisibleCards={3}
             onAddNodes={nodeInputs.addNodes}
-            getAddRejection={nodeInputs.getAddRejection}
             onRemoveNode={nodeInputs.removeNode}
             onClear={nodeInputs.clear}
             onColumnChange={nodeInputs.setColumn}

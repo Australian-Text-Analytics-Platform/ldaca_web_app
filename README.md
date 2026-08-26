@@ -110,7 +110,7 @@ pnpm -C frontend test -- --run
 
 ```sh
 cd backend
-CORS_ALLOWED_ORIGINS='["http://localhost:3000"]' \
+CORS_ALLOWED_ORIGINS='["http://localhost:3000","http://127.0.0.1:3000"]' \
   uv run uvicorn ldaca_wordflow.asgi:app --reload --port 8001
 uv run ruff check .
 uv run ty check

@@ -216,7 +216,7 @@ async def test_async_start_propagates_failure_before_readiness(
 
 
 @pytest.mark.anyio
-async def test_binderhub_profile_derives_proxy_root_path(
+async def test_explicit_reverse_proxy_root_path_is_forwarded(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     class FakeServer:
@@ -230,14 +230,14 @@ async def test_binderhub_profile_derives_proxy_root_path(
             self.started = True
             await self.release.wait()
 
-    monkeypatch.setenv("JUPYTERHUB_SERVICE_PREFIX", "/user/example/")
     monkeypatch.setattr("ldaca_wordflow.server_launcher.uvicorn.Server", FakeServer)
     handle = await start_async_server(
-        serve_frontend=False,
-        port=8104,
+        serve_frontend=True,
+        port=3000,
+        root_path="/user/example/proxy/3000",
         settings=Settings(multi_user=False),
     )
-    assert handle.server.config.root_path == "/user/example/proxy/8104"
+    assert handle.server.config.root_path == "/user/example/proxy/3000"
     cast(Any, handle.server).release.set()
     await handle.close()
 

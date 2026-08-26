@@ -80,10 +80,8 @@ describe('ServerPaginationFooter controlled pagination', () => {
     expect(screen.getByRole('link', { current: 'page' })).toHaveTextContent('50');
   });
 
-  // Regression guard for the React Compiler memoization bug: the footer receives
-  // a referentially stable TanStack `table`, so its DISPLAY must be driven by the
-  // real `pageIndex` prop. If the footer ever reads `table.getState()` again, the
-  // highlighted page freezes on 1 and this test fails.
+  // The footer is controlled by the backend-facing pagination props; the
+  // narrowed table value only dispatches page actions.
   it('advances the displayed active page when Next is clicked', () => {
     render(<ControlledHarness />);
     expect(screen.getByTestId('page-source')).toHaveTextContent('1');

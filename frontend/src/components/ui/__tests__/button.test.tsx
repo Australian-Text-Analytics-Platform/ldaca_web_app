@@ -4,25 +4,21 @@ import { describe, expect, it } from 'vitest';
 import { Button } from '../button';
 
 describe('Button', () => {
-  it.each([
-    'default',
-    'secondary',
-    'destructive',
-    'outline',
-    'ghost',
-    'link',
-  ] as const)('fades the complete disabled %s button like VS Code', (variant) => {
-    render(
-      <Button variant={variant} disabled>
-        Save
-      </Button>,
-    );
+  it.each(['default', 'secondary', 'destructive', 'outline', 'ghost', 'link'] as const)(
+    'fades the complete disabled %s button like VS Code',
+    (variant) => {
+      render(
+        <Button variant={variant} disabled>
+          Save
+        </Button>,
+      );
 
-    const button = screen.getByRole('button', { name: 'Save' });
-    expect(button).toHaveClass('disabled:opacity-40', 'disabled:cursor-default');
-    expect(button.className).not.toContain('disabled:text-');
-    expect(button.className).not.toContain('disabled:bg-');
-  });
+      const button = screen.getByRole('button', { name: 'Save' });
+      expect(button).toHaveClass('disabled:opacity-40', 'disabled:cursor-default');
+      expect(button.className).not.toContain('disabled:text-');
+      expect(button.className).not.toContain('disabled:bg-');
+    },
+  );
 
   it('uses VS Code standard and compact button geometry', () => {
     const { rerender } = render(<Button>Save</Button>);

@@ -5,11 +5,12 @@ import {
   AreaChart,
   Bar,
   BarChart,
+  type BarShapeProps,
   CartesianGrid,
-  Cell,
   Line,
   LineChart,
   ResponsiveContainer,
+  Rectangle,
   Tooltip as RechartsTooltip,
   XAxis,
   YAxis,
@@ -316,19 +317,19 @@ export function MultiSeriesChart({
                     radius={[6, 6, 0, 0]}
                     name={s.label ?? s.key}
                     isAnimationActive={animate}
-                  >
-                    {selection
-                      ? data.map((_, i) => (
-                          // eslint-disable-next-line @typescript-eslint/no-deprecated -- recharts <Cell> is the documented API for per-bar coloring with no drop-in replacement
-                          <Cell
-                            key={`${s.key}-${String(i)}`}
-                            fillOpacity={
-                              !hasSelection || selection.selectedIndices.has(i) ? 1 : 0.25
-                            }
-                          />
-                        ))
-                      : null}
-                  </Bar>
+                    shape={(barProps: BarShapeProps) => (
+                      <Rectangle
+                        {...barProps}
+                        fillOpacity={
+                          !selection ||
+                          !hasSelection ||
+                          selection.selectedIndices.has(barProps.index)
+                            ? 1
+                            : 0.25
+                        }
+                      />
+                    )}
+                  />
                 ))}
               </BarChart>
             ) : chartType === 'area' ? (

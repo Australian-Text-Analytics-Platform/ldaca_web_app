@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { arrowTypeName, type ArrowColumn, type ArrowField } from '@/lib/arrow/arrowTable';
 import { nodeSchemaQueryOptions } from '@/lib/nodeSchema';
@@ -50,7 +50,6 @@ interface SchemaManagementConfig {
 export function useSchemaManagement(config: SchemaManagementConfig) {
   const { nodeId, isLocked, workspaceId } = config;
 
-  const [currentSchema, setCurrentSchema] = useState<Record<string, ArrowField>>({});
   const [lockedSchema, setLockedSchema] = useState<Record<string, ArrowField> | null>(null);
 
   // Fetch through the shared node-schema query so every schema reader observes one resource.
@@ -66,17 +65,7 @@ export function useSchemaManagement(config: SchemaManagementConfig) {
     staleTime: 0,
   });
 
-  /* eslint-disable react-hooks/set-state-in-effect -- Syncing query data to local state; no cascading renders */
-  useEffect(() => {
-    if (!nodeId || !workspaceId) {
-      setCurrentSchema({});
-      return;
-    }
-    if (!isLocked) {
-      setCurrentSchema(schemaQuery.data ?? {});
-    }
-  }, [schemaQuery.data, isLocked, nodeId, workspaceId]);
-  /* eslint-enable react-hooks/set-state-in-effect */
+  const currentSchema = nodeId && workspaceId ? (schemaQuery.data ?? {}) : {};
 
   /** Schema seen by task builders: locked while a task is running, live otherwise. */
   const effectiveSchema = isLocked ? (lockedSchema ?? currentSchema) : currentSchema;

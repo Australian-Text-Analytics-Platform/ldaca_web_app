@@ -19,12 +19,15 @@ describe('getApiBase', () => {
     expect(getApiBase({ windowLocation: locationFor('http://localhost:3000/') })).toBe(
       'http://localhost:8001/api',
     );
+    expect(getApiBase({ windowLocation: locationFor('http://127.0.0.1:3000/') })).toBe(
+      'http://127.0.0.1:8001/api',
+    );
   });
 
   it('uses the hosted runtime base path on the current origin', () => {
-    window.__WORDFLOW_CONFIG__ = { basePath: '/wordflow' };
+    window.__WORDFLOW_CONFIG__ = { basePath: '/user/example/proxy/3000' };
 
-    expect(getApiBase()).toBe(`${window.location.origin}/wordflow/api`);
+    expect(getApiBase()).toBe(`${window.location.origin}/user/example/proxy/3000/api`);
   });
 
   it('uses the current origin for a root-mounted packaged frontend', () => {

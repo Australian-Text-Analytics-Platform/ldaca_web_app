@@ -1,5 +1,5 @@
 import { exportDataBlocks, type DataBlockExportFormat } from '@/api';
-import { saveBlob } from '@/lib/download';
+import { safeDownloadStem, saveBlob } from '@/lib/download';
 
 export const DATA_BLOCK_EXPORT_FORMATS: {
   value: DataBlockExportFormat;
@@ -17,9 +17,6 @@ export interface DataBlockExportSelection {
   id: string;
   name: string;
 }
-
-const safeStem = (value: string, fallback: string) =>
-  (value.trim() || fallback).replace(/[^\p{L}\p{N}_-]+/gu, '_').replace(/^_+|_+$/g, '') || fallback;
 
 const filenameFromResponse = (response: Response | undefined): string | null => {
   const disposition = response?.headers.get('content-disposition');
@@ -56,8 +53,8 @@ export const downloadDataBlocks = async ({
   const formatSpec = DATA_BLOCK_EXPORT_FORMATS.find((candidate) => candidate.value === format);
   const fallbackFilename =
     dataBlocks.length > 1
-      ? `${safeStem(workspaceName, workspaceId)}_data_blocks.zip`
-      : `${safeStem(dataBlocks[0]?.name ?? '', dataBlocks[0]?.id ?? 'data-block')}.${formatSpec?.extension ?? format}`;
+      ? `${safeDownloadStem(workspaceName, workspaceId)}_data_blocks.zip`
+      : `${safeDownloadStem(dataBlocks[0]?.name ?? '', dataBlocks[0]?.id ?? 'data-block')}.${formatSpec?.extension ?? format}`;
   const filename = filenameFromResponse(response) ?? fallbackFilename;
   await saveBlob(data, filename);
   return filename;

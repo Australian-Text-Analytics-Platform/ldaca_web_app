@@ -77,7 +77,6 @@ interface TokenFrequencyParameterPanelProps {
   isStopping?: boolean;
   onClearResults: () => void;
   hasIncompleteSelections: boolean;
-  hasResults: boolean;
   parametersLocked: boolean;
   studyNodeId: string | null;
   onStudyNodeChange: (nodeId: string) => void;
@@ -103,7 +102,6 @@ export const TokenFrequencyParameterPanel = ({
   isStopping,
   onClearResults,
   hasIncompleteSelections,
-  hasResults,
   parametersLocked,
   studyNodeId,
   onStudyNodeChange,
@@ -180,7 +178,6 @@ export const TokenFrequencyParameterPanel = ({
         clearDisabledReason: actionState.clearDisabledReason,
         isRunningAll: isAnalyzing,
         isStopping,
-        hasResult: hasResults,
         runAllLabel: 'Run',
         runAllHelp: { targetKey: 'analysis.token-frequency.run', label: 'Run token frequency' },
         clearHelp: { targetKey: 'analysis.token-frequency.clear-results', label: 'Clear results' },
@@ -194,12 +191,9 @@ export const TokenFrequencyParameterPanel = ({
         unavailableNodes={unavailableNodes}
         inputOrder={nodeInputs.inputs.map((input) => input.node_id)}
         availableNodes={nodeInputs.availableNodes}
-        graphSelectedIds={nodeInputs.graphSelectedIds}
-        recentPresets={nodeInputs.recentPresets}
         canAddMore={nodeInputs.canAddMore}
         maxNodes={2}
         onAddNodes={nodeInputs.addNodes}
-        getAddRejection={nodeInputs.getAddRejection}
         onRemoveNode={nodeInputs.removeNode}
         onClear={nodeInputs.clear}
         onColumnChange={onColumnChange}

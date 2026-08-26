@@ -27,16 +27,15 @@ function runBootstrap(stored: string | null | Error) {
 }
 
 describe('pre-React theme bootstrap', () => {
-  it.each([
-    null,
-    'system',
-    new Error('storage blocked'),
-  ])('falls back to Light 2026 for %s', (stored) => {
-    const result = runBootstrap(stored);
-    expect(result.root.dataset.theme).toBe('light-2026');
-    expect(result.root.style.colorScheme).toBe('light');
-    expect(result.themeColor).toBe('#FAFAFD');
-  });
+  it.each([null, 'system', new Error('storage blocked')])(
+    'falls back to Light 2026 for %s',
+    (stored) => {
+      const result = runBootstrap(stored);
+      expect(result.root.dataset.theme).toBe('light-2026');
+      expect(result.root.style.colorScheme).toBe('light');
+      expect(result.themeColor).toBe('#FAFAFD');
+    },
+  );
 
   it('applies a valid last-known dark theme before React starts', () => {
     const result = runBootstrap('dark-2026');

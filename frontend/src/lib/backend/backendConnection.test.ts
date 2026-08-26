@@ -29,16 +29,16 @@ describe('resolveBackendConnection', () => {
   });
 
   it('uses hosted browser runtime configuration without calling Tauri', async () => {
-    window.__WORDFLOW_CONFIG__ = { basePath: '/wordflow' };
+    window.__WORDFLOW_CONFIG__ = { basePath: '/user/example/proxy/3000' };
 
     const connection = await resolveBackendConnection();
 
     expect(connection).toEqual({
-      apiBaseUrl: `${window.location.origin}/wordflow/api`,
-      clientBaseUrl: `${window.location.origin}/wordflow`,
-      healthUrl: `${window.location.origin}/wordflow/health`,
+      apiBaseUrl: `${window.location.origin}/user/example/proxy/3000/api`,
+      clientBaseUrl: `${window.location.origin}/user/example/proxy/3000`,
+      healthUrl: `${window.location.origin}/user/example/proxy/3000/health`,
     });
-    expect(client.getConfig().baseUrl).toBe(`${window.location.origin}/wordflow`);
+    expect(client.getConfig().baseUrl).toBe(`${window.location.origin}/user/example/proxy/3000`);
     expect(mocks.invoke).not.toHaveBeenCalled();
   });
 

@@ -33,19 +33,32 @@ import os
 from IPython.display import Markdown, display
 from ldaca_wordflow import start_async_server
 
-wordflow_server = await start_async_server(port=8001)
-proxy_path = (
+PORT = 8001
+ROOT_PATH = (
     f"{os.environ['JUPYTERHUB_SERVICE_PREFIX'].rstrip('/')}"
-    f"/proxy/{wordflow_server.settings.backend_port}/"
+    f"/proxy/{PORT}"
 )
-display(Markdown(f"[Open Wordflow]({proxy_path})"))
+wordflow_server = await start_async_server(
+    serve_frontend=True,
+    port=PORT,
+    root_path=ROOT_PATH,
+)
+display(Markdown(f"[Open Wordflow]({ROOT_PATH}/)"))
 ```
 
-The call returns only after application lifespan startup succeeds. The link
-opens `${JUPYTERHUB_SERVICE_PREFIX}proxy/8001/`, where Jupyter Server Proxy
-removes the external prefix before forwarding requests. Wordflow supplies the
-same prefix as the ASGI `root_path`, and the served `runtime-config.js` directs
-the browser's API and health requests back through that path.
+The call returns only after application lifespan startup succeeds. With the
+default `PORT`, the link opens `${JUPYTERHUB_SERVICE_PREFIX}proxy/8001/`. Set
+`PORT = 3000` to use the corresponding `${JUPYTERHUB_SERVICE_PREFIX}proxy/3000/`
+URL instead. Jupyter Server Proxy removes the external prefix before forwarding
+requests. The notebook supplies the same prefix as Wordflow's generic ASGI
+`root_path`, and the served `runtime-config.js` directs the router, API, health,
+authentication, and event-stream requests back through that path. The backend
+does not inspect `JUPYTERHUB_SERVICE_PREFIX`.
+
+`serve_frontend=True` is the combined Binder contract: FastAPI serves the
+packaged SPA and API from the same process. For backend-only source development,
+use `serve_frontend=False` and run Vite separately for hot reload. The async
+launcher does not start or supervise Vite.
 
 Stop the caller-owned server before rerunning the cell or leaving the notebook:
 
@@ -58,13 +71,16 @@ await wordflow_server.close()
 For a source checkout, run from the repository root:
 
 ```bash
-uv run --project backend ldaca-wordflow --port 8001
+ROOT_PATH="${JUPYTERHUB_SERVICE_PREFIX%/}/proxy/8001"
+uv run --project backend ldaca-wordflow --port 8001 --root-path "$ROOT_PATH"
 ```
 
 For an isolated published release:
 
 ```bash
-uvx --from 'ldaca-wordflow==<fixed-version>' ldaca-wordflow --port 8001
+ROOT_PATH="${JUPYTERHUB_SERVICE_PREFIX%/}/proxy/8001"
+uvx --from 'ldaca-wordflow==<fixed-version>' ldaca-wordflow \
+  --port 8001 --root-path "$ROOT_PATH"
 ```
 
 Run these blocking commands in a Jupyter terminal rather than a notebook cell,

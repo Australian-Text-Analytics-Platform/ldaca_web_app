@@ -10,6 +10,9 @@
 import { toast } from 'sonner';
 import { isTauri } from '@/lib/isTauri';
 
+export const safeDownloadStem = (value: string, fallback: string): string =>
+  (value.trim() || fallback).replace(/[^\p{L}\p{N}_-]+/gu, '_').replace(/^_+|_+$/g, '') || fallback;
+
 /**
  * Append a numeric suffix before the extension if `filename` already exists
  * in the Downloads directory: `report.csv` → `report (1).csv`.

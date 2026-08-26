@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type * as DownloadModule from '@/lib/download';
 
 vi.mock('@/features/guidance/GuidanceContext', () => ({
   useGuidance: () => ({
@@ -28,7 +29,10 @@ vi.mock('@/api', () => ({
   exportDataBlocks: mocks.exportDataBlocks,
   exportWorkspaceArchive: mocks.exportWorkspaceArchive,
 }));
-vi.mock('@/lib/download', () => ({ saveBlob: mocks.saveBlob }));
+vi.mock('@/lib/download', async (importOriginal) => {
+  const actual = await importOriginal<typeof DownloadModule>();
+  return { ...actual, saveBlob: mocks.saveBlob };
+});
 vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
   useWorkspaceData: mocks.useWorkspaceData,
 }));

@@ -7,31 +7,28 @@ import {
 
 describe('topicModelingParameterReducer', () => {
   it('marks corpus sampling as user-set when a row changes', () => {
-    const state = topicModelingParameterReducer(createTopicModelingParameterState(), {
-      type: 'applyNodeDefaultSamples',
-      samples: [{ percent: '100' }],
-    });
-    const updated = topicModelingParameterReducer(state, {
+    const updated = topicModelingParameterReducer(createTopicModelingParameterState(), {
       type: 'updateCorpusSample',
-      index: 0,
+      nodeId: 'node-1',
       update: { percent: '25' },
     });
 
-    expect(updated.corpusSamples).toEqual([{ percent: '25' }]);
-    expect(updated.corpusSamplesUserSet).toBe(true);
+    expect(updated.corpusSamplesByNodeId).toEqual({ 'node-1': { percent: '25' } });
+    expect(updated.userSetSampleNodeIds).toEqual({ 'node-1': true });
   });
 
   it('hydrates saved request parameters and sample fractions together', () => {
     const state = topicModelingParameterReducer(createTopicModelingParameterState(), {
       type: 'hydrateRequest',
       request: {
+        node_ids: ['node-1', 'node-2'],
+        node_columns: { 'node-1': 'text', 'node-2': 'text' },
         min_cluster_size: 25,
         random_seed: 7,
         segmentation_method: 'paragraph',
         max_segment_tokens: 64,
         sample_fractions: [0.2, null],
       },
-      nodeDocCounts: [10000, 5000],
     });
 
     expect(state).toMatchObject({
@@ -40,34 +37,11 @@ describe('topicModelingParameterReducer', () => {
       randomSeedUserSet: true,
       segmentationMethod: 'paragraph',
       maxSegmentTokens: 64,
-      corpusSamples: [{ percent: '20' }, { percent: '100' }],
-      corpusSamplesUserSet: true,
-    });
-  });
-
-  it('preserves tuned sampling but clears result-scoped user flags after clear', () => {
-    const state = topicModelingParameterReducer(createTopicModelingParameterState(), {
-      type: 'hydrateRequest',
-      request: {
-        min_cluster_size: 4,
-        random_seed: 99,
-        segmentation_method: 'sentence',
-        max_segment_tokens: 128,
-        sample_fractions: [0.25],
+      corpusSamplesByNodeId: {
+        'node-1': { percent: '20' },
+        'node-2': { percent: '100' },
       },
-      nodeDocCounts: [10000],
+      userSetSampleNodeIds: { 'node-1': true, 'node-2': true },
     });
-    const cleared = topicModelingParameterReducer(state, {
-      type: 'resetAfterClear',
-      defaultSamples: [{ percent: '100' }],
-    });
-
-    expect(cleared.corpusSamples).toEqual([{ percent: '25' }]);
-    expect(cleared.corpusSamplesUserSet).toBe(true);
-    expect(cleared.minClusterSize).toBe(4);
-    expect(cleared.randomSeed).toBe(99);
-    expect(cleared.randomSeedUserSet).toBe(false);
-    expect(cleared.segmentationMethod).toBe('sentence');
-    expect(cleared.maxSegmentTokens).toBe(128);
   });
 });

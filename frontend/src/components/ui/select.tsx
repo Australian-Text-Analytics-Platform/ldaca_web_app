@@ -1,5 +1,5 @@
 import * as React from 'react';
-import * as SelectPrimitive from '@radix-ui/react-select';
+import { Select as SelectPrimitive } from 'radix-ui';
 import { cn } from '@/lib/utils';
 import { Check, ChevronDown, ChevronUp } from 'lucide-react';
 
@@ -12,14 +12,10 @@ const SelectGroup = SelectPrimitive.Group;
 /** Select value primitive used inside triggers to display the chosen option. */
 const SelectValue = SelectPrimitive.Value;
 
-type SelectTriggerProps = SelectPrimitive.SelectTriggerProps &
-  React.ComponentPropsWithoutRef<'button'> & { children?: React.ReactNode };
+type SelectTriggerProps = React.ComponentProps<typeof SelectPrimitive.Trigger>;
 
 /** Trigger button wrapper used by app selects for consistent focus and chevron styling. */
-const SelectTrigger = React.forwardRef<
-  React.ComponentRef<typeof SelectPrimitive.Trigger>,
-  SelectTriggerProps
->(({ className, children, ...props }, ref) => (
+const SelectTrigger = ({ className, children, ref, ...props }: SelectTriggerProps) => (
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
@@ -33,14 +29,14 @@ const SelectTrigger = React.forwardRef<
       <ChevronDown className="h-4 w-4 opacity-50" />
     </SelectPrimitive.Icon>
   </SelectPrimitive.Trigger>
-));
-SelectTrigger.displayName = SelectPrimitive.Trigger.displayName;
+);
 
 /** Scroll-up affordance shown by long select option lists. */
-const SelectScrollUpButton = React.forwardRef<
-  React.ComponentRef<typeof SelectPrimitive.ScrollUpButton>,
-  React.ComponentPropsWithoutRef<typeof SelectPrimitive.ScrollUpButton>
->(({ className, ...props }, ref) => (
+const SelectScrollUpButton = ({
+  className,
+  ref,
+  ...props
+}: React.ComponentProps<typeof SelectPrimitive.ScrollUpButton>) => (
   <SelectPrimitive.ScrollUpButton
     ref={ref}
     className={cn('flex cursor-default items-center justify-center py-1', className)}
@@ -48,14 +44,14 @@ const SelectScrollUpButton = React.forwardRef<
   >
     <ChevronUp className="h-4 w-4" />
   </SelectPrimitive.ScrollUpButton>
-));
-SelectScrollUpButton.displayName = SelectPrimitive.ScrollUpButton.displayName;
+);
 
 /** Scroll-down affordance shown by long select option lists. */
-const SelectScrollDownButton = React.forwardRef<
-  React.ComponentRef<typeof SelectPrimitive.ScrollDownButton>,
-  React.ComponentPropsWithoutRef<typeof SelectPrimitive.ScrollDownButton>
->(({ className, ...props }, ref) => (
+const SelectScrollDownButton = ({
+  className,
+  ref,
+  ...props
+}: React.ComponentProps<typeof SelectPrimitive.ScrollDownButton>) => (
   <SelectPrimitive.ScrollDownButton
     ref={ref}
     className={cn('flex cursor-default items-center justify-center py-1', className)}
@@ -63,16 +59,18 @@ const SelectScrollDownButton = React.forwardRef<
   >
     <ChevronDown className="h-4 w-4" />
   </SelectPrimitive.ScrollDownButton>
-));
-SelectScrollDownButton.displayName = SelectPrimitive.ScrollDownButton.displayName;
+);
 
-type SelectContentProps = SelectPrimitive.SelectContentProps & { children?: React.ReactNode };
+type SelectContentProps = React.ComponentProps<typeof SelectPrimitive.Content>;
 
 /** Portal-backed select content panel used by dropdown option lists. */
-const SelectContent = React.forwardRef<
-  React.ComponentRef<typeof SelectPrimitive.Content>,
-  SelectContentProps
->(({ className, children, position = 'popper', ...props }, ref) => (
+const SelectContent = ({
+  className,
+  children,
+  position = 'popper',
+  ref,
+  ...props
+}: SelectContentProps) => (
   <SelectPrimitive.Portal>
     <SelectPrimitive.Content
       ref={ref}
@@ -97,29 +95,25 @@ const SelectContent = React.forwardRef<
       <SelectScrollDownButton />
     </SelectPrimitive.Content>
   </SelectPrimitive.Portal>
-));
-SelectContent.displayName = SelectPrimitive.Content.displayName;
+);
 
 /** Select label row used to name grouped option sets. */
-const SelectLabel = React.forwardRef<
-  React.ComponentRef<typeof SelectPrimitive.Label>,
-  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Label>
->(({ className, ...props }, ref) => (
+const SelectLabel = ({
+  className,
+  ref,
+  ...props
+}: React.ComponentProps<typeof SelectPrimitive.Label>) => (
   <SelectPrimitive.Label
     ref={ref}
     className={cn('px-2 py-1 text-label font-semibold', className)}
     {...props}
   />
-));
-SelectLabel.displayName = SelectPrimitive.Label.displayName;
+);
 
-type SelectItemProps = SelectPrimitive.SelectItemProps & { children?: React.ReactNode };
+type SelectItemProps = React.ComponentProps<typeof SelectPrimitive.Item>;
 
 /** Select option row with checkmark indicator for chosen values. */
-const SelectItem = React.forwardRef<
-  React.ComponentRef<typeof SelectPrimitive.Item>,
-  SelectItemProps
->(({ className, children, ...props }, ref) => (
+const SelectItem = ({ className, children, ref, ...props }: SelectItemProps) => (
   <SelectPrimitive.Item
     ref={ref}
     className={cn(
@@ -135,7 +129,6 @@ const SelectItem = React.forwardRef<
     </span>
     <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
   </SelectPrimitive.Item>
-));
-SelectItem.displayName = SelectPrimitive.Item.displayName;
+);
 
 export { Select, SelectGroup, SelectValue, SelectTrigger, SelectContent, SelectLabel, SelectItem };

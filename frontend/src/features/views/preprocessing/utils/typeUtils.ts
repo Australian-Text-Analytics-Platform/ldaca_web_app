@@ -33,8 +33,8 @@ export const getOperatorsForField = (field: ArrowField | undefined) => {
     return [
       { value: 'contains', label: 'contains' },
       { value: 'eq', label: 'equals' },
-      { value: 'startswith', label: 'starts with' },
-      { value: 'endswith', label: 'ends with' },
+      { value: 'starts_with', label: 'starts with' },
+      { value: 'ends_with', label: 'ends with' },
       { value: 'is_null', label: 'is null' },
     ];
   }

@@ -31,21 +31,21 @@ describe('getRerunActionState', () => {
     });
   });
 
-  it.each([
-    'queued',
-    'running',
-  ] as const)('disables execution and Clear while an Analysis is %s', (analysisState) => {
-    expect(
-      getRerunActionState({
-        ...baseInput,
-        hasAttachedAnalysis: true,
-        analysisState,
-      }),
-    ).toMatchObject({
-      runDisabled: true,
-      clearDisabled: true,
-    });
-  });
+  it.each(['queued', 'running'] as const)(
+    'disables execution and Clear while an Analysis is %s',
+    (analysisState) => {
+      expect(
+        getRerunActionState({
+          ...baseInput,
+          hasAttachedAnalysis: true,
+          analysisState,
+        }),
+      ).toMatchObject({
+        runDisabled: true,
+        clearDisabled: true,
+      });
+    },
+  );
 
   it('requires a change before rerunning a successful Analysis', () => {
     expect(
@@ -75,23 +75,23 @@ describe('getRerunActionState', () => {
     });
   });
 
-  it.each([
-    'failed',
-    'cancelled',
-  ] as const)('requires Clear before retrying an Analysis that is %s', (analysisState) => {
-    expect(
-      getRerunActionState({
-        ...baseInput,
-        hasAttachedAnalysis: true,
-        analysisState,
-        hasChanges: false,
-      }),
-    ).toMatchObject({
-      runDisabled: true,
-      clearDisabled: false,
-      runDisabledReason: 'Clear Results before running again',
-    });
-  });
+  it.each(['failed', 'cancelled'] as const)(
+    'requires Clear before retrying an Analysis that is %s',
+    (analysisState) => {
+      expect(
+        getRerunActionState({
+          ...baseInput,
+          hasAttachedAnalysis: true,
+          analysisState,
+          hasChanges: false,
+        }),
+      ).toMatchObject({
+        runDisabled: true,
+        clearDisabled: false,
+        runDisabledReason: 'Clear Results before running again',
+      });
+    },
+  );
 
   it('keeps Clear available but disables retry for an attached Analysis with unknown state', () => {
     expect(

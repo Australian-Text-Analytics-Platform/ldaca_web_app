@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Slot } from '@radix-ui/react-slot';
+import { Slot } from 'radix-ui';
 import { cva, type VariantProps } from 'class-variance-authority';
 
 import { cn } from '@/lib/utils';
@@ -36,13 +36,10 @@ type TagProps = React.ComponentProps<'span'> &
     asChild?: boolean;
   };
 
-const Tag = React.forwardRef<React.ComponentRef<'span'>, TagProps>(
-  ({ className, tone, size, asChild = false, ...props }, ref) => {
-    const Comp = asChild ? Slot : 'span';
+const Tag = ({ className, tone, size, asChild = false, ref, ...props }: TagProps) => {
+  const Comp = asChild ? Slot.Root : 'span';
 
-    return <Comp ref={ref} className={cn(tagVariants({ tone, size }), className)} {...props} />;
-  },
-);
-Tag.displayName = 'Tag';
+  return <Comp ref={ref} className={cn(tagVariants({ tone, size }), className)} {...props} />;
+};
 
 export { Tag };

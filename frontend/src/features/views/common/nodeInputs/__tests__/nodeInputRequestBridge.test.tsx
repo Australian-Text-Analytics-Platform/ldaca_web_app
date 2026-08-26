@@ -5,23 +5,17 @@ import { StrictMode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NodeInputsPanel } from '@/features/views/common/components/NodeInputsPanel';
 import { useNodeInputRequestsStore } from '@/stores/nodeInputRequestsStore';
-import { useRecentSelectionsStore } from '@/stores/recentSelectionsStore';
 import type { AnalysisTabInput } from '../../tabs/tabStateOps';
 import { useTabNodeInputs } from '../useTabNodeInputs';
 
 const mocks = vi.hoisted(() => ({
   useWorkspaceData: vi.fn(),
-  useWorkspaceSelection: vi.fn(),
   useNodeColumnInfos: vi.fn(),
   useUIStore: vi.fn(),
 }));
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
   useWorkspaceData: mocks.useWorkspaceData,
-}));
-
-vi.mock('@/features/workspace/common/hooks/useWorkspaceSelection', () => ({
-  useWorkspaceSelection: mocks.useWorkspaceSelection,
 }));
 
 vi.mock('@/features/workspace/common/hooks/useNodeColumnInfos', () => ({
@@ -51,12 +45,9 @@ function RequestBridgeHarness({
       title="Preprocessing Inputs"
       resolvedNodes={nodeInputs.resolvedNodes}
       availableNodes={nodeInputs.availableNodes}
-      graphSelectedIds={nodeInputs.graphSelectedIds}
-      recentPresets={nodeInputs.recentPresets}
       canAddMore={nodeInputs.canAddMore}
       maxNodes={1}
       onAddNodes={nodeInputs.addNodes}
-      getAddRejection={nodeInputs.getAddRejection}
       onRemoveNode={nodeInputs.removeNode}
       onClear={nodeInputs.clear}
       onColumnChange={nodeInputs.setColumn}
@@ -71,12 +62,10 @@ describe('node input request bridge', () => {
       nextId: 1,
       pendingRequests: [],
     });
-    useRecentSelectionsStore.setState({ byWorkspace: {} });
     mocks.useWorkspaceData.mockReturnValue({
       currentWorkspaceId: 'workspace-1',
       nodes: [{ id: 'node-a', name: 'Node A' }],
     });
-    mocks.useWorkspaceSelection.mockReturnValue({ selectedNodeIds: [] });
     mocks.useNodeColumnInfos.mockReturnValue({
       getColumnInfos: () => [
         { name: 'text', typeName: 'Utf8', field: new Field('text', new Utf8()) },

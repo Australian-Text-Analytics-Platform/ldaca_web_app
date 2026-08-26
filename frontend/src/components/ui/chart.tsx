@@ -35,56 +35,60 @@ const slug = (key: string) => key.replace(/[^a-zA-Z0-9]+/g, '-');
 
 interface ChartContainerProps extends React.HTMLAttributes<HTMLDivElement> {
   config: ChartConfig;
+  ref?: React.Ref<HTMLDivElement>;
 }
 
 /** Chart wrapper that publishes series config and CSS color variables to Recharts children. */
-const ChartContainer = React.forwardRef<HTMLDivElement, ChartContainerProps>(
-  ({ className, children, config, style, ...props }, ref) => {
-    const cssVars: React.CSSProperties = (() => {
-      const entries = Object.entries(config).filter(([, value]) => value.color);
-      if (!entries.length) return style ?? {};
-      const vars = entries.reduce<Record<string, string>>((acc, [key, value]) => {
-        const variable = `--color-${slug(key)}`;
-        acc[variable] = value.color ?? '';
-        return acc;
-      }, {});
-      return {
-        ...style,
-        ...vars,
-      };
-    })();
+const ChartContainer = ({
+  className,
+  children,
+  config,
+  style,
+  ref,
+  ...props
+}: ChartContainerProps) => {
+  const cssVars: React.CSSProperties = (() => {
+    const entries = Object.entries(config).filter(([, value]) => value.color);
+    if (!entries.length) return style ?? {};
+    const vars = entries.reduce<Record<string, string>>((acc, [key, value]) => {
+      const variable = `--color-${slug(key)}`;
+      acc[variable] = value.color ?? '';
+      return acc;
+    }, {});
+    return {
+      ...style,
+      ...vars,
+    };
+  })();
 
-    const contextValue = { config };
+  const contextValue = { config };
 
-    return (
-      <ChartContext.Provider value={contextValue}>
-        <div ref={ref} className={cn('relative', className)} style={cssVars} {...props}>
-          {children}
-        </div>
-      </ChartContext.Provider>
-    );
-  },
-);
-ChartContainer.displayName = 'ChartContainer';
+  return (
+    <ChartContext.Provider value={contextValue}>
+      <div ref={ref} className={cn('relative', className)} style={cssVars} {...props}>
+        {children}
+      </div>
+    </ChartContext.Provider>
+  );
+};
 
 interface ChartTooltipProps extends Omit<React.ComponentProps<typeof Tooltip>, 'content'> {
   content?: React.ComponentProps<typeof Tooltip>['content'];
 }
 
 /** Recharts tooltip wrapper that provides the app's default cursor and content renderer. */
-const ChartTooltip = React.forwardRef<HTMLDivElement, ChartTooltipProps>(
-  ({ content, cursor = { strokeDasharray: '3 3' }, ...props }, _ref) => {
-    return (
-      <Tooltip
-        {...props}
-        cursor={cursor}
-        content={content ?? <ChartTooltipContent />}
-        wrapperStyle={{ outline: 'none' }}
-      />
-    );
-  },
+const ChartTooltip = ({
+  content,
+  cursor = { strokeDasharray: '3 3' },
+  ...props
+}: ChartTooltipProps) => (
+  <Tooltip
+    {...props}
+    cursor={cursor}
+    content={content ?? <ChartTooltipContent />}
+    wrapperStyle={{ outline: 'none' }}
+  />
 );
-ChartTooltip.displayName = 'ChartTooltip';
 
 interface TooltipItem {
   name?: string | number;
@@ -103,74 +107,79 @@ interface ChartTooltipContentProps {
   hideLabel?: boolean;
   nameKey?: string;
   labelFormatter?: (value?: string | number) => React.ReactNode;
+  ref?: React.Ref<HTMLDivElement>;
 }
 
 /** Tooltip content renderer used by `ChartTooltip` to show configured labels, colors, and values. */
-const ChartTooltipContent = React.forwardRef<HTMLDivElement, ChartTooltipContentProps>(
-  (
-    { active, payload, label, className, indicator = 'dot', hideLabel, nameKey, labelFormatter },
-    ref,
-  ) => {
-    const { config } = useChartContext();
+const ChartTooltipContent = ({
+  active,
+  payload,
+  label,
+  className,
+  indicator = 'dot',
+  hideLabel,
+  nameKey,
+  labelFormatter,
+  ref,
+}: ChartTooltipContentProps) => {
+  const { config } = useChartContext();
 
-    const items = payload ?? [];
+  const items = payload ?? [];
 
-    if (!active || items.length === 0) {
-      return null;
-    }
+  if (!active || items.length === 0) {
+    return null;
+  }
 
-    const resolvedLabel = labelFormatter ? labelFormatter(label) : label;
+  const resolvedLabel = labelFormatter ? labelFormatter(label) : label;
 
-    return (
-      <div
-        ref={ref}
-        className={cn(
-          'grid gap-2 rounded-md border border-[var(--vscode-widget-border)] bg-widget p-2 text-body text-widget-foreground shadow-[var(--vscode-shadow-lg)]',
-          className,
-        )}
-      >
-        {!hideLabel && resolvedLabel && (
-          <div className="font-medium text-surface-foreground">{resolvedLabel}</div>
-        )}
-        <div className="grid gap-1 text-label-secondary text-description">
-          {items.map((item, index) => {
-            const key = String(item.dataKey ?? item.name ?? index);
-            const data = config[key] ?? config[item.name ?? ''];
-            const colorVariable = data?.color ? `var(--color-${slug(key)})` : item.color;
+  return (
+    <div
+      ref={ref}
+      className={cn(
+        'grid gap-2 rounded-md border border-[var(--vscode-widget-border)] bg-widget p-2 text-body text-widget-foreground shadow-[var(--vscode-shadow-lg)]',
+        className,
+      )}
+    >
+      {!hideLabel && resolvedLabel && (
+        <div className="font-medium text-surface-foreground">{resolvedLabel}</div>
+      )}
+      <div className="grid gap-1 text-label-secondary text-description">
+        {items.map((item, index) => {
+          const key = String(item.dataKey ?? item.name ?? index);
+          const data = config[key] ?? config[item.name ?? ''];
+          const colorVariable = data?.color ? `var(--color-${slug(key)})` : item.color;
 
-            const Icon = data?.icon;
+          const Icon = data?.icon;
 
-            return (
-              <div key={key} className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-2">
-                  <span
-                    className={cn(
-                      'h-2 w-2 rounded-full',
-                      indicator === 'line' && 'h-[2px] w-4',
-                      indicator === 'line' && colorVariable ? 'rounded-none' : null,
-                    )}
-                    style={colorVariable ? { background: colorVariable } : undefined}
-                  />
-                  <span className="font-medium text-surface-foreground">
-                    {data?.label ??
-                      (nameKey && item.payload?.[nameKey] != null
-                        ? // eslint-disable-next-line @typescript-eslint/no-base-to-string -- recharts payload value is an untyped runtime label expected to be a primitive
-                          String(item.payload[nameKey])
-                        : key)}
-                  </span>
-                  {Icon ? <Icon className="h-3.5 w-3.5" /> : null}
-                </div>
-                <span className="font-mono text-surface-foreground">
-                  {item.value?.toLocaleString() ?? item.value}
+          return (
+            <div key={key} className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <span
+                  className={cn(
+                    'h-2 w-2 rounded-full',
+                    indicator === 'line' && 'h-[2px] w-4',
+                    indicator === 'line' && colorVariable ? 'rounded-none' : null,
+                  )}
+                  style={colorVariable ? { background: colorVariable } : undefined}
+                />
+                <span className="font-medium text-surface-foreground">
+                  {data?.label ??
+                    (nameKey && item.payload?.[nameKey] != null
+                      ? // eslint-disable-next-line @typescript-eslint/no-base-to-string -- recharts payload value is an untyped runtime label expected to be a primitive
+                        String(item.payload[nameKey])
+                      : key)}
                 </span>
+                {Icon ? <Icon className="h-3.5 w-3.5" /> : null}
               </div>
-            );
-          })}
-        </div>
+              <span className="font-mono text-surface-foreground">
+                {item.value?.toLocaleString() ?? item.value}
+              </span>
+            </div>
+          );
+        })}
       </div>
-    );
-  },
-);
-ChartTooltipContent.displayName = 'ChartTooltipContent';
+    </div>
+  );
+};
 
 export { ChartContainer, ChartTooltip, ChartTooltipContent };

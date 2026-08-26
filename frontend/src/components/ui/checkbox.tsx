@@ -1,13 +1,14 @@
 import * as React from 'react';
-import * as CheckboxPrimitive from '@radix-ui/react-checkbox';
+import { Checkbox as CheckboxPrimitive } from 'radix-ui';
 import { cn } from '@/lib/utils';
 import { Check } from 'lucide-react';
 
 /** Checkbox primitive used by forms and chart export options with shared checked styling. */
-const Checkbox = React.forwardRef<
-  React.ComponentRef<typeof CheckboxPrimitive.Root>,
-  React.ComponentPropsWithoutRef<typeof CheckboxPrimitive.Root>
->(({ className, ...props }, ref) => (
+const Checkbox = ({
+  className,
+  ref,
+  ...props
+}: React.ComponentProps<typeof CheckboxPrimitive.Root>) => (
   <CheckboxPrimitive.Root
     ref={ref}
     className={cn(
@@ -20,7 +21,6 @@ const Checkbox = React.forwardRef<
       <Check className="h-4 w-4" />
     </CheckboxPrimitive.Indicator>
   </CheckboxPrimitive.Root>
-));
-Checkbox.displayName = CheckboxPrimitive.Root.displayName;
+);
 
 export { Checkbox };

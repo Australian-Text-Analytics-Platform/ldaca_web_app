@@ -1,4 +1,3 @@
-import type { ColumnDef } from '@tanstack/react-table';
 import { ArrowRight, Loader2, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -28,7 +27,7 @@ import type { IntercoderReliabilityMetric } from '@/features/views/common/column
 import { MetadataColumnSelector } from '@/features/views/common/components/MetadataColumnSelector';
 import { PaginatedTableProcessingRow } from '@/features/views/common/components/PaginatedTableProcessingRow';
 import { ServerPaginationFooter } from '@/features/views/common/components/ServerPaginationFooter';
-import { useServerTable } from '@/features/views/common/hooks/useServerTable';
+import { type ServerColumnDef, useServerTable } from '@/features/views/common/hooks/useServerTable';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { toBgColor } from '@/features/views/common/vizPalette';
 import { annotationValuesDiffer } from '../annotationDifferenceQuery';
@@ -143,7 +142,7 @@ export function AnnotationAiPreviewPanel({
     });
     comparisonRows.set(targetColumn, Array.from(counts.values()));
   });
-  const tableColumns: ColumnDef<AnnotationPreviewRow>[] = [
+  const tableColumns: ServerColumnDef<AnnotationPreviewRow>[] = [
     { id: columns.text, accessorFn: (row) => row[columns.text] },
     { id: 'annotation_preview', accessorFn: (row) => row[columns.annotation] },
     ...(showCorrectionColumn && correctionColumn

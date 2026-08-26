@@ -1,16 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type {
-  Column as TableColumn,
   SortingState,
   PaginationState as TanstackPaginationState,
 } from '@tanstack/react-table';
-import {
-  type ColumnDef,
-  type ColumnPinningState,
-  flexRender,
-  getCoreRowModel,
-  useReactTable,
-} from '@tanstack/react-table';
+import { type ColumnPinningState, flexRender, useTable } from '@tanstack/react-table';
 import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -41,8 +34,13 @@ import { TopicDistributionBar } from './TopicDistributionBar';
 import type { DataRow, NodeTablePagination } from '../types';
 import { arrowTypeName, type ArrowField } from '@/lib/arrow/arrowTable';
 import { isTopicDistributionField } from '@/lib/arrow/semanticTypes';
-import { DATA_TYPES, getTypeDisplayName } from '../services/schemaMutations';
+import { DATA_TYPES, getTypeDisplayName, type ColumnCastType } from '../services/schemaMutations';
 import { useColumnMutations } from '../hooks/useColumnMutations';
+import {
+  workspaceTableFeatures,
+  type WorkspaceTableColumn,
+  type WorkspaceTableColumnDef,
+} from './workspaceTableFeatures';
 
 // --- Constants ---
 const WIDE_COLUMN_THRESHOLD = 120;
@@ -61,7 +59,7 @@ export interface WorkspaceTableProps {
   workspaceId?: string;
   nodeId?: string;
   documentColumn?: string;
-  onCast?: (column: string, targetType: string, format?: string) => Promise<void>;
+  onCast?: (column: string, targetType: ColumnCastType, format?: string) => Promise<void>;
   onRenameColumn?: (column: string, nextName: string) => Promise<void>;
   onDeleteColumn?: (column: string) => Promise<void>;
   onRefreshSchema?: () => Promise<unknown>;
@@ -109,7 +107,7 @@ export function WorkspaceTable({
 }: WorkspaceTableProps) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const [expandedColumns, setExpandedColumns] = useState<Record<string, boolean>>({});
-  const [columnPinning, setColumnPinning] = useState<ColumnPinningState>({ left: [] });
+  const [columnPinning, setColumnPinning] = useState<ColumnPinningState>({ start: [], end: [] });
   const {
     detailPayload,
     detailOpen,
@@ -210,7 +208,7 @@ export function WorkspaceTable({
   };
 
   // Build column definitions
-  const columnDefs: ColumnDef<DataRow>[] = columns.map((column) => {
+  const columnDefs: WorkspaceTableColumnDef[] = columns.map((column) => {
     const currentField = mutationColumnFields[column];
     const currentType = currentField ? arrowTypeName(currentField) : 'unknown';
     const isColumnLoading = Boolean(loadingCast[column]);
@@ -320,7 +318,7 @@ export function WorkspaceTable({
             : EXPANDED_COLUMN_MAX_WIDTH
           : undefined,
       },
-    } satisfies ColumnDef<DataRow>;
+    } satisfies WorkspaceTableColumnDef;
   });
 
   // TanStack Table instance (server-side)
@@ -333,7 +331,7 @@ export function WorkspaceTable({
 
   /**
    * Bridges TanStack pagination updates to server pagination callbacks.
-   * Passed to `useReactTable` as `onPaginationChange`.
+   * Passed to `useTable` as `onPaginationChange`.
    */
   const handlePaginationChange = (
     updater: TanstackPaginationState | ((prev: TanstackPaginationState) => TanstackPaginationState),
@@ -349,7 +347,7 @@ export function WorkspaceTable({
 
   /**
    * Bridges TanStack sorting updates to server sorting callbacks.
-   * Passed to `useReactTable` as `onSortingChange`.
+   * Passed to `useTable` as `onSortingChange`.
    */
   const handleSortingChangeInternal = (
     updater: SortingState | ((prev: SortingState) => SortingState),
@@ -359,11 +357,10 @@ export function WorkspaceTable({
     onPageChange?.(1);
   };
 
-  // eslint-disable-next-line react-hooks/incompatible-library -- useReactTable returns non-memoizable functions; React Compiler can skip this
-  const tableInstance = useReactTable({
+  const tableInstance = useTable({
+    features: workspaceTableFeatures,
     data: sanitizedData,
     columns: columnDefs,
-    getCoreRowModel: getCoreRowModel(),
     manualPagination: true,
     manualSorting: true,
     rowCount: usesLookaheadPagination ? undefined : totalRows,
@@ -384,7 +381,7 @@ export function WorkspaceTable({
    * Flow: read the column pin state, set sticky offsets, then add edge shadows for pinned sides.
    */
   const getPinnedStyles = (
-    col: TableColumn<DataRow>,
+    col: WorkspaceTableColumn,
     variant: 'header' | 'cell',
   ): React.CSSProperties | undefined => {
     const pinState = col.getIsPinned();
@@ -394,11 +391,11 @@ export function WorkspaceTable({
       zIndex: variant === 'header' ? 30 : 5,
     };
     if (variant === 'header') style.top = 0;
-    if (pinState === 'left') {
-      style.left = `${String(col.getStart('left'))}px`;
+    if (pinState === 'start') {
+      style.insetInlineStart = `${String(col.getStart('start'))}px`;
       style.boxShadow = '2px 0 0 -1px var(--vscode-surface-border)';
     } else {
-      style.right = `${String(col.getStart('right'))}px`;
+      style.insetInlineEnd = `${String(col.getStart('end'))}px`;
       style.boxShadow = '-2px 0 0 -1px var(--vscode-surface-border)';
     }
     return style;

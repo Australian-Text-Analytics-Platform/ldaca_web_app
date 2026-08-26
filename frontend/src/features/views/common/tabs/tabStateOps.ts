@@ -6,11 +6,9 @@
  * remains the source of truth for tab identity and analysis ownership.
  */
 import type { AnalysisKind, Tab, TopicModelingProjectionSelection } from '@/api';
+import type { NodeInput } from '../nodeInputs/nodeInputsCore';
 
-export interface AnalysisTabInput {
-  node_id: string;
-  column?: string | null;
-}
+export type AnalysisTabInput = NodeInput;
 export type AnalysisTabInputSets = Record<string, AnalysisTabInput[]>;
 
 export interface AnalysisTab {

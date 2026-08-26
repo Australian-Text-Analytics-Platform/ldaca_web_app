@@ -1,4 +1,3 @@
-import type { Table } from '@tanstack/react-table';
 import { cn } from '@/lib/utils';
 import {
   Pagination,
@@ -24,7 +23,12 @@ import { Label } from '@/components/ui/label';
 /** Default page-size options shared by every server-backed paginated table. */
 const DEFAULT_PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
-export interface ServerPaginationFooterProps<TData> {
+interface PaginationTableActions {
+  setPageIndex: (pageIndex: number) => void;
+  setPageSize: (pageSize: number) => void;
+}
+
+export interface ServerPaginationFooterProps {
   /**
    * TanStack instance used ONLY for actions (setPageIndex / setPageSize). Its
    * reference is referentially stable across renders, so display state is taken
@@ -32,7 +36,7 @@ export interface ServerPaginationFooterProps<TData> {
    * component on the unchanged `table` reference and the page indicator freezes
    * even as pagination advances.
    */
-  table: Table<TData>;
+  table: PaginationTableActions;
   /** Zero-based current page index (real changing value from the consumer). */
   pageIndex: number;
   /** Current page size (real changing value from the consumer). */
@@ -65,15 +69,9 @@ export interface ServerPaginationFooterProps<TData> {
 /**
  * Unified pagination footer for every server-backed TanStack table.
  *
- * DISPLAY state (current page, total pages, prev/next enablement) is derived
- * from the `pageIndex`/`pageSize`/`rowCount` props, which are the consumer's
- * REAL controlled values. This is deliberate: TanStack's `useReactTable`
- * returns a referentially stable instance, so under React Compiler a footer
- * that read `table.getState()` would be memoized on the unchanged `table`
- * reference and the page indicator would freeze on page 1 even as navigation
- * fired backend refetches. The stable `table` is kept only to dispatch ACTIONS
- * (`setPageIndex` / `setPageSize`), which flow through the same
- * `onPaginationChange` bridge that triggers refetches.
+ * Display state comes from the backend-controlled pagination props. The
+ * narrowed `table` interface is used only to dispatch page actions through the
+ * consumer's `onPaginationChange` bridge.
  *
  * For analysis tables (concordance, quotation) `rowCount` is the number of
  * SOURCE documents, not displayed hit rows — so the page count reflects
@@ -92,7 +90,7 @@ export interface ServerPaginationFooterProps<TData> {
  * links and optional summary/loading/trailing actions, then emit changes back
  * through the table instance.
  */
-export function ServerPaginationFooter<TData>({
+export function ServerPaginationFooter({
   table,
   pageIndex,
   pageSize,
@@ -106,9 +104,7 @@ export function ServerPaginationFooter<TData>({
   children,
   compact = false,
   className,
-}: ServerPaginationFooterProps<TData>) {
-  // Derived from real props (not `table.getState()`) so the component re-renders
-  // when the consumer's controlled pagination advances.
+}: ServerPaginationFooterProps) {
   const totalPages =
     rowCount === undefined ? undefined : pageSize > 0 ? Math.ceil(rowCount / pageSize) : 0;
   const pageCount = totalPages ?? pageIndex + 1 + (hasNext ? 1 : 0);

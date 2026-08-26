@@ -78,7 +78,7 @@ vi.mock('recharts', () => ({
     chartProps.barChartProps.push(capturedProps);
     return <div data-testid="bar-chart">{children}</div>;
   },
-  Cell: () => <div data-testid="cell" />,
+  Rectangle: () => <div data-testid="rectangle" />,
 }));
 
 const baseRows = [
@@ -180,64 +180,66 @@ describe('ConcordanceDispersionSummary', () => {
     expect(screen.getByTestId('area')).toBeInTheDocument();
   });
 
-  it.each([
-    4, 5, 10,
-  ] as const)('groups bars closely and alternates bin backgrounds at %i bins', (binCount) => {
-    render(
-      <ConcordanceDispersionSummary
-        rows={[]}
-        textColumn="text"
-        binCount={binCount}
-        splitBySource={false}
-        dataBlockLabel="Corpus"
-        searchWord="jobs Jobs"
-        chartMode="density-bar"
-        densitySeries={[
-          { label: 'jobs', counts: Array.from({ length: 100 }, () => 1) },
-          { label: 'Jobs', counts: Array.from({ length: 100 }, () => 2) },
-        ]}
-      />,
-    );
+  it.each([4, 5, 10] as const)(
+    'groups bars closely and alternates bin backgrounds at %i bins',
+    (binCount) => {
+      render(
+        <ConcordanceDispersionSummary
+          rows={[]}
+          textColumn="text"
+          binCount={binCount}
+          splitBySource={false}
+          dataBlockLabel="Corpus"
+          searchWord="jobs Jobs"
+          chartMode="density-bar"
+          densitySeries={[
+            { label: 'jobs', counts: Array.from({ length: 100 }, () => 1) },
+            { label: 'Jobs', counts: Array.from({ length: 100 }, () => 2) },
+          ]}
+        />,
+      );
 
-    expect(chartProps.barChartProps.at(-1)).toMatchObject({
-      barGap: 1,
-      barCategoryGap: '8%',
-    });
-    expect(chartProps.barProps).toHaveLength(2);
-    expect(chartProps.barProps.every((props) => props.stackId === undefined)).toBe(true);
-    expect(chartProps.barProps.every((props) => Array.isArray(props.radius))).toBe(true);
-    expect(chartProps.referenceAreaProps).toHaveLength(Math.ceil(binCount / 2));
-    expect(chartProps.referenceAreaProps[0]).toMatchObject({
-      x1: 0,
-      x2: 100 / binCount,
-      fill: 'var(--muted)',
-    });
-  });
+      expect(chartProps.barChartProps.at(-1)).toMatchObject({
+        barGap: 1,
+        barCategoryGap: '8%',
+      });
+      expect(chartProps.barProps).toHaveLength(2);
+      expect(chartProps.barProps.every((props) => props.stackId === undefined)).toBe(true);
+      expect(chartProps.barProps.every((props) => Array.isArray(props.radius))).toBe(true);
+      expect(chartProps.referenceAreaProps).toHaveLength(Math.ceil(binCount / 2));
+      expect(chartProps.referenceAreaProps[0]).toMatchObject({
+        x1: 0,
+        x2: 100 / binCount,
+        fill: 'var(--muted)',
+      });
+    },
+  );
 
-  it.each([
-    20, 25, 50, 100,
-  ] as const)('stacks bar series without alternating backgrounds at %i bins', (binCount) => {
-    render(
-      <ConcordanceDispersionSummary
-        rows={[]}
-        textColumn="text"
-        binCount={binCount}
-        splitBySource={false}
-        dataBlockLabel="Corpus"
-        searchWord="jobs Jobs"
-        chartMode="density-bar"
-        densitySeries={[
-          { label: 'jobs', counts: Array.from({ length: 100 }, () => 1) },
-          { label: 'Jobs', counts: Array.from({ length: 100 }, () => 2) },
-        ]}
-      />,
-    );
+  it.each([20, 25, 50, 100] as const)(
+    'stacks bar series without alternating backgrounds at %i bins',
+    (binCount) => {
+      render(
+        <ConcordanceDispersionSummary
+          rows={[]}
+          textColumn="text"
+          binCount={binCount}
+          splitBySource={false}
+          dataBlockLabel="Corpus"
+          searchWord="jobs Jobs"
+          chartMode="density-bar"
+          densitySeries={[
+            { label: 'jobs', counts: Array.from({ length: 100 }, () => 1) },
+            { label: 'Jobs', counts: Array.from({ length: 100 }, () => 2) },
+          ]}
+        />,
+      );
 
-    expect(chartProps.barProps).toHaveLength(2);
-    expect(chartProps.barProps.every((props) => props.stackId === 'density')).toBe(true);
-    expect(chartProps.barProps.every((props) => props.radius === 0)).toBe(true);
-    expect(chartProps.referenceAreaProps).toHaveLength(0);
-  });
+      expect(chartProps.barProps).toHaveLength(2);
+      expect(chartProps.barProps.every((props) => props.stackId === 'density')).toBe(true);
+      expect(chartProps.barProps.every((props) => props.radius === 0)).toBe(true);
+      expect(chartProps.referenceAreaProps).toHaveLength(0);
+    },
+  );
 
   it('uses the source color as a card edge without repeating the source description', () => {
     render(

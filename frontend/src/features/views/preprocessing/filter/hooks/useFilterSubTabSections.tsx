@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import { queryWorkspaceSqlTable, sqlIdentifier, sqlTable } from '@/api';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -93,7 +93,6 @@ export interface UseFilterSubTabSectionsResult {
     placeholder: string;
     disabled: boolean;
   };
-  summaryText: string;
   isFiltering: boolean;
   applyFilter: () => Promise<void>;
   applyButtonDisabled: boolean;
@@ -178,9 +177,6 @@ export const useFilterSubTabSections = (
   }>({ nodeId: selectedNodeId, value: '' });
   const [isFiltering, setIsFiltering] = useState(false);
   const latestMissingValueChecks = useRef(new Map<string, string>());
-  useEffect(() => {
-    latestMissingValueChecks.current.clear();
-  }, [currentWorkspaceId, selectedNodeId]);
   const optionSearchScope = `${currentWorkspaceId ?? ''}\0${selectedNodeId ?? ''}`;
   const [optionSearchState, setOptionSearchState] = useState<{
     scope: string;
@@ -235,7 +231,6 @@ export const useFilterSubTabSections = (
 
   const conditionsComplete = conditions.length > 0 && conditions.every(isConditionComplete);
 
-  const previewReady = hasSelection;
   const operationPayload: FilterRequest | null =
     conditionsComplete && previewRequest ? previewRequest : null;
 
@@ -255,7 +250,7 @@ export const useFilterSubTabSections = (
     operationPayload,
     operationFetch: filterPreview,
     operation: 'filter',
-    enabled: previewReady,
+    enabled: hasSelection,
   });
 
   const currentPreviewPage = previewPagination?.page ?? previewPage;
@@ -268,7 +263,10 @@ export const useFilterSubTabSections = (
    */
   const handleAddCondition = () => {
     const firstColumn = availableColumns[0];
-    setConditions([...conditions, createFilterCondition(Date.now().toString(), firstColumn)]);
+    setConditions((current) => [
+      ...current,
+      createFilterCondition(Date.now().toString(), firstColumn),
+    ]);
   };
 
   /**
@@ -583,11 +581,6 @@ export const useFilterSubTabSections = (
     ? 'Select a data block to preview filtered results.'
     : 'Showing original data. Configure conditions to preview filtered results.';
 
-  const summaryText =
-    conditions.length === 0
-      ? 'Define at least one condition to enable preview and filtering.'
-      : `${String(conditions.length)} condition${conditions.length === 1 ? '' : 's'} configured (${logic.toUpperCase()} logic).`;
-
   const hasApplicablePreviewRows =
     conditionsComplete && !previewLoading && !previewError && previewData.length > 0;
 
@@ -628,7 +621,6 @@ export const useFilterSubTabSections = (
       placeholder: autoNodeName,
       disabled: !hasSelection,
     },
-    summaryText,
     isFiltering,
     applyFilter: handleApplyFilter,
     applyButtonDisabled,
@@ -639,7 +631,7 @@ export const useFilterSubTabSections = (
       pagination: previewPagination,
       loading: previewLoading,
       error: previewError,
-      ready: previewReady,
+      ready: hasSelection,
       readyMessage: previewReadyMessage,
       page: currentPreviewPage,
       pageSize: previewPageSize,

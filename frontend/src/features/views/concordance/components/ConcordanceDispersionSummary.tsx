@@ -6,13 +6,14 @@ import {
   AreaChart,
   Bar,
   BarChart,
+  type BarShapeProps,
   CartesianGrid,
-  Cell,
   Line,
   LineChart,
   ReferenceArea,
   ReferenceLine,
   ResponsiveContainer,
+  Rectangle,
   XAxis,
   YAxis,
 } from 'recharts';
@@ -507,17 +508,17 @@ export function ConcordanceDispersionSummary({
               stackId={usesStackedBars ? 'density' : undefined}
               radius={usesStackedBars ? 0 : [4, 4, 0, 0]}
               isAnimationActive={false}
-            >
-              {selection
-                ? chartData.map((_, index) => (
-                    // eslint-disable-next-line @typescript-eslint/no-deprecated -- Recharts Cell is its documented per-bar opacity API.
-                    <Cell
-                      key={`${item.key}-${String(index)}`}
-                      fillOpacity={!hasSelection || selection.selectedIndices.has(index) ? 1 : 0.25}
-                    />
-                  ))
-                : null}
-            </Bar>
+              shape={(barProps: BarShapeProps) => (
+                <Rectangle
+                  {...barProps}
+                  fillOpacity={
+                    !selection || !hasSelection || selection.selectedIndices.has(barProps.index)
+                      ? 1
+                      : 0.25
+                  }
+                />
+              )}
+            />
           ))
         : chartMode === 'density-area'
           ? series.map((item) => (

@@ -28,16 +28,3 @@ export const normalizeStringArray = (values: string[]): string[] =>
     .map((value) => value.trim())
     .filter(Boolean)
     .sort();
-
-/** Safely extracts string arrays from untyped backend request payloads. */
-export const normalizeUnknownStringArray = (value: unknown): string[] => {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  return normalizeStringArray(
-    value
-      .map((item) => (typeof item === 'string' ? item : null))
-      .filter((item): item is string => item !== null),
-  );
-};

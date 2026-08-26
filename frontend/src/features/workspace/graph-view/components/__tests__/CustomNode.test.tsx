@@ -235,7 +235,7 @@ describe('CustomNode', () => {
     );
     expect(card.style.borderLeftWidth).toBe('');
     expect(identityHeader).toHaveStyle({ backgroundColor: '#2563eb', color: '#ffffff' });
-    expect(screen.getByTitle('Corpus')).toHaveStyle({ maxHeight: '3lh' });
+    expect(screen.getByTitle('Corpus')).toHaveClass('max-h-[3lh]');
   });
 
   it('opens the shared Data Block rename dialog from the full node menu', async () => {
@@ -319,9 +319,9 @@ describe('CustomNode', () => {
       'outline-offset-2',
       'outline-data-block-selection',
     );
-    expect(screen.getByTitle('sample_data/ADO/qldelection2020_candidate_tweets')).toHaveStyle({
-      maxHeight: '3lh',
-    });
+    expect(screen.getByTitle('sample_data/ADO/qldelection2020_candidate_tweets')).toHaveClass(
+      'max-h-[3lh]',
+    );
     expect(screen.getByTitle('sample_data/ADO/qldelection2020_candidate_tweets')).toHaveClass(
       'flex',
       'flex-col',

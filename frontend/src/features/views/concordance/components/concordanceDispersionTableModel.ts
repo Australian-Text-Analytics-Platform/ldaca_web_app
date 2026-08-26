@@ -46,7 +46,6 @@ interface Params {
   selectedMetadataColumns: string[];
   resultsViewportWidth: number;
   proportionalDispersionBars: boolean;
-  fallbackToAllColumns?: boolean;
 }
 
 export interface ConcordanceDispersionTableModel {
@@ -72,7 +71,6 @@ export function buildConcordanceDispersionTableModel({
   selectedMetadataColumns,
   resultsViewportWidth,
   proportionalDispersionBars,
-  fallbackToAllColumns = false,
 }: Params): ConcordanceDispersionTableModel {
   const rows = buildDispersionRows(nodeData.data);
   const longestTextLength = proportionalDispersionBars
@@ -93,8 +91,7 @@ export function buildConcordanceDispersionTableModel({
   return {
     rows,
     longestTextLength,
-    tableColumns:
-      fallbackToAllColumns && displayColumns.length === 0 ? nodeData.columns : displayColumns,
+    tableColumns: displayColumns,
     dispersionColumnStyle: getDispersionColumnStyle(showMetadata, resultsViewportWidth),
     metadataColumnStyle: getMetadataColumnStyle(showMetadata),
   };

@@ -11,20 +11,51 @@
  */
 import { useState } from 'react';
 import {
-  getCoreRowModel,
-  useReactTable,
+  columnFilteringFeature,
+  columnPinningFeature,
+  columnSizingFeature,
+  columnVisibilityFeature,
+  rowPaginationFeature,
+  rowSortingFeature,
+  tableFeatures,
+  useTable,
   type ColumnDef,
+  type ColumnFiltersState,
   type ColumnPinningState,
   type OnChangeFn,
   type PaginationState,
+  type RowData,
   type SortingState,
-  type ColumnFiltersState,
+  type Header,
+  type Table,
   type TableOptions,
 } from '@tanstack/react-table';
 
-export interface ServerTableOptions<TData> {
+const serverTableFeatures = tableFeatures({
+  columnFilteringFeature,
+  columnPinningFeature,
+  columnSizingFeature,
+  columnVisibilityFeature,
+  rowPaginationFeature,
+  rowSortingFeature,
+});
+
+type ServerTableFeatures = typeof serverTableFeatures;
+export type ServerColumnDef<TData extends RowData, TValue = unknown> = ColumnDef<
+  ServerTableFeatures,
+  TData,
+  TValue
+>;
+export type ServerTableInstance<TData extends RowData> = Table<ServerTableFeatures, TData>;
+export type ServerTableHeader<TData extends RowData, TValue = unknown> = Header<
+  ServerTableFeatures,
+  TData,
+  TValue
+>;
+
+export interface ServerTableOptions<TData extends RowData> {
   data: TData[];
-  columns: ColumnDef<TData>[];
+  columns: ServerColumnDef<TData>[];
   rowCount: number;
   pageIndex?: number;
   pageSize?: number;
@@ -33,8 +64,8 @@ export interface ServerTableOptions<TData> {
   onPaginationChange?: (pagination: PaginationState) => void;
   onSortingChange?: (sorting: SortingState) => void;
   onColumnFiltersChange?: (filters: ColumnFiltersState) => void;
-  /** Extra options forwarded to useReactTable (e.g. columnPinning state). */
-  tableOptions?: Partial<TableOptions<TData>>;
+  /** Extra options forwarded to useTable (e.g. columnPinning state). */
+  tableOptions?: Partial<TableOptions<ServerTableFeatures, TData>>;
 }
 
 /** Creates a TanStack Table instance whose sort/filter/page state drives backend queries. */
@@ -44,7 +75,7 @@ export interface ServerTableOptions<TData> {
  * Flow: initialize controlled or internal sorting/filter state, bridge table
  * change callbacks, then build a manual TanStack table for backend paging.
  */
-export function useServerTable<TData>({
+export function useServerTable<TData extends RowData>({
   data,
   columns,
   rowCount,
@@ -57,7 +88,7 @@ export function useServerTable<TData>({
   onColumnFiltersChange,
   tableOptions,
 }: ServerTableOptions<TData>) {
-  const [columnPinning, setColumnPinning] = useState<ColumnPinningState>({ left: [] });
+  const [columnPinning, setColumnPinning] = useState<ColumnPinningState>({ start: [], end: [] });
 
   const [internalSorting, setInternalSorting] = useState<SortingState>([]);
   const sorting = externalSorting ?? internalSorting;
@@ -91,11 +122,10 @@ export function useServerTable<TData>({
 
   const { state: tableOptionsState, ...restTableOptions } = tableOptions ?? {};
 
-  // eslint-disable-next-line react-hooks/incompatible-library -- useReactTable returns non-memoizable functions; React Compiler can skip this
-  const table = useReactTable<TData>({
+  const table = useTable({
+    features: serverTableFeatures,
     data,
     columns,
-    getCoreRowModel: getCoreRowModel(),
     manualPagination: true,
     manualSorting: true,
     manualFiltering: true,

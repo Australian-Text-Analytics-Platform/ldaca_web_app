@@ -11,6 +11,12 @@ interface DataBlockNameProps {
   title?: string;
 }
 
+const MAX_HEIGHT_CLASS = {
+  1: 'max-h-[1lh]',
+  2: 'max-h-[2lh]',
+  3: 'max-h-[3lh]',
+} as const;
+
 /**
  * Displays a Data Block name without inserting an ellipsis. Tail fade keeps
  * the beginning visible; head fade keeps the suffix visible. Wrapped head-fade
@@ -68,12 +74,12 @@ export function DataBlockName({
       dir={fadesHead && isSingleLine && isOverflowing ? 'rtl' : 'ltr'}
       className={cn(
         'relative min-w-0 overflow-hidden text-left',
+        MAX_HEIGHT_CLASS[maxLines],
         isSingleLine ? 'block whitespace-nowrap' : 'whitespace-normal',
         fadesHead && !isSingleLine ? 'flex flex-col justify-end' : 'block',
         className,
       )}
       style={{
-        maxHeight: `${String(maxLines)}lh`,
         overflowWrap: 'anywhere',
       }}
       title={title}
@@ -92,12 +98,9 @@ export function DataBlockName({
       <span
         data-testid={`data-block-name-${fadeEdge}-fade`}
         aria-hidden="true"
-        style={{
-          height: '1lh',
-          backgroundImage: fadeGradient,
-        }}
+        style={{ backgroundImage: fadeGradient }}
         className={cn(
-          'pointer-events-none absolute',
+          'pointer-events-none absolute h-[1lh]',
           fadesHead
             ? isSingleLine
               ? 'bottom-0 left-0 w-10'

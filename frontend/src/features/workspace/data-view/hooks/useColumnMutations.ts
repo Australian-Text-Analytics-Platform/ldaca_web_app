@@ -14,6 +14,7 @@ import {
   createColumnMutationState,
   type DatetimeModalState,
 } from './columnMutationState';
+import type { ColumnCastType } from '../services/schemaMutations';
 
 interface UseColumnMutationsArgs {
   /** Current workspace id; enables schema bootstrap when paired with a node id. */
@@ -23,7 +24,7 @@ interface UseColumnMutationsArgs {
   /** Current visible column names, used for duplicate-name validation. */
   columns: string[];
   columnFields: Record<string, ArrowField>;
-  onCast?: (column: string, targetType: string, format?: string) => Promise<void>;
+  onCast?: (column: string, targetType: ColumnCastType, format?: string) => Promise<void>;
   onRenameColumn?: (column: string, nextName: string) => Promise<void>;
   onDeleteColumn?: (column: string) => Promise<void>;
   /** Returns the latest node schema; called once on mount and after every mutation. */
@@ -49,7 +50,7 @@ export interface ColumnMutationsApi {
   requestDeleteColumn: (column: string) => void;
   confirmDeleteColumn: () => Promise<void>;
 
-  handleTypeChange: (column: string, newType: string) => void;
+  handleTypeChange: (column: string, newType: ColumnCastType) => void;
   startRename: (column: string) => void;
   cancelRename: () => void;
   submitRename: (column: string, value: string) => Promise<void>;
@@ -111,7 +112,7 @@ export const useColumnMutations = ({
 
   /** Runs a dtype cast and refreshes schema so headers reflect the new type. */
   const performCast = useCallback(
-    async (column: string, targetType: string, format?: string) => {
+    async (column: string, targetType: ColumnCastType, format?: string) => {
       if (!onCast) return;
       dispatch({ type: 'castLoadingChanged', column, active: true });
       try {
@@ -132,7 +133,7 @@ export const useColumnMutations = ({
 
   /** Handles dtype menu selection, including the datetime-format confirmation path. */
   const handleTypeChange = useCallback(
-    (column: string, newType: string) => {
+    (column: string, newType: ColumnCastType) => {
       if (!onCast) return;
       const currentField = mutationColumnFields[column];
       if (currentField && newType === arrowTypeName(currentField)) return;

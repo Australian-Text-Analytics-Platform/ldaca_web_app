@@ -11,7 +11,7 @@ import { APP_VERSION, APP_BUILD_DATE, APP_BUILD, getDocsBaseUrl } from '@/config
 import { useZoom } from '@/hooks/useZoom';
 import { useDocumentAnchor } from '@/hooks/useDocumentAnchor';
 
-export type DocumentType = 'tutorial' | 'information' | 'reference';
+type DocumentType = 'tutorial' | 'information' | 'reference';
 
 interface NavigationState {
   propTarget: DocumentTarget;

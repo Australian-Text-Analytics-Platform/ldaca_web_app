@@ -4,7 +4,6 @@ import { useWorkspaceCore } from './useWorkspaceCore';
 import { useWorkspaceQueries } from './useWorkspaceQueries';
 import { useWorkspaceNodeMutations } from './useWorkspaceNodeMutations';
 import { usePreprocessingInputsStore } from '@/stores/preprocessingInputsStore';
-import { useRecentSelectionsStore } from '@/stores/recentSelectionsStore';
 import { usePinnedNodesStore } from '@/stores/pinnedNodesStore';
 import { useNodeInputRequestsStore } from '@/stores/nodeInputRequestsStore';
 import { useAnalysisTabsPresentationStore } from '@/features/views/common/tabs/analysisTabsPresentationStore';
@@ -63,7 +62,6 @@ export const useWorkspaceInternal = () => {
     if (!workspacesHydrated) return;
     const workspaceIds = workspaces.map((workspace) => workspace.id);
     usePreprocessingInputsStore.getState().pruneWorkspaces(userId, workspaceIds);
-    useRecentSelectionsStore.getState().pruneWorkspaces(userId, workspaceIds);
     useAnalysisTabsPresentationStore.getState().pruneWorkspaces(userId, workspaceIds);
   }, [userId, workspaces, workspacesHydrated]);
 
@@ -77,7 +75,6 @@ export const useWorkspaceInternal = () => {
       replaceSelectedNodes(validSelectedIds, validActiveNodeId);
     }
     usePreprocessingInputsStore.getState().pruneNodes(userId, currentWorkspaceId, nodeIds);
-    useRecentSelectionsStore.getState().pruneNodes(userId, currentWorkspaceId, nodeIds);
     usePinnedNodesStore.getState().prune(nodeIds);
     useNodeInputRequestsStore.getState().prune(currentWorkspaceId, nodeIds);
   }, [

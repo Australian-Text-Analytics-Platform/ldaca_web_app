@@ -11,55 +11,55 @@ describe('useNodeInputs', () => {
   it.each([
     { maxNodes: 2, initialCount: 1 },
     { maxNodes: 6, initialCount: 5 },
-  ])('accepts through node $maxNodes, rejects the next node, and allows remove/re-add', ({
-    maxNodes,
-    initialCount,
-  }) => {
-    const allNodes = Array.from({ length: maxNodes + 1 }, (_, index) =>
-      projectWorkspaceNodeMetadata({
-        id: `node-${String(index + 1)}`,
-        name: `Node ${String(index + 1)}`,
-      }),
-    );
-    const initialValue: NodeInput[] = allNodes
-      .slice(0, initialCount)
-      .map((node) => ({ node_id: node.id, column: 'text' }));
+  ])(
+    'accepts through node $maxNodes, rejects the next node, and allows remove/re-add',
+    ({ maxNodes, initialCount }) => {
+      const allNodes = Array.from({ length: maxNodes + 1 }, (_, index) =>
+        projectWorkspaceNodeMetadata({
+          id: `node-${String(index + 1)}`,
+          name: `Node ${String(index + 1)}`,
+        }),
+      );
+      const initialValue: NodeInput[] = allNodes
+        .slice(0, initialCount)
+        .map((node) => ({ node_id: node.id, column: 'text' }));
 
-    const { result } = renderHook(() => {
-      const [value, setValue] = useState<NodeInput[]>(initialValue);
-      return useNodeInputs({
-        value,
-        onChange: setValue,
-        allNodes,
-        constraints: { fieldPredicate: isArrowStringField, maxNodes },
+      const { result } = renderHook(() => {
+        const [value, setValue] = useState<NodeInput[]>(initialValue);
+        return useNodeInputs({
+          value,
+          onChange: setValue,
+          allNodes,
+          constraints: { fieldPredicate: isArrowStringField, maxNodes },
+        });
       });
-    });
 
-    const lastAcceptedId = `node-${String(maxNodes)}`;
-    const rejectedId = `node-${String(maxNodes + 1)}`;
+      const lastAcceptedId = `node-${String(maxNodes)}`;
+      const rejectedId = `node-${String(maxNodes + 1)}`;
 
-    act(() => {
-      expect(result.current.addNodes([lastAcceptedId])).toEqual([]);
-    });
-    expect(result.current.inputs).toHaveLength(maxNodes);
+      act(() => {
+        expect(result.current.addNodes([lastAcceptedId])).toEqual([]);
+      });
+      expect(result.current.inputs).toHaveLength(maxNodes);
 
-    let rejections: ReturnType<typeof result.current.addNodes> = [];
-    act(() => {
-      rejections = result.current.addNodes([rejectedId]);
-    });
-    expect(rejections).toEqual([
-      { nodeId: rejectedId, reason: `This view accepts at most ${String(maxNodes)} nodes` },
-    ]);
+      let rejections: ReturnType<typeof result.current.addNodes> = [];
+      act(() => {
+        rejections = result.current.addNodes([rejectedId]);
+      });
+      expect(rejections).toEqual([
+        { nodeId: rejectedId, reason: `This view accepts at most ${String(maxNodes)} nodes` },
+      ]);
 
-    act(() => {
-      result.current.removeNode(lastAcceptedId);
-    });
-    expect(result.current.canAddMore).toBe(true);
+      act(() => {
+        result.current.removeNode(lastAcceptedId);
+      });
+      expect(result.current.canAddMore).toBe(true);
 
-    act(() => {
-      expect(result.current.addNodes([rejectedId])).toEqual([]);
-    });
-    expect(result.current.inputs.map((input) => input.node_id)).toContain(rejectedId);
-    expect(result.current.inputs).toHaveLength(maxNodes);
-  });
+      act(() => {
+        expect(result.current.addNodes([rejectedId])).toEqual([]);
+      });
+      expect(result.current.inputs.map((input) => input.node_id)).toContain(rejectedId);
+      expect(result.current.inputs).toHaveLength(maxNodes);
+    },
+  );
 });

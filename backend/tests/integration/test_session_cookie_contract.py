@@ -17,6 +17,11 @@ from ldaca_wordflow.models.session import SessionUser
 from ldaca_wordflow.runtime import Runtime, runtime_context
 from ldaca_wordflow.settings import Settings
 
+DEV_FRONTEND_ORIGINS = (
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+)
+
 
 def _settings(tmp_path: Path, *, multi_user: bool) -> Settings:
     return Settings(
@@ -154,41 +159,75 @@ def test_desktop_startup_refreshes_canonical_root_user_as_unlimited(
     assert row == ("Root User", None)
 
 
+@pytest.mark.parametrize("frontend_origin", DEV_FRONTEND_ORIGINS)
 def test_explicit_dev_origin_and_workspace_preflight_are_allowed(
     tmp_path: Path,
+    frontend_origin: str,
 ) -> None:
     """The separately served development frontend uses exact CORS configuration."""
 
     settings = Settings(
         data_root=tmp_path,
         multi_user=False,
-        cors_allowed_origins=("http://localhost:8001",),
+        cors_allowed_origins=DEV_FRONTEND_ORIGINS,
     )
     app = create_app(settings, serve_frontend=False)
     with TestClient(app, base_url="http://localhost:8001") as client:
-        csrf = client.get("/api/session").json()["csrf_token"]
+        session = client.get("/api/session", headers={"Origin": frontend_origin})
+        assert session.status_code == 200
+        assert session.headers["access-control-allow-origin"] == frontend_origin
+        csrf = session.json()["csrf_token"]
         created = client.post(
             "/api/workspaces",
-            json={"name": "Same origin"},
+            json={"name": "Split development"},
             headers={
-                "Origin": "http://localhost:8001",
+                "Origin": frontend_origin,
                 "X-CSRF-Token": csrf,
             },
         )
         assert created.status_code == 201
+        assert created.headers["access-control-allow-origin"] == frontend_origin
 
         preflight = client.options(
             f"/api/workspaces/{created.json()['id']}",
             headers={
-                "Origin": "http://localhost:8001",
+                "Origin": frontend_origin,
                 "Access-Control-Request-Method": "PATCH",
                 "Access-Control-Request-Headers": "content-type,x-csrf-token",
             },
         )
         assert preflight.status_code == 200
+        assert preflight.headers["access-control-allow-origin"] == frontend_origin
         allowed_headers = preflight.headers["access-control-allow-headers"].lower()
         assert "x-csrf-token" in allowed_headers
         assert "if-match" not in allowed_headers
+
+
+def test_unlisted_dev_origin_is_rejected(tmp_path: Path) -> None:
+    settings = Settings(
+        data_root=tmp_path,
+        multi_user=False,
+        cors_allowed_origins=DEV_FRONTEND_ORIGINS,
+    )
+    app = create_app(settings, serve_frontend=False)
+    with TestClient(app, base_url="http://localhost:8001") as client:
+        session = client.get(
+            "/api/session",
+            headers={"Origin": "http://localhost:3001"},
+        )
+        assert session.status_code == 200
+        assert "access-control-allow-origin" not in session.headers
+
+        preflight = client.options(
+            "/api/workspaces/example",
+            headers={
+                "Origin": "http://localhost:3001",
+                "Access-Control-Request-Method": "PATCH",
+                "Access-Control-Request-Headers": "content-type,x-csrf-token",
+            },
+        )
+        assert preflight.status_code == 400
+        assert "access-control-allow-origin" not in preflight.headers
 
 
 def test_bundled_same_origin_requires_no_cors_entry(tmp_path: Path) -> None:

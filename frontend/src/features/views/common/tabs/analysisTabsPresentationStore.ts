@@ -1,6 +1,52 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
+import { migrateLegacyAnnotationTabSettings } from '@/features/views/annotation/annotationTabSettings';
+
+export const ANALYSIS_TABS_PRESENTATION_STORAGE_KEY = 'ldaca-analysis-tab-presentation-v4';
+const LEGACY_ANALYSIS_TABS_PRESENTATION_STORAGE_KEY = 'ldaca-analysis-tab-presentation-v3';
+
+interface PersistedPresentationState {
+  state?: {
+    activeTabIds?: Record<string, string>;
+    tabSettings?: Record<string, Record<string, string>>;
+  };
+  version?: number;
+}
+
+/** Moves the prior device-local store once and consolidates Annotation settings. */
+export const migrateAnalysisTabsPresentationV3 = (storage: Storage): void => {
+  if (storage.getItem(ANALYSIS_TABS_PRESENTATION_STORAGE_KEY)) {
+    storage.removeItem(LEGACY_ANALYSIS_TABS_PRESENTATION_STORAGE_KEY);
+    return;
+  }
+  const legacyValue = storage.getItem(LEGACY_ANALYSIS_TABS_PRESENTATION_STORAGE_KEY);
+  if (!legacyValue) return;
+  try {
+    const persisted = JSON.parse(legacyValue) as PersistedPresentationState;
+    const tabSettings = Object.fromEntries(
+      Object.entries(persisted.state?.tabSettings ?? {}).map(([key, settings]) => [
+        key,
+        migrateLegacyAnnotationTabSettings(settings),
+      ]),
+    );
+    storage.setItem(
+      ANALYSIS_TABS_PRESENTATION_STORAGE_KEY,
+      JSON.stringify({
+        ...persisted,
+        state: { ...persisted.state, tabSettings },
+        version: 4,
+      }),
+    );
+    storage.removeItem(LEGACY_ANALYSIS_TABS_PRESENTATION_STORAGE_KEY);
+  } catch (error) {
+    console.warn('[analysis-tabs] Could not migrate v3 presentation settings:', error);
+  }
+};
+
+if (typeof localStorage !== 'undefined') {
+  migrateAnalysisTabsPresentationV3(localStorage);
+}
 
 interface AnalysisTabsPresentationState {
   /** Last active Tab ID keyed by user, Workspace, and analysis kind. */
@@ -130,8 +176,8 @@ export const useAnalysisTabsPresentationStore = create<AnalysisTabsPresentationS
           }),
       })),
       {
-        name: 'ldaca-analysis-tab-presentation-v3',
-        version: 3,
+        name: ANALYSIS_TABS_PRESENTATION_STORAGE_KEY,
+        version: 4,
         partialize: (state) => ({
           activeTabIds: state.activeTabIds,
           tabSettings: state.tabSettings,

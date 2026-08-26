@@ -15,6 +15,11 @@ import { useAnalysisSession } from './useAnalysisSession';
 
 type AnalysisSubmissionAction = 'preview' | 'run_all';
 
+export type AnalysisRequestOfKind<TKind extends Analysis['request']['kind']> = Extract<
+  Analysis['request'],
+  { kind: TKind }
+>;
+
 export interface RunAnalysisOptions<TAnalysis extends Analysis> {
   action: AnalysisSubmissionAction;
   resetBeforeRun?: () => void;
@@ -28,7 +33,10 @@ export type RunAnalysis = <TAnalysis extends Analysis>(
   options: RunAnalysisOptions<TAnalysis>,
 ) => Promise<TAnalysis | null>;
 
-interface UseAnalysisFeatureConfig<TResult = unknown, TRequest = unknown> {
+interface UseAnalysisFeatureConfig<
+  TResult = unknown,
+  TRequest extends Analysis['request'] = Analysis['request'],
+> {
   taskType: CanonicalAnalysisTaskType;
   workspaceId: string | null;
   tabId: string;
@@ -49,7 +57,7 @@ interface UseAnalysisFeatureConfig<TResult = unknown, TRequest = unknown> {
   retiredAnalysisIds?: string[];
 }
 
-interface UseAnalysisFeatureReturn<TResult, TRequest> {
+interface UseAnalysisFeatureReturn<TResult, TRequest extends Analysis['request']> {
   request: TRequest | null;
   analysisState: Analysis['state'] | null;
   analysisError: string | null;
@@ -120,7 +128,10 @@ const taskStatusFor = (task: TaskItem | null): AnalysisTaskStatus => {
  * Result resources. It does not reconstruct lifecycle state from Results or
  * discover ownership through the Workspace Task Inbox.
  */
-export function useAnalysisFeature<TResult = unknown, TRequest = unknown>(
+export function useAnalysisFeature<
+  TResult = unknown,
+  TRequest extends Analysis['request'] = Analysis['request'],
+>(
   config: UseAnalysisFeatureConfig<TResult, TRequest>,
 ): UseAnalysisFeatureReturn<TResult, TRequest> {
   const queryClient = useQueryClient();

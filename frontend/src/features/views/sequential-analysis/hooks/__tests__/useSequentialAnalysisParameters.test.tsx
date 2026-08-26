@@ -60,7 +60,7 @@ describe('sequential analysis parameter helpers', () => {
     expect(
       readSequentialServerParams({
         frequency: 'custom',
-        group_by_columns: ['speaker', 5, ''],
+        group_by_columns: ['speaker', ''],
         column_type: 'datetime',
         custom_interval_value: 2,
         custom_interval_unit: 'hours',
@@ -131,42 +131,17 @@ describe('useSequentialAnalysisParameters', () => {
     });
   });
 
-  it('requires the current node_id request field when hydrating selection', () => {
+  it('hydrates selection from the canonical node_id request field', () => {
     const { result } = renderHook(() => useSequentialAnalysisParameters());
     let hydrated: ReturnType<typeof result.current.applyHydratedRequest> | undefined;
 
     act(() => {
       hydrated = result.current.applyHydratedRequest({
-        nodeId: 'old-node',
+        node_id: 'current-node',
         time_column: 'year',
       });
     });
 
-    expect(hydrated?.nodeId).toBe('');
-  });
-
-  it('resets only non-selection fields after clear', () => {
-    const { result } = renderHook(() => useSequentialAnalysisParameters());
-
-    act(() => {
-      result.current.setFrequency('weekly');
-      result.current.setTimeColumn('date');
-      result.current.setGroupByColumns(['speaker']);
-      result.current.setCaseSensitive(false);
-      result.current.setNumericOriginInput('1990');
-      result.current.setNumericIntervalInput('5');
-      result.current.setCustomIntervalValueInput('4');
-      result.current.setCustomIntervalUnit('hours');
-      result.current.resetAfterClear();
-    });
-
-    expect(result.current.frequency).toBe('weekly');
-    expect(result.current.timeColumn).toBe('date');
-    expect(result.current.groupByColumns).toEqual(['speaker']);
-    expect(result.current.caseSensitive).toBe(true);
-    expect(result.current.numericOriginInput).toBe('');
-    expect(result.current.numericIntervalInput).toBe('1');
-    expect(result.current.customIntervalValueInput).toBe('1');
-    expect(result.current.customIntervalUnit).toBe('minutes');
+    expect(hydrated?.nodeId).toBe('current-node');
   });
 });

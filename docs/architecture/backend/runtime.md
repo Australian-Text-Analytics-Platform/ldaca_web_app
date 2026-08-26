@@ -14,23 +14,25 @@ ASGI lifespan has succeeded.
 
 Browser development is intentionally split: Uvicorn imports the API-only ASGI
 application with reload enabled, while Vite owns the frontend development
-server. The backend explicitly allows the Vite origin for that process. The
+server. The backend explicitly allows the exact `localhost:3000` and
+`127.0.0.1:3000` Vite origins for that process. The
 production CLI instead constructs one FastAPI application with the compiled
 SPA mounted, so the browser and API share one origin and one process entrypoint.
 The backend launcher does not supervise the Vite development server.
 
-The launcher also intentionally supports BinderHub through JupyterHub's
-`JUPYTERHUB_SERVICE_PREFIX` contract. In that profile it derives the ASGI
-`root_path` for the current `jupyter-server-proxy` port so generated links,
-OAuth return paths, CSRF path handling, and the packaged SPA remain below the
-user's JupyterHub service prefix. BinderHub is a first-class supported
-deployment profile; changes to launcher or `root_path` handling must retain an
-integration test for the derived proxy path.
+The launcher accepts an explicit ASGI `root_path` for arbitrary reverse-proxy
+deployments. The deployment caller owns discovery of its externally visible
+prefix; the backend does not inspect platform-specific environment variables.
+BinderHub's notebook passes its `jupyter-server-proxy` path through this generic
+argument so generated links, OAuth return paths, CSRF path handling, and the
+packaged SPA remain below the user's JupyterHub service prefix. Changes to
+`root_path` handling must retain a test for explicit prefix forwarding.
 
 BinderHub notebooks also require a non-blocking Python entrypoint. A notebook
-cell starts the bound Uvicorn server as an asynchronous task, receives a
-caller-owned handle, and can continue executing while the compiled frontend
-and backend are reachable through `jupyter-server-proxy`. The handle provides
+cell starts the bound Uvicorn server with `serve_frontend=True` as an
+asynchronous task, receives a caller-owned handle, and can continue executing
+while the compiled frontend and backend are reachable through
+`jupyter-server-proxy` on the selected port. The handle provides
 bounded graceful shutdown. This in-process background mode is part of the
 BinderHub contract; it is not the process model used by split browser
 development or hosted production. The executable setup is documented in the

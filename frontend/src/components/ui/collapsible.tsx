@@ -1,4 +1,4 @@
-import * as CollapsiblePrimitive from '@radix-ui/react-collapsible';
+import { Collapsible as CollapsiblePrimitive } from 'radix-ui';
 
 /** Collapsible root primitive used by sections that reveal or hide content. */
 const Collapsible = CollapsiblePrimitive.Root;

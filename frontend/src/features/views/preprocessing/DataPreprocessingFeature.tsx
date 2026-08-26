@@ -17,8 +17,7 @@ import { CONTEXTUAL_HINT_IDS } from '@/features/guidance/registry';
 import { useProgressiveContextualHints } from '@/features/guidance/useProgressiveContextualHints';
 import { NodeInputsPanel } from '@/features/views/common/components/NodeInputsPanel';
 import type { NodeSelectionRenderArgs } from '@/features/views/common/components/NodeSelectionList';
-import { useTabNodeInputs } from '@/features/views/common/nodeInputs';
-import { DEFAULT_TAB_INPUT_SET_ID } from '@/features/views/common/tabs/tabStateOps';
+import { useWorkspaceNodeInputs } from '@/features/views/common/nodeInputs';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
@@ -156,9 +155,9 @@ function DataPreprocessingFeature() {
   const setPersistedInputs = usePreprocessingInputsStore((state) => state.setInputs);
   const maxInputNodes =
     activeSubtab === 'join' ? MAX_JOIN_NODES : activeSubtab === 'concat' ? MAX_CONCAT_NODES : 1;
-  const nodeInputs = useTabNodeInputs({
-    tabInputSets: { [DEFAULT_TAB_INPUT_SET_ID]: persistedInputs },
-    onTabInputSetChange: (_selectorId, inputs) => {
+  const nodeInputs = useWorkspaceNodeInputs({
+    value: persistedInputs,
+    onChange: (inputs) => {
       if (!currentWorkspaceId) return;
       setPersistedInputs(userId, currentWorkspaceId, activeSubtab, inputs);
     },
@@ -314,12 +313,9 @@ function DataPreprocessingFeature() {
         guidanceTarget="preprocessing-inputs"
         resolvedNodes={nodeInputs.resolvedNodes}
         availableNodes={nodeInputs.availableNodes}
-        graphSelectedIds={nodeInputs.graphSelectedIds}
-        recentPresets={nodeInputs.recentPresets}
         canAddMore={nodeInputs.canAddMore}
         maxNodes={maxInputNodes}
         onAddNodes={nodeInputs.addNodes}
-        getAddRejection={nodeInputs.getAddRejection}
         onRemoveNode={nodeInputs.removeNode}
         onClear={nodeInputs.clear}
         onColumnChange={nodeInputs.setColumn}

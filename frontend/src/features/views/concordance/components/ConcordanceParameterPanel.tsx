@@ -145,12 +145,9 @@ export function ConcordanceParameterPanel({
             guidanceTarget="concordance-inputs"
             resolvedNodes={nodeInputs.resolvedNodes}
             availableNodes={nodeInputs.availableNodes}
-            graphSelectedIds={nodeInputs.graphSelectedIds}
-            recentPresets={nodeInputs.recentPresets}
             canAddMore={nodeInputs.canAddMore}
             maxNodes={2}
             onAddNodes={nodeInputs.addNodes}
-            getAddRejection={nodeInputs.getAddRejection}
             onRemoveNode={nodeInputs.removeNode}
             onClear={nodeInputs.clear}
             onColumnChange={handleColumnChange}

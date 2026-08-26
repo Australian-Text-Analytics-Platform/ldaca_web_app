@@ -8,6 +8,7 @@ import { queryWorkspaceSqlTable, sqlOrder, sqlTable } from '@/api';
 import type { NodeDataResponse } from '@/api/frontendModels';
 import { createNodeDataRequest, queryKeys, type NodeDataRequest } from '@/lib/queryKeys';
 import type { WorkspaceTableProps } from '../components/WorkspaceTable';
+import type { ColumnCastType } from '../services/schemaMutations';
 
 export interface WorkspaceDataTableHeaderInfo {
   nodeLabel: string;
@@ -330,7 +331,7 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
 
   /** Casts a column on the active node. */
   const handleCast = useCallback(
-    async (column: string, targetType: string, format?: string) => {
+    async (column: string, targetType: ColumnCastType, format?: string) => {
       if (!selectedNodeIdForCallbacks) return;
       await castColumn(selectedNodeIdForCallbacks, column, targetType, format);
     },

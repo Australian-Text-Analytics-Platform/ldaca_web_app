@@ -1,4 +1,4 @@
-import type { TopicSegmentationMethod } from '@/api';
+import type { TopicModelingAnalysisRequest, TopicSegmentationMethod } from '@/api';
 
 export const DEFAULT_MAX_SEGMENT_TOKENS = 256;
 export const DEFAULT_MIN_CLUSTER_SIZE = 10;
@@ -9,8 +9,8 @@ export interface CorpusSample {
 }
 
 export interface TopicModelingParameterState {
-  corpusSamples: CorpusSample[];
-  corpusSamplesUserSet: boolean;
+  corpusSamplesByNodeId: Record<string, CorpusSample>;
+  userSetSampleNodeIds: Record<string, true>;
   minClusterSize: number;
   randomSeed: number;
   randomSeedUserSet: boolean;
@@ -19,14 +19,12 @@ export interface TopicModelingParameterState {
 }
 
 type TopicModelingParameterAction =
-  | { type: 'applyNodeDefaultSamples'; samples: CorpusSample[] }
-  | { type: 'updateCorpusSample'; index: number; update: Partial<CorpusSample> }
+  | { type: 'updateCorpusSample'; nodeId: string; update: Partial<CorpusSample> }
   | { type: 'setMinClusterSize'; value: number }
   | { type: 'setRandomSeedFromUser'; value: number }
   | { type: 'setSegmentationMethod'; value: TopicSegmentationMethod }
   | { type: 'setMaxSegmentTokens'; value: number }
-  | { type: 'hydrateRequest'; request: Record<string, unknown>; nodeDocCounts: number[] }
-  | { type: 'resetAfterClear'; defaultSamples: CorpusSample[] };
+  | { type: 'hydrateRequest'; request: TopicModelingAnalysisRequest };
 
 /**
  * Creates the topic-modeling parameter snapshot used before any node defaults
@@ -35,8 +33,8 @@ type TopicModelingParameterAction =
  * reducer tests as the canonical default state.
  */
 export const createTopicModelingParameterState = (): TopicModelingParameterState => ({
-  corpusSamples: [],
-  corpusSamplesUserSet: false,
+  corpusSamplesByNodeId: {},
+  userSetSampleNodeIds: {},
   minClusterSize: DEFAULT_MIN_CLUSTER_SIZE,
   randomSeed: 0,
   randomSeedUserSet: false,
@@ -102,9 +100,9 @@ export const normalizeTopicSampleFractions = (
   });
 };
 
-const fractionsToSamples = (raw: unknown, nodeDocCounts: number[]): CorpusSample[] => {
+const fractionsToSamples = (raw: unknown, nodeCount: number): CorpusSample[] => {
   const rawList: unknown[] = Array.isArray(raw) ? raw : [];
-  const sampleCount = Math.max(rawList.length, nodeDocCounts.length);
+  const sampleCount = Math.max(rawList.length, nodeCount);
   const fractions = normalizeTopicSampleFractions(raw, sampleCount);
   return fractions.map((fraction) => {
     if (typeof fraction === 'number' && fraction > 0 && fraction < 1) {
@@ -117,31 +115,29 @@ const fractionsToSamples = (raw: unknown, nodeDocCounts: number[]): CorpusSample
 /**
  * Owns topic-modeling run parameters and their user-set flags. The reducer
  * keeps related value/dirty-state pairs in one place so hydration, node default
- * resets, and Clear Results cannot update them inconsistently.
+ * resets cannot update them inconsistently.
  * Used by: useTopicModelingParameters, which adapts these transitions to the
  * existing hook API consumed by TopicModelingFeature.
  * Flow: apply node-derived sampling defaults, mark explicit percentage edits, hydrate
- * saved request values, and reset result-scoped user flags while preserving
- * values the UI intentionally keeps after Clear Results.
+ * saved request values.
  */
 export const topicModelingParameterReducer = (
   state: TopicModelingParameterState,
   action: TopicModelingParameterAction,
 ): TopicModelingParameterState => {
   switch (action.type) {
-    case 'applyNodeDefaultSamples':
+    case 'updateCorpusSample': {
       return {
         ...state,
-        corpusSamples: action.samples,
-        corpusSamplesUserSet: false,
+        corpusSamplesByNodeId: {
+          ...state.corpusSamplesByNodeId,
+          [action.nodeId]: {
+            ...(state.corpusSamplesByNodeId[action.nodeId] ?? defaultCorpusSample()),
+            ...action.update,
+          },
+        },
+        userSetSampleNodeIds: { ...state.userSetSampleNodeIds, [action.nodeId]: true },
       };
-    case 'updateCorpusSample': {
-      const next = [...state.corpusSamples];
-      next[action.index] = {
-        ...(next[action.index] ?? defaultCorpusSample()),
-        ...action.update,
-      };
-      return { ...state, corpusSamples: next, corpusSamplesUserSet: true };
     }
     case 'setMinClusterSize':
       return { ...state, minClusterSize: sanitizeMinClusterSize(action.value) };
@@ -153,28 +149,28 @@ export const topicModelingParameterReducer = (
       return { ...state, maxSegmentTokens: sanitizeMaxSegmentTokens(action.value) };
     case 'hydrateRequest': {
       const hasSampling = Array.isArray(action.request.sample_fractions);
+      const samples = hasSampling
+        ? fractionsToSamples(action.request.sample_fractions, action.request.node_ids.length)
+        : [];
       return {
         ...state,
-        minClusterSize: sanitizeMinClusterSize(
-          action.request.min_cluster_size as number | undefined,
-        ),
-        randomSeed: Number(action.request.random_seed ?? 0),
+        minClusterSize: sanitizeMinClusterSize(action.request.min_cluster_size),
+        randomSeed: action.request.random_seed ?? 0,
         randomSeedUserSet: true,
         segmentationMethod: normalizeSegmentationMethod(action.request.segmentation_method),
-        maxSegmentTokens: sanitizeMaxSegmentTokens(
-          action.request.max_segment_tokens as number | undefined,
-        ),
-        corpusSamples: hasSampling
-          ? fractionsToSamples(action.request.sample_fractions, action.nodeDocCounts)
-          : state.corpusSamples,
-        corpusSamplesUserSet: hasSampling ? true : state.corpusSamplesUserSet,
+        maxSegmentTokens: sanitizeMaxSegmentTokens(action.request.max_segment_tokens),
+        corpusSamplesByNodeId: hasSampling
+          ? Object.fromEntries(
+              action.request.node_ids.map((nodeId, index) => [
+                nodeId,
+                samples[index] ?? defaultCorpusSample(),
+              ]),
+            )
+          : state.corpusSamplesByNodeId,
+        userSetSampleNodeIds: hasSampling
+          ? Object.fromEntries(action.request.node_ids.map((nodeId) => [nodeId, true]))
+          : state.userSetSampleNodeIds,
       };
     }
-    case 'resetAfterClear':
-      return {
-        ...state,
-        corpusSamples: state.corpusSamplesUserSet ? state.corpusSamples : action.defaultSamples,
-        randomSeedUserSet: false,
-      };
   }
 };

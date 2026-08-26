@@ -16,10 +16,9 @@ import {
 } from '@/lib/arrow/arrowTable';
 import { fetchNodeSchema } from '@/lib/nodeSchema';
 import AnalysisTaskBanner from '@/features/views/common/components/AnalysisTaskBanner';
-import { useAnalysisFeature } from '../common/hooks/useAnalysisFeature';
+import { type AnalysisRequestOfKind, useAnalysisFeature } from '../common/hooks/useAnalysisFeature';
 import { ANALYSIS_TASK_TYPES } from '../common/analysisIds';
 import { nodeInputsFromSelections, useTabNodeInputs } from '../common/nodeInputs';
-import { analysisInputsFromRequest } from '../common/utils';
 import { getRerunActionState } from '../common/rerunActionState';
 import { hasClearRequiredAnalysis } from '../common/analysisActionLifecycle';
 import { hasParameterDiff } from '../common/parameterComparison';
@@ -41,7 +40,7 @@ import { ChartImageDownloadDialog } from '@/components/ui/ChartImageDownloadDial
 import { downloadChartAs, findSvgInContainer, type ChartImageFormat } from '@/lib/chartExport';
 import { DEFAULT_TAB_INPUT_SET_ID } from '@/features/views/common/tabs/tabStateOps';
 import type { AnalysisTabFeatureProps } from '@/features/views/common/tabs/AnalysisTabsHost';
-import type { SequentialAnalysisRequest, SequentialAnalysisResponse } from '@/api';
+import type { SequentialAnalysisResponse } from '@/api';
 
 const isTimeCompatibleField = (field: ArrowField): boolean =>
   isArrowTemporalField(field) || isArrowIntegerField(field) || isArrowFloatField(field);
@@ -143,7 +142,7 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
     clearResults,
     stopTask,
     result: results,
-  } = useAnalysisFeature<SequentialAnalysisResponse, SequentialAnalysisRequest>({
+  } = useAnalysisFeature<SequentialAnalysisResponse, AnalysisRequestOfKind<'sequential'>>({
     taskType: ANALYSIS_TASK_TYPES.sequential,
     workspaceId: currentWorkspaceId,
     tabId: host.tabId,
@@ -159,13 +158,14 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
     },
     // Restores sequential request parameters, selection lock, and schema after reload.
     // Called by: useAnalysisFeature hydration because Trends restores must rebuild time-column selection, bucket settings, grouping columns, and case handling from the submitted request. Flow: unwrap request data, apply numeric or datetime controls, restore node/group selections, then release hydration state.
-    onRequest: async (requestPayload) => {
-      const req = requestPayload as unknown as Record<string, unknown>;
+    onRequest: async (request) => {
       setHydratingSelection(true);
       try {
-        const hydrated = sequentialParameters.applyHydratedRequest(req);
+        const hydrated = sequentialParameters.applyHydratedRequest(request);
         const nodeIdStr = hydrated.nodeId;
-        onTabInputSetChange(DEFAULT_TAB_INPUT_SET_ID, analysisInputsFromRequest(req, 1));
+        onTabInputSetChange(DEFAULT_TAB_INPUT_SET_ID, [
+          { node_id: request.node_id, column: request.time_column },
+        ]);
         hydratedParamsRef.current = hydrated.hydratedParams;
         if (nodeIdStr && currentWorkspaceId) {
           const schema = await fetchNodeSchema({
@@ -185,7 +185,6 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
       // Refresh the canonical forest; curated inputs remain in the Tab draft.
       refreshAnalyses();
       setLockedSchema(null);
-      sequentialParameters.resetAfterClear();
     },
   });
 
@@ -437,7 +436,6 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
           clearDisabledReason: actionState.clearDisabledReason,
           isRunningAll: isAnalyzing,
           isStopping,
-          hasResult: Boolean(results),
           runAllLabel: 'Run',
           clearHelp: {
             targetKey: 'analysis.sequential-analysis.clear-results',

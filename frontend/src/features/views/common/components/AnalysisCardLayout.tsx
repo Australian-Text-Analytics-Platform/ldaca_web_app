@@ -19,7 +19,6 @@ interface AnalysisCardLayoutProps {
   info?: HelpConfig<'info'>;
   help?: HelpConfig<'tutorial'>;
   tone?: 'default' | 'error';
-  headerActions?: React.ReactNode;
   actions?: {
     onPreview?: () => void | Promise<void>;
     onRunAll: () => void | Promise<void>;
@@ -29,18 +28,14 @@ interface AnalysisCardLayoutProps {
     previewDisabledReason?: string;
     runAllDisabled?: boolean;
     runAllDisabledReason?: string;
-    stopDisabled?: boolean;
-    stopDisabledReason?: string;
     clearDisabled?: boolean;
     clearDisabledReason?: string;
     isPreviewing?: boolean;
     isRunningAll?: boolean;
     isStopping?: boolean;
     isClearing?: boolean;
-    hasResult?: boolean;
     runAllLabel?: string;
     runAllHelp?: HelpConfig<'tutorial'>;
-    stopHelp?: HelpConfig<'tutorial'>;
     clearHelp?: HelpConfig<'tutorial'>;
   };
   children: React.ReactNode;
@@ -62,7 +57,6 @@ export function AnalysisCardLayout({
   info,
   help,
   tone = 'default',
-  headerActions,
   actions,
   children,
   parametersLocked = false,
@@ -95,17 +89,14 @@ export function AnalysisCardLayout({
         ? 'Stop the running analysis before clearing results'
         : (actions.clearDisabledReason ?? 'There are no results to clear')
     : undefined;
-  const stopDisabled = Boolean(actions?.stopDisabled) || Boolean(actions?.isStopping);
-  const stopDisabledReason = stopDisabled
-    ? actions?.isStopping
-      ? 'A stop request is already in progress'
-      : (actions?.stopDisabledReason ?? 'This task cannot be stopped right now')
+  const stopDisabledReason = actions?.isStopping
+    ? 'A stop request is already in progress'
     : undefined;
 
   return (
     <Card ref={cardRef} className={cardToneClassName}>
       <CardHeader className="space-y-0 pb-4">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex items-start">
           <CardTitle data-guidance={titleGuidanceTarget} className="flex items-center gap-2">
             {title}
             {info ? (
@@ -115,11 +106,6 @@ export function AnalysisCardLayout({
               <HelpIcon targetKey={help.targetKey} label={help.label} tooltip={help.tooltip} />
             ) : null}
           </CardTitle>
-          {headerActions ? (
-            <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:items-center">
-              {headerActions}
-            </div>
-          ) : null}
         </div>
       </CardHeader>
 
@@ -214,7 +200,7 @@ export function AnalysisCardLayout({
                     void actions.onStop?.();
                   }}
                   variant="outline"
-                  disabled={stopDisabled}
+                  disabled={actions.isStopping}
                 >
                   {actions.isStopping ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -224,13 +210,6 @@ export function AnalysisCardLayout({
                   Stop
                 </Button>
               </DisabledReasonTooltip>
-              {actions.stopHelp ? (
-                <HelpIcon
-                  targetKey={actions.stopHelp.targetKey}
-                  label={actions.stopHelp.label}
-                  tooltip={actions.stopHelp.tooltip}
-                />
-              ) : null}
             </div>
           ) : null}
         </CardFooter>

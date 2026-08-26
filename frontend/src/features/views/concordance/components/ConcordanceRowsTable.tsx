@@ -1,4 +1,4 @@
-import { flexRender, type Header, type Table as TanStackTable } from '@tanstack/react-table';
+import { flexRender } from '@tanstack/react-table';
 import type { CSSProperties, ReactNode } from 'react';
 import {
   Table,
@@ -14,14 +14,18 @@ import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { alignmentClassForColumn, type ConcordanceRow } from './concordanceTableModel';
 import { CONCORDANCE_COLUMN_KEYS } from '../../common/generatedColumns';
 import { toCellText } from '../concordanceTableDomain';
+import type {
+  ServerTableHeader,
+  ServerTableInstance,
+} from '@/features/views/common/hooks/useServerTable';
 
 interface Props {
-  table: TanStackTable<ConcordanceRow>;
+  table: ServerTableInstance<ConcordanceRow>;
   rows: ConcordanceRow[];
   tableColumns: string[];
   searchWord: string;
   loading: boolean;
-  renderHeader: (header: Header<ConcordanceRow, unknown>) => ReactNode;
+  renderHeader: (header: ServerTableHeader<ConcordanceRow>) => ReactNode;
   getRowClassName: (row: ConcordanceRow, index: number) => string;
   getRowStyle?: (row: ConcordanceRow, index: number) => CSSProperties | undefined;
   getSourceColor?: (row: ConcordanceRow) => string | undefined;
@@ -200,7 +204,7 @@ export function ConcordancePlainHeader({
   header,
   hint,
 }: {
-  header: Header<ConcordanceRow, unknown>;
+  header: ServerTableHeader<ConcordanceRow>;
   hint?: string;
 }) {
   return (

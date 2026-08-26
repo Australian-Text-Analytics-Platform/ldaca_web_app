@@ -2,27 +2,13 @@
  * Shared types for data preprocessing features
  */
 
-import type { FilterConditionInput, JsonDataInput } from '@/api';
+import type { FilterConditionInput } from '@/api';
 import type { ArrowField } from '@/lib/arrow/arrowTable';
 import type { Field } from 'apache-arrow';
 
-type FilterOperator =
-  | 'eq'
-  | 'gt'
-  | 'gte'
-  | 'lt'
-  | 'lte'
-  | 'contains'
-  | 'startswith'
-  | 'endswith'
-  | 'is_null'
-  | 'between'
-  | 'in';
+type FilterOperator = FilterConditionInput['operator'];
 
-export type FilterCondition = Omit<FilterConditionInput, 'operator' | 'value'> & {
-  operator: FilterOperator;
-  value?: JsonDataInput;
-};
+export type FilterCondition = FilterConditionInput;
 
 export interface FilterRequest {
   conditions: FilterCondition[];

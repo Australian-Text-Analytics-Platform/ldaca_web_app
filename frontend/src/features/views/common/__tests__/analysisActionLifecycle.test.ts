@@ -37,25 +37,25 @@ describe('getAnalysisActionLifecycle', () => {
     });
   });
 
-  it.each([
-    'queued',
-    'running',
-  ] as const)('attributes an active %s Run All lifecycle to Run All instead of Preview', (runAllState) => {
-    expect(
-      getAnalysisActionLifecycle({
-        isPreviewing: true,
-        isSubmittingRunAll: false,
-        runAllState,
-        hasActiveAnalysis: true,
-      }),
-    ).toEqual({
-      isPreviewing: false,
-      isRunningAll: true,
-      parametersLocked: true,
-      previewDisabled: true,
-      runAllDisabled: true,
-    });
-  });
+  it.each(['queued', 'running'] as const)(
+    'attributes an active %s Run All lifecycle to Run All instead of Preview',
+    (runAllState) => {
+      expect(
+        getAnalysisActionLifecycle({
+          isPreviewing: true,
+          isSubmittingRunAll: false,
+          runAllState,
+          hasActiveAnalysis: true,
+        }),
+      ).toEqual({
+        isPreviewing: false,
+        isRunningAll: true,
+        parametersLocked: true,
+        previewDisabled: true,
+        runAllDisabled: true,
+      });
+    },
+  );
 
   it('locks at the local Run All submission boundary before an Analysis exists', () => {
     expect(
@@ -90,25 +90,25 @@ describe('getAnalysisActionLifecycle', () => {
     });
   });
 
-  it.each([
-    'failed',
-    'cancelled',
-  ] as const)('unlocks both actions after Run All is %s', (runAllState) => {
-    expect(
-      getAnalysisActionLifecycle({
+  it.each(['failed', 'cancelled'] as const)(
+    'unlocks both actions after Run All is %s',
+    (runAllState) => {
+      expect(
+        getAnalysisActionLifecycle({
+          isPreviewing: false,
+          isSubmittingRunAll: false,
+          runAllState,
+          hasActiveAnalysis: false,
+        }),
+      ).toEqual({
         isPreviewing: false,
-        isSubmittingRunAll: false,
-        runAllState,
-        hasActiveAnalysis: false,
-      }),
-    ).toEqual({
-      isPreviewing: false,
-      isRunningAll: false,
-      parametersLocked: false,
-      previewDisabled: false,
-      runAllDisabled: false,
-    });
-  });
+        isRunningAll: false,
+        parametersLocked: false,
+        previewDisabled: false,
+        runAllDisabled: false,
+      });
+    },
+  );
 
   it('blocks both actions without locking parameters when Clear Results is required', () => {
     expect(

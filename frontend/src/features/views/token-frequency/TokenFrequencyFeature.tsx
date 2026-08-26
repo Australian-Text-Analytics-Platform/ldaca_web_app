@@ -12,7 +12,7 @@ import { isArrowStringField } from '@/lib/arrow/arrowTable';
 import { getAnalysisResultResource } from '../common/analysisApi';
 import { ANALYSIS_TASK_TYPES } from '../common/analysisIds';
 import TokenizerModelSelector from '../common/components/TokenizerModelSelector';
-import { useAnalysisFeature } from '../common/hooks/useAnalysisFeature';
+import { type AnalysisRequestOfKind, useAnalysisFeature } from '../common/hooks/useAnalysisFeature';
 import { useNodeColorControls } from '../common/hooks/useNodeColorControls';
 import { useTabNodeInputs } from '../common/nodeInputs';
 import { hasParameterDiff } from '../common/parameterComparison';
@@ -20,7 +20,7 @@ import { getRerunActionState } from '../common/rerunActionState';
 import { hasClearRequiredAnalysis } from '../common/analysisActionLifecycle';
 import { DEFAULT_TAB_INPUT_SET_ID } from '../common/tabs/tabStateOps';
 import { deriveTokenizerModelsByNode } from '../common/tokenizerModelPreferences';
-import { DEFAULT_TOKEN_LIMIT, parseAnalysisNodeRequest } from '../common/utils';
+import { DEFAULT_TOKEN_LIMIT } from '../common/utils';
 import FillDefaultStopWordsDialog from './components/FillDefaultStopWordsDialog';
 import { TokenFrequencyParameterPanel } from './components/panels/TokenFrequencyParameterPanel';
 import { TokenFrequencyResultsPanel } from './components/panels/TokenFrequencyResultsPanel';
@@ -85,22 +85,19 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
   const { setNodeColor: persistNodeColor } = useWorkspaceActions();
   const setCurrentView = useUIStore((state) => state.setCurrentView);
 
-  const [liveLastCompareNodeIds, setLastCompareNodeIds] = useState<string[]>([]);
-  const [liveStudyNodeId, setStudyNodeId] = useState<string | null>(null);
+  const [lastCompareNodeIds, setLastCompareNodeIds] = useState<string[]>([]);
+  const [studyNodeId, setStudyNodeId] = useState<string | null>(null);
 
-  const lastCompareNodeIds = liveLastCompareNodeIds;
-  const studyNodeId = liveStudyNodeId;
-
-  const restoreAnalysisNodeContext = (requestData: Record<string, unknown>) => {
-    const { nodeIds, selections } = parseAnalysisNodeRequest(requestData, 2);
+  const restoreAnalysisNodeContext = (request: TokenFrequencyRequest) => {
+    const nodeIds = request.node_ids.slice(0, 2);
     if (nodeIds.length === 0) return;
 
     setLastCompareNodeIds(nodeIds);
     setStudyNodeId(nodeIds[1] ?? null);
 
-    const hydratedInputs = selections.map(({ nodeId, column }) => ({
+    const hydratedInputs = nodeIds.map((nodeId) => ({
       node_id: nodeId,
-      column,
+      column: request.node_columns[nodeId] ?? '',
     }));
     const currentInputs = tabInputSets[DEFAULT_TAB_INPUT_SET_ID] ?? [];
     const restoredInputs = reconcileHydratedTokenFrequencyInputs(currentInputs, hydratedInputs);
@@ -116,17 +113,14 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
       onTabInputSetChange(DEFAULT_TAB_INPUT_SET_ID, restoredInputs);
     }
 
-    const requestedModels = requestData.node_tokenizer_models;
-    if (requestedModels && typeof requestedModels === 'object') {
-      setLiveTokenizerModelsByNode(
-        Object.fromEntries(
-          nodeIds.flatMap((nodeId) => {
-            const model = (requestedModels as Record<string, unknown>)[nodeId];
-            return typeof model === 'string' && model.trim() ? [[nodeId, model]] : [];
-          }),
-        ),
-      );
-    }
+    setLiveTokenizerModelsByNode(
+      Object.fromEntries(
+        nodeIds.flatMap((nodeId) => {
+          const model = request.node_tokenizer_models[nodeId];
+          return model?.trim() ? [[nodeId, model]] : [];
+        }),
+      ),
+    );
   };
 
   const panelNodeIds = derivePanelNodeIds(panelSelectedNodes);
@@ -153,7 +147,7 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
     clearResults,
     stopTask,
     result: results,
-  } = useAnalysisFeature<TokenFrequencyResponse, TokenFrequencyRequest>({
+  } = useAnalysisFeature<TokenFrequencyResponse, AnalysisRequestOfKind<'token_frequency'>>({
     taskType: ANALYSIS_TASK_TYPES.tokenFrequencies,
     workspaceId: currentWorkspaceId,
     tabId: host.tabId,
@@ -172,12 +166,9 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
      * Flow: unwrap the saved request, then restore columns, tokenizer models,
      * and study/reference roles while retaining an existing parameter-card order.
      */
-    onRequest: (requestPayload) => {
-      const requestData = requestPayload as unknown as Record<string, unknown>;
-      restoreAnalysisNodeContext(requestData);
-      applyTokenLimitState(
-        typeof requestData.token_limit === 'number' ? requestData.token_limit : null,
-      );
+    onRequest: (request) => {
+      restoreAnalysisNodeContext(request);
+      applyTokenLimitState(request.token_limit ?? null);
     },
     /** Clears local result and selection state when the feature reset action runs. */
     onCleared: () => {
@@ -189,17 +180,15 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
     },
   });
 
-  const effectiveNodeColumnSelections = nodeColumnSelections;
-
   const effectiveTokenizerModelsByNode = useMemo(() => {
     // Seed with models persisted to the backend from previous sessions,
     // then apply any live overrides the user has made in this session.
     return deriveTokenizerModelsByNode(
-      effectiveNodeColumnSelections,
+      nodeColumnSelections,
       nodeInputs.nodeInfoById,
       liveTokenizerModelsByNode,
     );
-  }, [effectiveNodeColumnSelections, nodeInputs.nodeInfoById, liveTokenizerModelsByNode]);
+  }, [nodeColumnSelections, nodeInputs.nodeInfoById, liveTokenizerModelsByNode]);
 
   // useCallback so the section components below stay React.memo-stable
   // across stopword-keystroke re-renders of this feature. Without it,
@@ -222,7 +211,7 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
   // Language is not stored per column (a column may mix languages), so the guess
   // is derived on demand from the first selected text column and the user
   // confirms or overrides it in the dialog.
-  const fillDefaultSelection = effectiveNodeColumnSelections.find((selection) => selection.column);
+  const fillDefaultSelection = nodeColumnSelections.find((selection) => selection.column);
   const fillDefaultTarget = {
     nodeId: fillDefaultSelection?.nodeId ?? null,
     column: fillDefaultSelection?.column ?? null,
@@ -282,7 +271,7 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
       tabId: host.tabId,
       panelNodeIds: orderedPanelNodeIds,
       panelSelectedNodes,
-      effectiveNodeColumnSelections,
+      effectiveNodeColumnSelections: nodeColumnSelections,
       tokenizerModelsByNode: effectiveTokenizerModelsByNode,
       stopWords,
       lastCompareNodeIds,
@@ -327,13 +316,9 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
     applyStopSetFromText(stopWords);
   };
 
-  const hasIncompleteSelections = effectiveNodeColumnSelections.some(
-    (selection) => !selection.column,
-  );
+  const hasIncompleteSelections = nodeColumnSelections.some((selection) => !selection.column);
   const selectedNodeIdsWithColumns = orderedPanelNodeIds.filter((nodeId) =>
-    effectiveNodeColumnSelections.some(
-      (selection) => selection.nodeId === nodeId && selection.column,
-    ),
+    nodeColumnSelections.some((selection) => selection.nodeId === nodeId && selection.column),
   );
   const missingTokenizerModelNodeIds = selectedNodeIdsWithColumns.filter(
     (nodeId) => !(effectiveTokenizerModelsByNode[nodeId] ?? '').trim(),
@@ -443,7 +428,6 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
           void clearResults();
         }}
         hasIncompleteSelections={hasIncompleteSelections}
-        hasResults={Boolean(results)}
         studyNodeId={effectiveStudyNodeId}
         onStudyNodeChange={(nodeId: string) => {
           setStudyNodeId(nodeId);

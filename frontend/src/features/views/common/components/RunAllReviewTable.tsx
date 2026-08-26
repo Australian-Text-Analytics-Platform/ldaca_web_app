@@ -1,4 +1,3 @@
-import type { ColumnDef } from '@tanstack/react-table';
 import { ArrowRight } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -26,7 +25,7 @@ import { type IntercoderReliabilityMetric } from '@/features/views/common/column
 import { MetadataColumnSelector } from '@/features/views/common/components/MetadataColumnSelector';
 import { ServerPaginationFooter } from '@/features/views/common/components/ServerPaginationFooter';
 import { useFullColumnComparisons } from '@/features/views/common/hooks/useFullColumnComparisons';
-import { useServerTable } from '@/features/views/common/hooks/useServerTable';
+import { type ServerColumnDef, useServerTable } from '@/features/views/common/hooks/useServerTable';
 import { annotationValuesDiffer } from '@/features/views/annotation/annotationDifferenceQuery';
 import { useAnnotationNodePage } from '@/features/views/annotation/hooks/useAnnotationNodePage';
 import { toBgColor } from '@/features/views/common/vizPalette';
@@ -179,7 +178,7 @@ export function RunAllReviewTable({
     (column) => dataColumns?.includes(column) && column !== correctionColumn,
   );
   const supplementalColumns = [...activeComparisonColumns, ...activeMetadataColumns];
-  const tableColumns: ColumnDef<Record<string, unknown>>[] = [
+  const tableColumns: ServerColumnDef<Record<string, unknown>>[] = [
     ...visibleRequiredColumns.map((column) => ({
       id: column,
       accessorFn: (row: Record<string, unknown>) => row[column],

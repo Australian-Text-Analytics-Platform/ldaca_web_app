@@ -1,7 +1,7 @@
 import { Text } from '@visx/text';
 import { Wordcloud } from '@visx/wordcloud';
 import { Download } from 'lucide-react';
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import HelpIcon from '@/components/help/HelpIcon';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -95,6 +95,10 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
   // Hook must come before any early return so React sees a stable call order
   // across renders, regardless of whether the comparative panel is showing.
   const measuredCardWidth = useElementWidth(unifiedCloudContainerRef);
+  const filteredStatistics = useMemo(
+    () => (statistics ?? []).filter((entry) => !appliedStopSet.has(entry.token.toLowerCase())),
+    [appliedStopSet, statistics],
+  );
 
   const hasMultipleNodes =
     normalizedNodeResults.length >= 2 ||
@@ -117,9 +121,7 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
   const nodeAColor = getColorForNode(nodeAId || nodeAName, 0);
   const nodeBColor = getColorForNode(nodeBId || nodeBName, 1);
 
-  const statsSource = Array.isArray(statistics) && statistics.length > 0 ? statistics : [];
-  const cloudStats = (Array.isArray(statsSource) ? statsSource : [])
-    .filter((s) => !appliedStopSet.has(s.token.toLowerCase()))
+  const cloudStats = filteredStatistics
     .map((s) => ({
       token: s.token,
       o1: Number(s.freq_reference ?? 0),
@@ -400,9 +402,7 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
             const studyId = lastCompareNodeIds[1] ?? null;
             return (
               <TokenFrequencyStatisticsTable
-                statistics={statistics.filter(
-                  (entry) => !appliedStopSet.has(entry.token.toLowerCase()),
-                )}
+                statistics={filteredStatistics}
                 onDownloadFrequencyCsv={onDownloadFrequencyCsv}
                 onTokenClick={onTokenClick}
                 tokenFilter={tokenFilter}

@@ -22,7 +22,7 @@ describe('DataBlockName', () => {
 
     const viewport = screen.getByTestId('data-block-name');
     await waitFor(() => expect(viewport).toHaveAttribute('dir', 'rtl'));
-    expect(viewport).toHaveStyle({ maxHeight: '1lh' });
+    expect(viewport).toHaveClass('max-h-[1lh]');
     expect(screen.getByText(/qldelection2020_candidate_tweets/)).toHaveAttribute('dir', 'ltr');
     expect(screen.getByTestId('data-block-name-head-fade')).toHaveClass('left-0', 'opacity-100');
   });
@@ -43,7 +43,7 @@ describe('DataBlockName', () => {
     const viewport = screen.getByTestId('data-block-name');
     expect(viewport).toHaveAttribute('dir', 'ltr');
     expect(viewport).toHaveClass('flex', 'flex-col', 'justify-end');
-    expect(viewport).toHaveStyle({ maxHeight: '3lh' });
+    expect(viewport).toHaveClass('max-h-[3lh]');
     await waitFor(() =>
       expect(screen.getByTestId('data-block-name-head-fade')).toHaveClass('opacity-100'),
     );

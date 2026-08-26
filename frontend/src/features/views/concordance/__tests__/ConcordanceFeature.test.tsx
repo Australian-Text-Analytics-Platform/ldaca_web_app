@@ -102,10 +102,8 @@ vi.mock('../../common/nodeInputs', () => ({
     removeNode: vi.fn(),
     clear: vi.fn(),
     setColumn: vi.fn(),
-    getAddRejection: vi.fn(() => null),
     availableNodes: [],
     canAddMore: true,
-    graphSelectedIds: [],
     workspaceId: 'ws-1',
     nodeInfoById: {
       'node-1': {

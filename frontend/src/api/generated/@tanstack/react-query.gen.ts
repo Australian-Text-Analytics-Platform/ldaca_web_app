@@ -501,27 +501,30 @@ export const listUserFileImportsInfiniteQueryKey = (options?: Options<ListUserFi
  *
  * Return retained import history in stable newest-first order.
  */
-export const listUserFileImportsInfiniteOptions = (options?: Options<ListUserFileImportsData>) => infiniteQueryOptions<ListUserFileImportsResponse, ListUserFileImportsError, InfiniteData<ListUserFileImportsResponse>, QueryKey<Options<ListUserFileImportsData>>, number | Pick<QueryKey<Options<ListUserFileImportsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
-// @ts-ignore
-{
-    queryFn: async ({ pageParam, queryKey, signal }) => {
-        // @ts-ignore
-        const page: Pick<QueryKey<Options<ListUserFileImportsData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
-            query: {
-                page: pageParam
-            }
-        };
-        const params = createInfiniteParams(queryKey, page);
-        const { data } = await listUserFileImports({
-            ...options,
-            ...params,
-            signal,
-            throwOnError: true
-        });
-        return data;
-    },
-    queryKey: listUserFileImportsInfiniteQueryKey(options)
-});
+export const listUserFileImportsInfiniteOptions = (options?: Options<ListUserFileImportsData>) => {
+    const opts = infiniteQueryOptions<ListUserFileImportsResponse, ListUserFileImportsError, InfiniteData<ListUserFileImportsResponse>, QueryKey<Options<ListUserFileImportsData>>, number | Pick<QueryKey<Options<ListUserFileImportsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
+    // @ts-ignore
+    {
+        queryFn: async ({ pageParam, queryKey, signal }) => {
+            // @ts-ignore
+            const page: Pick<QueryKey<Options<ListUserFileImportsData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
+                query: {
+                    page: pageParam
+                }
+            };
+            const params = createInfiniteParams(queryKey, page);
+            const { data } = await listUserFileImports({
+                ...options,
+                ...params,
+                signal,
+                throwOnError: true
+            });
+            return data;
+        },
+        queryKey: listUserFileImportsInfiniteQueryKey(options)
+    });
+    return opts as Omit<typeof opts, 'initialData'>;
+};
 
 /**
  * Delete User File Import
@@ -703,27 +706,30 @@ export const previewFileInfiniteQueryKey = (options: Options<PreviewFileData>): 
  *
  * Return one self-contained Arrow IPC preview page.
  */
-export const previewFileInfiniteOptions = (options: Options<PreviewFileData>) => infiniteQueryOptions<PreviewFileResponse, PreviewFileError, InfiniteData<PreviewFileResponse>, QueryKey<Options<PreviewFileData>>, number | Pick<QueryKey<Options<PreviewFileData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
-// @ts-ignore
-{
-    queryFn: async ({ pageParam, queryKey, signal }) => {
-        // @ts-ignore
-        const page: Pick<QueryKey<Options<PreviewFileData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
-            query: {
-                page: pageParam
-            }
-        };
-        const params = createInfiniteParams(queryKey, page);
-        const { data } = await previewFile({
-            ...options,
-            ...params,
-            signal,
-            throwOnError: true
-        });
-        return data;
-    },
-    queryKey: previewFileInfiniteQueryKey(options)
-});
+export const previewFileInfiniteOptions = (options: Options<PreviewFileData>) => {
+    const opts = infiniteQueryOptions<PreviewFileResponse, PreviewFileError, InfiniteData<PreviewFileResponse>, QueryKey<Options<PreviewFileData>>, number | Pick<QueryKey<Options<PreviewFileData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
+    // @ts-ignore
+    {
+        queryFn: async ({ pageParam, queryKey, signal }) => {
+            // @ts-ignore
+            const page: Pick<QueryKey<Options<PreviewFileData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
+                query: {
+                    page: pageParam
+                }
+            };
+            const params = createInfiniteParams(queryKey, page);
+            const { data } = await previewFile({
+                ...options,
+                ...params,
+                signal,
+                throwOnError: true
+            });
+            return data;
+        },
+        queryKey: previewFileInfiniteQueryKey(options)
+    });
+    return opts as Omit<typeof opts, 'initialData'>;
+};
 
 export const previewFileSchemaQueryKey = (options: Options<PreviewFileSchemaData>) => createQueryKey('previewFileSchema', options, false, ['user-files']);
 
@@ -965,27 +971,30 @@ export const listAnalysesInfiniteQueryKey = (options: Options<ListAnalysesData>)
  *
  * Return one stable page of live valid and corrupt Analyses.
  */
-export const listAnalysesInfiniteOptions = (options: Options<ListAnalysesData>) => infiniteQueryOptions<ListAnalysesResponse, ListAnalysesError, InfiniteData<ListAnalysesResponse>, QueryKey<Options<ListAnalysesData>>, number | Pick<QueryKey<Options<ListAnalysesData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
-// @ts-ignore
-{
-    queryFn: async ({ pageParam, queryKey, signal }) => {
-        // @ts-ignore
-        const page: Pick<QueryKey<Options<ListAnalysesData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
-            query: {
-                page: pageParam
-            }
-        };
-        const params = createInfiniteParams(queryKey, page);
-        const { data } = await listAnalyses({
-            ...options,
-            ...params,
-            signal,
-            throwOnError: true
-        });
-        return data;
-    },
-    queryKey: listAnalysesInfiniteQueryKey(options)
-});
+export const listAnalysesInfiniteOptions = (options: Options<ListAnalysesData>) => {
+    const opts = infiniteQueryOptions<ListAnalysesResponse, ListAnalysesError, InfiniteData<ListAnalysesResponse>, QueryKey<Options<ListAnalysesData>>, number | Pick<QueryKey<Options<ListAnalysesData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
+    // @ts-ignore
+    {
+        queryFn: async ({ pageParam, queryKey, signal }) => {
+            // @ts-ignore
+            const page: Pick<QueryKey<Options<ListAnalysesData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
+                query: {
+                    page: pageParam
+                }
+            };
+            const params = createInfiniteParams(queryKey, page);
+            const { data } = await listAnalyses({
+                ...options,
+                ...params,
+                signal,
+                throwOnError: true
+            });
+            return data;
+        },
+        queryKey: listAnalysesInfiniteQueryKey(options)
+    });
+    return opts as Omit<typeof opts, 'initialData'>;
+};
 
 export const getAnalysisQueryKey = (options: Options<GetAnalysisData>) => createQueryKey('getAnalysis', options, false, ['analyses']);
 
@@ -1184,27 +1193,30 @@ export const getAnalysisTableProjectionRowsInfiniteQueryKey = (options: Options<
 /**
  * Get Analysis Table Projection Rows
  */
-export const getAnalysisTableProjectionRowsInfiniteOptions = (options: Options<GetAnalysisTableProjectionRowsData>) => infiniteQueryOptions<GetAnalysisTableProjectionRowsResponse, GetAnalysisTableProjectionRowsError, InfiniteData<GetAnalysisTableProjectionRowsResponse>, QueryKey<Options<GetAnalysisTableProjectionRowsData>>, number | Pick<QueryKey<Options<GetAnalysisTableProjectionRowsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
-// @ts-ignore
-{
-    queryFn: async ({ pageParam, queryKey, signal }) => {
-        // @ts-ignore
-        const page: Pick<QueryKey<Options<GetAnalysisTableProjectionRowsData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
-            query: {
-                page: pageParam
-            }
-        };
-        const params = createInfiniteParams(queryKey, page);
-        const { data } = await getAnalysisTableProjectionRows({
-            ...options,
-            ...params,
-            signal,
-            throwOnError: true
-        });
-        return data;
-    },
-    queryKey: getAnalysisTableProjectionRowsInfiniteQueryKey(options)
-});
+export const getAnalysisTableProjectionRowsInfiniteOptions = (options: Options<GetAnalysisTableProjectionRowsData>) => {
+    const opts = infiniteQueryOptions<GetAnalysisTableProjectionRowsResponse, GetAnalysisTableProjectionRowsError, InfiniteData<GetAnalysisTableProjectionRowsResponse>, QueryKey<Options<GetAnalysisTableProjectionRowsData>>, number | Pick<QueryKey<Options<GetAnalysisTableProjectionRowsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
+    // @ts-ignore
+    {
+        queryFn: async ({ pageParam, queryKey, signal }) => {
+            // @ts-ignore
+            const page: Pick<QueryKey<Options<GetAnalysisTableProjectionRowsData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
+                query: {
+                    page: pageParam
+                }
+            };
+            const params = createInfiniteParams(queryKey, page);
+            const { data } = await getAnalysisTableProjectionRows({
+                ...options,
+                ...params,
+                signal,
+                throwOnError: true
+            });
+            return data;
+        },
+        queryKey: getAnalysisTableProjectionRowsInfiniteQueryKey(options)
+    });
+    return opts as Omit<typeof opts, 'initialData'>;
+};
 
 export const getAnalysisTableProjectionSchemaQueryKey = (options: Options<GetAnalysisTableProjectionSchemaData>) => createQueryKey('getAnalysisTableProjectionSchema', options, false, ['analyses']);
 
@@ -1251,27 +1263,30 @@ export const getAnalysisTableRowsInfiniteQueryKey = (options: Options<GetAnalysi
  *
  * Return one page of an open-ended Result table as Arrow IPC.
  */
-export const getAnalysisTableRowsInfiniteOptions = (options: Options<GetAnalysisTableRowsData>) => infiniteQueryOptions<GetAnalysisTableRowsResponse, GetAnalysisTableRowsError, InfiniteData<GetAnalysisTableRowsResponse>, QueryKey<Options<GetAnalysisTableRowsData>>, number | Pick<QueryKey<Options<GetAnalysisTableRowsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
-// @ts-ignore
-{
-    queryFn: async ({ pageParam, queryKey, signal }) => {
-        // @ts-ignore
-        const page: Pick<QueryKey<Options<GetAnalysisTableRowsData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
-            query: {
-                page: pageParam
-            }
-        };
-        const params = createInfiniteParams(queryKey, page);
-        const { data } = await getAnalysisTableRows({
-            ...options,
-            ...params,
-            signal,
-            throwOnError: true
-        });
-        return data;
-    },
-    queryKey: getAnalysisTableRowsInfiniteQueryKey(options)
-});
+export const getAnalysisTableRowsInfiniteOptions = (options: Options<GetAnalysisTableRowsData>) => {
+    const opts = infiniteQueryOptions<GetAnalysisTableRowsResponse, GetAnalysisTableRowsError, InfiniteData<GetAnalysisTableRowsResponse>, QueryKey<Options<GetAnalysisTableRowsData>>, number | Pick<QueryKey<Options<GetAnalysisTableRowsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
+    // @ts-ignore
+    {
+        queryFn: async ({ pageParam, queryKey, signal }) => {
+            // @ts-ignore
+            const page: Pick<QueryKey<Options<GetAnalysisTableRowsData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
+                query: {
+                    page: pageParam
+                }
+            };
+            const params = createInfiniteParams(queryKey, page);
+            const { data } = await getAnalysisTableRows({
+                ...options,
+                ...params,
+                signal,
+                throwOnError: true
+            });
+            return data;
+        },
+        queryKey: getAnalysisTableRowsInfiniteQueryKey(options)
+    });
+    return opts as Omit<typeof opts, 'initialData'>;
+};
 
 export const getAnalysisTableSchemaQueryKey = (options: Options<GetAnalysisTableSchemaData>) => createQueryKey('getAnalysisTableSchema', options, false, ['analyses']);
 

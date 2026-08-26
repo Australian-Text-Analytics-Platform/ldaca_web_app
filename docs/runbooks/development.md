@@ -39,7 +39,7 @@ cd backend
 uv run ruff check .
 uv run pytest -q
 uv run ty check
-CORS_ALLOWED_ORIGINS='["http://localhost:3000"]' \
+CORS_ALLOWED_ORIGINS='["http://localhost:3000","http://127.0.0.1:3000"]' \
   uv run uvicorn ldaca_wordflow.asgi:app --reload --port 8001
 ```
 
@@ -51,8 +51,10 @@ pnpm -C frontend check
 ```
 
 Run the backend and frontend commands in separate terminals. Vite serves the
-frontend on `http://localhost:3000` and connects directly to the backend on
-port `8001`; the exact backend Origin allowlist is therefore required for
+frontend on port `3000` and connects directly to the backend on port `8001`.
+Use either `http://localhost:3000` or `http://127.0.0.1:3000`; the frontend
+preserves that hostname when it selects `localhost:8001` or `127.0.0.1:8001`.
+Both exact frontend origins must therefore remain in the backend allowlist for
 unsafe CSRF-protected requests. Production does not use this split arrangement:
 the release workflow builds the SPA into the backend package and the backend
 serves both surfaces from one origin.

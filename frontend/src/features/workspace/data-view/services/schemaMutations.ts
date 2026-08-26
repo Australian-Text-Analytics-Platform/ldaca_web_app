@@ -8,6 +8,11 @@ export const DATA_TYPES = [
   { value: 'datetime', label: 'datetime' },
 ] as const;
 
+export type ColumnCastType = (typeof DATA_TYPES)[number]['value'];
+
+export const isColumnCastType = (value: string): value is ColumnCastType =>
+  DATA_TYPES.some((type) => type.value === value);
+
 /**
  * Indexes decoded Arrow schema fields for headers.
  * Used by useColumnMutations after schema refreshes to update cast controls.

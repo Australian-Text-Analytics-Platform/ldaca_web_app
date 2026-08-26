@@ -1,5 +1,4 @@
 import { useQueryClient } from '@tanstack/react-query';
-import type { ColumnDef } from '@tanstack/react-table';
 import { ArrowRight } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -31,7 +30,7 @@ import {
 import { MetadataColumnSelector } from '@/features/views/common/components/MetadataColumnSelector';
 import { ServerPaginationFooter } from '@/features/views/common/components/ServerPaginationFooter';
 import { useFullColumnComparisons } from '@/features/views/common/hooks/useFullColumnComparisons';
-import { useServerTable } from '@/features/views/common/hooks/useServerTable';
+import { type ServerColumnDef, useServerTable } from '@/features/views/common/hooks/useServerTable';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { queryKeys } from '@/lib/queryKeys';
 import { isArrowDictionaryField, isArrowStringField } from '@/lib/arrow/arrowTable';
@@ -213,7 +212,7 @@ export function AnnotationResultsPanel({
       ? differenceColumn
       : null;
   const supplementalColumns = [...activeComparisonColumns, ...activeMetadataColumns];
-  const tableColumns: ColumnDef<AnnotationResultRow>[] = [
+  const tableColumns: ServerColumnDef<AnnotationResultRow>[] = [
     { id: textColumn, accessorFn: (row) => row[textColumn] },
     { id: annotationColumn, accessorFn: (row) => row[annotationColumn] },
     ...(correctionColumn

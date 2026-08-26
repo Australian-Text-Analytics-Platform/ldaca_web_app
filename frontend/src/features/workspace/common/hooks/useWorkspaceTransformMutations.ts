@@ -19,6 +19,7 @@ import type { FilterRequest as FilterRequestPayload } from '@/features/views/pre
 import type { SliceRequestPayload } from '@/features/views/preprocessing/slice/hooks/sliceFormModel';
 import type { ReplaceRequest } from '@/features/views/preprocessing/replace/hooks/replaceRequestModel';
 import type { PreprocessingApplyMode } from '@/features/views/preprocessing/preprocessingApplyMode';
+import type { ColumnCastType } from '@/features/workspace/data-view/services/schemaMutations';
 import { useFreshNodesStore } from '@/stores/freshNodesStore';
 import {
   invalidateNodeWorkspaceQueries,
@@ -81,36 +82,40 @@ export const useWorkspaceTransformMutations = ({
   type NodeCreateBody = NonNullable<CreateNodeData['body']>;
   type NodeEditBody = NonNullable<EditNodeData['body']>;
   type NodePreviewBody = NonNullable<PreviewNodeCreationData['body']>;
+  type FilterNodeCreateBody = Extract<NodeCreateBody, { kind: 'filter' }>;
+  type SliceNodeCreateBody = Extract<NodeCreateBody, { kind: 'slice' }>;
+  type ReplaceNodeCreateBody = Extract<NodeCreateBody, { kind: 'replace' }>;
   type ExpressionNodeCreateBody = Extract<NodeCreateBody, { kind: 'expression' }>;
+  type FilterNodeEditBody = Extract<NodeEditBody, { kind: 'filter' }>;
+  type ReplaceNodeEditBody = Extract<NodeEditBody, { kind: 'replace' }>;
   type ExpressionNodeEditBody = Extract<NodeEditBody, { kind: 'expression' }>;
-  const asNodeCreateBody = (body: object) => body as NodeCreateBody;
-  const asNodeEditBody = (body: object) => body as NodeEditBody;
-  const asNodePreviewBody = (body: object) => body as NodePreviewBody;
+  type CastNodeEditBody = Extract<NodeEditBody, { kind: 'cast' }>;
 
-  const filterBody = (nodeId: string, request: FilterRequestPayload) =>
-    asNodeCreateBody({
-      kind: 'filter',
-      source_node_id: nodeId,
-      conditions: request.conditions,
-      logic: request.logic ?? 'and',
-      name: request.name,
-    });
-  const sliceBody = (nodeId: string, request: SliceRequestPayload) =>
-    asNodeCreateBody({ kind: 'slice', source_node_id: nodeId, ...request });
-  const replaceBody = (nodeId: string, request: ReplaceRequest) =>
-    asNodeCreateBody({
-      kind: 'replace',
-      source_node_id: nodeId,
-      source_column: request.source_column,
-      pattern: request.pattern,
-      replacement: request.replacement,
-      output_column: request.output_column,
-      mode: request.mode,
-      count: request.count,
-      match_limit: request.match_limit,
-      connector: request.connector,
-      name: request.name,
-    });
+  const filterBody = (nodeId: string, request: FilterRequestPayload): FilterNodeCreateBody => ({
+    kind: 'filter',
+    source_node_id: nodeId,
+    conditions: request.conditions,
+    logic: request.logic ?? 'and',
+    name: request.name,
+  });
+  const sliceBody = (nodeId: string, request: SliceRequestPayload): SliceNodeCreateBody => ({
+    kind: 'slice',
+    source_node_id: nodeId,
+    ...request,
+  });
+  const replaceBody = (nodeId: string, request: ReplaceRequest): ReplaceNodeCreateBody => ({
+    kind: 'replace',
+    source_node_id: nodeId,
+    source_column: request.source_column,
+    pattern: request.pattern,
+    replacement: request.replacement,
+    output_column: request.output_column,
+    mode: request.mode,
+    count: request.count,
+    match_limit: request.match_limit,
+    connector: request.connector,
+    name: request.name,
+  });
   const expressionBody = (
     nodeId: string,
     request: PolarsExpressionRequest,
@@ -122,29 +127,37 @@ export const useWorkspaceTransformMutations = ({
     group_by: request.group_by,
     name: request.name,
   });
-  const filterEditBody = (request: FilterRequestPayload) =>
-    asNodeEditBody({
-      kind: 'filter',
-      conditions: request.conditions,
-      logic: request.logic ?? 'and',
-    });
-  const replaceEditBody = (request: ReplaceRequest) =>
-    asNodeEditBody({
-      kind: 'replace',
-      source_column: request.source_column,
-      pattern: request.pattern,
-      replacement: request.replacement,
-      output_column: request.output_column,
-      mode: request.mode,
-      count: request.count,
-      match_limit: request.match_limit,
-      connector: request.connector,
-    });
+  const filterEditBody = (request: FilterRequestPayload): FilterNodeEditBody => ({
+    kind: 'filter',
+    conditions: request.conditions,
+    logic: request.logic ?? 'and',
+  });
+  const replaceEditBody = (request: ReplaceRequest): ReplaceNodeEditBody => ({
+    kind: 'replace',
+    source_column: request.source_column,
+    pattern: request.pattern,
+    replacement: request.replacement,
+    output_column: request.output_column,
+    mode: request.mode,
+    count: request.count,
+    match_limit: request.match_limit,
+    connector: request.connector,
+  });
   const expressionEditBody = (request: PolarsExpressionRequest): ExpressionNodeEditBody => ({
     kind: 'expression',
     context: request.context,
     expressions: request.expressions,
     group_by: request.group_by,
+  });
+  const castEditBody = (
+    column: string,
+    targetType: ColumnCastType,
+    format?: string,
+  ): CastNodeEditBody => ({
+    kind: 'cast',
+    column,
+    target_type: targetType,
+    datetime_format: format,
   });
 
   const invalidateEditedNode = (nodeId: string) => {
@@ -244,16 +257,11 @@ export const useWorkspaceTransformMutations = ({
     }: {
       nodeId: string;
       column: string;
-      targetType: string;
+      targetType: ColumnCastType;
       format?: string;
     }) =>
       editNode({
-        body: asNodeEditBody({
-          kind: 'cast',
-          column,
-          target_type: targetType,
-          datetime_format: format,
-        }),
+        body: castEditBody(column, targetType, format),
         path: { workspace_id: ensureWorkspaceSelected(), node_id: nodeId },
         throwOnError: true,
       }).then(({ data }) => requireNode(data)),
@@ -433,7 +441,7 @@ export const useWorkspaceTransformMutations = ({
         signal,
       }: WorkspaceOperationPreviewRequest<FilterRequestPayload>) =>
         previewNodeCreationTable({
-          body: asNodePreviewBody(filterBody(nodeId, payload)),
+          body: filterBody(nodeId, payload) satisfies NodePreviewBody,
           path: { workspace_id: workspaceId },
           query: { page, page_size: pageSize },
           signal,
@@ -449,7 +457,7 @@ export const useWorkspaceTransformMutations = ({
         signal,
       }: WorkspaceOperationPreviewRequest<SliceRequestPayload>) =>
         previewNodeCreationTable({
-          body: asNodePreviewBody(sliceBody(nodeId, payload)),
+          body: sliceBody(nodeId, payload) satisfies NodePreviewBody,
           path: { workspace_id: workspaceId },
           query: { page, page_size: pageSize },
           signal,
@@ -468,7 +476,7 @@ export const useWorkspaceTransformMutations = ({
         signal,
       }: WorkspaceOperationPreviewRequest<ReplaceRequest>) =>
         previewNodeCreationTable({
-          body: asNodePreviewBody(replaceBody(nodeId, payload)),
+          body: replaceBody(nodeId, payload) satisfies NodePreviewBody,
           path: { workspace_id: workspaceId },
           query: { page, page_size: pageSize },
           signal,
@@ -482,7 +490,7 @@ export const useWorkspaceTransformMutations = ({
         signal,
       }: WorkspaceOperationPreviewRequest<PolarsExpressionRequest>) =>
         previewNodeCreationTable({
-          body: asNodePreviewBody(expressionBody(nodeId, payload)),
+          body: expressionBody(nodeId, payload) satisfies NodePreviewBody,
           path: { workspace_id: workspaceId },
           query: { page, page_size: pageSize },
           signal,
@@ -492,7 +500,7 @@ export const useWorkspaceTransformMutations = ({
         request: PolarsExpressionRequest,
         mode: PreprocessingApplyMode = 'create',
       ) => expressionMutation.mutateAsync({ nodeId, request, mode }),
-      castColumn: (nodeId: string, column: string, targetType: string, format?: string) =>
+      castColumn: (nodeId: string, column: string, targetType: ColumnCastType, format?: string) =>
         castNodeMutation.mutateAsync({ nodeId, column, targetType, format }),
       renameColumn: (nodeId: string, column: string, newName: string) =>
         renameColumnMutation.mutateAsync({ nodeId, column, newName }),

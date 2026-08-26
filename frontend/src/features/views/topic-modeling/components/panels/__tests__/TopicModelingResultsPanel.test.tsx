@@ -332,31 +332,32 @@ describe('TopicModelingResultsPanel', () => {
     expect(onClusterCountCommit).toHaveBeenCalledWith(2);
   });
 
-  it.each(
-    interruptedPointerGestures,
-  )('rolls the draft back without committing after %s', (_reason, interrupt) => {
-    const onClusterCountCommit = vi.fn();
-    render(
-      <TooltipProvider>
-        <TopicModelingResultsPanel {...baseProps} onClusterCountCommit={onClusterCountCommit} />
-      </TooltipProvider>,
-    );
+  it.each(interruptedPointerGestures)(
+    'rolls the draft back without committing after %s',
+    (_reason, interrupt) => {
+      const onClusterCountCommit = vi.fn();
+      render(
+        <TooltipProvider>
+          <TopicModelingResultsPanel {...baseProps} onClusterCountCommit={onClusterCountCommit} />
+        </TooltipProvider>,
+      );
 
-    const { root } = prepareClusterSlider();
-    fireEvent.pointerDown(root, { button: 0, clientX: 0, pointerId: 1 });
-    expect(screen.getByRole('slider', { name: 'Number of topics' })).toHaveAttribute(
-      'aria-valuenow',
-      '2',
-    );
+      const { root } = prepareClusterSlider();
+      fireEvent.pointerDown(root, { button: 0, clientX: 0, pointerId: 1 });
+      expect(screen.getByRole('slider', { name: 'Number of topics' })).toHaveAttribute(
+        'aria-valuenow',
+        '2',
+      );
 
-    interrupt(root);
+      interrupt(root);
 
-    expect(onClusterCountCommit).not.toHaveBeenCalled();
-    expect(screen.getByRole('slider', { name: 'Number of topics' })).toHaveAttribute(
-      'aria-valuenow',
-      '4',
-    );
-  });
+      expect(onClusterCountCommit).not.toHaveBeenCalled();
+      expect(screen.getByRole('slider', { name: 'Number of topics' })).toHaveAttribute(
+        'aria-valuenow',
+        '4',
+      );
+    },
+  );
 
   it('does not commit when a pointer gesture finishes at the applied count', () => {
     const onClusterCountCommit = vi.fn();

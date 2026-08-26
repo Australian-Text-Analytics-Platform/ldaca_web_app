@@ -11,12 +11,13 @@ const labelVariants = cva(
 
 interface LabelProps
   extends React.LabelHTMLAttributes<HTMLLabelElement>,
-    VariantProps<typeof labelVariants> {}
+    VariantProps<typeof labelVariants> {
+  ref?: React.Ref<HTMLLabelElement>;
+}
 
 /** Form label primitive used by inputs and settings panels for consistent disabled-state styling. */
-const Label = React.forwardRef<HTMLLabelElement, LabelProps>(({ className, ...props }, ref) => (
+const Label = ({ className, ref, ...props }: LabelProps) => (
   <label ref={ref} className={cn(labelVariants(), className)} {...props} />
-));
-Label.displayName = 'Label';
+);
 
 export { Label };

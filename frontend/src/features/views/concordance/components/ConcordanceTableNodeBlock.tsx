@@ -269,7 +269,6 @@ function PerNodeConcordanceTable({
     nodeData,
     showMetadata,
     selectedMetadataColumns,
-    fallbackToAllColumns: true,
   });
 
   const currentNodePagination = nodePagination[paginationKey];

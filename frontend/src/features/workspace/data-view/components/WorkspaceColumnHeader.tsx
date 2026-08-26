@@ -1,4 +1,3 @@
-import type { Column as TableColumn } from '@tanstack/react-table';
 import {
   ArrowDown,
   ArrowUp,
@@ -22,8 +21,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
-import type { DataRow } from '../types';
+import { isColumnCastType, type ColumnCastType } from '../services/schemaMutations';
 import { RenameInput } from './RenameInput';
+import type { WorkspaceTableColumn } from './workspaceTableFeatures';
 
 interface DataTypeOption {
   value: string;
@@ -38,7 +38,7 @@ interface SortState {
 export interface WorkspaceColumnHeaderProps {
   column: string;
   /** TanStack column instance, used to drive pin state. */
-  colInst: TableColumn<DataRow>;
+  colInst: WorkspaceTableColumn;
 
   // Mutation state
   currentType: string;
@@ -64,7 +64,7 @@ export interface WorkspaceColumnHeaderProps {
   onStartRename: () => void;
   onSubmitRename: (column: string, value: string) => Promise<void>;
   onCancelRename: () => void;
-  onTypeChange: (newType: string) => void;
+  onTypeChange: (newType: ColumnCastType) => void;
   onRequestDelete: () => void;
 }
 
@@ -94,7 +94,7 @@ export function WorkspaceColumnHeader({
   onTypeChange,
   onRequestDelete,
 }: WorkspaceColumnHeaderProps) {
-  const isPinnedLeft = colInst.getIsPinned() === 'left';
+  const isPinnedStart = colInst.getIsPinned() === 'start';
 
   return (
     <div className="flex min-w-0 items-center gap-1">
@@ -102,16 +102,16 @@ export function WorkspaceColumnHeader({
       <button
         type="button"
         onClick={() => {
-          colInst.pin(isPinnedLeft ? false : 'left');
+          colInst.pin(isPinnedStart ? false : 'start');
         }}
         className={cn(
           'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-transparent text-description transition-colors hover:bg-panel-foreground/10 hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-focus',
-          isPinnedLeft && 'text-link',
+          isPinnedStart && 'text-link',
         )}
-        aria-pressed={isPinnedLeft}
-        aria-label={isPinnedLeft ? `Unpin column ${column}` : `Pin column ${column} to the left`}
+        aria-pressed={isPinnedStart}
+        aria-label={isPinnedStart ? `Unpin column ${column}` : `Pin column ${column} to the start`}
       >
-        <Pin className="h-3.5 w-3.5" fill={isPinnedLeft ? 'currentColor' : 'none'} />
+        <Pin className="h-3.5 w-3.5" fill={isPinnedStart ? 'currentColor' : 'none'} />
       </button>
 
       {isRenaming ? (
@@ -178,7 +178,7 @@ export function WorkspaceColumnHeader({
           <DropdownMenuRadioGroup
             value={currentType}
             onValueChange={(v) => {
-              if (!isColumnBusy) onTypeChange(v);
+              if (!isColumnBusy && isColumnCastType(v)) onTypeChange(v);
             }}
           >
             {availableTypes.map((t) => (

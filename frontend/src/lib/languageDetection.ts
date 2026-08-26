@@ -1,7 +1,8 @@
 import { normaliseIso6391LanguageCode } from './languages';
 import type { LanguageDetector as MediaPipeLanguageDetector } from '@mediapipe/tasks-text';
 
-const MEDIAPIPE_TEXT_TASKS_WASM_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-text/wasm';
+const MEDIAPIPE_TEXT_TASKS_WASM_URL =
+  'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-text@1.0.1/wasm';
 const MEDIAPIPE_LANGUAGE_DETECTOR_MODEL_URL =
   'https://storage.googleapis.com/mediapipe-models/language_detector/language_detector/float32/1/language_detector.tflite';
 const MAX_DETECTION_CHARS = 20_000;

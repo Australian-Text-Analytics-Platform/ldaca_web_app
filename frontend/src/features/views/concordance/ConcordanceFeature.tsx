@@ -17,7 +17,7 @@ import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorksp
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import AnalysisTaskBanner from '@/features/views/common/components/AnalysisTaskBanner';
-import { useAnalysisFeature } from '../common/hooks/useAnalysisFeature';
+import { type AnalysisRequestOfKind, useAnalysisFeature } from '../common/hooks/useAnalysisFeature';
 import { useNodeColorControls } from '../common/hooks/useNodeColorControls';
 import { ANALYSIS_TASK_TYPES } from '../common/analysisIds';
 import { nodeInputsFromSelections, useTabNodeInputs } from '../common/nodeInputs';
@@ -100,10 +100,8 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
     addNodes,
     removeNode,
     clear: clearInputs,
-    getAddRejection,
     availableNodes,
     canAddMore,
-    graphSelectedIds,
     getColumnInfos,
     nodeInfoById,
   } = useTabNodeInputs({
@@ -124,10 +122,8 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
     addNodes,
     removeNode,
     clear: clearInputs,
-    getAddRejection,
     availableNodes,
     canAddMore,
-    graphSelectedIds,
   } as ReturnType<typeof useTabNodeInputs>;
   // Add-node-as-needed model has no lock; ids derive from the inputs.
   const activeNodeIds = inputResolvedNodes.map((r) => r.id);
@@ -294,7 +290,7 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
     isStopping,
     analysisError,
     result: baseResult,
-  } = useAnalysisFeature<ConcordanceAnalysisResponse, ConcordanceAnalysisRequest>({
+  } = useAnalysisFeature<ConcordanceAnalysisResponse, AnalysisRequestOfKind<'concordance'>>({
     taskType: ANALYSIS_TASK_TYPES.concordance,
     workspaceId: currentWorkspaceId,
     tabId: host.tabId,
@@ -305,7 +301,7 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
       !latestPreview && concordanceRunAll?.request.kind === 'concordance_run_all'
         ? {
             analysisId: concordanceRunAll.id,
-            request: concordanceRunAll.request.source,
+            request: { ...concordanceRunAll.request.source, kind: 'concordance' },
           }
         : null,
     controlAnalysisId: activeAnalysis?.id ?? null,
@@ -319,22 +315,13 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
       return getAnalysisResultResource<ConcordanceAnalysisResponse>(currentWorkspaceId, taskId);
     },
     /** Restores concordance form controls from a saved request. */
-    onRequest: (requestPayload) => {
-      const reqObj = requestPayload as unknown as Record<string, unknown>;
-      const hydratedSelections = concordanceParameters.applyHydratedRequest(reqObj);
+    onRequest: (request) => {
+      const hydratedSelections = concordanceParameters.applyHydratedRequest(request);
       applyInputsFromSelections(hydratedSelections);
-      const rawModels =
-        reqObj.node_tokenizer_models && typeof reqObj.node_tokenizer_models === 'object'
-          ? (reqObj.node_tokenizer_models as Record<string, unknown>)
-          : {};
       hydrateTokenizerState(
         hydratedSelections.map((selection) => selection.nodeId),
-        Object.fromEntries(
-          Object.entries(rawModels).flatMap(([nodeId, model]) =>
-            typeof model === 'string' ? [[nodeId, model]] : [],
-          ),
-        ),
-        reqObj.search_mode === 'tokens' ? 'tokens' : 'regex',
+        request.node_tokenizer_models ?? {},
+        request.search_mode === 'tokens' ? 'tokens' : 'regex',
       );
       // Combined view is a client-only synthesis and is never persisted, so
       // hydrated tasks always restore to separated; the user can re-enter

@@ -41,8 +41,6 @@ export interface UseNodeInputsResult {
   canAddMore: boolean;
   /** Append nodes by id; returns rejections for ids that failed validation. */
   addNodes: (ids: string[]) => NodeAddRejection[];
-  /** Returns why a node cannot be added right now, or null when it can. */
-  getAddRejection: (id: string) => string | null;
   /** Remove one node from the inputs. */
   removeNode: (id: string) => void;
   /** Clear all inputs. */
@@ -116,11 +114,6 @@ export function useNodeInputs(config: UseNodeInputsConfig): UseNodeInputsResult 
     [value, nodeMap, constraints, getColumnInfos, onChange],
   );
 
-  const getAddRejection = useCallback(
-    (id: string): string | null => validateAdd(id, value, nodeMap, constraints),
-    [value, nodeMap, constraints],
-  );
-
   const removeNode = useCallback(
     (id: string) => {
       const next = value.filter((i) => i.node_id !== id);
@@ -157,7 +150,6 @@ export function useNodeInputs(config: UseNodeInputsConfig): UseNodeInputsResult 
     availableNodes,
     canAddMore,
     addNodes,
-    getAddRejection,
     removeNode,
     clear,
     setColumn,

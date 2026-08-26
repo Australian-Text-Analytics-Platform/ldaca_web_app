@@ -1,4 +1,4 @@
-import type { ColumnDef } from '@tanstack/react-table';
+import type { ServerColumnDef } from '@/features/views/common/hooks/useServerTable';
 import type { ConcordanceNodeResult } from '@/api';
 import {
   CONCORDANCE_COLUMN_KEYS,
@@ -30,7 +30,7 @@ export function alignmentClassForColumn(columnKey: string): string {
  * Used by: buildConcordanceTableModel because combined and per-node tables
  * share plain string cell rendering while wrapping headers/cells differently.
  */
-function buildConcordanceColumns(displayColumns: string[]): ColumnDef<ConcordanceRow>[] {
+function buildConcordanceColumns(displayColumns: string[]): ServerColumnDef<ConcordanceRow>[] {
   return displayColumns.map((columnKey) => ({
     id: columnKey,
     accessorFn: (row) => row[columnKey],
@@ -42,13 +42,12 @@ interface Params {
   nodeData: ConcordanceNodeResult;
   showMetadata: boolean;
   selectedMetadataColumns: string[];
-  fallbackToAllColumns?: boolean;
 }
 
 export interface ConcordanceTableModel {
   rows: ConcordanceRow[];
   tableColumns: string[];
-  columns: ColumnDef<ConcordanceRow>[];
+  columns: ServerColumnDef<ConcordanceRow>[];
 }
 
 /**
@@ -62,7 +61,6 @@ export function buildConcordanceTableModel({
   nodeData,
   showMetadata,
   selectedMetadataColumns,
-  fallbackToAllColumns = false,
 }: Params): ConcordanceTableModel {
   const rows = flattenConcordanceGroups(nodeData.data);
   const allColumns = nodeData.columns;
@@ -82,8 +80,7 @@ export function buildConcordanceTableModel({
       ]
     : concordanceColumns.filter((columnName) => allColumns.includes(columnName));
   const displayColumns = Array.from(new Set(rawDisplayColumns));
-  const tableColumns =
-    fallbackToAllColumns && displayColumns.length === 0 ? allColumns : displayColumns;
+  const tableColumns = displayColumns;
 
   return {
     rows,

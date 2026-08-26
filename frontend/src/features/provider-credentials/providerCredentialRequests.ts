@@ -28,12 +28,12 @@ import {
 } from './providerCredentialsStore';
 
 export type SecretFreeAnalysisSubmission =
-  | TokenFrequencyAnalysisRequest
-  | TopicModelingAnalysisRequest
-  | ConcordanceAnalysisRequest
-  | QuotationAnalysisRequest
-  | SequentialAnalysisRequest
-  | AnnotationAnalysisRequest;
+  | ({ kind: 'token_frequency' } & TokenFrequencyAnalysisRequest)
+  | ({ kind: 'topic_modeling' } & TopicModelingAnalysisRequest)
+  | ({ kind: 'concordance' } & ConcordanceAnalysisRequest)
+  | ({ kind: 'quotation' } & QuotationAnalysisRequest)
+  | ({ kind: 'sequential' } & SequentialAnalysisRequest)
+  | ({ kind: 'annotation' } & AnnotationAnalysisRequest);
 
 const currentMultiUserId = (): string | null => {
   const session = useAuthStore.getState().session;
@@ -153,15 +153,16 @@ export const submitTabAnalysisWithProviderCredential = ({
     request.kind === 'annotation'
       ? annotationCredential(request.provider_configuration_id)
       : undefined;
-  const submittedRequest =
+  const submittedRequest: SubmitTabAnalysisData['body']['request'] =
     request.kind === 'annotation' && apiKey ? { ...request, api_key: apiKey } : request;
+  const body: SubmitTabAnalysisData['body'] = {
+    execution_scope: executionScope,
+    request: submittedRequest,
+    parent_analysis_id: parentAnalysisId ?? null,
+    supersedes_analysis_ids: supersedesAnalysisIds,
+  };
   return submitTabAnalysis({
-    body: {
-      execution_scope: executionScope,
-      request: submittedRequest,
-      parent_analysis_id: parentAnalysisId ?? null,
-      supersedes_analysis_ids: supersedesAnalysisIds,
-    } as SubmitTabAnalysisData['body'],
+    body,
     path: { workspace_id: workspaceId, tab_id: tabId },
     throwOnError: true,
   });

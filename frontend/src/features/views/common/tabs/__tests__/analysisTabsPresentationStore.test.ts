@@ -1,14 +1,18 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import {
+  ANALYSIS_TABS_PRESENTATION_STORAGE_KEY,
   analysisTabSettingsKey,
   analysisTabsPresentationKey,
+  migrateAnalysisTabsPresentationV3,
   useAnalysisTabsPresentationStore,
 } from '../analysisTabsPresentationStore';
+import { ANNOTATION_TAB_SETTINGS_KEY } from '@/features/views/annotation/annotationTabSettings';
 
 describe('analysisTabsPresentationStore', () => {
   beforeEach(() => {
     useAnalysisTabsPresentationStore.setState({ activeTabIds: {}, tabSettings: {} });
+    localStorage.removeItem(ANALYSIS_TABS_PRESENTATION_STORAGE_KEY);
     localStorage.removeItem('ldaca-analysis-tab-presentation-v3');
   });
 
@@ -44,10 +48,45 @@ describe('analysisTabsPresentationStore', () => {
       .rememberActiveTab('user-1', 'workspace-1', 'token_frequency', 'tab-2');
 
     expect(
-      JSON.parse(localStorage.getItem('ldaca-analysis-tab-presentation-v3') ?? '{}'),
+      JSON.parse(localStorage.getItem(ANALYSIS_TABS_PRESENTATION_STORAGE_KEY) ?? '{}'),
     ).toMatchObject({
       state: { activeTabIds: { [key]: 'tab-2' } },
     });
+  });
+
+  it('migrates v3 Annotation keys into one v4 record', () => {
+    const settingsKey = analysisTabSettingsKey('user-1', 'workspace-1', 'tab-1');
+    localStorage.setItem(
+      'ldaca-analysis-tab-presentation-v3',
+      JSON.stringify({
+        state: {
+          activeTabIds: {},
+          tabSettings: {
+            [settingsKey]: {
+              annotationMode: 'ai',
+              annotationTargets: JSON.stringify({ 'node-1': 'annotation' }),
+              contextLength: '12',
+            },
+          },
+        },
+        version: 3,
+      }),
+    );
+
+    migrateAnalysisTabsPresentationV3(localStorage);
+
+    const persisted = JSON.parse(
+      localStorage.getItem(ANALYSIS_TABS_PRESENTATION_STORAGE_KEY) ?? '{}',
+    );
+    const migrated = persisted.state.tabSettings[settingsKey];
+    expect(persisted.version).toBe(4);
+    expect(migrated.contextLength).toBe('12');
+    expect(JSON.parse(migrated[ANNOTATION_TAB_SETTINGS_KEY])).toMatchObject({
+      annotationMode: 'ai',
+      annotationTargets: { 'node-1': 'annotation' },
+    });
+    expect(migrated.annotationMode).toBeUndefined();
+    expect(localStorage.getItem('ldaca-analysis-tab-presentation-v3')).toBeNull();
   });
 
   it('stores presentation settings per user, Workspace, and Tab', () => {

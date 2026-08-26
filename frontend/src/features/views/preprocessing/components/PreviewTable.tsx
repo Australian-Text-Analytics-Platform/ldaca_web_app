@@ -1,6 +1,6 @@
 import React from 'react';
 import { Loader2 } from 'lucide-react';
-import { flexRender, type ColumnDef } from '@tanstack/react-table';
+import { flexRender } from '@tanstack/react-table';
 import {
   Table,
   TableBody,
@@ -28,7 +28,7 @@ import {
 } from '@/components/ui/card';
 import { RowDetailPanel } from '../../common/components/RowDetailPanel';
 import { useRowDetailDialog } from '../../common/components/useRowDetailDialog';
-import { useServerTable } from '@/features/views/common/hooks/useServerTable';
+import { type ServerColumnDef, useServerTable } from '@/features/views/common/hooks/useServerTable';
 import { formatPreviewValue } from '../utils/typeUtils';
 import { type PreviewRow, type PreviewPagination, PREVIEW_PAGE_SIZE_OPTIONS } from '../types';
 
@@ -57,7 +57,7 @@ interface PreviewTableProps {
  * formatting in table cells.
  * Called by `PreviewTable` whenever backend columns change.
  */
-function buildColumnDefs(columnsToRender: string[]): ColumnDef<PreviewRow>[] {
+function buildColumnDefs(columnsToRender: string[]): ServerColumnDef<PreviewRow>[] {
   return columnsToRender.map((col) => ({
     accessorKey: col,
     header: col,

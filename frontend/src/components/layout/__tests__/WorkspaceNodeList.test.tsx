@@ -267,7 +267,7 @@ describe('WorkspaceNodeList', () => {
 
     expect(label).toHaveClass('whitespace-nowrap');
     expect(label).not.toHaveClass('truncate');
-    expect(nameViewport).toHaveStyle({ maxHeight: '1lh' });
+    expect(nameViewport).toHaveClass('max-h-[1lh]');
 
     const fade = within(row).getByTestId('data-block-name-head-fade');
     expect(fade).toHaveClass('left-0');

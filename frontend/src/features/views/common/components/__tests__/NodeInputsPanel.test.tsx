@@ -42,7 +42,6 @@ const baseProps = {
   availableNodes: [],
   canAddMore: true,
   onAddNodes: vi.fn(() => []),
-  getAddRejection: vi.fn(() => null),
   onRemoveNode: vi.fn(),
   onClear: vi.fn(),
   onColumnChange: vi.fn(),

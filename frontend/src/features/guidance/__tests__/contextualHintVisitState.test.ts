@@ -80,19 +80,19 @@ describe('contextualHintVisitState', () => {
     expect(selectContextualHintCandidates(state, sequences)).toEqual([]);
   });
 
-  it.each([
-    'target-missing',
-    'hints-disabled',
-  ] as const)('pauses the current visit for %s without removing the event backlog', (type) => {
-    let state = contextualHintVisitReducer(initialContextualHintVisitState, {
-      type: 'reach',
-      view: 'filter',
-      id: 'outcome',
-    });
-    state = contextualHintVisitReducer(state, { type: 'begin-view', view: 'filter' });
-    state = contextualHintVisitReducer(state, { type, view: 'filter' });
+  it.each(['target-missing', 'hints-disabled'] as const)(
+    'pauses the current visit for %s without removing the event backlog',
+    (type) => {
+      let state = contextualHintVisitReducer(initialContextualHintVisitState, {
+        type: 'reach',
+        view: 'filter',
+        id: 'outcome',
+      });
+      state = contextualHintVisitReducer(state, { type: 'begin-view', view: 'filter' });
+      state = contextualHintVisitReducer(state, { type, view: 'filter' });
 
-    expect(state.paused).toBe(true);
-    expect(state.reachedByView.filter).toEqual(['outcome']);
-  });
+      expect(state.paused).toBe(true);
+      expect(state.reachedByView.filter).toEqual(['outcome']);
+    },
+  );
 });

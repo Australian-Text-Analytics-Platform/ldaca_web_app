@@ -14,7 +14,6 @@ describe('AnalysisCardLayout', () => {
           onStop: vi.fn(),
           onClear: vi.fn(),
           isRunningAll: true,
-          hasResult: true,
         }}
       >
         <div>Parameters</div>
@@ -34,7 +33,6 @@ describe('AnalysisCardLayout', () => {
           onStop: vi.fn(),
           onClear: vi.fn(),
           isRunningAll: false,
-          hasResult: true,
         }}
       >
         <div>Parameters</div>
@@ -74,9 +72,9 @@ describe('AnalysisCardLayout', () => {
           onClear: vi.fn(),
           previewDisabled: true,
           runAllDisabled: true,
-          stopDisabled: true,
           clearDisabled: true,
           isPreviewing: true,
+          isStopping: true,
         }}
       >
         <div>Parameters</div>
@@ -87,7 +85,7 @@ describe('AnalysisCardLayout', () => {
       ['Preview', 'Preview is already running'],
       ['Run All', 'Wait for Preview to finish'],
       ['Clear Results', 'Stop the running analysis before clearing results'],
-      ['Stop', 'This task cannot be stopped right now'],
+      ['Stop', 'A stop request is already in progress'],
     ] as const;
 
     for (const [buttonName, reason] of cases) {

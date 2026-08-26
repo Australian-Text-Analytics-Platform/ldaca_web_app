@@ -50,15 +50,4 @@ describe('concordanceTableModel', () => {
     expect(model.tableColumns).toEqual(['CONC_left_context', 'CONC_matched_text', 'speaker']);
     expect(model.columns.map((column) => column.id)).toEqual(model.tableColumns);
   });
-
-  it('falls back to backend columns when no generated concordance columns are displayable', () => {
-    const model = buildConcordanceTableModel({
-      nodeData: makeNodeData(['speaker']),
-      showMetadata: false,
-      selectedMetadataColumns: [],
-      fallbackToAllColumns: true,
-    });
-
-    expect(model.tableColumns).toEqual(['speaker']);
-  });
 });

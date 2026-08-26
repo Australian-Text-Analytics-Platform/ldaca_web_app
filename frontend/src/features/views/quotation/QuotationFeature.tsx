@@ -4,7 +4,6 @@ import { toast } from 'sonner';
 import {
   type Analysis,
   type QuotationAnalysisRequest,
-  type QuotationEngineConfig,
   type QuotationResult,
   type QuotationRunAllResult,
   type DataBlockCreationSource,
@@ -30,7 +29,7 @@ import { getAnalysisOutputResource, getAnalysisResultResource } from '../common/
 import { ANALYSIS_TASK_TYPES } from '../common/analysisIds';
 import { AnalysisCardLayout } from '../common/components/AnalysisCardLayout';
 import { RowDetailPanel } from '../common/components/RowDetailPanel';
-import { useAnalysisFeature } from '../common/hooks/useAnalysisFeature';
+import { type AnalysisRequestOfKind, useAnalysisFeature } from '../common/hooks/useAnalysisFeature';
 import { usePersistNodeDocumentColumn } from '../common/hooks/usePersistNodeDocumentColumn';
 import { useTabNodeInputs } from '../common/nodeInputs';
 import { hasParameterDiff } from '../common/parameterComparison';
@@ -40,7 +39,6 @@ import {
   hasClearRequiredAnalysis,
 } from '../common/analysisActionLifecycle';
 import { DEFAULT_TAB_INPUT_SET_ID } from '../common/tabs/tabStateOps';
-import { analysisInputsFromRequest } from '../common/utils';
 import { QuotationEngineSettingsFields } from './components/QuotationEngineSettingsFields';
 import { type QuotationHoverState } from './components/QuotationHighlightedCell';
 import { QuotationResultsPanel } from './components/QuotationResultsPanel';
@@ -170,7 +168,7 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
     isStopping,
     result,
     isResultFetching,
-  } = useAnalysisFeature<QuotationResult, QuotationAnalysisRequest>({
+  } = useAnalysisFeature<QuotationResult, AnalysisRequestOfKind<'quotation'>>({
     taskType: ANALYSIS_TASK_TYPES.quotation,
     workspaceId: currentWorkspaceId,
     tabId: host.tabId,
@@ -181,7 +179,7 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
       !latestPreview && quotationRunAll?.request.kind === 'quotation_run_all'
         ? {
             analysisId: quotationRunAll.id,
-            request: quotationRunAll.request.source,
+            request: { ...quotationRunAll.request.source, kind: 'quotation' },
           }
         : null,
     controlAnalysisId: activeAnalysis?.id ?? null,
@@ -196,13 +194,12 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
     // Restores saved request settings after reload.
     // Called by: useAnalysisFeature hydration to restore the quotation engine
     // configuration before rendering results.
-    onRequest: (requestPayload) => {
-      const requestData = requestPayload as unknown as Record<string, unknown>;
-      const nodeId = typeof requestData.node_id === 'string' ? requestData.node_id : '';
-      const column = typeof requestData.column === 'string' ? requestData.column : '';
-      if (!nodeId || !column) return;
-      onTabInputSetChange(DEFAULT_TAB_INPUT_SET_ID, analysisInputsFromRequest(requestData, 1));
-      hydrateEngineConfig((requestData.engine as QuotationEngineConfig | null) ?? null);
+    onRequest: (request) => {
+      if (!request.node_id || !request.column) return;
+      onTabInputSetChange(DEFAULT_TAB_INPUT_SET_ID, [
+        { node_id: request.node_id, column: request.column },
+      ]);
+      hydrateEngineConfig(request.engine ?? null);
       setSelectedMetadataColumns([]);
     },
     // Clears quotation-specific state after the shared lifecycle deletes the task result.
@@ -563,7 +560,6 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
             isRunningAll: analysisActionLifecycle.isRunningAll,
             isStopping,
             isClearing,
-            hasResult: hasLoaded,
             clearHelp: {
               targetKey: 'analysis.quotation.clear-results',
               label: 'Clear results',
@@ -576,12 +572,9 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
             guidanceTarget="quotation-inputs"
             resolvedNodes={nodeInputs.resolvedNodes}
             availableNodes={nodeInputs.availableNodes}
-            graphSelectedIds={nodeInputs.graphSelectedIds}
-            recentPresets={nodeInputs.recentPresets}
             canAddMore={nodeInputs.canAddMore}
             maxNodes={1}
             onAddNodes={nodeInputs.addNodes}
-            getAddRejection={nodeInputs.getAddRejection}
             onRemoveNode={nodeInputs.removeNode}
             onClear={nodeInputs.clear}
             onColumnChange={handleColumnChange}

@@ -1,13 +1,16 @@
 import * as React from 'react';
-import * as SeparatorPrimitive from '@radix-ui/react-separator';
+import { Separator as SeparatorPrimitive } from 'radix-ui';
 
 import { cn } from '@/lib/utils';
 
 /** Separator primitive used by menus, panels, and dialogs for semantic visual dividers. */
-const Separator = React.forwardRef<
-  React.ComponentRef<typeof SeparatorPrimitive.Root>,
-  React.ComponentPropsWithoutRef<typeof SeparatorPrimitive.Root>
->(({ className, orientation = 'horizontal', decorative = true, ...props }, ref) => (
+const Separator = ({
+  className,
+  orientation = 'horizontal',
+  decorative = true,
+  ref,
+  ...props
+}: React.ComponentProps<typeof SeparatorPrimitive.Root>) => (
   <SeparatorPrimitive.Root
     ref={ref}
     decorative={decorative}
@@ -19,7 +22,6 @@ const Separator = React.forwardRef<
     )}
     {...props}
   />
-));
-Separator.displayName = SeparatorPrimitive.Root.displayName;
+);
 
 export { Separator };

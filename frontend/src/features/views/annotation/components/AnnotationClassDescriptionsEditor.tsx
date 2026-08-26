@@ -267,8 +267,7 @@ export function AnnotationClassDescriptionsEditor({
           <div className="flex flex-wrap gap-1.5">
             {visibleClassChips.map((chip, index) =>
               // Only classes with a description get a hover tooltip; the trigger
-              // is a native span (asChild) so the ref/hover wiring is guaranteed
-              // even though Badge is not a forwardRef component.
+              // is a native span (asChild) so the hover target stays explicit.
               chip.description ? (
                 <Tooltip key={`${chip.name}-${String(index)}`}>
                   <TooltipTrigger asChild>

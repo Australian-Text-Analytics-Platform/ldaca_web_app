@@ -30,20 +30,26 @@ import os
 from IPython.display import Markdown, display
 from ldaca_wordflow import start_async_server
 
-server = await start_async_server(port=8001)
-proxy_path = (
+port = 8001
+root_path = (
     f"{os.environ['JUPYTERHUB_SERVICE_PREFIX'].rstrip('/')}"
-    f"/proxy/{server.settings.backend_port}/"
+    f"/proxy/{port}"
 )
-display(Markdown(f"[Open Wordflow]({proxy_path})"))
+server = await start_async_server(
+    serve_frontend=True,
+    port=port,
+    root_path=root_path,
+)
+display(Markdown(f"[Open Wordflow]({root_path}/)"))
 ```
 
 `start_async_server()` returns only after ASGI lifespan startup succeeds. Its
-caller-owned handle supports waiting and bounded graceful shutdown. Under
-JupyterHub, the launcher derives the proxy `root_path` from
-`JUPYTERHUB_SERVICE_PREFIX`. Install `ldaca-wordflow[deploy]` in the Binder
-environment so `jupyter-server-proxy` is available to the Jupyter server. Do
-not run this cell while a CLI-launched instance already owns the same port.
+caller-owned handle supports waiting and bounded graceful shutdown. The caller
+owns reverse-proxy discovery and supplies the generic ASGI `root_path`;
+Wordflow does not inspect JupyterHub environment variables. Install
+`ldaca-wordflow[deploy]` in the Binder environment so `jupyter-server-proxy` is
+available to the Jupyter server. Do not run this cell while a CLI-launched
+instance already owns the same port.
 
 When finished, stop the caller-owned server from another cell:
 

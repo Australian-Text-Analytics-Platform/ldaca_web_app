@@ -4,6 +4,7 @@ Usage:
     uvx ldaca-wordflow                  # Launch full app (backend + frontend)
     uvx ldaca-wordflow --backend        # Launch backend only
     uvx ldaca-wordflow --port 9000      # Custom port
+    uvx ldaca-wordflow --root-path /app # External reverse-proxy prefix
 
 The package entry point parses operator choices, loads one immutable settings
 snapshot, configures process logging/watchdog behavior, and starts the server.
@@ -37,6 +38,12 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         type=str,
         default=None,
         help="Host to bind to (default: 127.0.0.1 in single-user mode)",
+    )
+    parser.add_argument(
+        "--root-path",
+        type=str,
+        default=None,
+        help="ASGI root path supplied by an external reverse proxy",
     )
     parser.add_argument(
         "--multi-user",
@@ -82,6 +89,7 @@ def main(argv: list[str] | None = None) -> None:
         serve_frontend=serve_frontend,
         port=args.port,
         host=args.host,
+        root_path=args.root_path,
         settings=cli_settings,
         startup_file=args.startup_file,
     )

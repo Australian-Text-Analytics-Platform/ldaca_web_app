@@ -29,7 +29,6 @@ export interface NodeSelectionListProps {
   maxCompare: number;
   /** When provided, each card shows an × button that removes that node from the inputs. */
   onRemoveNode?: (nodeId: string) => void;
-  renderNodeMeta?: (args: NodeSelectionRenderArgs) => React.ReactNode;
   renderNodeBody?: (args: NodeSelectionRenderArgs) => React.ReactNode;
   renderExtraNodeContent?: (args: NodeSelectionRenderArgs) => React.ReactNode;
   getNodeTitle?: (node: WorkspaceNodeMetadata, nodeId: string, index: number) => string;
@@ -52,7 +51,6 @@ export function NodeSelectionList({
   nodeColors,
   maxCompare,
   onRemoveNode,
-  renderNodeMeta,
   renderNodeBody,
   renderExtraNodeContent,
   getNodeTitle = (node) => node.name,
@@ -127,11 +125,6 @@ export function NodeSelectionList({
                 >
                   {title}
                 </div>
-                {node && renderNodeMeta && (
-                  <div className="text-label-secondary text-description">
-                    {renderNodeMeta({ node, nodeId, index, color })}
-                  </div>
-                )}
               </CardHeader>
               {unavailable ? (
                 <CardContent className="space-y-2 px-3 pb-3 pt-0">

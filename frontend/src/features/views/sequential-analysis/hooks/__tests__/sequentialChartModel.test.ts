@@ -18,19 +18,18 @@ const fallbacks: SequentialResultSummaryFallbacks = {
 };
 
 const build = (
-  results: Record<string, unknown> | null,
+  results:
+    | ({ data: Record<string, unknown>[] } & {
+        analysis_params?: BuildSequentialChartModelInput['parameters'];
+      })
+    | null,
   overrides: Partial<Omit<BuildSequentialChartModelInput, 'results' | 'fallbacks'>> & {
     fallbacks?: SequentialResultSummaryFallbacks;
   } = {},
 ) => {
-  const parameters =
-    results?.analysis_params && typeof results.analysis_params === 'object'
-      ? (results.analysis_params as Record<string, unknown>)
-      : null;
-  const output = results ? { ...results } : null;
-  if (output) delete output.analysis_params;
+  const { analysis_params: parameters = null, ...output } = results ?? { data: [] };
   return buildSequentialChartModel({
-    results: output,
+    results: results ? output : null,
     parameters,
     fallbacks: overrides.fallbacks ?? fallbacks,
     chartType: overrides.chartType ?? 'line',
@@ -405,7 +404,7 @@ describe('buildSequentialChartModel', () => {
       ],
       analysis_params: {
         column_type: 'datetime',
-        group_by_columns: ['group', 42, ''],
+        group_by_columns: ['group', ''],
       },
     });
 
@@ -419,13 +418,6 @@ describe('buildSequentialChartModel', () => {
         'invalid-group-value',
       ]),
     );
-  });
-
-  it('marks non-array data malformed rather than trusting a result cast', () => {
-    const model = build({ data: { row: true }, analysis_params: {} });
-
-    expect(model.status).toBe('malformed');
-    expect(model.diagnostics).toEqual([expect.objectContaining({ code: 'invalid-data' })]);
   });
 
   it('supports saved custom intervals in seconds', () => {
@@ -488,41 +480,42 @@ describe('buildSequentialChartModel', () => {
     }
   });
 
-  it.each([
-    'line',
-    'bar',
-    'area',
-  ] as const)('keeps colors and single-point metadata stable while emitting %s export legends', (chartType) => {
-    const result = {
-      data: [
-        {
-          time_period: '2024-01',
-          period_start: '2024-01-01',
-          period_end: '2024-02-01',
-          group: 'A',
-          sequential_count: 1,
-        },
-        {
-          time_period: '2024-01',
-          period_start: '2024-01-01',
-          period_end: '2024-02-01',
-          group: 'B',
-          sequential_count: 2,
-        },
-      ],
-      analysis_params: { column_type: 'datetime', group_by_columns: ['group'] },
-    };
-    const base = build(result, { chartType });
-    const hiddenId = base.groups[0]?.id ?? '';
-    const hidden = build(result, { chartType, hiddenKeys: new Set([hiddenId]) });
+  it.each(['line', 'bar', 'area'] as const)(
+    'keeps colors and single-point metadata stable while emitting %s export legends',
+    (chartType) => {
+      const result = {
+        data: [
+          {
+            time_period: '2024-01',
+            period_start: '2024-01-01',
+            period_end: '2024-02-01',
+            group: 'A',
+            sequential_count: 1,
+          },
+          {
+            time_period: '2024-01',
+            period_start: '2024-01-01',
+            period_end: '2024-02-01',
+            group: 'B',
+            sequential_count: 2,
+          },
+        ],
+        analysis_params: { column_type: 'datetime', group_by_columns: ['group'] },
+      };
+      const base = build(result, { chartType });
+      const hiddenId = base.groups[0]?.id ?? '';
+      const hidden = build(result, { chartType, hiddenKeys: new Set([hiddenId]) });
 
-    expect(hidden.groups[0]).toEqual(expect.objectContaining({ color: '#2563eb', hidden: true }));
-    expect(hidden.groups[1]).toEqual(expect.objectContaining({ color: '#16a34a', hidden: false }));
-    expect(hidden.series).toEqual([
-      expect.objectContaining({ color: '#16a34a', singlePoint: true }),
-    ]);
-    expect(hidden.legend.map((item) => item.type)).toEqual([chartType, chartType]);
-  });
+      expect(hidden.groups[0]).toEqual(expect.objectContaining({ color: '#2563eb', hidden: true }));
+      expect(hidden.groups[1]).toEqual(
+        expect.objectContaining({ color: '#16a34a', hidden: false }),
+      );
+      expect(hidden.series).toEqual([
+        expect.objectContaining({ color: '#16a34a', singlePoint: true }),
+      ]);
+      expect(hidden.legend.map((item) => item.type)).toEqual([chartType, chartType]);
+    },
+  );
 
   it('formats early datetime epochs as dates while numeric category zero stays numeric', () => {
     const datetime = build(
@@ -541,12 +534,11 @@ describe('buildSequentialChartModel', () => {
     expect(numeric.tooltip.labelFormatter(0)).toBe('0');
   });
 
-  it('reports invalid custom intervals and invalid persisted group arrays', () => {
+  it('reports invalid custom intervals', () => {
     const model = build({
       data: [],
       analysis_params: {
         column_type: 'datetime',
-        group_by_columns: 'speaker',
         frequency: 'custom',
         custom_interval_value: -2,
         custom_interval_unit: 'seconds',
@@ -555,10 +547,7 @@ describe('buildSequentialChartModel', () => {
 
     expect(model.status).toBe('malformed');
     expect(model.summary.customIntervalValue).toBeNull();
-    expect(model.diagnostics.map((item) => item.code)).toEqual([
-      'invalid-group-columns',
-      'invalid-parameters',
-    ]);
+    expect(model.diagnostics.map((item) => item.code)).toEqual(['invalid-parameters']);
   });
 
   it('deduplicates repeated saved group columns instead of creating redundant tuple identity', () => {

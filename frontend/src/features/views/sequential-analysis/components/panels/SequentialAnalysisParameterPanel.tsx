@@ -37,8 +37,10 @@ const FREQUENCY_LABELS: Record<SequentialFrequency, string> = {
   custom: 'Customised',
 };
 
-/** Default dropdown — hourly..yearly + custom. */
+/** Supported datetime buckets, ordered from finest to coarsest. */
 const DEFAULT_FREQUENCY_OPTIONS: { value: SequentialFrequency; label: string }[] = [
+  { value: 'second', label: FREQUENCY_LABELS.second },
+  { value: 'minute', label: FREQUENCY_LABELS.minute },
   { value: 'hourly', label: FREQUENCY_LABELS.hourly },
   { value: 'daily', label: FREQUENCY_LABELS.daily },
   { value: 'weekly', label: FREQUENCY_LABELS.weekly },
@@ -74,8 +76,6 @@ export interface SequentialAnalysisParameterPanelProps {
   // Datetime branch
   frequency: SequentialFrequency;
   onFrequencyChange: (value: SequentialFrequency) => void;
-  /** Optional override for the frequency dropdown options. Defaults to the preset list (hourly..yearly + custom). */
-  frequencyOptions?: { value: SequentialFrequency; label: string }[];
   customIntervalValueInput: string;
   onCustomIntervalValueChange: (value: string) => void;
   customIntervalUnit: SequentialCustomIntervalUnit;
@@ -118,7 +118,6 @@ export function SequentialAnalysisParameterPanel({
   onCustomIntervalValueChange,
   customIntervalUnit,
   onCustomIntervalUnitChange,
-  frequencyOptions = DEFAULT_FREQUENCY_OPTIONS,
   numericOriginInput,
   onNumericOriginChange,
   numericIntervalInput,
@@ -137,12 +136,9 @@ export function SequentialAnalysisParameterPanel({
         guidanceTarget="trends-inputs"
         resolvedNodes={nodeInputs.resolvedNodes}
         availableNodes={nodeInputs.availableNodes}
-        graphSelectedIds={nodeInputs.graphSelectedIds}
-        recentPresets={nodeInputs.recentPresets}
         canAddMore={nodeInputs.canAddMore}
         maxNodes={1}
         onAddNodes={nodeInputs.addNodes}
-        getAddRejection={nodeInputs.getAddRejection}
         onRemoveNode={nodeInputs.removeNode}
         onClear={nodeInputs.clear}
         onColumnChange={onColumnChange}
@@ -172,7 +168,7 @@ export function SequentialAnalysisParameterPanel({
                     <SelectValue placeholder="Select frequency" />
                   </SelectTrigger>
                   <SelectContent>
-                    {frequencyOptions.map((option) => (
+                    {DEFAULT_FREQUENCY_OPTIONS.map((option) => (
                       <SelectItem key={option.value} value={option.value}>
                         {option.label}
                       </SelectItem>

@@ -1,4 +1,4 @@
-import type { SequentialAnalysisRequest } from '@/api';
+import type { SequentialAnalysisRequest, SequentialAnalysisResponse } from '@/api';
 import type {
   MultiSeriesChartSeries,
   MultiSeriesChartXAxisConfig,
@@ -11,24 +11,6 @@ export type SequentialXAxisType = 'category' | 'number';
 type SequentialFrequency = NonNullable<SequentialAnalysisRequest['frequency']>;
 type SequentialCustomIntervalUnit = NonNullable<SequentialAnalysisRequest['custom_interval_unit']>;
 
-const CUSTOM_INTERVAL_UNITS: SequentialCustomIntervalUnit[] = [
-  'seconds',
-  'minutes',
-  'hours',
-  'days',
-  'weeks',
-];
-const FREQUENCIES: SequentialFrequency[] = [
-  'second',
-  'minute',
-  'hourly',
-  'daily',
-  'weekly',
-  'monthly',
-  'quarterly',
-  'yearly',
-  'custom',
-];
 const NUMERIC_X_KEY = '__x_numeric__';
 
 const SEQUENTIAL_ANALYSIS_PALETTE = [
@@ -87,6 +69,20 @@ export interface SequentialResultSummaryFallbacks {
   customIntervalUnit: SequentialCustomIntervalUnit | null;
 }
 
+type SequentialChartParameters = Partial<
+  Pick<
+    SequentialAnalysisRequest,
+    | 'time_column'
+    | 'group_by_columns'
+    | 'column_type'
+    | 'numeric_origin'
+    | 'numeric_interval'
+    | 'frequency'
+    | 'custom_interval_value'
+    | 'custom_interval_unit'
+  >
+>;
+
 interface SequentialResultSummary {
   timeColumn: string;
   groupBy: string[];
@@ -101,9 +97,7 @@ interface SequentialResultSummary {
 
 interface SequentialChartDiagnostic {
   code:
-    | 'invalid-data'
     | 'invalid-group-columns'
-    | 'invalid-row'
     | 'invalid-period'
     | 'invalid-count'
     | 'invalid-group-value'
@@ -144,8 +138,8 @@ interface SequentialVisibilityCounts {
 }
 
 export interface BuildSequentialChartModelInput {
-  results: Record<string, unknown> | null | undefined;
-  parameters: Record<string, unknown> | null | undefined;
+  results: SequentialAnalysisResponse | null | undefined;
+  parameters: SequentialChartParameters | null | undefined;
   fallbacks: SequentialResultSummaryFallbacks;
   chartType: ChartTypeOption;
   xAxisType: SequentialXAxisType;
@@ -179,124 +173,36 @@ export interface SequentialChartModel {
   counts: SequentialVisibilityCounts;
 }
 
-function isCustomIntervalUnit(value: unknown): value is SequentialCustomIntervalUnit {
-  return (
-    typeof value === 'string' &&
-    CUSTOM_INTERVAL_UNITS.includes(value as SequentialCustomIntervalUnit)
-  );
-}
-
-function isFrequency(value: unknown): value is SequentialFrequency {
-  return typeof value === 'string' && FREQUENCIES.includes(value as SequentialFrequency);
-}
-
-function finiteNumberOrNull(value: unknown, fallback: number | null): number | null {
-  if (value === null) return null;
-  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
-}
-
 function buildSummary(
-  parameters: Record<string, unknown> | null | undefined,
+  parameters: SequentialChartParameters | null | undefined,
   fallbacks: SequentialResultSummaryFallbacks,
   diagnostics: SequentialChartDiagnostic[],
 ): SequentialResultSummary {
-  const rawParams = parameters;
-  const params =
-    rawParams && typeof rawParams === 'object' && !Array.isArray(rawParams) ? rawParams : {};
-  const invalidParameter = (message: string) => {
-    diagnostics.push({ code: 'invalid-parameters', message });
-  };
-  if (rawParams !== undefined && rawParams !== null && params !== rawParams) {
-    invalidParameter('Result analysis parameters were not an object.');
-  }
-  if (params.time_column !== undefined && typeof params.time_column !== 'string') {
-    invalidParameter('Result time column was not a string.');
-  }
-  const timeColumn =
-    typeof params.time_column === 'string' ? params.time_column : fallbacks.timeColumn;
+  const timeColumn = parameters?.time_column ?? fallbacks.timeColumn;
   let groupBy = fallbacks.groupBy;
-  if (params.group_by_columns !== undefined && params.group_by_columns !== null) {
-    if (Array.isArray(params.group_by_columns)) {
-      const validColumns = params.group_by_columns.filter(
-        (column): column is string => typeof column === 'string' && column.trim().length > 0,
-      );
-      groupBy = Array.from(new Set(validColumns));
-      if (
-        validColumns.length !== params.group_by_columns.length ||
-        groupBy.length !== validColumns.length
-      ) {
-        diagnostics.push({
-          code: 'invalid-group-columns',
-          message: 'Ignored non-string, blank, or duplicate group-by columns.',
-        });
-      }
-    } else {
+  if (parameters?.group_by_columns) {
+    const validColumns = parameters.group_by_columns.filter((column) => column.trim().length > 0);
+    groupBy = Array.from(new Set(validColumns));
+    if (
+      validColumns.length !== parameters.group_by_columns.length ||
+      groupBy.length !== validColumns.length
+    ) {
       diagnostics.push({
         code: 'invalid-group-columns',
-        message: 'Result group-by columns were not an array; live parameters were used.',
+        message: 'Ignored blank or duplicate group-by columns.',
       });
     }
   }
-  if (
-    params.column_type !== undefined &&
-    params.column_type !== 'numeric' &&
-    params.column_type !== 'datetime'
-  ) {
-    invalidParameter('Result column type was neither datetime nor numeric.');
-  }
-  const columnType =
-    params.column_type === 'numeric' || params.column_type === 'datetime'
-      ? params.column_type
-      : fallbacks.columnType;
-  if (
-    params.numeric_origin !== undefined &&
-    params.numeric_origin !== null &&
-    (typeof params.numeric_origin !== 'number' || !Number.isFinite(params.numeric_origin))
-  ) {
-    invalidParameter('Result numeric origin was not a finite number or null.');
-  }
-  if (
-    params.numeric_interval !== undefined &&
-    params.numeric_interval !== null &&
-    (typeof params.numeric_interval !== 'number' || !Number.isFinite(params.numeric_interval))
-  ) {
-    invalidParameter('Result numeric interval was not a finite number or null.');
-  }
+  const columnType = parameters?.column_type ?? fallbacks.columnType;
   const numericOrigin =
-    columnType === 'numeric'
-      ? finiteNumberOrNull(params.numeric_origin, fallbacks.numericOrigin)
-      : null;
+    columnType === 'numeric' ? (parameters?.numeric_origin ?? fallbacks.numericOrigin) : null;
   let numericInterval =
-    columnType === 'numeric'
-      ? finiteNumberOrNull(params.numeric_interval, fallbacks.numericInterval)
-      : null;
-  if (params.frequency !== undefined && !isFrequency(params.frequency)) {
-    invalidParameter('Result frequency was not supported.');
-  }
-  const rawFrequency = isFrequency(params.frequency) ? params.frequency : fallbacks.frequency;
-  const customValueHasInvalidType =
-    params.custom_interval_value !== undefined &&
-    params.custom_interval_value !== null &&
-    (typeof params.custom_interval_value !== 'number' ||
-      !Number.isFinite(params.custom_interval_value));
-  if (customValueHasInvalidType) {
-    invalidParameter('Result custom interval was not a finite number or null.');
-  }
-  let customIntervalValue = finiteNumberOrNull(
-    params.custom_interval_value,
-    fallbacks.customIntervalValue,
-  );
-  const rawUnit = params.custom_interval_unit ?? fallbacks.customIntervalUnit;
-  const customIntervalUnit = isCustomIntervalUnit(rawUnit) ? rawUnit : null;
-  if (
-    params.custom_interval_unit !== undefined &&
-    params.custom_interval_unit !== null &&
-    !isCustomIntervalUnit(params.custom_interval_unit)
-  ) {
-    invalidParameter('Result custom interval unit was not supported.');
-  }
+    columnType === 'numeric' ? (parameters?.numeric_interval ?? fallbacks.numericInterval) : null;
+  const rawFrequency = parameters?.frequency ?? fallbacks.frequency;
+  let customIntervalValue = parameters?.custom_interval_value ?? fallbacks.customIntervalValue;
+  const customIntervalUnit = parameters?.custom_interval_unit ?? fallbacks.customIntervalUnit;
   if (columnType === 'numeric' && (numericInterval === null || numericInterval <= 0)) {
-    if (params.numeric_interval !== undefined) {
+    if (parameters?.numeric_interval !== undefined) {
       diagnostics.push({
         code: 'invalid-parameters',
         message: 'Result numeric interval was not a positive finite number.',
@@ -310,7 +216,7 @@ function buildSummary(
       !Number.isInteger(customIntervalValue) ||
       customIntervalValue <= 0)
   ) {
-    if (params.custom_interval_value !== undefined && !customValueHasInvalidType) {
+    if (parameters?.custom_interval_value !== undefined) {
       diagnostics.push({
         code: 'invalid-parameters',
         message: 'Result custom interval was not a positive whole number.',
@@ -388,24 +294,14 @@ function buildGroupIdentity(
 }
 
 function normalizeRows(
-  results: Record<string, unknown> | null | undefined,
+  results: SequentialAnalysisResponse | null | undefined,
   summary: SequentialResultSummary,
   diagnostics: SequentialChartDiagnostic[],
 ): SequentialCanonicalRow[] {
-  const data = results?.data;
-  if (data === undefined || data === null) return [];
-  if (!Array.isArray(data)) {
-    diagnostics.push({ code: 'invalid-data', message: 'Result data was not an array.' });
-    return [];
-  }
+  const data = results?.data ?? [];
 
   const rows: SequentialCanonicalRow[] = [];
-  data.forEach((candidate, rowIndex) => {
-    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
-      diagnostics.push({ code: 'invalid-row', message: 'Ignored a non-object row.', rowIndex });
-      return;
-    }
-    const row = candidate as Record<string, unknown>;
+  data.forEach((row, rowIndex) => {
     if (!isPeriodBoundary(row.period_start) || !isPeriodBoundary(row.period_end)) {
       diagnostics.push({
         code: 'invalid-period',

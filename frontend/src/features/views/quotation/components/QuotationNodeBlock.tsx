@@ -1,5 +1,4 @@
 import { useEffect, useRef } from 'react';
-import type { ColumnDef } from '@tanstack/react-table';
 import { flexRender } from '@tanstack/react-table';
 import { ArrowUpDown } from 'lucide-react';
 import type { SourceRowPagination } from '@/api';
@@ -14,7 +13,7 @@ import {
 import { AnalysisTableFrame } from '@/features/views/common/components/AnalysisTableScrollArea';
 import { PaginatedTableProcessingRow } from '@/features/views/common/components/PaginatedTableProcessingRow';
 import { ServerPaginationFooter } from '@/features/views/common/components/ServerPaginationFooter';
-import { useServerTable } from '@/features/views/common/hooks/useServerTable';
+import { type ServerColumnDef, useServerTable } from '@/features/views/common/hooks/useServerTable';
 import { QUOTATION_DOCUMENT_COLUMN } from '../../common/generatedColumns';
 import type { QuotationResultRow } from '../quotationResultsModel';
 import { QuotationHighlightedCell, type QuotationHoverState } from './QuotationHighlightedCell';
@@ -119,7 +118,7 @@ function QuotationNodeBlockContent({
     if (viewportRef.current) viewportRef.current.scrollTop = 0;
   }, [pageSize]);
 
-  const columns: ColumnDef<QuotationResultRow>[] = cols.map((columnName) => ({
+  const columns: ServerColumnDef<QuotationResultRow>[] = cols.map((columnName) => ({
     id: columnName,
     accessorFn: (row) =>
       columnName === QUOTATION_DOCUMENT_COLUMN ? row.text : row.raw[columnName],

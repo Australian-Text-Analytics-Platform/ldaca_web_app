@@ -60,7 +60,6 @@ interface Props {
   onStop?: () => void | Promise<void>;
   onClear: () => void | Promise<void>;
   hasMissingColumns: boolean;
-  hasResult: boolean;
   parametersLocked: boolean;
 }
 /**
@@ -95,7 +94,6 @@ export function TopicModelingParameterPanel({
   onStop,
   onClear,
   hasMissingColumns,
-  hasResult,
   parametersLocked,
 }: Props) {
   const [minClusterSizeDraft, setMinClusterSizeDraft] = useState<NumericInputDraft>(() => ({
@@ -196,7 +194,6 @@ export function TopicModelingParameterPanel({
         isRunningAll: isRunning,
         isStopping,
         isClearing,
-        hasResult,
         runAllLabel: 'Run',
       }}
       actionsGuidanceTarget="topic-modeling-actions"
@@ -206,12 +203,9 @@ export function TopicModelingParameterPanel({
         guidanceTarget="topic-modeling-inputs"
         resolvedNodes={nodeInputs.resolvedNodes}
         availableNodes={nodeInputs.availableNodes}
-        graphSelectedIds={nodeInputs.graphSelectedIds}
-        recentPresets={nodeInputs.recentPresets}
         canAddMore={nodeInputs.canAddMore}
         maxNodes={2}
         onAddNodes={nodeInputs.addNodes}
-        getAddRejection={nodeInputs.getAddRejection}
         onRemoveNode={nodeInputs.removeNode}
         onClear={nodeInputs.clear}
         onColumnChange={onColumnChange}

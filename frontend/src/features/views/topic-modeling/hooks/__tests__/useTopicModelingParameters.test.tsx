@@ -2,19 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { WorkspaceNodeInfo } from '@/api';
 
-import {
-  projectWorkspaceNodeMetadata,
-  type WorkspaceNodeMetadata,
-} from '@/features/workspace/common/workspaceNodeMetadata';
 import { useTopicModelingParameters } from '../useTopicModelingParameters';
-
-const nodes = (...counts: number[]): WorkspaceNodeMetadata[] =>
-  counts.map((_count, index) =>
-    projectWorkspaceNodeMetadata({
-      id: `node-${String(index + 1)}`,
-      name: `Node ${String(index + 1)}`,
-    }),
-  );
 
 const nodeIds = (...counts: number[]) => counts.map((_, index) => `node-${String(index + 1)}`);
 
@@ -37,9 +25,7 @@ describe('useTopicModelingParameters', () => {
   it('derives default corpus sampling from selected node sizes', async () => {
     const { result } = renderHook(() =>
       useTopicModelingParameters({
-        panelSelectedNodes: nodes(8000, 80),
         panelNodeIds: nodeIds(8000, 80),
-        panelNodeIdsKey: 'node-1|node-2',
         nodeInfoById: nodeInfoById(8000, 80),
       }),
     );
@@ -57,12 +43,10 @@ describe('useTopicModelingParameters', () => {
     expect(result.current.randomSeed).toBe(0);
   });
 
-  it('tracks user-set parameters and preserves tuned sampling across clear', async () => {
+  it('tracks user-set parameters', async () => {
     const { result } = renderHook(() =>
       useTopicModelingParameters({
-        panelSelectedNodes: nodes(8000),
         panelNodeIds: nodeIds(8000),
-        panelNodeIdsKey: 'node-1',
         nodeInfoById: nodeInfoById(8000),
       }),
     );
@@ -79,28 +63,20 @@ describe('useTopicModelingParameters', () => {
     expect(result.current.corpusSamplesUserSet).toBe(true);
     expect(result.current.randomSeedUserSet).toBe(true);
     expect(result.current.sampleFractionsForRequest).toEqual([0.25]);
-
-    act(() => {
-      result.current.resetAfterClear();
-    });
-
-    expect(result.current.corpusSamples).toEqual([{ percent: '25' }]);
-    expect(result.current.randomSeed).toBe(99);
-    expect(result.current.randomSeedUserSet).toBe(false);
   });
 
   it('hydrates saved request parameters and sampling fractions', () => {
     const { result } = renderHook(() =>
       useTopicModelingParameters({
-        panelSelectedNodes: nodes(10000, 5000),
         panelNodeIds: nodeIds(10000, 5000),
-        panelNodeIdsKey: 'node-1|node-2',
         nodeInfoById: nodeInfoById(10000, 5000),
       }),
     );
 
     act(() => {
       result.current.hydrateParameters({
+        node_ids: ['node-1', 'node-2'],
+        node_columns: { 'node-1': 'text', 'node-2': 'text' },
         min_cluster_size: 25,
         random_seed: 7,
         sample_fractions: [0.2, null],
@@ -116,38 +92,26 @@ describe('useTopicModelingParameters', () => {
 
   it('restores hydrated sampling fractions after selected node counts resolve', async () => {
     const { result, rerender } = renderHook(
-      ({
-        panelSelectedNodes,
-        panelNodeIdsKey,
-      }: {
-        panelSelectedNodes: WorkspaceNodeMetadata[];
-        panelNodeIdsKey: string;
-      }) =>
+      ({ panelNodeIdsKey }: { panelNodeIdsKey: string }) =>
         useTopicModelingParameters({
-          panelSelectedNodes,
           panelNodeIds: panelNodeIdsKey ? panelNodeIdsKey.split('|') : [],
-          panelNodeIdsKey,
           nodeInfoById: panelNodeIdsKey === 'node-1' ? nodeInfoById(10000) : {},
         }),
       {
-        initialProps: {
-          panelSelectedNodes: [] as WorkspaceNodeMetadata[],
-          panelNodeIdsKey: '',
-        },
+        initialProps: { panelNodeIdsKey: '' },
       },
     );
 
     act(() => {
       result.current.hydrateParameters({
+        node_ids: ['node-1'],
+        node_columns: { 'node-1': 'text' },
         random_seed: 7,
         sample_fractions: [0.2],
       });
     });
 
-    rerender({
-      panelSelectedNodes: nodes(10000),
-      panelNodeIdsKey: 'node-1',
-    });
+    rerender({ panelNodeIdsKey: 'node-1' });
 
     await waitFor(() => {
       expect(result.current.corpusSamples).toEqual([{ percent: '20' }]);

@@ -17,13 +17,14 @@ import {
 interface IsoDateInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   committedValue: string;
   onCommit: (value: string) => void;
+  ref?: React.Ref<HTMLInputElement>;
 }
 
 /**
  * ISO text input used by datetime filter controls. It normalizes typed values
  * before committing them to the owning condition row.
  */
-const IsoDateInput = React.forwardRef<HTMLInputElement, IsoDateInputProps>((props, externalRef) => {
+const IsoDateInput = (props: IsoDateInputProps) => {
   const {
     committedValue,
     onCommit,
@@ -36,6 +37,7 @@ const IsoDateInput = React.forwardRef<HTMLInputElement, IsoDateInputProps>((prop
     readOnly: parentReadOnly,
     className: parentClassName,
     placeholder = ISO_PLACEHOLDER,
+    ref: externalRef,
     ...restProps
   } = props;
 
@@ -123,9 +125,7 @@ const IsoDateInput = React.forwardRef<HTMLInputElement, IsoDateInputProps>((prop
       style={{ width: '28ch', minWidth: '28ch', maxWidth: '28ch', flex: 'none' }}
     />
   );
-});
-
-IsoDateInput.displayName = 'IsoDateInput';
+};
 
 interface DateTimePickerFieldProps {
   value: string;

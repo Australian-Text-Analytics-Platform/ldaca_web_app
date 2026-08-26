@@ -1,9 +1,10 @@
 import type { ArrowField } from '@/lib/arrow/arrowTable';
+import type { ColumnCastType } from '../services/schemaMutations';
 
 export interface DatetimeModalState {
   isOpen: boolean;
   column: string;
-  targetType: string;
+  targetType: ColumnCastType | '';
 }
 
 export interface ColumnMutationState {
@@ -19,7 +20,7 @@ export type ColumnMutationAction =
   | { type: 'schemaApplied'; columnFields: Record<string, ArrowField> }
   | { type: 'castLoadingChanged'; column: string; active: boolean }
   | { type: 'columnActionLoadingChanged'; column: string; active: boolean }
-  | { type: 'datetimeRequested'; column: string; targetType: string }
+  | { type: 'datetimeRequested'; column: string; targetType: ColumnCastType }
   | { type: 'datetimeClosed' }
   | { type: 'renameStarted'; column: string }
   | { type: 'renameClosed' }

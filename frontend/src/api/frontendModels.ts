@@ -91,11 +91,11 @@ export interface WorkspaceGraphResponse {
   nodes: WorkspaceGraphNode[];
   edges: WorkspaceGraphEdge[];
 }
-export type WorkspaceCatalogueItem = ListWorkspacesResponse[number];
 export type WorkspaceSummary = AvailableWorkspaceListItem & { availability: 'available' };
 export type UnavailableWorkspaceSummary = UnavailableWorkspaceListItem & {
   availability: 'unavailable';
 };
+export type WorkspaceCatalogueItem = ListWorkspacesResponse[number];
 
 export interface FileTreeNodeResponse {
   name: string;

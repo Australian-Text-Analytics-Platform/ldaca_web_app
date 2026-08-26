@@ -5,6 +5,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Analysis } from '@/api';
 import type { RunAnalysisOptions } from '../../common/hooks/useAnalysisFeature';
+import {
+  ANNOTATION_TAB_SETTINGS_KEY,
+  DEFAULT_ANNOTATION_TAB_SETTINGS,
+} from '../annotationTabSettings';
+
+const annotationSettings = (
+  values: Partial<typeof DEFAULT_ANNOTATION_TAB_SETTINGS>,
+): Record<string, string> => ({
+  [ANNOTATION_TAB_SETTINGS_KEY]: JSON.stringify({
+    ...DEFAULT_ANNOTATION_TAB_SETTINGS,
+    ...values,
+  }),
+});
 
 async function executeAnalysis<TAnalysis extends Analysis>(options: RunAnalysisOptions<TAnalysis>) {
   try {
@@ -121,11 +134,8 @@ vi.mock('@/features/views/common/nodeInputs', async (importOriginal) => ({
           ]
         : [],
       availableNodes: [],
-      graphSelectedIds: [],
-      recentPresets: [],
       canAddMore: !sourceSelected,
       addNodes: vi.fn(),
-      getAddRejection: vi.fn(() => null),
       removeNode: vi.fn(),
       clear: vi.fn(),
       setColumn: sourceSelected
@@ -379,16 +389,16 @@ describe('AnnotationFeature', () => {
           latestRunAll: null,
           activeAnalysis: null,
           inputSets: {},
-          settings: {
+          settings: annotationSettings({
             annotationMode: 'ai',
-            annotationTargets: JSON.stringify({ 'source-1': 'annotation' }),
+            annotationTargets: { 'source-1': 'annotation' },
             aiProviderConfigurationId: 'provider-1',
             aiProviderType: 'openai',
-            aiProviderModels: JSON.stringify({ 'provider-1': 'gpt-test' }),
-            aiMaxExamplesPerClass: '3',
+            aiProviderModels: { 'provider-1': 'gpt-test' },
+            aiMaxExamplesPerClass: 3,
             aiExampleSamplingMethod: 'random',
-            aiExampleRandomSeed: '42',
-          },
+            aiExampleRandomSeed: 42,
+          }),
           correctionColumns: {},
           setInputSet: mocks.setInputSet,
           setSetting: mocks.setSetting,
@@ -432,7 +442,7 @@ describe('AnnotationFeature', () => {
           latestRunAll: null,
           activeAnalysis: null,
           inputSets: {},
-          settings: { annotationMode: 'ai' },
+          settings: annotationSettings({ annotationMode: 'ai' }),
           correctionColumns: {},
           setInputSet: mocks.setInputSet,
           setSetting: mocks.setSetting,
@@ -511,9 +521,7 @@ describe('AnnotationFeature', () => {
           latestRunAll: null,
           activeAnalysis: null,
           inputSets: {},
-          settings: {
-            annotationTargets: JSON.stringify({ 'source-1': 'text' }),
-          },
+          settings: annotationSettings({ annotationTargets: { 'source-1': 'text' } }),
           correctionColumns: {},
           setInputSet: mocks.setInputSet,
           setSetting: mocks.setSetting,
@@ -562,10 +570,10 @@ describe('AnnotationFeature', () => {
       'annotation',
     );
     expect(screen.queryByLabelText('New Column Name')).not.toBeInTheDocument();
-    expect(mocks.setSetting).toHaveBeenCalledWith(
-      'annotationTargets',
-      JSON.stringify({ 'source-1': 'annotation' }),
-    );
+    expect(mocks.setSetting.mock.lastCall?.[0]).toBe(ANNOTATION_TAB_SETTINGS_KEY);
+    expect(JSON.parse(mocks.setSetting.mock.lastCall?.[1] ?? '{}').annotationTargets).toEqual({
+      'source-1': 'annotation',
+    });
   });
 
   it('labels the manual review action Start before opening and Close while open', async () => {
@@ -581,9 +589,7 @@ describe('AnnotationFeature', () => {
           latestRunAll: null,
           activeAnalysis: null,
           inputSets: {},
-          settings: {
-            annotationTargets: JSON.stringify({ 'source-1': 'annotation' }),
-          },
+          settings: annotationSettings({ annotationTargets: { 'source-1': 'annotation' } }),
           correctionColumns: {},
           setInputSet: mocks.setInputSet,
           setSetting: mocks.setSetting,
@@ -612,9 +618,7 @@ describe('AnnotationFeature', () => {
           latestRunAll: null,
           activeAnalysis: null,
           inputSets: {},
-          settings: {
-            annotationTargets: JSON.stringify({ 'source-1': 'annotation' }),
-          },
+          settings: annotationSettings({ annotationTargets: { 'source-1': 'annotation' } }),
           correctionColumns: {},
           setInputSet: mocks.setInputSet,
           setSetting: mocks.setSetting,
@@ -657,9 +661,7 @@ describe('AnnotationFeature', () => {
           latestRunAll: null,
           activeAnalysis: null,
           inputSets: {},
-          settings: {
-            annotationTargets: JSON.stringify({ 'source-1': 'annotation' }),
-          },
+          settings: annotationSettings({ annotationTargets: { 'source-1': 'annotation' } }),
           correctionColumns: {},
           setInputSet: mocks.setInputSet,
           setSetting: mocks.setSetting,
@@ -689,9 +691,7 @@ describe('AnnotationFeature', () => {
           latestRunAll: null,
           activeAnalysis: null,
           inputSets: {},
-          settings: {
-            annotationTargets: JSON.stringify({ 'source-1': 'text' }),
-          },
+          settings: annotationSettings({ annotationTargets: { 'source-1': 'text' } }),
           correctionColumns: {},
           setInputSet: mocks.setInputSet,
           setSetting: mocks.setSetting,
@@ -727,10 +727,10 @@ describe('AnnotationFeature', () => {
           latestRunAll: null,
           activeAnalysis: null,
           inputSets: {},
-          settings: {
+          settings: annotationSettings({
             annotationMode: 'manual',
-            annotationTargets: JSON.stringify({ 'source-1': 'annotation' }),
-          },
+            annotationTargets: { 'source-1': 'annotation' },
+          }),
           correctionColumns: { 'source-1': 'review' },
           setInputSet: mocks.setInputSet,
           setSetting: mocks.setSetting,
@@ -779,10 +779,10 @@ describe('AnnotationFeature', () => {
           latestRunAll: null,
           activeAnalysis: null,
           inputSets: {},
-          settings: {
+          settings: annotationSettings({
             annotationMode: 'ai',
-            annotationTargets: JSON.stringify({ 'source-1': 'annotation' }),
-          },
+            annotationTargets: { 'source-1': 'annotation' },
+          }),
           correctionColumns: { 'source-1': 'review' },
           setInputSet: mocks.setInputSet,
           setSetting: mocks.setSetting,
@@ -812,7 +812,7 @@ describe('AnnotationFeature', () => {
           latestRunAll: runAllAnalysis('failed', message),
           activeAnalysis: null,
           inputSets: {},
-          settings: { annotationMode: 'ai' },
+          settings: annotationSettings({ annotationMode: 'ai' }),
           correctionColumns: {},
           setInputSet: mocks.setInputSet,
           setSetting: mocks.setSetting,
@@ -838,7 +838,7 @@ describe('AnnotationFeature', () => {
           latestRunAll: runAllAnalysis('succeeded'),
           activeAnalysis: null,
           inputSets: {},
-          settings: { annotationMode: 'ai' },
+          settings: annotationSettings({ annotationMode: 'ai' }),
           correctionColumns: {},
           setInputSet: mocks.setInputSet,
           setSetting: mocks.setSetting,

@@ -106,7 +106,11 @@ describe('useConcordanceParameters', () => {
     const { result } = renderHook(() => useConcordanceParameters());
 
     act(() => {
-      result.current.applyHydratedRequest({ search_word: 'historical' });
+      result.current.applyHydratedRequest({
+        node_ids: ['node-1'],
+        node_columns: { 'node-1': 'text' },
+        search_word: 'historical',
+      });
     });
 
     expect(result.current.ignorePunctuation).toBe(false);

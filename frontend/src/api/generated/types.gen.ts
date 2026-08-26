@@ -1202,23 +1202,7 @@ export type ConcatStringExpressionInput = {
     /**
      * Operands
      */
-    operands: Array<({
-        op: 'column';
-    } & ColumnExpression) | ({
-        op: 'literal';
-    } & LiteralExpression) | ({
-        op: 'add' | 'and' | 'divide' | 'eq' | 'fill_null' | 'gt' | 'gte' | 'is_in' | 'lt' | 'lte' | 'modulo' | 'multiply' | 'ne' | 'or' | 'subtract';
-    } & BinaryExpressionInput) | ({
-        op: 'abs' | 'count' | 'day' | 'is_not_null' | 'is_null' | 'lowercase' | 'max' | 'mean' | 'min' | 'month' | 'n_unique' | 'not' | 'sum' | 'uppercase' | 'year';
-    } & UnaryExpressionInput) | ({
-        op: 'contains' | 'ends_with' | 'starts_with';
-    } & StringExpressionInput) | ({
-        op: 'cast';
-    } & CastExpressionInput) | ({
-        op: 'round';
-    } & RoundExpressionInput) | ({
-        op: 'concat_string';
-    } & ConcatStringExpressionInput)>;
+    operands: Array<ColumnExpression | LiteralExpression | BinaryExpressionInput | UnaryExpressionInput | StringExpressionInput | CastExpressionInput | RoundExpressionInput | ConcatStringExpressionInput>;
     /**
      * Separator
      */
@@ -1236,23 +1220,7 @@ export type ConcatStringExpressionOutput = {
     /**
      * Operands
      */
-    operands: Array<({
-        op: 'column';
-    } & ColumnExpression) | ({
-        op: 'literal';
-    } & LiteralExpression) | ({
-        op: 'add' | 'and' | 'divide' | 'eq' | 'fill_null' | 'gt' | 'gte' | 'is_in' | 'lt' | 'lte' | 'modulo' | 'multiply' | 'ne' | 'or' | 'subtract';
-    } & BinaryExpressionOutput) | ({
-        op: 'abs' | 'count' | 'day' | 'is_not_null' | 'is_null' | 'lowercase' | 'max' | 'mean' | 'min' | 'month' | 'n_unique' | 'not' | 'sum' | 'uppercase' | 'year';
-    } & UnaryExpressionOutput) | ({
-        op: 'contains' | 'ends_with' | 'starts_with';
-    } & StringExpressionOutput) | ({
-        op: 'cast';
-    } & CastExpressionOutput) | ({
-        op: 'round';
-    } & RoundExpressionOutput) | ({
-        op: 'concat_string';
-    } & ConcatStringExpressionOutput)>;
+    operands: Array<ColumnExpression | LiteralExpression | BinaryExpressionOutput | UnaryExpressionOutput | StringExpressionOutput | CastExpressionOutput | RoundExpressionOutput | ConcatStringExpressionOutput>;
     /**
      * Separator
      */
@@ -6776,11 +6744,7 @@ export type ListWorkspacesResponses = {
      *
      * Successful Response
      */
-    200: Array<({
-        availability: 'available';
-    } & AvailableWorkspaceListItem) | ({
-        availability: 'unavailable';
-    } & UnavailableWorkspaceListItem)>;
+    200: Array<AvailableWorkspaceListItem | UnavailableWorkspaceListItem>;
 };
 
 export type ListWorkspacesResponse = ListWorkspacesResponses[keyof ListWorkspacesResponses];

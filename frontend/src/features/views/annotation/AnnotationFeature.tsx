@@ -1,27 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import type {
-  Analysis,
-  AnnotationAnalysisRequest,
-  AnnotationResult,
-  AnnotationRunAllResult,
-} from '@/api';
+import type { Analysis, AnnotationResult, AnnotationRunAllResult } from '@/api';
 import { sqlIdentifier, sqlTable } from '@/api';
 import { Button } from '@/components/ui/button';
 import { useGuidance } from '@/features/guidance/GuidanceContext';
 import { CONTEXTUAL_HINT_IDS } from '@/features/guidance/registry';
 import { useProgressiveContextualHints } from '@/features/guidance/useProgressiveContextualHints';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -55,12 +41,11 @@ import { isArrowStringField } from '@/lib/arrow/arrowTable';
 import { getAnalysisOutputResource } from '../common/analysisApi';
 import { ANALYSIS_TASK_TYPES } from '../common/analysisIds';
 import AnalysisTaskBanner from '../common/components/AnalysisTaskBanner';
-import { useAnalysisFeature } from '../common/hooks/useAnalysisFeature';
+import { type AnalysisRequestOfKind, useAnalysisFeature } from '../common/hooks/useAnalysisFeature';
 import { usePersistNodeDocumentColumn } from '../common/hooks/usePersistNodeDocumentColumn';
 import { useNodeColorControls } from '../common/hooks/useNodeColorControls';
 import { GREY } from '../common/vizPalette';
 import { hasParameterDiff } from '../common/parameterComparison';
-import { acceptPlaceholderOnTab } from '../common/placeholderTabFill';
 import { getRerunActionState } from '../common/rerunActionState';
 import {
   getAnalysisActionLifecycle,
@@ -77,6 +62,7 @@ import {
   DEFAULT_ANNOTATION_PROMPT,
 } from './components/AnnotationPromptInput';
 import { AnnotationResultsPanel } from './components/AnnotationResultsPanel';
+import { CreateStringColumnDialog } from './components/CreateStringColumnDialog';
 import { useAnnotationAiPreview } from './hooks/useAnnotationAiPreview';
 import { useAnnotationClassDescriptions } from './hooks/useAnnotationClassDescriptions';
 import { useAnnotationTabSettings } from './hooks/useAnnotationTabSettings';
@@ -112,6 +98,10 @@ interface ManualReviewSnapshot {
   descriptionColumn: string | null;
   correctionColumn: string | null;
 }
+
+type CreateColumnDialogState =
+  | { kind: 'annotation'; nodeId: string; columns: string[] }
+  | { kind: 'correction'; nodeId: string; annotationColumn: string; columns: string[] };
 
 interface ColumnPickerProps {
   label: string;
@@ -195,24 +185,15 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
   } = host;
   const tabTaskId = latestPreview?.id ?? null;
   const [descriptionColumns, setDescriptionColumns] = useState<Record<string, string>>({});
-  const [annotationColumnDialog, setAnnotationColumnDialog] = useState<{
-    nodeId: string;
-    columns: string[];
-  } | null>(null);
-  const [newAnnotationColumnName, setNewAnnotationColumnName] = useState('');
-  const [annotationColumnError, setAnnotationColumnError] = useState<string | null>(null);
-  const [correctionColumnDialog, setCorrectionColumnDialog] = useState<{
-    nodeId: string;
-    annotationColumn: string;
-    columns: string[];
-  } | null>(null);
-  const [newCorrectionColumnName, setNewCorrectionColumnName] = useState('');
-  const [correctionColumnError, setCorrectionColumnError] = useState<string | null>(null);
+  const [createColumnDialog, setCreateColumnDialog] = useState<CreateColumnDialogState | null>(
+    null,
+  );
+  const [newColumnName, setNewColumnName] = useState('');
+  const [createColumnError, setCreateColumnError] = useState<string | null>(null);
   const [manualReviewSnapshot, setManualReviewSnapshot] = useState<ManualReviewSnapshot | null>(
     null,
   );
-  const [isCreatingAnnotationColumn, setIsCreatingAnnotationColumn] = useState(false);
-  const [isCreatingCorrectionColumn, setIsCreatingCorrectionColumn] = useState(false);
+  const [isCreatingColumn, setIsCreatingColumn] = useState(false);
   const [isStartingManualReview, setIsStartingManualReview] = useState(false);
   const [isCreatingClassTable, setIsCreatingClassTable] = useState(false);
   // Tab-persisted AI settings live in their own hook so this feature body can
@@ -359,9 +340,9 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
         ]}
         onValueChange={(next) => {
           if (next === CREATE_ANNOTATION_COLUMN_ACTION) {
-            setNewAnnotationColumnName('');
-            setAnnotationColumnError(null);
-            setAnnotationColumnDialog({ nodeId, columns });
+            setNewColumnName('');
+            setCreateColumnError(null);
+            setCreateColumnDialog({ kind: 'annotation', nodeId, columns });
             return;
           }
           setAnnotationTarget(nodeId, next);
@@ -450,7 +431,10 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
     storedAiCorrectionColumn !== resolvedAnnotationColumn
       ? storedAiCorrectionColumn
       : null;
-  const defaultCorrectionColumnName = `${correctionColumnDialog?.annotationColumn ?? DEFAULT_ANNOTATION_COLUMN_NAME}.correction`;
+  const defaultColumnName =
+    createColumnDialog?.kind === 'correction'
+      ? `${createColumnDialog.annotationColumn}.correction`
+      : DEFAULT_ANNOTATION_COLUMN_NAME;
 
   // AI-mode preview wiring. Resolve the selected named provider configuration
   // and prompt (user text or the grayed default). The
@@ -469,24 +453,24 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
     aiClassCount > 0 &&
     canAnnotate(selectedAiProvider, aiModel);
 
-  // Creating a new annotation column is an immediate, identity-preserving Data
-  // Block edit. Manual cell changes then use the same Undo/Redo history.
-  const handleCreateAnnotationColumn = async () => {
-    if (!annotationColumnDialog || !currentWorkspaceId) return;
-    const columnName = newAnnotationColumnName.trim() || DEFAULT_ANNOTATION_COLUMN_NAME;
+  // Creating an annotation or correction column is the same identity-preserving
+  // Data Block edit; only the selected role differs after creation.
+  const handleCreateColumn = async () => {
+    if (!createColumnDialog || !currentWorkspaceId) return;
+    const columnName = newColumnName.trim() || defaultColumnName;
     const currentColumns =
       sourceNodeInputs.resolvedNodes
-        .find((node) => node.id === annotationColumnDialog.nodeId)
-        ?.columnOptions.map((option) => option.name) ?? annotationColumnDialog.columns;
+        .find((node) => node.id === createColumnDialog.nodeId)
+        ?.columnOptions.map((option) => option.name) ?? createColumnDialog.columns;
     if (currentColumns.includes(columnName)) {
-      setAnnotationColumnError(`A column named "${columnName}" already exists.`);
+      setCreateColumnError(`A column named "${columnName}" already exists.`);
       return;
     }
-    setAnnotationColumnError(null);
-    setIsCreatingAnnotationColumn(true);
+    setCreateColumnError(null);
+    setIsCreatingColumn(true);
     try {
       await polarsExpressionApply(
-        annotationColumnDialog.nodeId,
+        createColumnDialog.nodeId,
         {
           context: 'with_columns',
           expressions: [
@@ -505,68 +489,28 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
         },
         'update',
       );
-      setAnnotationTarget(annotationColumnDialog.nodeId, columnName);
-      setAnnotationColumnDialog(null);
-      setNewAnnotationColumnName('');
+      if (createColumnDialog.kind === 'annotation') {
+        setAnnotationTarget(createColumnDialog.nodeId, columnName);
+      } else {
+        await host.setCorrectionColumn(createColumnDialog.nodeId, columnName);
+        setManualReviewSnapshot((current) =>
+          current?.nodeId === createColumnDialog.nodeId
+            ? {
+                ...current,
+                correctionColumn: columnName,
+                sourceColumns: [...current.sourceColumns, columnName],
+              }
+            : current,
+        );
+      }
+      setCreateColumnDialog(null);
+      setNewColumnName('');
     } catch (error) {
-      console.warn('[annotation] Failed to create annotation column:', error);
-      toast.error(
-        error instanceof Error ? error.message : 'Could not create the annotation column.',
-      );
+      const role = createColumnDialog.kind;
+      console.warn(`[annotation] Failed to create ${role} column:`, error);
+      toast.error(error instanceof Error ? error.message : `Could not create the ${role} column.`);
     } finally {
-      setIsCreatingAnnotationColumn(false);
-    }
-  };
-
-  const handleCreateCorrectionColumn = async () => {
-    if (!correctionColumnDialog || !currentWorkspaceId) return;
-    const columnName = newCorrectionColumnName.trim() || defaultCorrectionColumnName;
-    if (correctionColumnDialog.columns.includes(columnName)) {
-      setCorrectionColumnError(`A column named "${columnName}" already exists.`);
-      return;
-    }
-    setCorrectionColumnError(null);
-    setIsCreatingCorrectionColumn(true);
-    try {
-      await polarsExpressionApply(
-        correctionColumnDialog.nodeId,
-        {
-          context: 'with_columns',
-          expressions: [
-            {
-              expression: {
-                op: 'cast',
-                operand: { op: 'literal', value: null },
-                dtype: 'string',
-                strict: false,
-              },
-              alias: columnName,
-            },
-          ],
-          group_by: [],
-          name: null,
-        },
-        'update',
-      );
-      await host.setCorrectionColumn(correctionColumnDialog.nodeId, columnName);
-      setManualReviewSnapshot((current) =>
-        current?.nodeId === correctionColumnDialog.nodeId
-          ? {
-              ...current,
-              correctionColumn: columnName,
-              sourceColumns: [...current.sourceColumns, columnName],
-            }
-          : current,
-      );
-      setCorrectionColumnDialog(null);
-      setNewCorrectionColumnName('');
-    } catch (error) {
-      console.warn('[annotation] Failed to create correction column:', error);
-      toast.error(
-        error instanceof Error ? error.message : 'Could not create the correction column.',
-      );
-    } finally {
-      setIsCreatingCorrectionColumn(false);
+      setIsCreatingColumn(false);
     }
   };
 
@@ -581,9 +525,9 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
     annotationColumn: string,
     columns: string[],
   ) => {
-    setNewCorrectionColumnName('');
-    setCorrectionColumnError(null);
-    setCorrectionColumnDialog({ nodeId, annotationColumn, columns });
+    setNewColumnName('');
+    setCreateColumnError(null);
+    setCreateColumnDialog({ kind: 'correction', nodeId, annotationColumn, columns });
   };
 
   const handleUseCorrectionColumnAsExample = (
@@ -645,7 +589,7 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
   const hasCompleteExample = Boolean(exampleNode && exampleAnnotationColumn);
   // Preview creation captures every selector and setting in one immutable root
   // Analysis. Run All later executes only from that snapshot.
-  const currentAiRequest: AnnotationAnalysisRequest | null =
+  const currentAiRequest: AnalysisRequestOfKind<'annotation'> | null =
     sourceNode &&
     currentWorkspaceId &&
     selectedAiProvider &&
@@ -697,7 +641,7 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
     banner: aiBanner,
     clearResults: clearAiResults,
     stopTask: stopAiTask,
-  } = useAnalysisFeature<AnnotationResult, AnnotationAnalysisRequest>({
+  } = useAnalysisFeature<AnnotationResult, AnalysisRequestOfKind<'annotation'>>({
     taskType: ANALYSIS_TASK_TYPES.annotation,
     workspaceId: currentWorkspaceId,
     tabId: host.tabId,
@@ -706,7 +650,7 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
       !latestPreview && annotationRunAll && annotationRunAllSource
         ? {
             analysisId: annotationRunAll.id,
-            request: annotationRunAllSource,
+            request: { ...annotationRunAllSource, kind: 'annotation' },
           }
         : null,
     controlAnalysisId: activeAnalysis?.id ?? null,
@@ -849,10 +793,7 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
     ? 'Add an API key in Settings → AI before running Annotation'
     : aiActionState.runDisabledReason;
   const controlsLocked =
-    analysisActionLifecycle.parametersLocked ||
-    isCreatingAnnotationColumn ||
-    isCreatingCorrectionColumn ||
-    isStartingManualReview;
+    analysisActionLifecycle.parametersLocked || isCreatingColumn || isStartingManualReview;
 
   const runFreshAiAnalysis = async () => {
     if (!currentAiRequest || !currentWorkspaceId) return;
@@ -1020,13 +961,11 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
                     previewDisabled:
                       analysisActionLifecycle.previewDisabled ||
                       aiActionState.runDisabled ||
-                      isCreatingAnnotationColumn ||
-                      isCreatingCorrectionColumn ||
+                      isCreatingColumn ||
                       analysisActionLifecycle.isPreviewing,
-                    previewDisabledReason:
-                      isCreatingAnnotationColumn || isCreatingCorrectionColumn
-                        ? 'Wait for the column to finish creating'
-                        : providerDisabledReason,
+                    previewDisabledReason: isCreatingColumn
+                      ? 'Wait for the column to finish creating'
+                      : providerDisabledReason,
                     runAllDisabled:
                       !currentAiRequest ||
                       analysisActionLifecycle.runAllDisabled ||
@@ -1039,7 +978,6 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
                     isPreviewing: analysisActionLifecycle.isPreviewing,
                     isRunningAll: analysisActionLifecycle.isRunningAll,
                     isStopping: isAiStopping,
-                    hasResult: Boolean(aiResult),
                   }
                 : undefined
             }
@@ -1087,12 +1025,9 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
                     title="Selected Data Blocks"
                     resolvedNodes={sourceNodeInputs.resolvedNodes}
                     availableNodes={sourceNodeInputs.availableNodes}
-                    graphSelectedIds={sourceNodeInputs.graphSelectedIds}
-                    recentPresets={sourceNodeInputs.recentPresets}
                     canAddMore={sourceNodeInputs.canAddMore}
                     maxNodes={1}
                     onAddNodes={sourceNodeInputs.addNodes}
-                    getAddRejection={sourceNodeInputs.getAddRejection}
                     onRemoveNode={sourceNodeInputs.removeNode}
                     onClear={sourceNodeInputs.clear}
                     onColumnChange={handleSourceTextColumnChange}
@@ -1131,7 +1066,6 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
                       canAddMore={classNodeInputs.canAddMore}
                       maxNodes={1}
                       onAddNodes={classNodeInputs.addNodes}
-                      getAddRejection={classNodeInputs.getAddRejection}
                       onRemoveNode={classNodeInputs.removeNode}
                       onClear={classNodeInputs.clear}
                       onColumnChange={classNodeInputs.setColumn}
@@ -1258,7 +1192,6 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
                         canAddMore={exampleNodeInputs.canAddMore}
                         maxNodes={1}
                         onAddNodes={exampleNodeInputs.addNodes}
-                        getAddRejection={exampleNodeInputs.getAddRejection}
                         onRemoveNode={exampleNodeInputs.removeNode}
                         onClear={exampleNodeInputs.clear}
                         onColumnChange={handleExampleTextColumnChange}
@@ -1283,146 +1216,43 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
           </AnalysisCardLayout>
         </section>
       </div>
-      <Dialog
-        open={Boolean(annotationColumnDialog)}
-        onOpenChange={(open) => {
-          if (open || isCreatingAnnotationColumn) return;
-          setAnnotationColumnDialog(null);
-          setNewAnnotationColumnName('');
-          setAnnotationColumnError(null);
+      <CreateStringColumnDialog
+        open={Boolean(createColumnDialog)}
+        title={
+          createColumnDialog?.kind === 'correction'
+            ? 'Create correction column'
+            : 'Create annotation column'
+        }
+        description={
+          createColumnDialog?.kind === 'correction'
+            ? 'Add an empty string column to this Data Block and select it for user corrections.'
+            : 'Add an empty string column to this Data Block and select it for annotation.'
+        }
+        inputId={
+          createColumnDialog?.kind === 'correction'
+            ? 'annotation-correction-column-name'
+            : 'annotation-column-name'
+        }
+        inputLabel={
+          createColumnDialog?.kind === 'correction' ? 'Correction column name' : 'Column name'
+        }
+        value={newColumnName}
+        placeholder={defaultColumnName}
+        error={createColumnError}
+        pending={isCreatingColumn}
+        onValueChange={(value) => {
+          setNewColumnName(value);
+          setCreateColumnError(null);
         }}
-      >
-        <DialogContent>
-          <form
-            className="space-y-4"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void handleCreateAnnotationColumn();
-            }}
-          >
-            <DialogHeader>
-              <DialogTitle>Create annotation column</DialogTitle>
-              <DialogDescription>
-                Add an empty string column to this Data Block and select it for annotation.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-2">
-              <Label htmlFor="annotation-column-name">Column name</Label>
-              <Input
-                id="annotation-column-name"
-                aria-label="Column name"
-                value={newAnnotationColumnName}
-                placeholder={DEFAULT_ANNOTATION_COLUMN_NAME}
-                maxLength={500}
-                disabled={isCreatingAnnotationColumn}
-                onChange={(event) => {
-                  setNewAnnotationColumnName(event.target.value);
-                  setAnnotationColumnError(null);
-                }}
-                onKeyDown={(event) => {
-                  acceptPlaceholderOnTab({
-                    event,
-                    value: newAnnotationColumnName,
-                    setValue: setNewAnnotationColumnName,
-                  });
-                }}
-              />
-              {annotationColumnError ? (
-                <p role="alert" className="text-body text-error">
-                  {annotationColumnError}
-                </p>
-              ) : null}
-            </div>
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={isCreatingAnnotationColumn}
-                onClick={() => {
-                  setAnnotationColumnDialog(null);
-                  setNewAnnotationColumnName('');
-                  setAnnotationColumnError(null);
-                }}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isCreatingAnnotationColumn}>
-                {isCreatingAnnotationColumn ? 'Creating...' : 'Create'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-      <Dialog
-        open={Boolean(correctionColumnDialog)}
-        onOpenChange={(open) => {
-          if (open || isCreatingCorrectionColumn) return;
-          setCorrectionColumnDialog(null);
-          setNewCorrectionColumnName('');
-          setCorrectionColumnError(null);
+        onClose={() => {
+          setCreateColumnDialog(null);
+          setNewColumnName('');
+          setCreateColumnError(null);
         }}
-      >
-        <DialogContent>
-          <form
-            className="space-y-4"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void handleCreateCorrectionColumn();
-            }}
-          >
-            <DialogHeader>
-              <DialogTitle>Create correction column</DialogTitle>
-              <DialogDescription>
-                Add an empty string column to this Data Block and select it for user corrections.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-2">
-              <Label htmlFor="annotation-correction-column-name">Column name</Label>
-              <Input
-                id="annotation-correction-column-name"
-                aria-label="Correction column name"
-                value={newCorrectionColumnName}
-                placeholder={defaultCorrectionColumnName}
-                maxLength={500}
-                disabled={isCreatingCorrectionColumn}
-                onChange={(event) => {
-                  setNewCorrectionColumnName(event.target.value);
-                  setCorrectionColumnError(null);
-                }}
-                onKeyDown={(event) => {
-                  acceptPlaceholderOnTab({
-                    event,
-                    value: newCorrectionColumnName,
-                    setValue: setNewCorrectionColumnName,
-                  });
-                }}
-              />
-              {correctionColumnError ? (
-                <p role="alert" className="text-body text-error">
-                  {correctionColumnError}
-                </p>
-              ) : null}
-            </div>
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={isCreatingCorrectionColumn}
-                onClick={() => {
-                  setCorrectionColumnDialog(null);
-                  setNewCorrectionColumnName('');
-                  setCorrectionColumnError(null);
-                }}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isCreatingCorrectionColumn}>
-                {isCreatingCorrectionColumn ? 'Creating...' : 'Create'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+        onSubmit={() => {
+          void handleCreateColumn();
+        }}
+      />
       {annotationMode === 'ai' && aiBanner ? (
         <AnalysisTaskBanner
           analysisName="Annotation"
@@ -1494,7 +1324,7 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
                 manualReviewSnapshot.sourceColumns,
               );
             },
-            disabled: isCreatingCorrectionColumn,
+            disabled: isCreatingColumn,
           }}
         />
       ) : null}
@@ -1565,7 +1395,7 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
                   reviewCorrectionColumn,
                 );
               },
-              disabled: isCreatingCorrectionColumn,
+              disabled: isCreatingColumn,
             }}
           />
         </>
@@ -1612,7 +1442,7 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
                 previewCorrectionColumn,
               );
             },
-            disabled: isCreatingCorrectionColumn,
+            disabled: isCreatingColumn,
           }}
         />
       ) : null}

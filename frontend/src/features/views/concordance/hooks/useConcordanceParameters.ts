@@ -1,4 +1,5 @@
 import { useReducer, type Dispatch, type SetStateAction } from 'react';
+import type { ConcordanceAnalysisRequest } from '@/api';
 import {
   concordanceParameterReducer,
   createConcordanceParameterState,
@@ -86,23 +87,17 @@ export function useConcordanceParameters() {
    * Called by: ConcordanceFeature's `useAnalysisFeature` request hydration
    * callback before it projects the saved Result.
    */
-  const applyHydratedRequest = (request: Record<string, unknown>): ConcordanceInputSelection[] => {
-    const nodeIds = Array.isArray(request.node_ids)
-      ? request.node_ids
-          .slice(0, 2)
-          .filter((value: unknown): value is string => typeof value === 'string')
-      : [];
-    const nodeColumns =
-      request.node_columns && typeof request.node_columns === 'object'
-        ? (request.node_columns as Record<string, unknown>)
-        : {};
+  const applyHydratedRequest = (
+    request: ConcordanceAnalysisRequest,
+  ): ConcordanceInputSelection[] => {
+    const nodeIds = request.node_ids.slice(0, 2);
 
     const hydratedParams = readConcordanceServerParams(request);
     dispatchParameters({ type: 'hydrateParams', params: hydratedParams });
 
     return nodeIds.map((nodeId) => ({
       nodeId,
-      column: typeof nodeColumns[nodeId] === 'string' ? nodeColumns[nodeId] : '',
+      column: request.node_columns[nodeId] ?? '',
     }));
   };
 

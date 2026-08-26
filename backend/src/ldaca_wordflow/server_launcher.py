@@ -190,19 +190,11 @@ def _prepare_server(
                 "server_host": selected_host,
             }
         )
-        resolved_root_path = root_path
-        if resolved_root_path is None:
-            hub_prefix = os.environ.get("JUPYTERHUB_SERVICE_PREFIX", "")
-            if hub_prefix:
-                resolved_root_path = (
-                    f"{hub_prefix.rstrip('/')}/proxy/{current.backend_port}"
-                )
-
         config = uvicorn.Config(
             create_app(current, serve_frontend=serve_frontend),
             host=current.server_host,
             port=current.backend_port,
-            root_path=resolved_root_path or "",
+            root_path=root_path or "",
             reload=False,
             log_level="info",
         )

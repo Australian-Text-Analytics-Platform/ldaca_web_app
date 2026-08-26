@@ -1,10 +1,9 @@
 import { useEffect, useRef } from 'react';
 import type { ConcordanceNodeResult as ConcordanceResultEntry } from '@/api';
 import type { ReactNode } from 'react';
-import type { ColumnDef } from '@tanstack/react-table';
 import { AnalysisTableFrame } from '@/features/views/common/components/AnalysisTableScrollArea';
 import { ServerPaginationFooter } from '@/features/views/common/components/ServerPaginationFooter';
-import { useServerTable } from '@/features/views/common/hooks/useServerTable';
+import { type ServerColumnDef, useServerTable } from '@/features/views/common/hooks/useServerTable';
 import { GroupedResultsPageSizeSummary } from '../../common/components/GroupedResultsPageSizeSummary';
 import { PAGE_SIZE_OPTIONS_DEFAULT } from '../../common/constants';
 import type { NodeColumnSelection } from '../../common/nodeSelectionTypes';
@@ -31,7 +30,7 @@ const EMPTY_BIN_SELECTION: ReadonlySet<number> = new Set<number>();
 // exists purely to drive ServerPaginationFooter from the active Review
 // projection's explicit document-or-match row count.
 const EMPTY_DISPERSION_ROWS: Record<string, unknown>[] = [];
-const EMPTY_DISPERSION_COLUMNS: ColumnDef<Record<string, unknown>>[] = [];
+const EMPTY_DISPERSION_COLUMNS: ServerColumnDef<Record<string, unknown>>[] = [];
 
 export interface ConcordanceDispersionNodeBlockProps {
   nodeKey: string;
@@ -341,7 +340,6 @@ export function ConcordanceDispersionNodeBlock({
       selectedMetadataColumns,
       resultsViewportWidth,
       proportionalDispersionBars,
-      fallbackToAllColumns: true,
     });
 
   const nodeIsLoading = Boolean(nodeLoading[paginationKey]);
