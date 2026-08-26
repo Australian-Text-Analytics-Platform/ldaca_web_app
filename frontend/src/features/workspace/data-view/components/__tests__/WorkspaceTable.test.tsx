@@ -1,4 +1,5 @@
 /* eslint-disable testing-library/no-container, testing-library/no-node-access -- Radix exposes the imperative viewport only as an internal DOM slot. */
+import { useState } from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
@@ -122,6 +123,35 @@ describe('WorkspaceTable', () => {
     expect(metadata.getByText('speaker')).toBeInTheDocument();
     expect(metadata.getByText('Ada')).toBeInTheDocument();
     expect(metadata.queryByText(/^document$/)).not.toBeInTheDocument();
+  });
+
+  it('keeps row details open while moving across known-total pages', async () => {
+    const user = userEvent.setup();
+
+    function Harness() {
+      const [page, setPage] = useState(1);
+      return (
+        <WorkspaceTable
+          columns={['document']}
+          columnFields={{ document: new Field('document', new Utf8()) }}
+          data={[{ document: page === 1 ? 'Workspace row one.' : 'Workspace row two.' }]}
+          documentColumn="document"
+          pagination={{ page, page_size: 1 }}
+          rowCount={2}
+          onPageChange={setPage}
+        />
+      );
+    }
+
+    render(<Harness />);
+    await user.click(screen.getByText('Workspace row one.'));
+    await user.click(screen.getByRole('button', { name: 'Next row' }));
+
+    const dialog = await screen.findByRole('dialog');
+    await waitFor(() => {
+      expect(within(dialog).getByText('Workspace row two.')).toBeInTheDocument();
+    });
+    expect(within(dialog).getByRole('button', { name: 'Previous row' })).toBeEnabled();
   });
 
   it('preserves both axes for sorting and resets only rows for pagination', () => {

@@ -1,12 +1,15 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
+import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import {
   Table,
   TableBody,
@@ -18,7 +21,7 @@ import {
 
 // ---- Public types ----
 
-interface RowDetailCustomization {
+export interface RowDetailCustomization {
   /** Label shown in the dialog title parentheses, e.g. "Concordance" */
   label?: string;
   /** Key-value pairs shown in the metadata grid below the title */
@@ -33,6 +36,15 @@ interface RowDetailCustomization {
    * Return `null` to hide the document section entirely.
    */
   renderDocumentText?: (text: string, record: Record<string, unknown>) => React.ReactNode;
+}
+
+export interface RowDetailNavigation {
+  canPrevious: boolean;
+  canNext: boolean;
+  pendingDirection: 'previous' | 'next' | null;
+  error: string | null;
+  onPrevious: () => void;
+  onNext: () => void;
 }
 
 export interface RowDetailPayload {
@@ -51,6 +63,7 @@ export interface RowDetailPanelProps {
   onOpenChange: (open: boolean) => void;
   payload: RowDetailPayload | null;
   customization?: RowDetailCustomization;
+  navigation: RowDetailNavigation;
 }
 
 // ---- Helpers ----
@@ -79,7 +92,14 @@ export function RowDetailPanel({
   onOpenChange,
   payload,
   customization,
+  navigation,
 }: RowDetailPanelProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+  }, [payload]);
+
   if (!payload) return null;
 
   const { record, textColumn, fullText, excludeMetadataColumns } = payload;
@@ -105,7 +125,7 @@ export function RowDetailPanel({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl w-full max-h-[80vh] overflow-hidden">
+      <DialogContent className="grid max-h-[80vh] w-full max-w-4xl grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden">
         <DialogHeader>
           <DialogTitle>Row Details{titleSuffix}</DialogTitle>
           <DialogDescription className="sr-only">
@@ -113,7 +133,11 @@ export function RowDetailPanel({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="overflow-y-auto max-h-[calc(80vh-120px)] pr-1">
+        <div
+          ref={scrollRef}
+          data-testid="row-detail-scroll"
+          className="min-h-0 overflow-y-auto pr-1"
+        >
           {/* Summary / customization fields */}
           {customization?.summaryFields && customization.summaryFields.length > 0 && (
             <div className="mb-6 grid grid-cols-2 gap-4 text-body">
@@ -186,6 +210,51 @@ export function RowDetailPanel({
             </div>
           )}
         </div>
+
+        <DialogFooter
+          data-testid="row-detail-navigation"
+          className="border-t border-surface-border pt-3 sm:justify-between sm:space-x-0"
+        >
+          <Button
+            type="button"
+            variant="outline"
+            onClick={navigation.onPrevious}
+            disabled={!navigation.canPrevious || navigation.pendingDirection !== null}
+            aria-label="Previous row"
+          >
+            {navigation.pendingDirection === 'previous' ? (
+              <Loader2 aria-hidden="true" className="animate-spin" />
+            ) : (
+              <ChevronLeft aria-hidden="true" />
+            )}
+            Previous row
+          </Button>
+          {navigation.error ? (
+            <p role="alert" className="self-center text-body text-error">
+              {navigation.error}
+            </p>
+          ) : navigation.pendingDirection ? (
+            <p role="status" className="self-center text-body text-description">
+              Loading {navigation.pendingDirection} row…
+            </p>
+          ) : (
+            <span />
+          )}
+          <Button
+            type="button"
+            variant="outline"
+            onClick={navigation.onNext}
+            disabled={!navigation.canNext || navigation.pendingDirection !== null}
+            aria-label="Next row"
+          >
+            Next row
+            {navigation.pendingDirection === 'next' ? (
+              <Loader2 aria-hidden="true" className="animate-spin" />
+            ) : (
+              <ChevronRight aria-hidden="true" />
+            )}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

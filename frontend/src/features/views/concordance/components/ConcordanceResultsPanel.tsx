@@ -26,8 +26,6 @@ interface Section {
   color?: string;
   disabled?: boolean;
 }
-type ConcordanceGroupedRow = Record<string, unknown>[];
-
 interface ConcordanceResultsShell {
   resultsRef: RefObject<HTMLDivElement | null>;
   resultsViewportRef: RefObject<HTMLDivElement | null>;
@@ -74,6 +72,7 @@ interface ConcordanceResultsMetadata {
 
 interface ConcordanceResultsSources {
   searchWord: string;
+  caseSensitive: boolean;
   panelSelectedNodes: WorkspaceNodeMetadata[];
   effectiveNodeColumnSelections: NodeColumnSelection[];
   labelToNodeId: Record<string, string> | null;
@@ -170,12 +169,6 @@ export function ConcordanceSourceSummaries({
 interface ConcordanceResultsCommands {
   handleSort: (columnKey: string, paginationKey: string, requestNodeId: string) => void;
   handlePageChange: (newPage: number, paginationKey: string, requestNodeId: string) => void;
-  handleRowClick: (
-    row: Record<string, unknown>,
-    nodeId: string,
-    column: string,
-    groupedHits?: ConcordanceGroupedRow,
-  ) => void;
 }
 
 export interface ConcordanceResultsPanelProps {
@@ -240,6 +233,7 @@ export function ConcordanceResultsPanel({
   },
   sources: {
     searchWord,
+    caseSensitive,
     panelSelectedNodes,
     effectiveNodeColumnSelections,
     labelToNodeId,
@@ -257,7 +251,7 @@ export function ConcordanceResultsPanel({
     nodeLoading,
     reviewDensityByNode,
   },
-  commands: { handleSort, handlePageChange, handleRowClick },
+  commands: { handleSort, handlePageChange },
 }: ConcordanceResultsPanelProps) {
   const showDispersion = concordanceView === 'dispersion';
   const previewTermLabels = Object.values(results.data).flatMap((node) =>
@@ -440,6 +434,7 @@ export function ConcordanceResultsPanel({
                     nodeData,
                     context: blockContext,
                     searchWord,
+                    caseSensitive,
                     showMetadata,
                     selectedMetadataColumns,
                     panelSelectedNodes,
@@ -482,7 +477,6 @@ export function ConcordanceResultsPanel({
                         : reviewDensityByNode[resolvedNodeId]?.series
                       : undefined,
                     handlePageChange,
-                    handleRowClick,
                     setCombinedPage,
                   };
                   return concordanceView === 'dispersion' ? (

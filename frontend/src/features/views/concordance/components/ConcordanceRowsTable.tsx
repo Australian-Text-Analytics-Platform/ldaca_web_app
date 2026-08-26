@@ -30,7 +30,7 @@ interface Props {
   getRowStyle?: (row: ConcordanceRow, index: number) => CSSProperties | undefined;
   getSourceColor?: (row: ConcordanceRow) => string | undefined;
   highlightL1R1: boolean;
-  onRowClick: (row: ConcordanceRow) => void;
+  onRowClick: (row: ConcordanceRow, index: number) => void;
 }
 
 /**
@@ -163,7 +163,7 @@ export function ConcordanceRowsTable({
                 className={getRowClassName(row, index)}
                 style={getRowStyle?.(row, index)}
                 onClick={() => {
-                  onRowClick(row);
+                  onRowClick(row, index);
                 }}
               >
                 {tableRow.getVisibleCells().map((cell) => {

@@ -1,10 +1,12 @@
-import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import { CONCORDANCE_COLUMN_KEYS } from '../../../common/generatedColumns';
-import { useConcordanceRowDetail } from '../useConcordanceRowDetail';
+import {
+  buildConcordanceRowDetailCustomization,
+  buildConcordanceRowDetailPayload,
+} from '../../concordanceRowDetail';
 
-describe('useConcordanceRowDetail', () => {
+describe('concordanceRowDetail', () => {
   const hit = {
     text: 'alpha beta alpha',
     speaker: 'A',
@@ -17,38 +19,30 @@ describe('useConcordanceRowDetail', () => {
     [CONCORDANCE_COLUMN_KEYS.endIdx]: 5,
   };
 
-  it('opens row details with grouped hit context and concordance summary fields', () => {
-    const { result } = renderHook(() =>
-      useConcordanceRowDetail({
-        currentWorkspaceId: 'workspace-1',
-        caseSensitive: false,
-        searchWord: 'alpha',
-      }),
-    );
-
-    act(() => {
-      result.current.handleRowClick(hit, 'node-1', 'text', [
+  it('builds grouped hit context and concordance summary fields', () => {
+    const item = {
+      row: hit,
+      nodeId: 'node-1',
+      column: 'text',
+      groupedHits: [
         hit,
         {
           ...hit,
           [CONCORDANCE_COLUMN_KEYS.startIdx]: 11,
           [CONCORDANCE_COLUMN_KEYS.endIdx]: 16,
         },
-      ]);
-    });
+      ],
+    };
+    const payload = buildConcordanceRowDetailPayload(item);
+    const customization = buildConcordanceRowDetailCustomization(item, 'alpha', false);
 
-    expect(result.current.detailOpen).toBe(true);
-    expect(result.current.detailPayload?.record).toMatchObject(hit);
-    expect(result.current.detailPayload?.textColumn).toBe('text');
-    expect(result.current.detailPayload?.fullText).toBe('alpha beta alpha');
-    expect(result.current.detailPayload?.excludeMetadataColumns).toContain(
-      CONCORDANCE_COLUMN_KEYS.matchedText,
-    );
-    expect(result.current.detailPayload?.excludeMetadataColumns).toContain(
-      CONCORDANCE_COLUMN_KEYS.dispersion,
-    );
+    expect(payload.record).toMatchObject(hit);
+    expect(payload.textColumn).toBe('text');
+    expect(payload.fullText).toBe('alpha beta alpha');
+    expect(payload.excludeMetadataColumns).toContain(CONCORDANCE_COLUMN_KEYS.matchedText);
+    expect(payload.excludeMetadataColumns).toContain(CONCORDANCE_COLUMN_KEYS.dispersion);
 
-    const fields = result.current.concordanceCustomization?.summaryFields ?? [];
+    const fields = customization.summaryFields ?? [];
     expect(fields.map((field) => [field.label, field.value])).toEqual([
       ['Search Word', 'alpha'],
       ['Matches', '2'],
@@ -57,26 +51,14 @@ describe('useConcordanceRowDetail', () => {
       ['R1 Word', 'after'],
       ['R1 Freq', '4'],
     ]);
-    expect(
-      result.current.concordanceCustomization?.renderDocumentText?.('alpha beta alpha', hit),
-    ).toBeTruthy();
+    expect(customization.renderDocumentText?.('alpha beta alpha', hit)).toBeTruthy();
   });
 
-  it('ignores row clicks when there is no workspace', () => {
-    const { result } = renderHook(() =>
-      useConcordanceRowDetail({
-        currentWorkspaceId: null,
-        caseSensitive: false,
-        searchWord: 'alpha',
-      }),
+  it('uses one row as the default hit group', () => {
+    const item = { row: hit, nodeId: 'node-1', column: 'text' };
+    const customization = buildConcordanceRowDetailCustomization(item, 'alpha', false);
+    expect(customization.summaryFields?.find((field) => field.label === 'Matches')?.value).toBe(
+      '1',
     );
-
-    act(() => {
-      result.current.handleRowClick(hit, 'node-1', 'text');
-    });
-
-    expect(result.current.detailOpen).toBe(false);
-    expect(result.current.detailPayload).toBeNull();
-    expect(result.current.concordanceCustomization).toBeUndefined();
   });
 });

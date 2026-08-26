@@ -86,6 +86,7 @@ The **Data Viewer** fills the bottom-right area and displays the contents of sel
 - Click any row to open the **Row Details** panel, which displays the full contents of that row in a readable layout. The <a href="tutorials/assets/ui/row_details.png" target="_blank">row details</a> panel has two sections:
   - **Document** — shows the full text of the data block's designated document column (the column marked as the primary text when the data was loaded, e.g. the column named `text`, `document`, or `doc`). The section heading displays the column name, e.g. *Document: text*. If no document column has been configured for the data block, this section is omitted.
   - **Metadata** — shows all remaining columns as a two-column key/value table, making it easy to inspect structured fields such as speaker, date, or source alongside the document text.
+- Use **Previous row** and **Next row** at the bottom of the Row Details panel to review adjacent displayed rows. The Data Viewer changes table pages automatically when you move past the first or last row on a page.
 - The table is paginated — use the controls at the bottom to navigate through large data blocks.
 - Scroll vertically with your mouse scroll wheel. Hold **Shift** to scroll horizontally.
 

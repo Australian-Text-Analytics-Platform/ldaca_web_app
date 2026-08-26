@@ -13,7 +13,6 @@ import {
   buildQuotationDisplayColumns,
   buildQuotationMetadataColumns,
   filterQuotationRowsWithQuotes,
-  type QuotationResultRow,
   resolveQuotationMetadataColumns,
 } from '../quotationResultsModel';
 import { MAX_CONTEXT_LENGTH } from '../quotationTextClip';
@@ -43,7 +42,7 @@ interface QuotationResultsPanelProps {
   onSort: (nodeId: string, columnName: string) => void;
   onPageChange: (page: number) => void;
   onPageSizeChange: (pageSize: number) => void;
-  onRowClick: (row: QuotationResultRow) => void;
+  onRowClick: (rowIndex: number) => void;
   isPageLoading: boolean;
 }
 
@@ -207,9 +206,7 @@ export function QuotationResultsPanel({
               onSort={onSort}
               onPageChange={onPageChange}
               onPageSizeChange={onPageSizeChange}
-              onRowClick={(row) => {
-                onRowClick(row);
-              }}
+              onRowClick={onRowClick}
               pageSizeOptions={[...PAGE_SIZE_OPTIONS_DEFAULT]}
               pageSizeSummary={
                 <GroupedResultsPageSizeSummary

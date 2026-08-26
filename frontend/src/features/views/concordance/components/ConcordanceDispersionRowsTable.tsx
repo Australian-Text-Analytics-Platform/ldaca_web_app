@@ -29,7 +29,7 @@ interface Props {
   termColors?: Record<string, string>;
   getRowClassName: (row: ConcordanceDispersionRow, index: number) => string;
   getRowStyle?: (row: ConcordanceDispersionRow, index: number) => CSSProperties | undefined;
-  onRowClick: (row: ConcordanceDispersionRow) => void;
+  onRowClick: (row: ConcordanceDispersionRow, index: number) => void;
 }
 
 /**
@@ -91,7 +91,7 @@ export function ConcordanceDispersionRowsTable({
               className={getRowClassName(row, index)}
               style={getRowStyle?.(row, index)}
               onClick={() => {
-                onRowClick(row);
+                onRowClick(row, index);
               }}
             >
               {tableColumns.map((columnKey, cellIndex) => (

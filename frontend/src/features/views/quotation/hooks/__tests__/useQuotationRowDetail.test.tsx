@@ -1,11 +1,13 @@
-import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import { QUOTATION_COLUMN_KEYS } from '../../../common/generatedColumns';
 import { normalizeQuotationRow } from '../../quotationResultsModel';
-import { useQuotationRowDetail } from '../useQuotationRowDetail';
+import {
+  buildQuotationRowDetailCustomization,
+  buildQuotationRowDetailPayload,
+} from '../../quotationRowDetail';
 
-describe('useQuotationRowDetail', () => {
+describe('quotationRowDetail', () => {
   const row = {
     text: 'Alice said hello.',
     metadata: 'kept',
@@ -21,42 +23,30 @@ describe('useQuotationRowDetail', () => {
     [QUOTATION_COLUMN_KEYS.quoteEndIdx]: 16,
   };
 
-  it('opens row details with quotation summary fields and generated-column exclusions', () => {
-    const { result } = renderHook(() => useQuotationRowDetail());
+  it('builds quotation summary fields and generated-column exclusions', () => {
+    const normalized = normalizeQuotationRow(row, 'text');
+    const payload = buildQuotationRowDetailPayload(normalized);
+    const customization = buildQuotationRowDetailCustomization(normalized);
 
-    act(() => {
-      result.current.handleRowClick(normalizeQuotationRow(row, 'text'));
-    });
+    expect(payload.record).toMatchObject(row);
+    expect(payload.textColumn).toBe('text');
+    expect(payload.fullText).toBe('Alice said hello.');
+    expect(payload.excludeMetadataColumns).toContain(QUOTATION_COLUMN_KEYS.quote);
+    expect(payload.excludeMetadataColumns).toContain('__spans');
 
-    expect(result.current.detailOpen).toBe(true);
-    expect(result.current.detailPayload?.record).toMatchObject(row);
-    expect(result.current.detailPayload?.textColumn).toBe('text');
-    expect(result.current.detailPayload?.fullText).toBe('Alice said hello.');
-    expect(result.current.detailPayload?.excludeMetadataColumns).toContain(
-      QUOTATION_COLUMN_KEYS.quote,
-    );
-    expect(result.current.detailPayload?.excludeMetadataColumns).toContain('__spans');
-
-    const fields = result.current.quotationCustomization?.summaryFields ?? [];
+    const fields = customization.summaryFields ?? [];
     expect(fields.map((field) => [field.label, field.value])).toEqual([
       ['Quote Type', 'direct'],
       ['Speaker', 'Alice'],
       ['Verb', 'said'],
       ['Quote', 'hello'],
     ]);
-    expect(
-      result.current.quotationCustomization?.renderDocumentText?.('Alice said hello.', row),
-    ).toBeTruthy();
+    expect(customization.renderDocumentText?.('Alice said hello.', row)).toBeTruthy();
   });
 
   it('omits full text when the selected text column is absent', () => {
-    const { result } = renderHook(() => useQuotationRowDetail());
-
-    act(() => {
-      result.current.handleRowClick(normalizeQuotationRow(row, 'missing_text'));
-    });
-
-    expect(result.current.detailPayload?.fullText).toBe('');
-    expect(result.current.quotationCustomization?.label).toBe('Quotation');
+    const normalized = normalizeQuotationRow(row, 'missing_text');
+    expect(buildQuotationRowDetailPayload(normalized).fullText).toBe('');
+    expect(buildQuotationRowDetailCustomization(normalized).label).toBe('Quotation');
   });
 });

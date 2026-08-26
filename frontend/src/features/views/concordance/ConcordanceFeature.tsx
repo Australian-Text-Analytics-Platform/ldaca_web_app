@@ -43,10 +43,8 @@ import {
 import { ConcordanceParameterPanel } from './components/ConcordanceParameterPanel';
 import TokenizerModelSelector from '../common/components/TokenizerModelSelector';
 import { ConcordanceResultsPanel } from './components/ConcordanceResultsPanel';
-import { RowDetailPanel } from '../common/components/RowDetailPanel';
 import { usePersistNodeDocumentColumn } from '../common/hooks/usePersistNodeDocumentColumn';
 import { usePersistNodeTokenizerModel } from '../common/hooks/usePersistNodeTokenizerModel';
-import { useConcordanceRowDetail } from './hooks/useConcordanceRowDetail';
 import type { ConcordanceRunAllReviewSource } from './concordanceRunAllReview';
 import { queryKeys } from '@/lib/queryKeys';
 import { ResultAddToWorkspaceDialog } from '../common/components/ResultAddToWorkspaceDialog';
@@ -455,13 +453,6 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
       resolveNodeIdForKey,
     });
   const availableMetadataColumnsKey = availableMetadataColumns.join('|');
-
-  const { detailPayload, detailOpen, setDetailOpen, concordanceCustomization, handleRowClick } =
-    useConcordanceRowDetail({
-      currentWorkspaceId,
-      caseSensitive: resultCaseSensitive,
-      searchWord: resultSearchWord,
-    });
 
   // No auto-selection on activation: Show metadata starts empty and the user
   // explicitly ticks the columns they want. We just clean up any selections
@@ -918,6 +909,7 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
           }}
           sources={{
             searchWord: resultSearchWord,
+            caseSensitive: resultCaseSensitive,
             panelSelectedNodes: resultPanelNodes,
             effectiveNodeColumnSelections: resultPanelColumnSelections,
             labelToNodeId,
@@ -946,7 +938,6 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
                   handleReviewPageChange(newPage, paginationKey);
                 }
               : handlePageChange,
-            handleRowClick,
           }}
         />
       ) : null}
@@ -961,13 +952,6 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
         </Card>
       )}
 
-      {/* Detail Modal */}
-      <RowDetailPanel
-        open={detailOpen}
-        onOpenChange={setDetailOpen}
-        payload={detailPayload}
-        customization={concordanceCustomization}
-      />
       {addToWorkspaceDialogOpen ? (
         <ResultAddToWorkspaceDialog
           open

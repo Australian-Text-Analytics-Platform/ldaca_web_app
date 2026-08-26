@@ -56,6 +56,8 @@ export interface WorkspaceTableProps {
   loading?: boolean;
   /** Background fetch state that must not replace the current table shell. */
   fetching?: boolean;
+  /** Page-query failure used by transparent Row Details navigation. */
+  pageError?: unknown;
   workspaceId?: string;
   nodeId?: string;
   documentColumn?: string;
@@ -90,6 +92,7 @@ export function WorkspaceTable({
   columnFields,
   loading = false,
   fetching = false,
+  pageError,
   workspaceId,
   nodeId,
   documentColumn,
@@ -108,13 +111,6 @@ export function WorkspaceTable({
   const viewportRef = useRef<HTMLDivElement>(null);
   const [expandedColumns, setExpandedColumns] = useState<Record<string, boolean>>({});
   const [columnPinning, setColumnPinning] = useState<ColumnPinningState>({ start: [], end: [] });
-  const {
-    detailPayload,
-    detailOpen,
-    setDetailOpen,
-    openDetail: openRowDetail,
-  } = useRowDetailDialog();
-
   const sanitizedData = useMemo(() => (Array.isArray(data) ? data : []), [data]);
   const backendColumns = useMemo(
     () => responseColumns.filter((column) => column.trim().length > 0),
@@ -403,6 +399,31 @@ export function WorkspaceTable({
 
   const tableRows = tableInstance.getRowModel().rows;
   const visibleColumnCount = Math.max(tableInstance.getVisibleLeafColumns().length, 1);
+  const hasPreviousPage = pageIndex > 0;
+  const hasNextPage = usesLookaheadPagination
+    ? hasNext
+    : totalRows !== undefined && (pageIndex + 1) * pageSize < totalRows;
+  const { detailPayload, detailOpen, setDetailOpen, openDetailAt, navigation } = useRowDetailDialog(
+    {
+      sequenceKey: `${workspaceId ?? ''}\0${nodeId ?? ''}\0${String(pageSize)}\0${JSON.stringify(sorting)}`,
+      items: sanitizedData,
+      page: pageIndex + 1,
+      hasPreviousPage,
+      hasNextPage,
+      loading: fetching,
+      error: pageError,
+      onPageChange: (nextPage) => {
+        onPageChange?.(nextPage);
+      },
+      toPayload: (row) => ({
+        record: { ...row },
+        textColumn:
+          documentColumn && Object.prototype.hasOwnProperty.call(row, documentColumn)
+            ? documentColumn
+            : undefined,
+      }),
+    },
+  );
 
   if (loading) {
     return (
@@ -468,12 +489,7 @@ export function WorkspaceTable({
                   key={row.id}
                   className="cursor-pointer transition-colors duration-150 hover:bg-panel/40 [&>td]:px-1 [&>td]:py-1"
                   onClick={() => {
-                    const detailTextColumn =
-                      documentColumn &&
-                      Object.prototype.hasOwnProperty.call(row.original, documentColumn)
-                        ? documentColumn
-                        : undefined;
-                    openRowDetail({ record: { ...row.original }, textColumn: detailTextColumn });
+                    openDetailAt(row.index);
                   }}
                 >
                   {row.getVisibleCells().map((cell) => {
@@ -575,7 +591,12 @@ export function WorkspaceTable({
         </AlertDialogContent>
       </AlertDialog>
 
-      <RowDetailPanel open={detailOpen} onOpenChange={setDetailOpen} payload={detailPayload} />
+      <RowDetailPanel
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        payload={detailPayload}
+        navigation={navigation}
+      />
     </>
   );
 }

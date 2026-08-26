@@ -29,6 +29,7 @@ import { getAnalysisOutputResource, getAnalysisResultResource } from '../common/
 import { ANALYSIS_TASK_TYPES } from '../common/analysisIds';
 import { AnalysisCardLayout } from '../common/components/AnalysisCardLayout';
 import { RowDetailPanel } from '../common/components/RowDetailPanel';
+import { useRowDetailDialog } from '../common/components/useRowDetailDialog';
 import { type AnalysisRequestOfKind, useAnalysisFeature } from '../common/hooks/useAnalysisFeature';
 import { usePersistNodeDocumentColumn } from '../common/hooks/usePersistNodeDocumentColumn';
 import { useTabNodeInputs } from '../common/nodeInputs';
@@ -44,12 +45,16 @@ import { type QuotationHoverState } from './components/QuotationHighlightedCell'
 import { QuotationResultsPanel } from './components/QuotationResultsPanel';
 import { useQuotationContextPreference } from './hooks/useQuotationContextPreference';
 import { useQuotationEngineSettings } from './hooks/useQuotationEngineSettings';
-import { useQuotationRowDetail } from './hooks/useQuotationRowDetail';
+import {
+  buildQuotationRowDetailCustomization,
+  buildQuotationRowDetailPayload,
+} from './quotationRowDetail';
 import { useQuotationTaskFlow } from './hooks/useQuotationTaskFlow';
 import { useQuotationPage } from './hooks/useQuotationPage';
 import { createNodeDataRequest, queryKeys } from '@/lib/queryKeys';
 import { isArrowStringField } from '@/lib/arrow/arrowTable';
 import type { QuotationReviewRowUnit } from './quotationArrowPage';
+import { filterQuotationRowsWithQuotes } from './quotationResultsModel';
 import { ResultAddToWorkspaceDialog } from '../common/components/ResultAddToWorkspaceDialog';
 import { projectWorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 
@@ -129,14 +134,6 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
   const [isAddingToWorkspace, setIsAddingToWorkspace] = useState(false);
   const [errorDialogOpen, setErrorDialogOpen] = useState(false);
   const [errorDialogMessage, setErrorDialogMessage] = useState<string>('');
-  const {
-    detailPayload,
-    detailOpen,
-    setDetailOpen,
-    quotationCustomization,
-    handleRowClick: handleQuotationRowClick,
-  } = useQuotationRowDetail();
-
   const originalColumnsByNode = (() => {
     const map: Record<string, string[]> = {};
     nodeInputs.resolvedNodes.forEach((resolved) => {
@@ -271,6 +268,36 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
         : null,
     pageRequest,
   );
+  const quotationDetailRows = filterQuotationRowsWithQuotes(quotationPage.data?.rows);
+  const detailPage = quotationPage.data?.pagination.page ?? pageRequest.page;
+  const requestDetailPage = (nextPage: number) => {
+    if (runAllSource) {
+      setRunAllReviewQuery((current) => ({ ...current, page: nextPage }));
+    } else {
+      setPreviewPageRequest((current) => ({ ...current, page: nextPage }));
+    }
+  };
+  const {
+    detailPayload,
+    selectedItem: selectedQuotationRow,
+    detailOpen,
+    setDetailOpen,
+    openDetailAt: openQuotationDetailAt,
+    navigation: quotationNavigation,
+  } = useRowDetailDialog({
+    sequenceKey: `${quotationRunAll?.id ?? tabTaskId ?? ''}\0${runAllReviewRowUnit}\0${pageRequest.sort_by ?? ''}\0${String(pageRequest.descending)}\0${String(pageRequest.page_size)}`,
+    items: quotationDetailRows,
+    page: detailPage,
+    hasPreviousPage: quotationPage.data?.pagination.has_prev ?? detailPage > 1,
+    hasNextPage: quotationPage.data?.pagination.has_next ?? false,
+    loading: quotationPage.isFetching || isResultFetching,
+    error: quotationPage.error,
+    onPageChange: requestDetailPage,
+    toPayload: buildQuotationRowDetailPayload,
+  });
+  const quotationCustomization = selectedQuotationRow
+    ? buildQuotationRowDetailCustomization(selectedQuotationRow)
+    : undefined;
   const resultNodeKey = runAllSource?.node_id ?? resultNodeId;
   const resultsByNode =
     quotationPage.data && resultNodeKey ? { [resultNodeKey]: quotationPage.data } : {};
@@ -666,7 +693,7 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
             onSort={effHandleSort}
             onPageChange={effHandlePageChange}
             onPageSizeChange={effHandlePageSizeChange}
-            onRowClick={handleQuotationRowClick}
+            onRowClick={openQuotationDetailAt}
             isPageLoading={quotationPage.isFetching || isResultFetching}
           />
         ) : null}
@@ -710,6 +737,7 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
         onOpenChange={setDetailOpen}
         payload={detailPayload}
         customization={quotationCustomization}
+        navigation={quotationNavigation}
       />
     </>
   );
