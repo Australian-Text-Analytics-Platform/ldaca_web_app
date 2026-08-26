@@ -13,6 +13,12 @@ sibling may continue closing while the target becomes the sole open Workspace.
 The frontend derives this state from Workspace resources and does not restore a
 last Workspace from device storage.
 
+Across cooperating backend processes that share one Data Root, a Workspace has
+at most one process owner while it is `open` or `closing`. This ownership is
+independent per Workspace: different processes may open different Workspaces.
+Because runtime state remains process-local, a Workspace open elsewhere may be
+listed as `closed` until this backend attempts to open or delete it.
+
 Every persisted Workspace has a monotonically increasing Revision. A mutating
 command runs against the sole open aggregate under its Workspace gate, and the
 next complete snapshot advances that Revision. Clients observe the resulting
@@ -148,7 +154,8 @@ Preference from a source, clone, or Analysis-created output.
 - Collection scans hide foreign-owned, unattributable, unsafely named,
   staging, trash, and non-UUID entries. An Unavailable Workspace is visible
   only after its canonical UUID directory and current-owner sidecar validate.
-- Workspace deletion cannot race active Analysis execution or completion.
+- Workspace deletion cannot race active Analysis execution, completion, or
+  another backend's open lifetime.
 - Removing a Data Block preserves graph validity and cannot orphan descendants.
 - Idempotent completion may reuse an existing Data Block only when its complete
   persisted identity matches; an ID collision with different metadata fails.

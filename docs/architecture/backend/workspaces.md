@@ -46,16 +46,22 @@ to authorize deletion of unavailable content.
 `WorkspaceService` is the sole residency and mutation authority. The runtime
 keeps one coordination slot per Workspace ID and at most one aggregate object
 in that slot. Every load, mutation, completion, archive install, or deletion
-for the same Workspace passes through its asynchronous gate.
+for the same Workspace passes through its asynchronous gate. The slot also
+retains a non-blocking operating-system file lock for the complete `open` or
+`closing` lifetime. This makes one Workspace exclusive across cooperating
+backend processes without locking the Data Root or unrelated Workspaces.
 
 `WorkspaceLifecycleService` owns public open, close, and delete commands. A
 short-lived per-user gate serializes those commands so one user can have at
-most one `open` Workspace. Opening first validates the target, then requests
-closure of every open sibling, and finally opens the target. An idle sibling
-closes immediately; a busy sibling may remain `closing` until admitted
-Analysis work drains. Multiple closing Workspaces are permitted. Reopening a
-closing target makes it the sole open Workspace. Gates are independent across
-users and are removed when no lifecycle command is waiting or running.
+most one `open` Workspace in that process. Opening first validates and reserves
+cross-process ownership of the target, then requests closure of every open
+sibling, and finally loads the target. Lock contention therefore leaves the
+current Workspace open. An idle sibling closes immediately; a busy sibling may
+remain `closing` until admitted Analysis work drains and retains its process
+lock until final close. Multiple closing Workspaces are permitted. Reopening a
+closing target reuses its retained lock and makes it the sole open Workspace.
+Gates are independent across users and are removed when no lifecycle command
+is waiting or running.
 
 If opening the target fails after sibling closure has begun, the service
 returns the real failure and leaves the resulting runtime states visible. It
@@ -63,6 +69,16 @@ does not fabricate a rollback. Runtime-state events publish every transition,
 and clients reconcile from the resulting Workspace resources. There is no
 detached lifecycle path, remembered selected Workspace, automatic load, LRU,
 idle timer, or automatic eviction.
+
+The lock registry is `data_root/workspaces/.locks/`, with one persistent
+`<workspace-id>.lock` rendezvous file per Workspace. On Unix the descriptor
+uses non-blocking `flock`; on Windows it uses non-blocking `msvcrt.locking`.
+The operating-system lock is authoritative. PID text is rewritten only for
+diagnostics, so an unexpected process exit releases ownership without stale
+file removal. Registry directories and entries must be owned, ordinary local
+filesystem objects: links, reparse points, unexpected file types, and ownership
+mismatches fail closed. A safe but contended lock is `workspace_in_use`; an
+unsafe or inaccessible registry is `workspace_lock_unavailable`.
 
 ```mermaid
 stateDiagram-v2
@@ -119,6 +135,8 @@ data_root/
 ├── workspaces/
 │   ├── .staging/
 │   ├── .trash/
+│   ├── .locks/
+│   │   └── <workspace-id>.lock
 │   └── <workspace-id>/
 │       ├── access.json
 │       ├── workspace.json
@@ -138,7 +156,8 @@ replaces archived timestamps with one new publication timestamp. Its current
 final-source rebase occurs after the live rename; the resulting crash window is
 tracked in the
 [persistence-integrity reference](../../reference/persistence-integrity.md).
-Export omits `access.json`; import rejects an archive-supplied sidecar.
+Export omits `access.json`; import rejects an archive-supplied sidecar. Lock
+files are outside Workspace directories and are never portable archive content.
 
 Portable archive format 18 materializes Data Blocks and retained Analysis query
 inputs as Parquet, includes terminal Analysis forests and declared Artifacts,
@@ -163,11 +182,18 @@ snapshot, matching nodes receive those captured stacks so a rejected command
 neither advances nor erases session history.
 
 Deletion coordinates with private Analysis execution and excludes new
-submission or completion through the same Workspace gate. Once execution has
-been signalled to stop, the complete Workspace directory is atomically renamed into
-`.trash/`, making it unreachable before recursive cleanup. The sidecar moves
-with the directory, so an interrupted cleanup remains attributable and startup
-can retry removal without inventing a database tombstone.
+submission or completion through the same Workspace gate. A locally closed
+Workspace first acquires the same process lock, so another backend cannot delete
+a Workspace it has open. Once execution has been signalled to stop, the complete
+Workspace directory is atomically renamed into `.trash/`, making it unreachable
+before recursive cleanup. The sidecar moves with the directory, so an
+interrupted cleanup remains attributable and startup can retry removal without
+inventing a database tombstone.
+
+Startup reconciliation acquires each Workspace lock independently. It skips a
+Workspace currently owned by another backend, reconciles unlocked siblings,
+and releases each temporary lock through its cleanup path. Listing and archive
+reads remain available because they do not claim process ownership.
 
 User File and archive behavior is described in
 [Files and Storage](../../domain/files-and-storage.md).

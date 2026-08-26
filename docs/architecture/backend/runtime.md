@@ -114,8 +114,12 @@ Each backend instance intentionally supports one ASGI process. Multiple Uvicorn
 workers would split Workspace gates, event subscribers, queues, and execution
 handles. See [ADR 0001](../../adr/0001-single-process-lifespan-owned-backend.md).
 Independent backend instances may share one Data Root; there is no root-level
-process lock. Each persistent store remains responsible for its own transaction
-or atomic-write boundary.
+process lock. Open and delete lifetimes instead use one operating-system lock
+per Workspace, allowing independent instances to open different Workspaces
+while rejecting conflicting ownership of the same Workspace. This coordination
+does not make multiple Uvicorn workers within one application supported; each
+persistent store remains responsible for its own transaction or atomic-write
+boundary.
 
 Supported process-entry profiles are split Vite/Uvicorn development, direct
 ASGI hosting, the bundled production CLI, the Tauri-supervised backend CLI, and

@@ -263,6 +263,15 @@ class WorkspaceClosingError(WorkspaceConflictError):
     code = "workspace_closing"
 
 
+class WorkspaceInUseError(WorkspaceConflictError):
+    """Another backend process owns the target Workspace's open lifetime."""
+
+    code = "workspace_in_use"
+
+    def __init__(self) -> None:
+        super().__init__("Workspace is open in another Wordflow backend process")
+
+
 class WorkspaceCorruptError(AppError):
     """An owned Workspace folder cannot be read as the current strict schema."""
 
@@ -365,6 +374,17 @@ class AnalysisResultUnavailableError(AppError):
 class InternalServiceError(AppError):
     status_code = 500
     code = "internal_service_error"
+
+
+class WorkspaceLockUnavailableError(AppError):
+    """The backend cannot safely establish Workspace process ownership."""
+
+    status_code = 500
+    code = "workspace_lock_unavailable"
+    expose_message = True
+
+    def __init__(self) -> None:
+        super().__init__("Workspace locking is unavailable")
 
 
 # ── 502 Bad Gateway ──────────────────────────────────────────────────────────

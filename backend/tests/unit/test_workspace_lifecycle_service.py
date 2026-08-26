@@ -11,7 +11,7 @@ from ldaca_wordflow.services.events import EventHub
 from ldaca_wordflow.services.workspace import WorkspaceRecord, WorkspaceService
 from ldaca_wordflow.services.workspace_lifecycle import WorkspaceLifecycleService
 from ldaca_wordflow.settings import Settings
-from ldaca_wordflow.shared.errors import WorkspaceNotFoundError
+from ldaca_wordflow.shared.errors import WorkspaceInUseError, WorkspaceNotFoundError
 
 from ._storage import unlimited_storage_admission
 
@@ -202,6 +202,27 @@ async def test_open_failure_exposes_sibling_transition_without_fake_rollback(
     assert (await workspaces.get_workspace("owner", second.id)).runtime_state == (
         "closed"
     )
+
+
+async def test_process_lock_conflict_preserves_the_current_workspace(
+    tmp_path: Path,
+) -> None:
+    """Target process ownership is established before local sibling closure."""
+
+    external = _workspace_service(tmp_path)
+    local = _workspace_service(tmp_path)
+    analyses = _Analyses()
+    lifecycle = WorkspaceLifecycleService(local, cast(Any, analyses))
+    current = await local.create_workspace("owner", "Current")
+    target = await external.create_workspace("owner", "Target")
+    await local.open_workspace("owner", current.id)
+    await external.open_workspace("owner", target.id)
+
+    with pytest.raises(WorkspaceInUseError):
+        await lifecycle.open("owner", target.id)
+
+    assert (await local.get_workspace("owner", current.id)).runtime_state == "open"
+    assert (await local.get_workspace("owner", target.id)).runtime_state == "closed"
 
 
 async def test_close_defers_only_while_analysis_execution_is_active(
