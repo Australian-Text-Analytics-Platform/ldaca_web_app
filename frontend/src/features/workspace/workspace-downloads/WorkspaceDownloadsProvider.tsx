@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import { exportWorkspaceArchive } from '@/api';
-import { saveBlob } from '@/lib/download';
+import { saveBackendDownload } from '@/lib/download';
 import {
   WorkspaceDownloadsContext,
   type PendingWorkspaceDownload,
@@ -42,12 +42,18 @@ export function WorkspaceDownloadsProvider({ children }: { children: ReactNode }
       { workspaceId, artifactName: workspaceName, status: 'pending' },
     ]);
     try {
-      const { data } = await exportWorkspaceArchive({
-        parseAs: 'blob',
-        path: { workspace_id: workspaceId },
-        throwOnError: true,
-      });
-      await saveBlob(data, workspaceArtifactFilename(workspaceName, workspaceId));
+      await saveBackendDownload(
+        `/api/workspaces/${encodeURIComponent(workspaceId)}/archive`,
+        workspaceArtifactFilename(workspaceName, workspaceId),
+        async () => {
+          const { data } = await exportWorkspaceArchive({
+            parseAs: 'blob',
+            path: { workspace_id: workspaceId },
+            throwOnError: true,
+          });
+          return { blob: data };
+        },
+      );
       toast.success(`Downloaded workspace "${workspaceName || workspaceId}".`, { duration: 3500 });
     } catch (error) {
       toast.error((error as Error).message || 'Failed to start workspace download.', {

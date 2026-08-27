@@ -1,29 +1,43 @@
 # Desktop Architecture
 
 Tauri is a native supervisor around the same React frontend and FastAPI
-backend. Rust owns runtime discovery, the local child process, native folder
+backend. Rust owns runtime selection, the local child process, native folder
 selection, native downloads, signed application updates, and shutdown. Python
 owns Data Root validation, persistence, and Runtime switching.
 
 ## Runtime Contract
 
-`runtime-manifest.json` is the sole packaged Python layout contract. It records
-target platform, Python selector and ABI, backend lock provenance, and portable
-relative interpreter, Python-home, and site-package paths. Rust validates the
-complete manifest and never recursively guesses a runtime.
+`runtime-manifest.json` is the sole packaged Python layout contract. Schema 3
+records the installed backend version, target platform, Python selector and
+ABI, exact `backend/uv.lock` digest, and portable relative interpreter,
+Python-home, and site-package paths. Rust validates the complete manifest
+before starting Python.
+
+Runtime selection has two explicit build profiles. `tauri dev` enables the
+`dev-runtime` Cargo feature and reads only the freshly prepared
+`frontend/src-tauri/backend-runtime` directory. Packaging applies
+`tauri.bundle.conf.json`, embeds that same staged directory, and packaged code
+reads only Tauri's `backend-runtime` resource. There is no environment override,
+executable-adjacent search, debug fallback, or recursive interpreter discovery.
+The base Tauri configuration deliberately has no resource entry, so ordinary
+Cargo checks compile the supervisor without pretending a missing runtime is a
+valid package.
 
 ```mermaid
 sequenceDiagram
     participant App as Tauri application
+    participant Worker as Blocking startup worker
     participant Runtime as Packaged Python runtime
     participant Backend as FastAPI child process
     participant Webview
 
-    App->>Runtime: validate runtime-manifest.json
-    App->>Backend: launch with port zero and private startup record
+    App->>Worker: schedule backend startup and return from setup
+    Worker->>Runtime: validate runtime-manifest.json
+    Worker->>Backend: launch with port zero and private startup record
     Backend->>Backend: enter ASGI lifespan
-    Backend-->>App: publish live port, identity, and version
-    App->>App: validate startup identity, version, and loopback address
+    Backend-->>Worker: publish live port, identity, and version
+    Worker->>Worker: validate startup identity, version, and loopback address
+    Worker->>App: publish owned child and schedule main-thread UI work
     App->>Webview: show window
     Webview->>App: request current backend URL
     App-->>Webview: return live URL from managed state
@@ -41,9 +55,13 @@ sequenceDiagram
     App-->>Webview: allow window close
 ```
 
-At startup, Tauri launches the backend with port zero and a private startup
-record, waits for ASGI control-plane liveness, validates process identity and package version,
-installs the assigned URL in managed Rust state, and only then shows the window.
+At startup, Tauri's synchronous setup hook installs native wiring, validates
+that the hidden main window exists, schedules one blocking startup worker, and
+returns. The worker launches the backend with port zero and a private startup
+record, waits for ASGI control-plane liveness, validates process identity and
+package version, and atomically transfers the child and assigned URL into
+managed Rust state. Window and dialog operations are then scheduled explicitly
+on Tauri's main thread; the main thread never polls a file or waits on Python.
 The frontend connection gate obtains that URL through `get_backend_url`,
 configures the generated client, checks `/health/live`, obtains
 `/api/data-root`, and verifies `/health/ready` before mounting authentication
@@ -60,7 +78,13 @@ bytecode included before signing, but it must not add or update `__pycache__`
 content inside the sealed application bundle at runtime.
 
 The supervisor owns `starting`, `live`, `failed`, and `stopped` process states.
-It never restarts the child for a Data Root change.
+The startup worker owns the child until the single `starting` to `live`
+publication succeeds. Close and exit first publish cancellation, so readiness
+polling stops promptly; a late success or failure cannot overwrite `stopped`.
+If publication is rejected, the worker's process owner performs bounded
+process-tree shutdown. The parent-PID watchdog remains a final guard for abrupt
+desktop termination. The supervisor never restarts the child for a Data Root
+change.
 
 The main window remains hidden until backend liveness. If runtime resolution or
 backend startup fails, Tauri schedules a native
@@ -93,11 +117,32 @@ zoom controls or persist zoom state.
 Debug desktop builds allow both the fixed Vite development origin and the
 platform's packaged Tauri origin through backend CORS, so `tauri dev` and a
 packaged debug application use the same supervisor. Release builds allow only
-the packaged Tauri origin.
+the packaged Tauri origin. The Vite development server uses a fixed strict
+`127.0.0.1:3001` profile and ignores `src-tauri` changes. During `tauri dev`,
+the webview loads that server for hot module replacement. During `tauri build`,
+Vite produces the static `frontendDist` before Tauri bundles it; an installed
+desktop application requires neither Node.js nor a Vite server.
 
-Native downloads accept a relative backend API path and safe filename, reject
-redirects, stream to a temporary file, and publish without replacement. The
-webview cannot supply an arbitrary URL or privileged headers.
+Rust owns the complete desktop Downloads-folder boundary. GET resources accept
+only a relative backend `/api/` path; Data Block exports have a separate typed
+POST command rather than a generic native HTTP proxy. Both reject redirects and
+stream the backend response to a private temporary file. Client-generated
+charts, tables, and archives cross IPC as bytes and use the same native file
+installer. Installation atomically claims the first available safe filename,
+so concurrent desktop instances cannot overwrite each other. The webview has no
+filesystem permission and cannot supply an arbitrary URL, HTTP method, headers,
+or destination path. Browser deployments continue to fetch through the
+generated client and delegate saving to the browser download UI.
+
+Plugin-specific capabilities grant only the JavaScript commands the webview
+invokes: native folder selection and revealing an already saved file. The one
+additional explicit core grant supports Tauri's zoom shortcut command;
+`core:default` remains Tauri's standard core set. Rust-side dialogs do not
+require a webview dialog-default grant. Production scripts are restricted to
+`self`; Tauri injects the hashes and nonces required by bundled assets. The
+separate development CSP admits only the fixed loopback Vite WebSocket and
+development script evaluation needed for HMR, so development accommodations
+never ship in the packaged policy.
 
 ## Application Updates
 

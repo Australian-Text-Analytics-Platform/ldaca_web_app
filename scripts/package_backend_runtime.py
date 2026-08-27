@@ -324,11 +324,17 @@ def write_runtime_manifest(
                 str(python_bin),
                 "-c",
                 (
-                    "import json,platform,sys,sysconfig;"
+                    "import importlib.metadata,json,platform,sys,sysconfig;"
+                    "versions=[dist.version for dist in importlib.metadata.distributions("
+                    "path=[sys.argv[1]]) if dist.metadata['Name']=='ldaca-wordflow'];"
+                    "assert len(versions)==1;"
                     "print(json.dumps({'version':platform.python_version(),"
-                    "'free_threaded':bool(sysconfig.get_config_var('Py_GIL_DISABLED')),"
+                    "'backend_version':versions[0],"
+                    "'free_threaded':bool(sysconfig.get_config_var("
+                    "'Py_GIL_DISABLED')),"
                     "'platform':sys.platform,'machine':platform.machine().lower()}))"
                 ),
+                str(site_packages),
             ],
             capture_output=True,
         ).stdout
@@ -354,7 +360,8 @@ def write_runtime_manifest(
         (BACKEND_PROJECT_ROOT / "uv.lock").read_bytes()
     ).hexdigest()
     manifest = {
-        "schema_version": 2,
+        "schema_version": 3,
+        "backend_version": interpreter["backend_version"],
         "target_os": target_os,
         "target_arch": target_arch,
         "python_selector": python_version,

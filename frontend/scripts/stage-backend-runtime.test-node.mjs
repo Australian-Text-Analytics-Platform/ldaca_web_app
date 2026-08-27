@@ -5,6 +5,8 @@ import path from 'node:path';
 import test from 'node:test';
 
 import {
+  expectedBackendVersion,
+  expectedUvLockSha256,
   resolveRuntimeLayout,
   stageBackendRuntime,
 } from './stage-backend-runtime.mjs';
@@ -27,13 +29,14 @@ function createRuntime(root) {
   fs.writeFileSync(
     path.join(root, 'runtime-manifest.json'),
     JSON.stringify({
-      schema_version: 2,
+      schema_version: 3,
+      backend_version: expectedBackendVersion,
       target_os: { darwin: 'macos', win32: 'windows', linux: 'linux' }[process.platform],
       target_arch: { arm64: 'aarch64', x64: 'x86_64' }[process.arch],
       python_selector: '3.14',
       python_version: '3.14.0',
       python_free_threaded: false,
-      uv_lock_sha256: 'a'.repeat(64),
+      uv_lock_sha256: expectedUvLockSha256,
       ...paths,
     }),
   );
@@ -90,4 +93,42 @@ test('runtime layout rejects free-threaded Python', () => {
   fs.writeFileSync(manifestPath, JSON.stringify(manifest));
 
   assert.throws(() => resolveRuntimeLayout(root), /provenance is invalid/);
+});
+
+test('runtime layout rejects a stale backend version or lockfile', () => {
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'runtime-provenance-'));
+  const root = path.join(temp, 'runtime');
+  createRuntime(root);
+
+  const manifestPath = path.join(root, 'runtime-manifest.json');
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  manifest.backend_version = '0.0.0-stale';
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest));
+  assert.throws(() => resolveRuntimeLayout(root), /provenance is invalid/);
+
+  createRuntime(root);
+  const currentManifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  currentManifest.uv_lock_sha256 = 'a'.repeat(64);
+  fs.writeFileSync(manifestPath, JSON.stringify(currentManifest));
+  assert.throws(() => resolveRuntimeLayout(root), /provenance is invalid/);
+});
+
+test('staging a replacement removes files retained from the previous runtime', () => {
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'runtime-replacement-'));
+  const source = path.join(temp, 'source', 'backend-runtime');
+  const target = path.join(temp, 'staged', 'backend-runtime');
+  createRuntime(source);
+
+  stageBackendRuntime({ sourceRuntime: source, targetRuntime: target, platform: 'darwin' });
+  const staleDistribution = path.join(
+    target,
+    'python/lib/python3.14/site-packages/ldaca_wordflow-previous.dist-info',
+  );
+  fs.mkdirSync(staleDistribution, { recursive: true });
+  fs.writeFileSync(path.join(staleDistribution, 'METADATA'), 'stale');
+
+  stageBackendRuntime({ sourceRuntime: source, targetRuntime: target, platform: 'darwin' });
+
+  assert.equal(fs.existsSync(staleDistribution), false);
+  assert.doesNotThrow(() => resolveRuntimeLayout(target));
 });

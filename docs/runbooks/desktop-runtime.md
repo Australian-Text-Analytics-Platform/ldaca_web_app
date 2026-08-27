@@ -10,18 +10,56 @@ pnpm prepare:backend-runtime
 
 `scripts/package_backend_runtime.py` creates a clean managed standard Python
 `3.14` runtime, installs the backend without editable links, copies platform
-runtime support, and writes `runtime-manifest.json`. The locked sync honors
+runtime support, and writes the schema 3 `runtime-manifest.json`. The manifest
+records the installed backend version and the exact `backend/uv.lock` digest in
+addition to the relocatable Python layout. The locked sync honors
 `backend/pyproject.toml` source overrides, so checked-out sibling packages are
 built when configured and packages without an override come from their locked
 registry source. Packaging fails when `pyproject.toml` and `uv.lock` disagree;
 it does not use `--no-sources`. The packager removes Finder `._*` and
 `.DS_Store` metadata before signing because HFS disk-image installation does
 not preserve those pseudo-files as ordinary sealed resources. The frontend
-staging script validates and copies that complete runtime into Tauri resources
-without rewriting the manifest.
+staging script validates the target, backend version, lock digest, Python ABI,
+and layout, copies into a temporary sibling directory, then replaces
+`frontend/src-tauri/backend-runtime` as a whole. A previous runtime can never be
+merged into the replacement.
 
-Do not set `PYTHONPATH` manually or create a separate desktop development
-runtime. `pnpm desktop:dev` and release builds use the same packaging contract.
+Do not set `PYTHONPATH` manually or create another desktop development runtime.
+`pnpm desktop:dev` and release builds consume the same staged directory.
+
+## Develop
+
+Start the native development application from the repository root:
+
+```bash
+pnpm desktop:dev
+```
+
+The desktop Vite server owns the fixed strict origin
+`http://127.0.0.1:3001`. It exits when that port is occupied and never scans for
+or kills another listener. Identify the listener before stopping the intended
+process:
+
+```bash
+lsof -nP -iTCP:3001 -sTCP:LISTEN
+```
+
+On Windows, use PowerShell:
+
+```powershell
+Get-NetTCPConnection -LocalPort 3001 -State Listen
+```
+
+The loopback-only Vite server does not restrict the desktop application's
+outbound access. LDaCA Data Portal traffic leaves through the supervised Python
+backend.
+
+The development command explicitly enables the Rust `dev-runtime` feature, so
+the supervisor reads only `frontend/src-tauri/backend-runtime`. Packaged builds
+do not enable that feature. They use `pnpm -C frontend tauri:build`, which
+applies `src-tauri/tauri.bundle.conf.json` and makes Tauri embed the staged
+directory as its `backend-runtime` resource. Do not invoke raw `tauri build` for
+a distributable package.
 
 ## Validate
 
@@ -32,21 +70,20 @@ cargo test
 cargo clippy --all-targets --all-features -- -D warnings
 ```
 
-Packaging must fail when the staged manifest or any declared path is missing,
-absolute, escaping, corrupt, or for another platform/ABI. After bundling, the
-ignored package probe must resolve the final resource directory, import the
-backend and both compiled extensions, exercise DuckDB-backed cached tokenization,
-launch the packaged backend without a Data Root, verify `/health/live`, and shut
-down its process tree.
+Preparation and packaging must fail when the staged manifest or any declared
+path is missing, absolute, escaping, corrupt, stale, or for another
+version/platform/ABI. Rust also compiles the current lockfile digest into the
+desktop binary and verifies the bundled manifest against it before Python
+starts. After bundling, the ignored package probe must resolve the final
+resource directory, import the backend and both compiled extensions, exercise
+DuckDB-backed cached tokenization, launch the packaged backend without a Data
+Root, verify `/health/live`, and shut down its process tree.
 The cached-tokenization probe uses the built-in tokenizer so it verifies that
 DuckDB's JSON support is statically linked in a clean temporary home without
 downloading a model or DuckDB extension. Run
 macOS signature verification again after this probe: the shared launcher
 disables Python bytecode writes so the packaged runtime must not mutate the
 sealed application resources.
-
-`LDACA_BACKEND_RUNTIME` may point to one complete alternate manifest root for
-testing. It is not a partial path override and is never silently ignored.
 
 ## Desktop CI
 
@@ -56,8 +93,8 @@ once per platform after version validation. Backend Ruff, Ty, and Pytest gates
 belong to the root CI workflow; desktop CI retains only supervisor, bundle, and
 packaged-runtime checks.
 
-The reusable build workflow owns all compilation and packaging. It preserves
-the source-aware backend-runtime build, then:
+The reusable build workflow owns all compilation and packaging. It prepares the
+source-aware backend runtime and invokes only the packaging configuration, then:
 
 - creates a signed MSI and updater signature on Windows;
 - builds explicitly for `aarch64-apple-darwin` on Apple Silicon;
@@ -133,3 +170,19 @@ providers remount for the new `runtime_generation`. Perform the reload check wit
 Command-R on macOS and Ctrl-R on Windows. The packaged application must never
 fall back to port `8001`; that port remains only the documented split web
 development default.
+
+Also exercise lifecycle interruption before accepting a desktop build. Close
+the hidden/startup application while Python is still launching and confirm the
+application exits without waiting for the 30-second readiness deadline, no
+startup-error dialog appears after the close, and the child process tree is
+gone. Repeat with a normal live application close and with application Quit;
+each path must terminate only its owned backend process and leave no orphan.
+
+Exercise all three desktop download paths: a large User File or Workspace GET,
+a Data Block POST export, and a client-generated chart or table file. Confirm
+each appears in Downloads without buffering backend bodies in the webview. Save
+the same filename concurrently from two desktop instances and verify both files
+remain with collision-free numeric suffixes. The packaged webview must have no
+filesystem capability; **Show in folder** may reveal only the path returned by
+the Rust saver. Repeat a representative download in the browser deployment and
+confirm it still uses the browser's own download UI.

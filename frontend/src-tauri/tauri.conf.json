@@ -25,7 +25,8 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self' tauri: https://tauri.localhost; connect-src 'self' ipc: tauri: https://tauri.localhost http://ipc.localhost http://127.0.0.1:*; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; frame-src https://sydney.au1.qualtrics.com https://*.qualtrics.com;"
+      "csp": "default-src 'self' tauri: https://tauri.localhost; connect-src 'self' ipc: tauri: https://tauri.localhost http://ipc.localhost http://127.0.0.1:*; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; frame-src https://sydney.au1.qualtrics.com https://*.qualtrics.com;",
+      "devCsp": "default-src 'self' tauri: https://tauri.localhost; connect-src 'self' ipc: tauri: https://tauri.localhost http://ipc.localhost http://127.0.0.1:* ws://127.0.0.1:3001; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; frame-src https://sydney.au1.qualtrics.com https://*.qualtrics.com;"
     }
   },
   "bundle": {
@@ -44,9 +45,6 @@
     "macOS": {
       "signingIdentity": "-"
     },
-    "resources": [
-      "backend-runtime"
-    ],
     "copyright": "Copyright © 2025 Language Data Commons of Australia (LDaCA)",
     "category": "Education",
     "shortDescription": "Text analytics and visualization platform",

@@ -5,16 +5,14 @@ use std::io;
 use std::path::{Component, Path, PathBuf};
 use tauri::{path::BaseDirectory, AppHandle, Manager};
 
-const DEV_BACKEND_RUNTIME: &str = concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/../../dist-tauri/backend-runtime"
-);
+const DEV_BACKEND_RUNTIME: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/backend-runtime");
 const BUNDLE_RUNTIME_DIR: &str = "backend-runtime";
 const RUNTIME_MANIFEST: &str = "runtime-manifest.json";
 
 #[derive(Debug, Deserialize)]
 struct RuntimeManifest {
     schema_version: u32,
+    backend_version: String,
     target_os: String,
     target_arch: String,
     python_selector: String,
@@ -60,7 +58,7 @@ impl BackendRuntime {
                 format!("Invalid {}: {error}", manifest_path.display()),
             )
         })?;
-        if manifest.schema_version != 2 {
+        if manifest.schema_version != 3 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 format!(
@@ -85,14 +83,21 @@ impl BackendRuntime {
             )
             .into());
         }
+        if manifest.backend_version != env!("CARGO_PKG_VERSION") {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!(
+                    "Runtime backend version {} does not match desktop version {}",
+                    manifest.backend_version,
+                    env!("CARGO_PKG_VERSION")
+                ),
+            )
+            .into());
+        }
         if manifest.python_selector != "3.14"
             || !manifest.python_version.starts_with("3.14.")
             || manifest.python_free_threaded
-            || manifest.uv_lock_sha256.len() != 64
-            || !manifest
-                .uv_lock_sha256
-                .bytes()
-                .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+            || manifest.uv_lock_sha256 != env!("LDACA_UV_LOCK_SHA256")
         {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
@@ -139,47 +144,19 @@ fn resolve_manifest_path(root: &Path, field: &str, value: &str) -> Result<PathBu
     Ok(resolved)
 }
 
-/// Resolve the runtime root from one explicit override or exact bundle paths.
+/// Resolve the one runtime root selected by the compiled desktop profile.
 ///
-/// Called during Tauri setup. An explicit `LDACA_BACKEND_RUNTIME` is strict;
-/// otherwise the bundle resource, executable-adjacent platform locations, and
-/// the debug source runtime are tried without recursive scans or interpreter
-/// inference.
+/// Development builds explicitly enable `dev-runtime` and use the prepared
+/// source-tree runtime. Packaged builds resolve only the Tauri resource path.
 pub(crate) fn locate_backend_runtime(app: &AppHandle) -> Result<BackendRuntime, Box<dyn Error>> {
-    if let Some(root) = std::env::var_os("LDACA_BACKEND_RUNTIME") {
-        return BackendRuntime::from_root(PathBuf::from(root));
-    }
-
-    let mut candidates = Vec::new();
-    if let Ok(path) = app
-        .path()
-        .resolve(BUNDLE_RUNTIME_DIR, BaseDirectory::Resource)
-    {
-        candidates.push(path);
-    }
-    if let Ok(executable) = std::env::current_exe() {
-        if let Some(executable_dir) = executable.parent() {
-            candidates.push(executable_dir.join(BUNDLE_RUNTIME_DIR));
-            if let Some(contents_dir) = executable_dir.parent() {
-                candidates.push(contents_dir.join("Resources").join(BUNDLE_RUNTIME_DIR));
-            }
-        }
-    }
-    if cfg!(debug_assertions) {
-        candidates.push(PathBuf::from(DEV_BACKEND_RUNTIME));
-    }
-
-    for candidate in candidates {
-        if candidate.join(RUNTIME_MANIFEST).is_file() {
-            return BackendRuntime::from_root(candidate);
-        }
-    }
-
-    Err(io::Error::new(
-        io::ErrorKind::NotFound,
-        "Backend runtime not found. Run `pnpm prepare:backend-runtime` and ensure the bundle contains backend-runtime.",
-    )
-    .into())
+    let root = if cfg!(feature = "dev-runtime") {
+        PathBuf::from(DEV_BACKEND_RUNTIME)
+    } else {
+        app.path()
+            .resolve(BUNDLE_RUNTIME_DIR, BaseDirectory::Resource)
+            .map_err(|error| io::Error::other(format!("Cannot resolve bundled runtime: {error}")))?
+    };
+    BackendRuntime::from_root(root)
 }
 
 /// Remove Windows extended path prefixes before forwarding paths to Python.
@@ -223,7 +200,7 @@ mod tests {
         fs::create_dir_all(&site_packages).expect("site packages");
         fs::write(
             root.join(RUNTIME_MANIFEST),
-            format!(r#"{{"schema_version":2,"target_os":"{}","target_arch":"{}","python_selector":"3.14","python_version":"3.14.0","python_free_threaded":false,"uv_lock_sha256":"{}","python_executable":"managed-python/cpython-test/bin/python3","python_home":"managed-python/cpython-test","site_packages":"python/lib/python3.14/site-packages"}}"#, std::env::consts::OS, std::env::consts::ARCH, "a".repeat(64)),
+            format!(r#"{{"schema_version":3,"backend_version":"{}","target_os":"{}","target_arch":"{}","python_selector":"3.14","python_version":"3.14.0","python_free_threaded":false,"uv_lock_sha256":"{}","python_executable":"managed-python/cpython-test/bin/python3","python_home":"managed-python/cpython-test","site_packages":"python/lib/python3.14/site-packages"}}"#, env!("CARGO_PKG_VERSION"), std::env::consts::OS, std::env::consts::ARCH, env!("LDACA_UV_LOCK_SHA256")),
         )
         .expect("manifest");
     }
@@ -269,11 +246,39 @@ mod tests {
         write_layout(&root);
         fs::write(
             root.join(RUNTIME_MANIFEST),
-            format!(r#"{{"schema_version":2,"target_os":"{}","target_arch":"{}","python_selector":"3.14","python_version":"3.14.0","python_free_threaded":false,"uv_lock_sha256":"{}","python_executable":"../python","python_home":"managed-python/cpython-test","site_packages":"python/lib/python3.14/site-packages"}}"#, std::env::consts::OS, std::env::consts::ARCH, "a".repeat(64)),
+            format!(r#"{{"schema_version":3,"backend_version":"{}","target_os":"{}","target_arch":"{}","python_selector":"3.14","python_version":"3.14.0","python_free_threaded":false,"uv_lock_sha256":"{}","python_executable":"../python","python_home":"managed-python/cpython-test","site_packages":"python/lib/python3.14/site-packages"}}"#, env!("CARGO_PKG_VERSION"), std::env::consts::OS, std::env::consts::ARCH, env!("LDACA_UV_LOCK_SHA256")),
         )
         .expect("escaping manifest");
         let error = BackendRuntime::from_root(&root).expect_err("escape must fail");
         assert!(error.to_string().contains("portable relative path"));
+        fs::remove_dir_all(root).expect("remove fixture");
+    }
+
+    #[test]
+    fn stale_backend_version_and_lockfile_fail_at_resolution() {
+        let root = fixture_root("stale-provenance");
+        write_layout(&root);
+        let manifest_path = root.join(RUNTIME_MANIFEST);
+        let manifest = fs::read_to_string(&manifest_path).expect("read manifest");
+        fs::write(
+            &manifest_path,
+            manifest.replace(env!("CARGO_PKG_VERSION"), "0.0.0-stale"),
+        )
+        .expect("stale version manifest");
+        let error = BackendRuntime::from_root(&root).expect_err("stale version must fail");
+        assert!(error.to_string().contains("does not match desktop version"));
+
+        write_layout(&root);
+        let manifest = fs::read_to_string(&manifest_path).expect("read manifest");
+        fs::write(
+            &manifest_path,
+            manifest.replace(env!("LDACA_UV_LOCK_SHA256"), &"0".repeat(64)),
+        )
+        .expect("stale lock manifest");
+        let error = BackendRuntime::from_root(&root).expect_err("stale lock must fail");
+        assert!(error
+            .to_string()
+            .contains("lock provenance is incompatible"));
         fs::remove_dir_all(root).expect("remove fixture");
     }
 }
