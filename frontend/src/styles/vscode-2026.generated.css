@@ -96,6 +96,12 @@
   --vscode-sideBar-border: #F0F1F2FF;
   --vscode-titleBar-activeBackground: #FAFAFD;
   --vscode-titleBar-activeForeground: #606060;
+  --vscode-commandCenter-background: #FFFFFF;
+  --vscode-commandCenter-foreground: #202020;
+  --vscode-commandCenter-border: #D8D8D8AA;
+  --vscode-commandCenter-activeBackground: #DADADA4f;
+  --vscode-commandCenter-activeForeground: #202020;
+  --vscode-commandCenter-activeBorder: #D8D8D8;
   --vscode-menu-background: #FAFAFD;
   --vscode-menu-foreground: #202020;
   --vscode-menu-selectionBackground: #0069CC1A;
@@ -192,6 +198,12 @@
   --vscode-sideBar-border: #2A2B2CFF;
   --vscode-titleBar-activeBackground: #191A1B;
   --vscode-titleBar-activeForeground: #8C8C8C;
+  --vscode-commandCenter-background: #191A1B;
+  --vscode-commandCenter-foreground: #bfbfbf;
+  --vscode-commandCenter-border: #2E3031;
+  --vscode-commandCenter-activeBackground: #FFFFFF0F;
+  --vscode-commandCenter-activeForeground: #bfbfbf;
+  --vscode-commandCenter-activeBorder: #333536;
   --vscode-menu-background: #202122;
   --vscode-menu-foreground: #bfbfbf;
   --vscode-menu-selectionBackground: #3994BC26;

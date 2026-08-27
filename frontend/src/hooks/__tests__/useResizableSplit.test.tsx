@@ -74,3 +74,31 @@ describe('useResizableSplit pointer dragging', () => {
     expect(handle.releasePointerCapture).toHaveBeenCalledWith(11);
   });
 });
+
+describe('useResizableSplit persistence', () => {
+  it.each([
+    { stored: '0.08', expected: 0.2 },
+    { stored: '0.92', expected: 0.8 },
+  ])(
+    'clamps a restored percent value of $stored to its configured bounds',
+    ({ stored, expected }) => {
+      window.localStorage.setItem('test.split', stored);
+
+      const { result, unmount } = renderHook(() =>
+        useResizableSplit({
+          defaultValue: 0.5,
+          min: 0.2,
+          max: 0.8,
+          persistKey: 'test.split',
+        }),
+      );
+
+      expect(result.current.value).toBe(expected);
+      expect(result.current.splitterProps['aria-valuenow']).toBe(expected * 100);
+      expect(window.localStorage.getItem('test.split')).toBe(String(expected));
+
+      unmount();
+      window.localStorage.removeItem('test.split');
+    },
+  );
+});

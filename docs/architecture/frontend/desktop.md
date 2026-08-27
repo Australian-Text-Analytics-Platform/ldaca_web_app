@@ -126,6 +126,19 @@ injected shortcut handler requires the main webview's explicit
 `core:webview:allow-set-webview-zoom` capability. Wordflow does not add custom
 zoom controls or persist zoom state.
 
+The main macOS window keeps native decorations and traffic-light controls while
+using Tauri's overlay title-bar style with the native title hidden. The main
+React entry reserves a 35-pixel, theme-owned draggable strip above every
+bootstrap, authentication, and Workspace state, allowing the webview background
+to form continuous application chrome without recreating native window buttons.
+Within an active Workspace, the strip presents session-only view and analysis
+Tab history plus a 22-pixel VS Code command-center control backed by the shared
+Workspace Tabs query. Blank chrome starts native dragging through the narrow
+`core:window:allow-start-dragging` capability, while the navigation and quick
+access controls opt out. The strip has no visual divider from the application
+shell. It is absent from browser and non-macOS builds, and the separate updater
+entry retains its own utility-window layout.
+
 Debug desktop builds allow both the fixed Vite development origin and the
 platform's packaged Tauri origin through backend CORS, so `tauri dev` and a
 packaged debug application use the same supervisor. Release builds allow only
@@ -147,9 +160,9 @@ or destination path. Browser deployments continue to fetch through the
 generated client and delegate saving to the browser download UI.
 
 Plugin-specific capabilities grant only the JavaScript commands the webview
-invokes: native folder selection and revealing an already saved file. The one
-additional explicit core grant supports Tauri's zoom shortcut command;
-`core:default` remains Tauri's standard core set. Rust-side dialogs do not
+invokes: native folder selection and revealing an already saved file. Two
+additional explicit core grants support Tauri's zoom shortcut and macOS title
+bar dragging commands; `core:default` remains Tauri's standard core set. Rust-side dialogs do not
 require a webview dialog-default grant. Production scripts are restricted to
 `self`; Tauri injects the hashes and nonces required by bundled assets. The
 separate development CSP admits only the fixed loopback Vite WebSocket and

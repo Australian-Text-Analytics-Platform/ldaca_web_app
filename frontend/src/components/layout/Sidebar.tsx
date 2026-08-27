@@ -232,7 +232,7 @@ function Sidebar() {
   return (
     <SidebarRoot
       data-testid="sidebar-container"
-      className="@container/sidebar pr-0! [&_[data-slot=sidebar-inner]]:overflow-hidden [&_[data-slot=sidebar-inner]]:rounded-lg [&_[data-slot=sidebar-inner]]:border [&_[data-slot=sidebar-inner]]:border-sidebar-border [&_[data-slot=sidebar-inner]]:bg-sidebar"
+      className="@container/sidebar pt-0! pr-0! [&_[data-slot=sidebar-inner]]:overflow-hidden [&_[data-slot=sidebar-inner]]:rounded-lg [&_[data-slot=sidebar-inner]]:border [&_[data-slot=sidebar-inner]]:border-sidebar-border [&_[data-slot=sidebar-inner]]:bg-sidebar"
     >
       <div className="flex h-full min-h-0 w-full flex-col">
         <SidebarHeader data-testid="sidebar-title" className="shrink-0 overflow-hidden px-3 py-2">

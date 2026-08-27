@@ -29,11 +29,17 @@ describe('pinned VS Code 2026 theme manifest', () => {
     expect(manifest.themes['light-2026']).toMatchObject({
       'editor.background': '#FFFFFF',
       'button.background': '#0069CC',
+      'commandCenter.background': '#FFFFFF',
+      'commandCenter.border': '#D8D8D8AA',
+      'commandCenter.activeBackground': '#DADADA4f',
       focusBorder: '#0069CCFF',
     });
     expect(manifest.themes['dark-2026']).toMatchObject({
       'editor.background': '#121314',
       'button.background': '#297AA0',
+      'commandCenter.background': '#191A1B',
+      'commandCenter.border': '#2E3031',
+      'commandCenter.activeBackground': '#FFFFFF0F',
       focusBorder: '#3994BCB3',
     });
   });

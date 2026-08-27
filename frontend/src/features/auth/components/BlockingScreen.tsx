@@ -28,7 +28,7 @@ function BlockingScreen({
   showLogo = true,
 }: BlockingScreenProps) {
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-editor px-4 py-10">
+    <div className="flex h-full min-h-0 items-center justify-center bg-editor px-4 py-10">
       <div className="w-full max-w-xl space-y-4 rounded-lg border bg-surface px-10 py-12 text-center">
         {showLogo && (
           <div className="flex justify-center">

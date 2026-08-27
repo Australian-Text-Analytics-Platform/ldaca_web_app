@@ -1,10 +1,9 @@
 /** Manage durable Workspace Tabs plus frontend-owned tab presentation state. */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   createTab as createServerTab,
   deleteTab as deleteServerTab,
-  listTabs,
   updateTab as updateServerTab,
 } from '@/api';
 import type { AnalysisKind, Tab, TopicModelingProjectionSelection } from '@/api';
@@ -24,6 +23,7 @@ import {
   analysisTabsPresentationKey,
   useAnalysisTabsPresentationStore,
 } from './analysisTabsPresentationStore';
+import { useWorkspaceTabResources } from './workspaceTabsQuery';
 
 export interface UseWorkspaceTabsResult {
   tabs: AnalysisTab[];
@@ -117,19 +117,7 @@ export function useWorkspaceTabs(
   const [localState, setLocalState] = useState<Record<string, LocalTabState>>({});
   const creatingRef = useRef(false);
 
-  const tabsQuery = useQuery({
-    queryKey,
-    enabled: Boolean(workspaceId),
-    staleTime: 15_000,
-    queryFn: async () => {
-      if (!workspaceId) throw new Error('Workspace is required');
-      const { data } = await listTabs({
-        path: { workspace_id: workspaceId },
-        throwOnError: true,
-      });
-      return data;
-    },
-  });
+  const tabsQuery = useWorkspaceTabResources(workspaceId);
 
   const serverTabs = (tabsQuery.data ?? []).filter((tab) => tab.kind === kind);
   const mergedTabs = mergeServerTabs(

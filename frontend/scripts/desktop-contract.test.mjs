@@ -103,7 +103,9 @@ describe('desktop configuration contracts', () => {
     expect(updaterCapability.permissions).toEqual(['core:default']);
     expect(desktopShell).toContain('Check for Updates…');
     expect(desktopShell).toContain('desktop_updater::show_manual_check(app_handle.clone())');
-    expect(desktopShell).toContain('desktop_updater::schedule_automatic_check(app.handle().clone())');
+    expect(desktopShell).toContain(
+      'desktop_updater::schedule_automatic_check(app.handle().clone())',
+    );
     expect(desktopShell).toContain('tauri_plugin_store::Builder::default().build()');
     expect(desktopShell).toContain('window.label() == "main"');
     expect(desktopShell).not.toContain('desktop_update_check_requested');
@@ -118,7 +120,9 @@ describe('desktop configuration contracts', () => {
     expect(viteConfig).toContain("main: path.resolve(frontendRootDir, 'index.html')");
     expect(viteConfig).toContain("updater: path.resolve(frontendRootDir, 'updater.html')");
     expect(existsSync(resolve(repoRoot, 'frontend/updater.html'))).toBe(true);
-    expect(existsSync(resolve(repoRoot, 'frontend/src/features/updater/UpdaterWindow.tsx'))).toBe(true);
+    expect(existsSync(resolve(repoRoot, 'frontend/src/features/updater/UpdaterWindow.tsx'))).toBe(
+      true,
+    );
     expect(existsSync(resolve(repoRoot, '.github/workflows/check-context-docs.yml'))).toBe(false);
     expect(existsSync(resolve(repoRoot, '.github/workflows/check-docs-drift.yml'))).toBe(false);
   });
@@ -136,8 +140,43 @@ describe('desktop configuration contracts', () => {
     expect(tauri.app.windows).toHaveLength(1);
     expect(mainWindow.zoomHotkeysEnabled).toBe(true);
     expect(capability.windows).toEqual(['main']);
-    expect(explicitWindowPermissions).toEqual(['core:webview:allow-set-webview-zoom']);
+    expect(explicitWindowPermissions).toEqual([
+      'core:window:allow-start-dragging',
+      'core:webview:allow-set-webview-zoom',
+    ]);
     expect(desktopShell).not.toMatch(/\.set_zoom\s*\(/);
+  });
+
+  it('uses native macOS traffic lights over the desktop-owned title bar', () => {
+    const tauri = JSON.parse(read('frontend/src-tauri/tauri.conf.json'));
+    const capability = JSON.parse(read('frontend/src-tauri/capabilities/default.json'));
+    const app = read('frontend/src/App.tsx');
+    const desktopFrame = read('frontend/src/components/layout/DesktopWindowFrame.tsx');
+    const desktopHeader = read('frontend/src/components/layout/DesktopNavigationHeader.tsx');
+    const workspaceShell = read('frontend/src/components/layout/WorkspaceShell.tsx');
+    const workspaceView = read('frontend/src/components/layout/WorkspaceView.tsx');
+    const sidebar = read('frontend/src/components/layout/Sidebar.tsx');
+    const [mainWindow] = tauri.app.windows;
+
+    expect(mainWindow.decorations ?? true).toBe(true);
+    expect(mainWindow.titleBarStyle).toBe('Overlay');
+    expect(mainWindow.hiddenTitle).toBe(true);
+    expect(app).toContain('<DesktopWindowFrame>');
+    expect(desktopFrame).toContain('data-tauri-drag-region="deep"');
+    expect(desktopFrame).toContain('isMacOSDesktop()');
+    expect(workspaceShell).toContain('<DesktopNavigationHeader />');
+    expect(desktopHeader).toContain('data-tauri-drag-region="deep"');
+    expect(desktopHeader).toContain('data-tauri-drag-region="false"');
+    expect(desktopHeader).toContain('h-[22px] w-[38vw] max-w-[600px]');
+    expect(desktopHeader).toContain('sideOffset={-22}');
+    expect(desktopHeader).not.toContain('border-b');
+    expect(workspaceShell).toContain(
+      'className="h-full min-h-0 bg-[var(--vscode-titleBar-activeBackground)]"',
+    );
+    expect(workspaceShell).toContain('p-2 pt-0 pl-0');
+    expect(workspaceView).toContain('p-2 pt-0 pb-0 pl-0');
+    expect(sidebar).toContain('@container/sidebar pt-0! pr-0!');
+    expect(capability.permissions).toContain('core:window:allow-start-dragging');
   });
 
   it('discovers the desktop backend through IPC without page-load injection', () => {
@@ -163,7 +202,7 @@ describe('desktop configuration contracts', () => {
     expect(desktopShell).toContain('download::export_data_blocks_to_downloads');
     expect(desktopShell).toContain('download::save_bytes_to_downloads');
     expect(nativeDownloads).not.toContain('method: String');
-    expect(webDownloads).not.toContain("@tauri-apps/plugin-fs");
+    expect(webDownloads).not.toContain('@tauri-apps/plugin-fs');
     expect(packageJson.dependencies).not.toHaveProperty('@tauri-apps/plugin-fs');
     expect(cargo).not.toMatch(/^tauri-plugin-fs\s*=/m);
     expect(desktopShell).not.toContain('tauri_plugin_fs::init');
@@ -176,6 +215,7 @@ describe('desktop configuration contracts', () => {
 
     expect(capability.permissions).toEqual([
       'core:default',
+      'core:window:allow-start-dragging',
       'core:webview:allow-set-webview-zoom',
       'opener:allow-reveal-item-in-dir',
       'dialog:allow-open',

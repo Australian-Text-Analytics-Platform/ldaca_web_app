@@ -64,7 +64,7 @@ function WorkspaceView({
     <div className="flex flex-col h-full bg-transparent" ref={containerRef}>
       <InsetCard
         ref={topRef}
-        className="min-h-30 p-2 pb-0 pl-0 max-md:pl-2 @max-[639px]/workspace-shell:pl-2"
+        className="min-h-30 p-2 pt-0 pb-0 pl-0 max-md:pl-2 @max-[639px]/workspace-shell:pl-2"
         style={{ height: `calc(${String(ratio * 100)}% - 0.125rem)` }}
       >
         <div className="p-2 bg-panel border-b border-surface-border shrink-0">

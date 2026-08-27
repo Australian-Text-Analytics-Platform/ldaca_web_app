@@ -8,6 +8,7 @@ import { loadRemoteRegistry } from '@/tutorials/remoteRegistry';
 import { WorkspaceShell } from '@/components/layout/WorkspaceShell';
 import { GlobalHosts } from '@/components/layout/GlobalHosts';
 import { BackendBootstrapGate } from '@/components/layout/BackendBootstrapGate';
+import { DesktopWindowFrame } from '@/components/layout/DesktopWindowFrame';
 import { Button } from '@/components/ui/button';
 
 function App() {
@@ -20,7 +21,7 @@ function AppContent() {
   }, []);
 
   return (
-    <>
+    <DesktopWindowFrame>
       <BackendBootstrapGate>
         <>
           <AuthBootstrap />
@@ -28,7 +29,7 @@ function AppContent() {
         </>
       </BackendBootstrapGate>
       <GlobalHosts />
-    </>
+    </DesktopWindowFrame>
   );
 }
 

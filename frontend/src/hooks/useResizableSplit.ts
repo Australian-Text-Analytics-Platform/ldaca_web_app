@@ -127,6 +127,26 @@ const writePersisted = (key: string | undefined, value: number) => {
   }
 };
 
+const clampSplitValue = (
+  value: number,
+  min: number,
+  max: number,
+  mode: ResizableSplitMode,
+  maxPixels?: number,
+  containerSize?: number,
+): number => {
+  let effectiveMax = max;
+  if (
+    mode === 'percent' &&
+    typeof maxPixels === 'number' &&
+    typeof containerSize === 'number' &&
+    containerSize > 0
+  ) {
+    effectiveMax = Math.min(effectiveMax, maxPixels / containerSize);
+  }
+  return Math.min(effectiveMax, Math.max(min, value));
+};
+
 /** Provides state, DOM refs, keyboard handlers, and pointer handlers for resizable panes. */
 /**
  * Used directly by: `WorkspaceView`, `DataLoaderFeature`, and the
@@ -159,7 +179,9 @@ export function useResizableSplit({
   const draggingRef = useRef(false);
   // Lazy initializer so we read localStorage exactly once on mount,
   // then drive state through normal setValue paths.
-  const [value, setValue] = useState(() => readPersisted(persistKey, defaultValue));
+  const [value, setValue] = useState(() =>
+    clampSplitValue(readPersisted(persistKey, defaultValue), min, max, mode, maxPixels),
+  );
   const liveValueRef = useRef(value);
   const rafIdRef = useRef<number | null>(null);
   const dragCleanupRef = useRef<(() => void) | null>(null);
@@ -202,18 +224,8 @@ export function useResizableSplit({
    * getBoundingClientRect().
    */
   const clamp = useCallback(
-    (v: number, containerSize?: number): number => {
-      let effectiveMax = max;
-      if (
-        mode === 'percent' &&
-        typeof maxPixels === 'number' &&
-        typeof containerSize === 'number' &&
-        containerSize > 0
-      ) {
-        effectiveMax = Math.min(effectiveMax, maxPixels / containerSize);
-      }
-      return Math.min(effectiveMax, Math.max(min, v));
-    },
+    (v: number, containerSize?: number): number =>
+      clampSplitValue(v, min, max, mode, maxPixels, containerSize),
     [min, max, mode, maxPixels],
   );
 

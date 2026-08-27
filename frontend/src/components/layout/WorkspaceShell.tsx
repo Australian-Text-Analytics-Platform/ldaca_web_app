@@ -18,6 +18,7 @@ import { GuidanceProvider } from '@/features/guidance/GuidanceProvider';
 import { NodeInputPointerCarrier } from '@/components/layout/NodeInputPointerCarrier';
 import { ResizeHandle } from '@/components/layout/ResizeHandle';
 import { AccountThemeSynchronizer } from '@/features/theme/AccountThemeSynchronizer';
+import { DesktopNavigationHeader } from '@/components/layout/DesktopNavigationHeader';
 
 const WorkspaceView = lazy(() => import('@/components/layout/WorkspaceView'));
 
@@ -55,16 +56,17 @@ function WorkspaceShellContent() {
   return (
     <WorkspaceProvider>
       <GuidanceProvider>
+        <DesktopNavigationHeader />
         <ViewRouteSync />
         <ErrorBoundary>
           <SidebarProvider
-            className="bg-[var(--vscode-titleBar-activeBackground)]"
+            className="h-full min-h-0 bg-[var(--vscode-titleBar-activeBackground)]"
             style={{ ['--sidebar-width' as string]: `${String(sidebarWidth)}px` }}
           >
             <DocumentModalHost />
             <NodeInputPointerCarrier />
             <RefreshStatusBanner />
-            <div className="flex h-dvh w-full overflow-hidden" ref={sidebarHostRef}>
+            <div className="flex h-full w-full overflow-hidden" ref={sidebarHostRef}>
               <ErrorBoundary>
                 <Sidebar />
               </ErrorBoundary>
@@ -93,7 +95,7 @@ function WorkspaceShellContent() {
                     <InsetCard
                       ref={mainRef}
                       role="main"
-                      className={`relative h-full p-2 pl-0 ${isRightCollapsed ? 'pr-2' : 'pr-0'} max-md:h-auto max-md:min-h-[calc(100dvh-3.5rem)] max-md:w-full! max-md:min-w-0! max-md:px-2 @max-[639px]/workspace-shell:h-auto @max-[639px]/workspace-shell:min-h-[calc(100dvh-3.5rem)] @max-[639px]/workspace-shell:w-full! @max-[639px]/workspace-shell:min-w-0! @max-[639px]/workspace-shell:px-2 ${
+                      className={`relative h-full p-2 pt-0 pl-0 ${isRightCollapsed ? 'pr-2' : 'pr-0'} max-md:h-auto max-md:min-h-[calc(100dvh-3.5rem)] max-md:w-full! max-md:min-w-0! max-md:px-2 @max-[639px]/workspace-shell:h-auto @max-[639px]/workspace-shell:min-h-[calc(100dvh-3.5rem)] @max-[639px]/workspace-shell:w-full! @max-[639px]/workspace-shell:min-w-0! @max-[639px]/workspace-shell:px-2 ${
                         isResizing ? 'transition-none' : 'transition-all duration-300 ease-in-out'
                       }`}
                       style={{
