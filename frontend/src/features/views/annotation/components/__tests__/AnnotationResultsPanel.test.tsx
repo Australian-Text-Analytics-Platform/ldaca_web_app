@@ -84,6 +84,8 @@ function ManualResults(
     | 'onMetadataColumnsChange'
     | 'reliabilityMetric'
     | 'onReliabilityMetricChange'
+    | 'tableHeight'
+    | 'onTableHeightChange'
   >,
 ) {
   const [comparisonColumns, setComparisonColumns] = useState(['reviewer']);
@@ -99,6 +101,8 @@ function ManualResults(
       onMetadataColumnsChange={setMetadataColumns}
       reliabilityMetric={reliabilityMetric}
       onReliabilityMetricChange={setReliabilityMetric}
+      tableHeight={null}
+      onTableHeightChange={vi.fn()}
     />
   );
 }
@@ -185,14 +189,21 @@ describe('AnnotationResultsPanel', () => {
     expect(headers[0]).toHaveTextContent('text');
     expect(headers[1]).toHaveTextContent('annotation');
     expect(within(headers[2]).getByText('reviewer')).toBeInTheDocument();
-    expect(within(headers[2]).queryByRole('button', { name: /Cohen’s Kappa/ })).toBeNull();
+    expect(
+      await within(headers[2]).findByRole('button', {
+        name: 'Cohen’s Kappa unavailable for annotation versus reviewer',
+      }),
+    ).toBeVisible();
     expect(
       within(headers[2]).getByRole('button', { name: 'Show comparison values for reviewer' }),
     ).toBeInTheDocument();
+    expect(
+      within(headers[1]).getByRole('button', { name: 'Filter rows by annotation' }),
+    ).toBeEnabled();
     const filterToggle = within(headers[2]).getByRole('button', {
-      name: 'Filter difference for reviewer',
+      name: 'Filter rows by reviewer',
     });
-    expect(filterToggle).toBeDisabled();
+    expect(filterToggle).toBeEnabled();
     expect(filterToggle).toHaveAttribute('aria-pressed', 'false');
     const resultRow = screen.getByRole('row', { name: 'Example Comparison value hidden' });
     expect(within(resultRow).getAllByRole('cell').at(-1)).toHaveTextContent('•••');
@@ -216,7 +227,7 @@ describe('AnnotationResultsPanel', () => {
     expect(setPagination).toHaveBeenCalledWith({ pageIndex: 99, pageSize: 10 });
   });
 
-  it('enables the per-column filter only while its comparison is revealed', async () => {
+  it('keeps one row filter at a time and allows it while the comparison is masked', async () => {
     const user = userEvent.setup();
     queryWorkspaceSqlTable.mockResolvedValue({
       columns: ['__reference', '__comparison', '__count'],
@@ -227,18 +238,32 @@ describe('AnnotationResultsPanel', () => {
 
     renderPanel();
 
-    const reviewerFilter = screen.getByRole('button', {
-      name: 'Filter difference for reviewer',
-    });
-    expect(reviewerFilter).toBeDisabled();
-    await user.click(screen.getByRole('button', { name: 'Show comparison values for reviewer' }));
+    const reviewerFilter = screen.getByRole('button', { name: 'Filter rows by reviewer' });
+    const annotationFilter = screen.getByRole('button', { name: 'Filter rows by annotation' });
     expect(reviewerFilter).toBeEnabled();
-
     await user.click(reviewerFilter);
+    await user.click(screen.getByRole('menuitemcheckbox', { name: 'Differs from annotation' }));
+    await user.keyboard('{Escape}');
     expect(reviewerFilter).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getAllByLabelText('Comparison value hidden')).toHaveLength(1);
+
+    await user.click(screen.getByRole('button', { name: 'Show comparison values for reviewer' }));
     await user.click(screen.getByRole('button', { name: 'Hide comparison values for reviewer' }));
-    expect(reviewerFilter).toBeDisabled();
+    expect(reviewerFilter).toHaveAttribute('aria-pressed', 'true');
+
+    await user.click(annotationFilter);
+    await user.click(screen.getByRole('menuitemradio', { name: 'Empty' }));
+    await user.keyboard('{Escape}');
+    expect(annotationFilter).toHaveAttribute('aria-pressed', 'true');
     expect(reviewerFilter).toHaveAttribute('aria-pressed', 'false');
+
+    await user.click(screen.getByRole('button', { name: 'Compare To' }));
+    await user.click(screen.getByRole('menuitemcheckbox', { name: 'reviewer' }));
+    await user.keyboard('{Escape}');
+    expect(screen.getByRole('button', { name: 'Filter rows by annotation' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
   });
 
   it('shows selected metadata alongside manual annotations', async () => {

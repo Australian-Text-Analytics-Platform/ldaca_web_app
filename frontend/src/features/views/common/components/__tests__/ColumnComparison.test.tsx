@@ -107,6 +107,12 @@ describe('ColumnComparison', () => {
     expect(screen.queryByText('annotation ↓ / review →')).not.toBeInTheDocument();
     const matrixRows = within(matrix).getAllByRole('row');
 
+    expect(within(matrix).getByRole('columnheader', { name: 'covid' })).toHaveClass(
+      'text-widget-foreground/80',
+    );
+    expect(within(matrix).getByRole('rowheader', { name: 'job' })).toHaveClass(
+      'text-widget-foreground/80',
+    );
     expect(
       within(matrixRows[1])
         .getAllByRole('cell')
@@ -160,9 +166,9 @@ describe('ColumnComparison', () => {
     ).toHaveTextContent('α 0.531');
   });
 
-  it('exposes the accessible difference-filter toggle when the table enables it', async () => {
+  it('opens the row-filter menu from the header and reports its active state', async () => {
     const user = userEvent.setup();
-    const onDifferenceFilterChange = vi.fn();
+    const onFilterChange = vi.fn();
     const { rerender } = render(
       <ColumnComparisonHeader
         metric="cohens_kappa"
@@ -173,18 +179,21 @@ describe('ColumnComparison', () => {
         isError={false}
         revealed
         onRevealedChange={vi.fn()}
-        differenceFilterActive={false}
-        onDifferenceFilterChange={onDifferenceFilterChange}
+        filter={{ differs: false, existence: 'off' }}
+        onFilterChange={onFilterChange}
       />,
     );
 
-    const toggle = screen.getByRole('button', { name: 'Filter difference for review' });
+    const toggle = screen.getByRole('button', { name: 'Filter rows by review' });
     expect(toggle).toHaveAttribute('aria-pressed', 'false');
     expect(toggle.textContent).toBe('');
-    await user.hover(toggle);
-    expect((await screen.findAllByText('Filter difference'))[0]).toBeVisible();
     await user.click(toggle);
-    expect(onDifferenceFilterChange).toHaveBeenCalledWith(true);
+    await user.click(screen.getByRole('menuitemcheckbox', { name: 'Differs from annotation' }));
+    expect(onFilterChange).toHaveBeenLastCalledWith({ differs: true, existence: 'off' });
+    await user.click(screen.getByRole('menuitemradio', { name: 'Has value' }));
+    expect(onFilterChange).toHaveBeenLastCalledWith({ differs: false, existence: 'present' });
+    await user.keyboard('{Escape}');
+
     rerender(
       <ColumnComparisonHeader
         metric="cohens_kappa"
@@ -195,15 +204,17 @@ describe('ColumnComparison', () => {
         isError={false}
         revealed
         onRevealedChange={vi.fn()}
-        differenceFilterActive
-        onDifferenceFilterChange={onDifferenceFilterChange}
+        filter={{ differs: true, existence: 'present' }}
+        onFilterChange={onFilterChange}
       />,
     );
-    const activeToggle = screen.getByRole('button', { name: 'Filter difference for review' });
-    expect(activeToggle.textContent).toBe('');
+    expect(screen.getByRole('button', { name: 'Filter rows by review' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
   });
 
-  it('keeps reliability and filtering unavailable until the comparison is revealed', async () => {
+  it('keeps reliability and filtering available while the comparison is masked', async () => {
     const user = userEvent.setup();
     const onRevealedChange = vi.fn();
     render(
@@ -216,12 +227,15 @@ describe('ColumnComparison', () => {
         isError={false}
         revealed={false}
         onRevealedChange={onRevealedChange}
-        onDifferenceFilterChange={vi.fn()}
+        filter={{ differs: false, existence: 'off' }}
+        onFilterChange={vi.fn()}
       />,
     );
 
-    expect(screen.queryByRole('button', { name: /Cohen’s Kappa/ })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Filter difference for review' })).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'Cohen’s Kappa 0.500 for annotation versus review' }),
+    ).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Filter rows by review' })).toBeEnabled();
     await user.click(screen.getByRole('button', { name: 'Show comparison values for review' }));
     expect(onRevealedChange).toHaveBeenCalledWith(true);
   });

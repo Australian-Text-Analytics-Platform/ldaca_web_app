@@ -29,7 +29,11 @@ export interface AnnotationTabSettings {
   annotationComparisonColumns: Record<string, string[]>;
   annotationReliabilityMetrics: Record<string, IntercoderReliabilityMetric>;
   annotationMetadataColumns: Record<string, string[]>;
+  /** Shared result-table height in pixels for Manual, Preview, and Review; null keeps the default. */
+  annotationTableHeight: number | null;
 }
+
+export const ANNOTATION_TABLE_MIN_HEIGHT = 384;
 
 export const DEFAULT_ANNOTATION_TAB_SETTINGS: AnnotationTabSettings = {
   annotationMode: 'manual',
@@ -50,6 +54,7 @@ export const DEFAULT_ANNOTATION_TAB_SETTINGS: AnnotationTabSettings = {
   annotationComparisonColumns: {},
   annotationReliabilityMetrics: {},
   annotationMetadataColumns: {},
+  annotationTableHeight: null,
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -95,6 +100,11 @@ const providerType = (value: unknown): AnnotationProviderType | null =>
 
 const finiteNumber = (value: unknown, fallback: number): number =>
   typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+
+const tableHeight = (value: unknown): number | null =>
+  typeof value === 'number' && Number.isFinite(value) && value >= ANNOTATION_TABLE_MIN_HEIGHT
+    ? Math.round(value)
+    : null;
 
 const integerInRange = (
   value: unknown,
@@ -170,6 +180,7 @@ const settingsFromRecord = (
       typeof value.aiReasoningEffort === 'string' ? value.aiReasoningEffort : 'medium',
     annotationTargets: stringMap(value.annotationTargets),
     annotationReliabilityMetrics,
+    annotationTableHeight: tableHeight(value.annotationTableHeight),
     ...roles,
   };
 };

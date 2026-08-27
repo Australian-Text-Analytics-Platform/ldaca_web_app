@@ -27,7 +27,8 @@ type SettingsUpdate =
   | ((current: AnnotationTabSettings) => AnnotationTabSettings);
 
 /**
- * Owns Annotation's device-local mode, AI settings, and column-role selections.
+ * Owns Annotation's device-local mode, AI settings, column-role selections, and the shared
+ * result-table height.
  * All committed values are serialized as one tab-setting record; prompt and
  * model drafts remain local until their existing commit events fire.
  */
@@ -167,6 +168,13 @@ export function useAnnotationTabSettings({
     [commitSettings],
   );
 
+  const setAnnotationTableHeight = useCallback(
+    (annotationTableHeight: number | null) => {
+      commitSettings({ annotationTableHeight });
+    },
+    [commitSettings],
+  );
+
   const uniqueRoleColumns = useCallback(
     (nodeId: string, columns: string[]) =>
       Array.from(new Set(columns)).filter((column) => column !== excludedRoleColumns[nodeId]),
@@ -233,5 +241,6 @@ export function useAnnotationTabSettings({
     setAnnotationComparisonColumns,
     setAnnotationReliabilityMetric,
     setAnnotationMetadataColumns,
+    setAnnotationTableHeight,
   };
 }

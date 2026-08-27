@@ -239,6 +239,8 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
     setAnnotationReliabilityMetric,
     annotationMetadataColumns,
     setAnnotationMetadataColumns,
+    annotationTableHeight,
+    setAnnotationTableHeight,
   } = useAnnotationTabSettings({
     tabSettings,
     onTabSettingChange,
@@ -1307,6 +1309,8 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
           onMetadataColumnsChange={(columns) => {
             setAnnotationMetadataColumns(manualReviewSnapshot.nodeId, columns);
           }}
+          tableHeight={annotationTableHeight}
+          onTableHeightChange={setAnnotationTableHeight}
           correction={{
             column: manualReviewSnapshot.correctionColumn,
             onColumnChange: (column) => {
@@ -1375,6 +1379,8 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
             onMetadataColumnsChange={(columns) => {
               setAnnotationMetadataColumns(annotationRunAllSource.node_id, columns);
             }}
+            tableHeight={annotationTableHeight}
+            onTableHeightChange={setAnnotationTableHeight}
             correction={{
               column: reviewCorrectionColumn,
               classOptions: annotationRunAllSource.classes.map((item) => item.name),
@@ -1421,6 +1427,8 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
               setAnnotationMetadataColumns(serverAiRequest.node_id, columns);
             },
           }}
+          tableHeight={annotationTableHeight}
+          onTableHeightChange={setAnnotationTableHeight}
           correction={{
             nodeId: serverAiRequest.node_id,
             column: previewCorrectionColumn,

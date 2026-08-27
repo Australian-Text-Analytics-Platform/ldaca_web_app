@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowRight, ChevronDown, Eye, EyeOff, Filter } from 'lucide-react';
+import { ArrowDown, ArrowRight, ChevronDown, Eye, EyeOff } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import type { AnnotationRowFilterValue } from '@/features/views/annotation/annotationRowFilter';
 import {
   type ConfusionCount,
   INTERCODER_RELIABILITY_METRICS,
@@ -20,49 +21,11 @@ import {
   formatIntercoderReliability,
   isIntercoderReliabilityMetric,
 } from '@/features/views/common/columnComparisonModel';
+import { AnnotationColumnFilterMenu } from './AnnotationColumnFilterMenu';
 
 export type { ConfusionCount } from '@/features/views/common/columnComparisonModel';
 
 const displayLabel = (value: string): string => (value === '' ? '(blank)' : value);
-
-interface DifferenceFilterButtonProps {
-  active: boolean;
-  disabled?: boolean;
-  ariaLabel: string;
-  tooltip: string;
-  onActiveChange: (active: boolean) => void;
-}
-
-/** Prominent exclusive filter control used by Annotation table headers. */
-function DifferenceFilterButton({
-  active,
-  disabled = false,
-  ariaLabel,
-  tooltip,
-  onActiveChange,
-}: DifferenceFilterButtonProps) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          type="button"
-          variant={active ? 'default' : 'outline'}
-          size="sm"
-          className="size-7 p-0"
-          aria-label={ariaLabel}
-          aria-pressed={active}
-          disabled={disabled}
-          onClick={() => {
-            onActiveChange(!active);
-          }}
-        >
-          <Filter aria-hidden="true" className="size-3.5" />
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent>{tooltip}</TooltipContent>
-    </Tooltip>
-  );
-}
 
 interface ColumnComparisonHeaderProps {
   label?: string;
@@ -74,14 +37,17 @@ interface ColumnComparisonHeaderProps {
   isError: boolean;
   revealed: boolean;
   onRevealedChange: (revealed: boolean) => void;
-  differenceFilterActive?: boolean;
-  onDifferenceFilterChange?: (active: boolean) => void;
+  /** Row filter carried by this column; omitted by tables without server-side filtering. */
+  filter?: AnnotationRowFilterValue;
+  onFilterChange?: (filter: AnnotationRowFilterValue) => void;
 }
 
 /**
  * Presents one comparison column without exposing its coding until the user reveals it.
- * Rendered by: Annotation Manual, Preview, and Review headers. Flow: always show the column name
- * and disclosure control; only a revealed column adds reliability, matrix, and filtering.
+ * Rendered by: Annotation Manual, Preview, and Review headers. Flow: always show the column name,
+ * the disclosure control, the aggregate reliability score with its matrix, and (when the table
+ * supports it) the row-filter menu. Only per-row values and difference tint wait for reveal, so a
+ * coder can track agreement and filter rows without seeing how any individual row was coded.
  */
 export function ColumnComparisonHeader({
   label,
@@ -93,8 +59,8 @@ export function ColumnComparisonHeader({
   isError,
   revealed,
   onRevealedChange,
-  differenceFilterActive = false,
-  onDifferenceFilterChange,
+  filter,
+  onFilterChange,
 }: ColumnComparisonHeaderProps) {
   const labels = Array.from(
     new Set((rows ?? []).flatMap((row) => [row.reference, row.comparison])),
@@ -147,96 +113,93 @@ export function ColumnComparisonHeader({
           </TooltipTrigger>
           <TooltipContent>{revealed ? 'Hide comparison' : 'Show comparison'}</TooltipContent>
         </Tooltip>
-        {revealed ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Badge
-                asChild
-                variant="outline"
-                className="h-7 px-2.5 text-body font-medium tabular-nums"
-              >
-                <button type="button" aria-label={scoreDescription}>
-                  {score}
-                </button>
-              </Badge>
-            </TooltipTrigger>
-            <TooltipContent side="top" className="max-w-none p-3">
-              {isLoading ? (
-                <p>Loading comparison...</p>
-              ) : isError || !rows ? (
-                <p>Could not load comparison.</p>
-              ) : labels.length === 0 ? (
-                <p>No rows contain values in both columns.</p>
-              ) : (
-                <div className="grid grid-cols-[auto_auto] grid-rows-[auto_auto] gap-x-2 gap-y-1">
-                  <div
-                    aria-label={`${comparisonColumn} column axis`}
-                    className="col-start-2 row-start-1 flex items-center justify-center gap-1 border-b border-button-foreground/25 pb-1 font-medium"
-                  >
-                    <span>{comparisonColumn}</span>
-                    <ArrowRight aria-hidden="true" className="size-3" />
-                  </div>
-                  <div
-                    aria-label={`${referenceColumn} row axis`}
-                    className="col-start-1 row-start-2 flex flex-col items-center justify-center gap-1 border-r border-button-foreground/25 pr-1.5 font-medium"
-                  >
-                    <span className="rotate-180 [writing-mode:vertical-rl]">{referenceColumn}</span>
-                    <ArrowDown aria-hidden="true" className="size-3" />
-                  </div>
-                  <table
-                    aria-label={`${referenceColumn} versus ${comparisonColumn} confusion matrix`}
-                    className="col-start-2 row-start-2 border-separate border-spacing-x-2 border-spacing-y-1 text-label-secondary tabular-nums"
-                  >
-                    <caption className="sr-only">
-                      Rows are {referenceColumn}; columns are {comparisonColumn}.
-                    </caption>
-                    <thead>
-                      <tr>
-                        <th className="px-1 font-normal" scope="col">
-                          <span className="sr-only">Row label</span>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Badge
+              asChild
+              variant="outline"
+              className="h-7 px-2.5 text-body font-medium tabular-nums"
+            >
+              <button type="button" aria-label={scoreDescription}>
+                {score}
+              </button>
+            </Badge>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-none p-3">
+            {isLoading ? (
+              <p>Loading comparison...</p>
+            ) : isError || !rows ? (
+              <p>Could not load comparison.</p>
+            ) : labels.length === 0 ? (
+              <p>No rows contain values in both columns.</p>
+            ) : (
+              <div className="grid grid-cols-[auto_auto] grid-rows-[auto_auto] gap-x-2 gap-y-1">
+                <div
+                  aria-label={`${comparisonColumn} column axis`}
+                  className="col-start-2 row-start-1 flex items-center justify-center gap-1 border-b border-widget-foreground/25 pb-1 font-medium"
+                >
+                  <span>{comparisonColumn}</span>
+                  <ArrowRight aria-hidden="true" className="size-3" />
+                </div>
+                <div
+                  aria-label={`${referenceColumn} row axis`}
+                  className="col-start-1 row-start-2 flex flex-col items-center justify-center gap-1 border-r border-widget-foreground/25 pr-1.5 font-medium"
+                >
+                  <span className="rotate-180 [writing-mode:vertical-rl]">{referenceColumn}</span>
+                  <ArrowDown aria-hidden="true" className="size-3" />
+                </div>
+                <table
+                  aria-label={`${referenceColumn} versus ${comparisonColumn} confusion matrix`}
+                  className="col-start-2 row-start-2 border-separate border-spacing-x-2 border-spacing-y-1 text-label-secondary tabular-nums"
+                >
+                  <caption className="sr-only">
+                    Rows are {referenceColumn}; columns are {comparisonColumn}.
+                  </caption>
+                  <thead>
+                    <tr>
+                      <th className="px-1 font-normal" scope="col">
+                        <span className="sr-only">Row label</span>
+                      </th>
+                      {labels.map((comparisonLabel) => (
+                        <th
+                          key={comparisonLabel}
+                          className="px-1 text-center text-widget-foreground/80"
+                          scope="col"
+                        >
+                          {displayLabel(comparisonLabel)}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {labels.map((referenceLabel) => (
+                      <tr key={referenceLabel}>
+                        <th className="pr-2 text-right text-widget-foreground/80" scope="row">
+                          {displayLabel(referenceLabel)}
                         </th>
                         {labels.map((comparisonLabel) => (
-                          <th
+                          <td
                             key={comparisonLabel}
-                            className="px-1 text-center text-button-foreground/80"
-                            scope="col"
+                            className="min-w-8 px-1 text-center font-medium"
                           >
-                            {displayLabel(comparisonLabel)}
-                          </th>
+                            {countByPair.get(JSON.stringify([referenceLabel, comparisonLabel])) ??
+                              0}
+                          </td>
                         ))}
                       </tr>
-                    </thead>
-                    <tbody>
-                      {labels.map((referenceLabel) => (
-                        <tr key={referenceLabel}>
-                          <th className="pr-2 text-right text-button-foreground/80" scope="row">
-                            {displayLabel(referenceLabel)}
-                          </th>
-                          {labels.map((comparisonLabel) => (
-                            <td
-                              key={comparisonLabel}
-                              className="min-w-8 px-1 text-center font-medium"
-                            >
-                              {countByPair.get(JSON.stringify([referenceLabel, comparisonLabel])) ??
-                                0}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </TooltipContent>
-          </Tooltip>
-        ) : null}
-        {onDifferenceFilterChange ? (
-          <DifferenceFilterButton
-            active={differenceFilterActive}
-            disabled={!revealed}
-            ariaLabel={`Filter difference for ${comparisonColumn}`}
-            tooltip="Filter difference"
-            onActiveChange={onDifferenceFilterChange}
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </TooltipContent>
+        </Tooltip>
+        {filter && onFilterChange ? (
+          <AnnotationColumnFilterMenu
+            column={comparisonColumn}
+            value={filter}
+            onChange={onFilterChange}
+            differsLabel={`Differs from ${referenceColumn}`}
           />
         ) : null}
       </TooltipProvider>
