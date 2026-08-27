@@ -34,14 +34,20 @@ dependencies = [
     "psutil>=6.1.0",                            # Process management for proper cleanup of child processes
     "polars-text>=0.5.1",
     "polars-source-utils>=0.2.0",
-    "tbb>=2022.3.1 ; sys_platform != 'darwin'",
+    # Intel TBB ships no Windows ARM64 build; workers/utils.py treats it as optional.
+    "tbb>=2022.3.1 ; sys_platform != 'darwin' and (sys_platform != 'win32' or platform_machine != 'ARM64')",
     "tzdata>=2025.2 ; sys_platform == 'win32'",
     "openai>=2.26.0",                           # AsyncOpenAI: OpenAI/OpenRouter/OpenAI-compatible custom annotation calls
     "anthropic>=0.40.0",                        # AsyncAnthropic: server-side Claude annotation calls
     "google-genai>=1.0.0",                      # google-genai aio: server-side Gemini annotation calls
     "spacy>=3.7.0",
     "rtoml>=0.12.0",
-    "uvicorn[standard]>=0.35.0",
+    # uvicorn[standard] pulls httptools, which has no Windows ARM64 wheel; list the
+    # extras explicitly so the C parser is skipped there (uvicorn falls back to h11).
+    "uvicorn>=0.35.0",
+    "httptools>=0.6.4 ; sys_platform != 'win32' or platform_machine != 'ARM64'",
+    "watchfiles>=1.0.0",
+    "websockets>=13.0",
 ]
 
 [project.optional-dependencies]
