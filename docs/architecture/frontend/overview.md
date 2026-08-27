@@ -151,7 +151,7 @@ The project uses React Compiler. Manual memoization is reserved for
 identity-sensitive boundaries such as contexts, effects, React Flow, tables,
 and external-library adapters rather than routine render optimization.
 
-Live UI chrome, CodeMirror, React Flow, Recharts, Sonner, Joyride, Markdown,
+Live UI chrome, CodeMirror, React Flow, Apache ECharts, Sonner, Joyride, Markdown,
 and OAuth presentation consume the semantic VS Code variables. Persisted Data
 Block and series colors retain identity across themes. Chart and image export
 renderers deliberately keep a white canvas and their stable export palette;
@@ -167,3 +167,7 @@ legend and Uncased control live in a shared card between the dispersion table
 and optional plot because both surfaces consume that state. The shared controls
 remain available when proportional document-length bars hide the plot; plot-only
 controls remain in the plot header.
+
+Trends consumes the same shared result-level legend and Uncased control. Its
+case folding is frontend presentation and filtering state over exact backend
+group indices, so changing it never submits or reruns Sequential Analysis.

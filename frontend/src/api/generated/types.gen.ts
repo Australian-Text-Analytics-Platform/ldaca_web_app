@@ -71,6 +71,8 @@ export type Analysis = {
     } & ConcordanceDocumentDataBlockCreationAnalysisRequest) | ({
         kind: 'quotation_result_data_block_creation';
     } & QuotationResultDataBlockCreationAnalysisRequest) | ({
+        kind: 'sequential_data_block_creation';
+    } & SequentialDataBlockCreationAnalysisRequest) | ({
         kind: 'annotation_run_all';
     } & AnnotationRunAllAnalysisRequest) | ({
         kind: 'topic_modeling_data_block_creation';
@@ -131,6 +133,8 @@ export type AnalysisCreate = {
     } & ConcordanceDocumentDataBlockCreationAnalysisRequest) | ({
         kind: 'quotation_result_data_block_creation';
     } & QuotationResultDataBlockCreationAnalysisRequest) | ({
+        kind: 'sequential_data_block_creation';
+    } & SequentialDataBlockCreationAnalysisRequest) | ({
         kind: 'annotation_run_all';
     } & AnnotationRunAllSubmission) | ({
         kind: 'topic_modeling_data_block_creation';
@@ -2111,6 +2115,8 @@ export type DerivationProvenance = {
     } & ConcordanceDocumentDataBlockCreationDerivation) | ({
         kind: 'quotation_result_data_block_creation';
     } & QuotationResultDataBlockCreationDerivation) | ({
+        kind: 'sequential_data_block_creation';
+    } & SequentialDataBlockCreationDerivation) | ({
         kind: 'topic_modeling_data_block_creation';
     } & TopicModelingDataBlockCreationDerivation);
     /**
@@ -3342,10 +3348,6 @@ export type SampleUserFileImportResult = {
  */
 export type SequentialAnalysisRequest = {
     /**
-     * Case Sensitive
-     */
-    case_sensitive?: boolean;
-    /**
      * Column Type
      */
     column_type?: 'datetime' | 'numeric';
@@ -3392,6 +3394,73 @@ export type SequentialAnalysisRequest = {
 };
 
 /**
+ * SequentialDataBlockCreationAnalysisRequest
+ */
+export type SequentialDataBlockCreationAnalysisRequest = {
+    /**
+     * Kind
+     */
+    kind?: 'sequential_data_block_creation';
+    source: SequentialDataBlockCreationSource;
+};
+
+/**
+ * SequentialDataBlockCreationDerivation
+ */
+export type SequentialDataBlockCreationDerivation = {
+    /**
+     * Kind
+     */
+    kind?: 'sequential_data_block_creation';
+};
+
+/**
+ * SequentialDataBlockCreationResult
+ */
+export type SequentialDataBlockCreationResult = {
+    /**
+     * Kind
+     */
+    kind?: 'sequential_data_block_creation';
+    /**
+     * Output Node Ids
+     */
+    output_node_ids: Array<string>;
+    /**
+     * Outputs
+     */
+    outputs: Array<DataBlockCreationOutput>;
+};
+
+/**
+ * SequentialDataBlockCreationSource
+ *
+ * One immutable Trends filter and source-column selection.
+ */
+export type SequentialDataBlockCreationSource = {
+    /**
+     * Excluded Group Indices
+     */
+    excluded_group_indices?: Array<number>;
+    /**
+     * New Node Name
+     */
+    new_node_name: string;
+    /**
+     * Selected Columns
+     */
+    selected_columns: Array<string>;
+    /**
+     * Selected Period Indices
+     */
+    selected_period_indices?: Array<number> | null;
+    /**
+     * Source Node Id
+     */
+    source_node_id: string;
+};
+
+/**
  * SequentialResult
  */
 export type SequentialResult = {
@@ -3399,7 +3468,38 @@ export type SequentialResult = {
      * Kind
      */
     kind?: 'sequential';
+    source: SequentialSourceDescriptor;
     table: CompleteTableResource;
+};
+
+/**
+ * SequentialSourceDescriptor
+ */
+export type SequentialSourceDescriptor = {
+    /**
+     * Columns
+     */
+    columns: Array<string>;
+    /**
+     * Document Column
+     */
+    document_column?: string | null;
+    /**
+     * Group Count
+     */
+    group_count: number;
+    /**
+     * Node Id
+     */
+    node_id: string;
+    /**
+     * Node Name
+     */
+    node_name: string;
+    /**
+     * Period Count
+     */
+    period_count: number;
 };
 
 /**
@@ -4824,6 +4924,8 @@ export type AnalysisCreateWritable = {
     } & ConcordanceDocumentDataBlockCreationAnalysisRequest) | ({
         kind: 'quotation_result_data_block_creation';
     } & QuotationResultDataBlockCreationAnalysisRequest) | ({
+        kind: 'sequential_data_block_creation';
+    } & SequentialDataBlockCreationAnalysisRequest) | ({
         kind: 'annotation_run_all';
     } & AnnotationRunAllSubmissionWritable) | ({
         kind: 'topic_modeling_data_block_creation';
@@ -7320,7 +7422,9 @@ export type GetAnalysisResultResponses = {
         kind: 'concordance_document_data_block_creation';
     } & ConcordanceDocumentDataBlockCreationResult) | ({
         kind: 'quotation_result_data_block_creation';
-    } & QuotationResultDataBlockCreationResult);
+    } & QuotationResultDataBlockCreationResult) | ({
+        kind: 'sequential_data_block_creation';
+    } & SequentialDataBlockCreationResult);
 };
 
 export type GetAnalysisResultResponse = GetAnalysisResultResponses[keyof GetAnalysisResultResponses];
@@ -7427,7 +7531,9 @@ export type QueryAnalysisResultResponses = {
         kind: 'concordance_document_data_block_creation';
     } & ConcordanceDocumentDataBlockCreationResult) | ({
         kind: 'quotation_result_data_block_creation';
-    } & QuotationResultDataBlockCreationResult);
+    } & QuotationResultDataBlockCreationResult) | ({
+        kind: 'sequential_data_block_creation';
+    } & SequentialDataBlockCreationResult);
 };
 
 export type QueryAnalysisResultResponse = QueryAnalysisResultResponses[keyof QueryAnalysisResultResponses];

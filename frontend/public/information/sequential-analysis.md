@@ -27,6 +27,11 @@ to eliminate case differences in the extracted data.
 - Can I change any of the settings/parameters?
 You can change the frequency (e.g. daily vs monthly), you can change the chart type for the visualisation, and you can add parameters (based on metadata) for the comparison (Add Group). You can change which parameters are visible and which are not visible in the timeline. When numerical data is selected, you can decide the interval where the origin to start for the X-axis (not necessarily starting from Zero).
 
+You can also create a new Data Block from the original source rows. Use click
+or drag selection to choose periods, hide any groups you do not want, and then
+choose **Add to Workspace**. With no selected periods, all periods are included;
+chart zoom does not affect the new Data Block.
+
 - Is there a notebook version?
 There was a preliminary notebook version of this concept on this [GitHub Repo](https://github.com/Australian-Text-Analytics-Platform/atap-corpus-timeline), however this visualisation works the best with various filtering/extracting/creating tools as an integration.
 

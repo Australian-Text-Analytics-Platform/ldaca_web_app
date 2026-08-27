@@ -34,7 +34,7 @@ import {
 } from './editorTabsLayout';
 
 /** Optional per-tab identity colours that replace the theme's tab fills. */
-export interface EditorTabFill {
+interface EditorTabFill {
   /** Fill behind the active tab; also the hover fill of an inactive tab. */
   active: string;
   /** Fill behind an inactive tab. */

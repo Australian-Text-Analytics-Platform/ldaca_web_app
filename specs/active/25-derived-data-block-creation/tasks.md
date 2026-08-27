@@ -8,3 +8,6 @@
 - [x] Update durable and user documentation.
 - [x] Complete backend, frontend, documentation, and live smoke checks.
 - [x] Post superseding Issue #25 and dependency Issue #24 comments.
+- [x] Add immutable Trends publication artifacts and stable period/group indices.
+- [x] Add Trends selection, legend filtering, and Add to Workspace controls.
+- [x] Move Trends case folding to the shared frontend result legend.

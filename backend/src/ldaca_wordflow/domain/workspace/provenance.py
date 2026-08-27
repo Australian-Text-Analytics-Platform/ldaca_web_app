@@ -271,6 +271,10 @@ class QuotationResultDataBlockCreationDerivation(_StrictModel):
     kind: Literal["quotation_result_data_block_creation"] = "quotation_result_data_block_creation"
 
 
+class SequentialDataBlockCreationDerivation(_StrictModel):
+    kind: Literal["sequential_data_block_creation"] = "sequential_data_block_creation"
+
+
 class TopicModelingDataBlockCreationDerivation(_StrictModel):
     kind: Literal["topic_modeling_data_block_creation"] = "topic_modeling_data_block_creation"
     role: Literal["topic_data", "topic_meanings"]
@@ -292,6 +296,7 @@ DerivationOperation = Annotated[
     | ConcordanceMatchDataBlockCreationDerivation
     | ConcordanceDocumentDataBlockCreationDerivation
     | QuotationResultDataBlockCreationDerivation
+    | SequentialDataBlockCreationDerivation
     | TopicModelingDataBlockCreationDerivation,
     Field(discriminator="kind"),
 ]
@@ -312,6 +317,7 @@ _DERIVATION_OPERATION_TYPES: dict[str, type[_StrictModel]] = {
         ConcordanceMatchDataBlockCreationDerivation,
         ConcordanceDocumentDataBlockCreationDerivation,
         QuotationResultDataBlockCreationDerivation,
+        SequentialDataBlockCreationDerivation,
         TopicModelingDataBlockCreationDerivation,
     )
 }
@@ -497,6 +503,7 @@ def describe_provenance(
             ConcordanceMatchDataBlockCreationDerivation: "concordance Match Data Block Creation",
             ConcordanceDocumentDataBlockCreationDerivation: "concordance Document Data Block Creation",
             QuotationResultDataBlockCreationDerivation: "quotation Data Block Creation",
+            SequentialDataBlockCreationDerivation: "Trends Data Block Creation",
             TopicModelingDataBlockCreationDerivation: "topic modeling Data Block Creation",
         }
         return f"{labels[type(operation)]} of {inputs[0]}"
@@ -530,6 +537,7 @@ __all__ = [
     "NodeProvenance",
     "NodeReference",
     "QuotationResultDataBlockCreationDerivation",
+    "SequentialDataBlockCreationDerivation",
     "TopicModelingDataBlockCreationDerivation",
     "ReplaceDerivation",
     "RoundExpression",

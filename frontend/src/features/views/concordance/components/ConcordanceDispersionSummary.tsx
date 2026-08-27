@@ -1,32 +1,11 @@
 import { useId, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, ChevronRight, Download } from 'lucide-react';
 import { toast } from 'sonner';
-import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  type BarShapeProps,
-  CartesianGrid,
-  Line,
-  LineChart,
-  ReferenceArea,
-  ReferenceLine,
-  ResponsiveContainer,
-  Rectangle,
-  XAxis,
-  YAxis,
-} from 'recharts';
+import type { EChartsCoreOption } from 'echarts/core';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChartImageDownloadDialog } from '@/components/ui/ChartImageDownloadDialog';
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-  type ChartConfig,
-} from '@/components/ui/chart';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
@@ -44,6 +23,8 @@ import {
   type ChartExportLegendItem,
   type ChartImageFormat,
 } from '@/lib/chartExport';
+import { EChartsView } from '../../common/components/EChartsView';
+import { FilterableSeriesControls } from '../../common/components/FilterableSeriesControls';
 import { VIZ_PALETTE } from '../../common/vizPalette';
 import {
   CONCORDANCE_DISPERSION_CHART_MODES,
@@ -55,10 +36,6 @@ import {
   type DispersionDisplayBinCount,
   type ConcordanceDensitySeriesInput,
 } from '../concordanceDispersionDomain';
-import {
-  ConcordanceDispersionMatchControls,
-  type ConcordanceDispersionLegendItem,
-} from './ConcordanceDispersionMatchControls';
 
 interface Props {
   rows: ConcordanceDispersionRow[];
@@ -91,31 +68,20 @@ interface Props {
   showChart?: boolean;
 }
 
-interface DispersionChartSeries extends ConcordanceDispersionLegendItem {
+interface DispersionChartSeries {
+  key: string;
+  color: string;
+  matchedTexts: string[];
+  hidden: boolean;
+  countLabel: string;
   /** Human-readable label for tooltip/export display. */
   label?: string;
-  /** Recharts `strokeDasharray` string. Undefined = solid. */
-  dash?: string;
-}
-
-interface ChartPointerState {
-  activeTooltipIndex?: number | string;
-}
-
-interface ChartPointerEvent {
-  shiftKey?: boolean;
-}
-
-interface DragSelection {
-  startIndex: number;
-  endIndex: number;
 }
 
 const AGGREGATE_DEFAULT_COLOR = '#0284c7';
-const X_AXIS_TICKS = [0, 20, 40, 60, 80, 100];
 const CHART_HEIGHT = 240;
-const RESPONSIVE_CHART_INITIAL_WIDTH = 800;
 const GROUPED_BAR_MAX_BIN_COUNT = 10;
+const SELECTION_DIMENSION = '__wordflow_selected__';
 const CHART_MODE_LABELS: Record<ConcordanceDispersionChartMode, string> = {
   'density-line': 'Density: line',
   'density-bar': 'Density: bar',
@@ -150,9 +116,6 @@ const formatTickLabel = (value: number): string => {
   return `${String(Math.round(value))}%`;
 };
 
-/** Mirrors ChartContainer's CSS-variable slug so lines can use shadcn chart theme variables. */
-const chartColorVar = (key: string): string => `var(--color-${key.replace(/[^a-zA-Z0-9]+/g, '-')})`;
-
 /** Builds cumulative running totals from the density-bin rows for the stepped cumulative figure. */
 const buildCumulativeChartData = (
   bins: readonly Record<string, unknown>[],
@@ -173,19 +136,16 @@ const buildCumulativeChartData = (
   });
 };
 
-/** Parses Recharts' active tooltip index and rejects pointer events outside the charted points. */
-const parseActiveTooltipIndex = (
-  rawIndex: number | string | undefined,
-  pointCount: number,
-): number | null => {
-  const parsed =
-    typeof rawIndex === 'number'
-      ? rawIndex
-      : typeof rawIndex === 'string'
-        ? Number(rawIndex)
-        : Number.NaN;
-  if (!Number.isInteger(parsed) || parsed < 0 || parsed >= pointCount) return null;
-  return parsed;
+const displayChartValue = (value: unknown): string => {
+  if (
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'bigint' ||
+    typeof value === 'boolean'
+  ) {
+    return String(value);
+  }
+  return '0';
 };
 
 /**
@@ -212,9 +172,7 @@ export function ConcordanceDispersionSummary({
 }: Props) {
   const controlId = useId();
   const chartContainerRef = useRef<HTMLDivElement | null>(null);
-  const dragSelectionRef = useRef<DragSelection | null>(null);
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
-  const [dragSelection, setDragSelection] = useState<DragSelection | null>(null);
   const [chartMenuOpen, setChartMenuOpen] = useState(false);
   const [cumulativeOptionOpen, setCumulativeOptionOpen] = useState(false);
 
@@ -282,116 +240,126 @@ export function ConcordanceDispersionSummary({
     [bins, chartMode, series],
   );
 
-  const chartConfig = useMemo<ChartConfig>(() => {
-    const config: ChartConfig = {};
-    for (const item of series) {
-      config[item.key] = {
-        label: item.label ?? item.key,
-        color: item.color,
-      };
-    }
-    return config;
-  }, [series]);
-
-  const lineType = chartMode === 'cumulative' ? 'step' : 'natural';
   const hasSelection = !!selection && selection.selectedIndices.size > 0;
   const usesGroupedBars = chartMode === 'density-bar' && binCount <= GROUPED_BAR_MAX_BIN_COUNT;
   const usesStackedBars = chartMode === 'density-bar' && !usesGroupedBars;
-
-  /** Starts a chart drag-selection from the nearest Recharts tooltip point. */
-  const handleDragStart = selection
-    ? (nextState: ChartPointerState | null | undefined) => {
-        const index = parseActiveTooltipIndex(nextState?.activeTooltipIndex, chartData.length);
-        if (index == null) return;
-        const next = { startIndex: index, endIndex: index };
-        dragSelectionRef.current = next;
-        setDragSelection(next);
-      }
-    : undefined;
-
-  /** Updates the visual drag-selection range while the pointer moves across chart points. */
-  const handleDragMove = selection
-    ? (nextState: ChartPointerState | null | undefined) => {
-        const index = parseActiveTooltipIndex(nextState?.activeTooltipIndex, chartData.length);
-        if (index == null) return;
-        const current = dragSelectionRef.current;
-        if (!current || current.endIndex === index) return;
-        const next = { ...current, endIndex: index };
-        dragSelectionRef.current = next;
-        setDragSelection(next);
-      }
-    : undefined;
-
-  /** Commits a drag range, preserving single-point click selection when start and end match. */
-  const handleDragEnd = selection
-    ? (nextState: ChartPointerState | null | undefined, event?: ChartPointerEvent) => {
-        const current = dragSelectionRef.current;
-        if (!current) return;
-        const endIndex =
-          parseActiveTooltipIndex(nextState?.activeTooltipIndex, chartData.length) ??
-          current.endIndex;
-        const shiftHeld = !!event?.shiftKey;
-        if (current.startIndex === endIndex) {
-          selection.onSelect(endIndex, shiftHeld);
-        } else {
-          selection.onSelectRange(current.startIndex, endIndex, shiftHeld);
+  const usesSelectionVisual = hasSelection && chartMode === 'density-bar';
+  const source = usesSelectionVisual
+    ? chartData.map((row, index) => ({
+        ...row,
+        [SELECTION_DIMENSION]: selection.selectedIndices.has(index) ? 1 : 0,
+      }))
+    : chartData;
+  const seriesOptions = series.map((item) => {
+    const common = {
+      id: item.key,
+      name: item.label ?? item.key,
+      encode: { x: 'binCenter', y: item.key, tooltip: [item.key] },
+      itemStyle: { color: item.color },
+      emphasis: { focus: 'series' as const },
+    };
+    if (chartMode === 'density-bar') {
+      return {
+        ...common,
+        type: 'bar' as const,
+        stack: usesStackedBars ? 'density' : undefined,
+        barGap: usesGroupedBars ? '10%' : '0%',
+        barCategoryGap: usesGroupedBars ? '8%' : '4%',
+        itemStyle: {
+          color: item.color,
+          borderRadius: usesStackedBars ? 0 : [4, 4, 0, 0],
+        },
+      };
+    }
+    return {
+      ...common,
+      type: 'line' as const,
+      ...(chartMode === 'cumulative' ? { step: 'middle' as const } : { smooth: true }),
+      ...(chartMode === 'density-area' ? { stack: 'density' } : {}),
+      showSymbol: chartMode === 'density-line' || hasSelection,
+      symbolSize: (_value: unknown, params: { dataIndex?: number }) => {
+        if (!hasSelection) return chartMode === 'density-line' ? 6 : 0;
+        return selection.selectedIndices.has(params.dataIndex ?? -1) ? 10 : 6;
+      },
+      lineStyle: { color: item.color, width: 2 },
+      areaStyle:
+        chartMode === 'density-area'
+          ? { color: item.color, opacity: hasSelection ? 0.2 : 0.35 }
+          : undefined,
+    };
+  });
+  const chartOption: EChartsCoreOption = {
+    dataset: {
+      dimensions: [
+        'binCenter',
+        ...series.map((item) => item.key),
+        ...(usesSelectionVisual ? [SELECTION_DIMENSION] : []),
+      ],
+      source,
+    },
+    grid: { containLabel: true, top: 10, right: 12, bottom: 32, left: 12 },
+    tooltip: {
+      trigger: 'axis',
+      renderMode: 'richText',
+      confine: true,
+      axisPointer: { type: 'line' },
+      formatter: (rawParams: unknown) => {
+        const params = Array.isArray(rawParams)
+          ? (rawParams as { value?: Record<string, unknown> }[])
+          : [];
+        const row = params[0]?.value;
+        const lines = [formatBinRange(Number(row?.binCenter), binCount)];
+        for (const item of series) {
+          lines.push(`${item.label ?? item.key}: ${displayChartValue(row?.[item.key])}`);
         }
-        dragSelectionRef.current = null;
-        setDragSelection(null);
-      }
-    : undefined;
-
-  /** Cancels incomplete drag affordances if the pointer leaves the chart before release. */
-  const handleDragCancel = selection
-    ? () => {
-        dragSelectionRef.current = null;
-        setDragSelection(null);
-      }
-    : undefined;
-
-  interface DotProps {
-    cx?: number;
-    cy?: number;
-    index?: number;
-  }
-
-  /** Renders density dots by default and switches to selection-aware dots when bins are selected. */
-  const renderDot = (color: string, showDefaultDot: boolean) => (props: DotProps) => {
-    const { cx, cy, index } = props;
-    if (typeof cx !== 'number' || typeof cy !== 'number' || typeof index !== 'number') {
-      return null;
-    }
-    if (!hasSelection) {
-      return showDefaultDot ? <circle cx={cx} cy={cy} r={3} fill={color} /> : null;
-    }
-    if (selection.selectedIndices.has(index)) {
-      return <circle cx={cx} cy={cy} r={5} fill={color} stroke="white" strokeWidth={1.5} />;
-    }
-    return <circle cx={cx} cy={cy} r={3} fill={color} fillOpacity={0.25} />;
-  };
-
-  /** Derives the Recharts dot renderer for line/area modes and selection state. */
-  const dotFor = (item: DispersionChartSeries) => {
-    const color = chartColorVar(item.key);
-    if (selection) return renderDot(color, chartMode === 'density-line');
-    if (chartMode === 'density-line') return { fill: color };
-    return false;
-  };
-
-  const binCenterForIndex = (index: number): number | null => {
-    const raw = chartData[index]?.binCenter;
-    return typeof raw === 'number' && Number.isFinite(raw) ? raw : null;
-  };
-
-  const dragStartX = dragSelection ? binCenterForIndex(dragSelection.startIndex) : null;
-  const dragEndX = dragSelection ? binCenterForIndex(dragSelection.endIndex) : null;
-  const dragRange =
-    dragStartX != null && dragEndX != null
+        return lines.join('\n');
+      },
+    },
+    xAxis: {
+      type: 'value',
+      min: 0,
+      max: 100,
+      interval: 20,
+      axisLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: { formatter: (value: number) => formatTickLabel(value), margin: 8 },
+      splitLine: { show: false },
+    },
+    yAxis: {
+      type: 'value',
+      minInterval: 1,
+      axisLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: { margin: 8 },
+      splitLine: { lineStyle: { color: 'var(--vscode-charts-lines)' } },
+    },
+    // Per-item opacity is encoded for bars. Line and area modes show selection
+    // through their point symbols instead.
+    ...(usesSelectionVisual
       ? {
-          x1: Math.max(0, Math.min(dragStartX, dragEndX) - 100 / Math.max(1, binCount) / 2),
-          x2: Math.min(100, Math.max(dragStartX, dragEndX) + 100 / Math.max(1, binCount) / 2),
+          visualMap: {
+            type: 'piecewise',
+            show: false,
+            dimension: SELECTION_DIMENSION,
+            seriesIndex: seriesOptions.map((_, index) => index),
+            pieces: [
+              { value: 1, opacity: 1 },
+              { value: 0, opacity: 0.25 },
+            ],
+          },
         }
-      : null;
+      : {}),
+    series: seriesOptions,
+  };
+  const getPointSummary = (index: number) => {
+    const row = chartData[index];
+    if (!row) return `Bin ${String(index + 1)}`;
+    const values = series.map(
+      (item) => `${item.label ?? item.key}: ${displayChartValue(row[item.key])}`,
+    );
+    return `${formatBinRange(Number(row.binCenter), binCount)}. ${values.join(', ')}`;
+  };
+  const dataResetKey = `${String(binCount)}:${JSON.stringify(bins)}`;
 
   /**
    * Called by: ConcordanceDispersionSummary download dialog to export the rendered chart.
@@ -438,146 +406,36 @@ export function ConcordanceDispersionSummary({
     }
   };
 
-  const chartContents = (
-    <>
-      {usesGroupedBars &&
-        chartData.map((_, index) =>
-          index % 2 === 0 ? (
-            <ReferenceArea
-              key={`bar-bin-background-${String(index)}`}
-              x1={(index * 100) / binCount}
-              x2={((index + 1) * 100) / binCount}
-              fill="var(--muted)"
-              fillOpacity={0.45}
-              strokeOpacity={0}
-              ifOverflow="hidden"
-            />
-          ) : null,
-        )}
-      <CartesianGrid vertical={false} />
-      <XAxis
-        dataKey="binCenter"
-        type="number"
-        domain={[0, 100]}
-        ticks={X_AXIS_TICKS}
-        tickFormatter={formatTickLabel}
-        tickLine={false}
-        axisLine={false}
-        tickMargin={8}
-      />
-      <YAxis allowDecimals={false} tickLine={false} axisLine={false} tickMargin={8} width={36} />
-      <ChartTooltip
-        cursor={false}
-        content={
-          <ChartTooltipContent
-            indicator="line"
-            labelFormatter={(label) => formatBinRange(Number(label), binCount)}
-          />
-        }
-      />
-      {dragRange && (
-        <ReferenceArea
-          x1={dragRange.x1}
-          x2={dragRange.x2}
-          fill="var(--vscode-button-background)"
-          fillOpacity={0.12}
-          strokeOpacity={0}
-        />
-      )}
-      {dragStartX != null && (
-        <ReferenceLine
-          x={dragStartX}
-          stroke="var(--vscode-button-background)"
-          strokeDasharray="4 4"
-          strokeWidth={2}
-        />
-      )}
-      {chartMode === 'density-bar'
-        ? series.map((item) => (
-            <Bar
-              key={item.key}
-              dataKey={item.key}
-              name={item.label ?? item.key}
-              fill={chartColorVar(item.key)}
-              stackId={usesStackedBars ? 'density' : undefined}
-              radius={usesStackedBars ? 0 : [4, 4, 0, 0]}
-              isAnimationActive={false}
-              shape={(barProps: BarShapeProps) => (
-                <Rectangle
-                  {...barProps}
-                  fillOpacity={
-                    !selection || !hasSelection || selection.selectedIndices.has(barProps.index)
-                      ? 1
-                      : 0.25
-                  }
-                />
-              )}
-            />
-          ))
-        : chartMode === 'density-area'
-          ? series.map((item) => (
-              <Area
-                key={item.key}
-                dataKey={item.key}
-                name={item.label ?? item.key}
-                type="natural"
-                stackId="density"
-                stroke={chartColorVar(item.key)}
-                strokeDasharray={item.dash}
-                fill={chartColorVar(item.key)}
-                fillOpacity={hasSelection ? 0.2 : 0.35}
-                dot={dotFor(item)}
-                activeDot={{ r: 6 }}
-                isAnimationActive={false}
-                connectNulls
-              />
-            ))
-          : series.map((item) => (
-              <Line
-                key={item.key}
-                dataKey={item.key}
-                name={item.label ?? item.key}
-                type={lineType}
-                stroke={chartColorVar(item.key)}
-                strokeDasharray={item.dash}
-                strokeWidth={2}
-                dot={dotFor(item)}
-                activeDot={{ r: 6 }}
-                isAnimationActive={false}
-                connectNulls
-              />
-            ))}
-    </>
-  );
-
-  const chartProps = {
-    accessibilityLayer: true,
-    data: chartData as never,
-    margin: { top: 10, right: 12, bottom: 4, left: 12 },
-    onMouseDown: handleDragStart as never,
-    onMouseMove: handleDragMove as never,
-    onMouseUp: handleDragEnd as never,
-    onMouseLeave: handleDragCancel,
-  };
-
   return (
     <>
-      <ConcordanceDispersionMatchControls
-        items={allSeries}
-        uncasedMatchedTexts={uncasedMatchedTexts}
-        onUncasedMatchedTextsChange={onUncasedMatchedTextsChange}
-        onToggleMatchedTexts={onToggleMatchedTexts}
+      <FilterableSeriesControls
+        items={allSeries.map((item) => ({
+          key: item.key,
+          color: item.color,
+          text: item.countLabel,
+          label: item.countLabel,
+          hidden: item.hidden,
+        }))}
+        ariaLabel="Matched terms"
+        pressedWhenHidden
+        uncased={uncasedMatchedTexts}
+        onUncasedChange={onUncasedMatchedTextsChange}
+        onClearSelection={selection?.onClear}
+        clearSelectionDisabled={!selection || selection.selectedIndices.size === 0}
+        onToggle={
+          onToggleMatchedTexts
+            ? (key) => {
+                const item = allSeries.find((candidate) => candidate.key === key);
+                if (item) onToggleMatchedTexts(item.matchedTexts);
+              }
+            : undefined
+        }
       />
       {showChart ? (
         <Card data-testid="concordance-dispersion-chart">
           <CardHeader className="gap-3 pb-2 md:flex-row md:items-start md:justify-between">
             <CardTitle className="text-body">{chartTitle}</CardTitle>
             <div className="flex flex-wrap items-center justify-end gap-3">
-              {selection && selection.selectedIndices.size > 0 && (
-                <Button type="button" variant="outline" size="sm" onClick={selection.onClear}>
-                  Clear Selection ({selection.selectedIndices.size})
-                </Button>
-              )}
               {onBinCountChange && (
                 <div className="flex items-center gap-2 text-body text-foreground">
                   <span id={`${controlId}-bin-count`}>Bin No.</span>
@@ -690,34 +548,18 @@ export function ConcordanceDispersionSummary({
             </div>
           </CardHeader>
           <CardContent ref={chartContainerRef} className="pb-2">
-            <ChartContainer
-              config={chartConfig}
-              className={selection ? 'h-[240px] w-full cursor-pointer' : 'h-[240px] w-full'}
-            >
-              <ResponsiveContainer
-                width="100%"
-                height="100%"
-                minWidth={0}
-                initialDimension={{
-                  width: RESPONSIVE_CHART_INITIAL_WIDTH,
-                  height: CHART_HEIGHT,
-                }}
-              >
-                {chartMode === 'density-bar' ? (
-                  <BarChart
-                    {...chartProps}
-                    barGap={usesGroupedBars ? 1 : 0}
-                    barCategoryGap={usesGroupedBars ? '8%' : '4%'}
-                  >
-                    {chartContents}
-                  </BarChart>
-                ) : chartMode === 'density-area' ? (
-                  <AreaChart {...chartProps}>{chartContents}</AreaChart>
-                ) : (
-                  <LineChart {...chartProps}>{chartContents}</LineChart>
-                )}
-              </ResponsiveContainer>
-            </ChartContainer>
+            <EChartsView
+              option={chartOption}
+              height={CHART_HEIGHT}
+              pointCount={chartData.length}
+              dataResetKey={dataResetKey}
+              ariaLabel={`${chartTitle}. ${titleText}`}
+              selectedIndices={selection?.selectedIndices}
+              onSelect={selection?.onSelect}
+              onSelectRange={selection?.onSelectRange}
+              getPointSummary={getPointSummary}
+              testId="concordance-echarts"
+            />
           </CardContent>
           <ChartImageDownloadDialog
             open={downloadDialogOpen}

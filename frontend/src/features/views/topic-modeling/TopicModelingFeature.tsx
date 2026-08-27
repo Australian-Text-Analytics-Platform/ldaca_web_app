@@ -21,9 +21,9 @@ import { TopicModelingParameterPanel } from './components/panels/TopicModelingPa
 import { TopicModelingResultsPanel } from './components/panels/TopicModelingResultsPanel';
 import {
   TopicModelingAddToWorkspaceDialog,
+  type TopicModelingAddToWorkspaceSelection,
   type TopicModelingAddToWorkspaceSource,
 } from './components/TopicModelingAddToWorkspaceDialog';
-import { createDefaultTopicModelingAddToWorkspaceColumns } from './components/topicModelingAddToWorkspaceState';
 import {
   DEFAULT_MAX_SEGMENT_TOKENS,
   DEFAULT_MIN_CLUSTER_SIZE,
@@ -133,9 +133,6 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
   const [isClearing, setIsClearing] = useState(false);
   const [addToWorkspaceDialogOpen, setAddToWorkspaceDialogOpen] = useState(false);
   const [isAddingToWorkspace, setIsAddingToWorkspace] = useState(false);
-  const [addToWorkspaceSourceIds, setAddToWorkspaceSourceIds] = useState<Set<string>>(new Set());
-  const [addToWorkspaceColumns, setAddToWorkspaceColumns] = useState<Record<string, string[]>>({});
-  const [addToWorkspaceNames, setAddToWorkspaceNames] = useState<Record<string, string>>({});
 
   const {
     request: serverRequest,
@@ -311,37 +308,21 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
   }));
 
   const openAddToWorkspaceDialog = () => {
-    const sourceIds = new Set(addToWorkspaceSources.map((source) => source.id));
-    setAddToWorkspaceSourceIds(sourceIds);
-    setAddToWorkspaceColumns(
-      createDefaultTopicModelingAddToWorkspaceColumns(addToWorkspaceSources),
-    );
-    setAddToWorkspaceNames(
-      Object.fromEntries(
-        addToWorkspaceSources.map((source) => [source.id, `${source.name} topics`]),
-      ),
-    );
     setAddToWorkspaceDialogOpen(true);
   };
 
-  const handleAddToWorkspace = async () => {
-    if (!tabTaskId || addToWorkspaceSourceIds.size === 0) return;
-    const nodeIds = addToWorkspaceSources
-      .map((source) => source.id)
-      .filter((nodeId) => addToWorkspaceSourceIds.has(nodeId));
+  const handleAddToWorkspace = async (selections: TopicModelingAddToWorkspaceSelection[]) => {
+    if (!tabTaskId || selections.length === 0) return;
+    const nodeIds = selections.map((selection) => selection.sourceId);
     setIsAddingToWorkspace(true);
     try {
       await createTopicModelingDataBlocks(host.tabId, tabTaskId, {
         node_ids: nodeIds,
         selected_columns: Object.fromEntries(
-          nodeIds.map((nodeId) => {
-            const source = addToWorkspaceSources.find((candidate) => candidate.id === nodeId);
-            const selected = new Set(addToWorkspaceColumns[nodeId] ?? []);
-            return [nodeId, source?.columns.filter((column) => selected.has(column)) ?? []];
-          }),
+          selections.map((selection) => [selection.sourceId, selection.selectedColumns]),
         ),
         new_node_names: Object.fromEntries(
-          nodeIds.map((nodeId) => [nodeId, addToWorkspaceNames[nodeId]?.trim() ?? '']),
+          selections.map((selection) => [selection.sourceId, selection.newName]),
         ),
         topic_ids: selectedTopicIds.size > 0 ? [...selectedTopicIds] : null,
         cluster_count: result?.clustering.cluster_count ?? 0,
@@ -545,41 +526,18 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
           }}
         />
       )}
-      <TopicModelingAddToWorkspaceDialog
-        open={addToWorkspaceDialogOpen}
-        onOpenChange={setAddToWorkspaceDialogOpen}
-        sources={addToWorkspaceSources}
-        selectedSourceIds={addToWorkspaceSourceIds}
-        selectedColumns={addToWorkspaceColumns}
-        names={addToWorkspaceNames}
-        selectedTopicCount={selectedTopicIds.size > 0 ? selectedTopicIds.size : null}
-        isSubmitting={isAddingToWorkspace}
-        onToggleSource={(nodeId) => {
-          setAddToWorkspaceSourceIds((current) => {
-            const next = new Set(current);
-            if (next.has(nodeId)) next.delete(nodeId);
-            else next.add(nodeId);
-            return next;
-          });
-        }}
-        onToggleColumn={(nodeId, column) => {
-          setAddToWorkspaceColumns((current) => {
-            const columns = current[nodeId] ?? [];
-            return {
-              ...current,
-              [nodeId]: columns.includes(column)
-                ? columns.filter((item) => item !== column)
-                : [...columns, column],
-            };
-          });
-        }}
-        onNameChange={(nodeId, name) => {
-          setAddToWorkspaceNames((current) => ({ ...current, [nodeId]: name }));
-        }}
-        onSubmit={() => {
-          void handleAddToWorkspace();
-        }}
-      />
+      {addToWorkspaceDialogOpen ? (
+        <TopicModelingAddToWorkspaceDialog
+          open
+          onOpenChange={setAddToWorkspaceDialogOpen}
+          sources={addToWorkspaceSources}
+          selectedTopicCount={selectedTopicIds.size > 0 ? selectedTopicIds.size : null}
+          isSubmitting={isAddingToWorkspace}
+          onSubmit={(selections) => {
+            void handleAddToWorkspace(selections);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

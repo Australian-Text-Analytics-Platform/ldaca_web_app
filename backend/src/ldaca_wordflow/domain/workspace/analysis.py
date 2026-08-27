@@ -206,8 +206,6 @@ class SequentialAnalysisRequest(_StrictModel):
     custom_interval_unit: (
         Literal["seconds", "minutes", "hours", "days", "weeks"] | None
     ) = None
-    case_sensitive: bool = True
-
     @model_validator(mode="after")
     def validate_interval(self) -> "SequentialAnalysisRequest":
         if self.column_type == "numeric" and (
@@ -334,6 +332,30 @@ class DataBlockCreationSource(_StrictModel):
         return self
 
 
+class SequentialDataBlockCreationSource(DataBlockCreationSource):
+    """One immutable Trends filter and source-column selection."""
+
+    selected_period_indices: list[int] | None = Field(default=None, min_length=1)
+    excluded_group_indices: list[int] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_filter(self) -> "SequentialDataBlockCreationSource":
+        if self.selected_period_indices is not None:
+            if len(self.selected_period_indices) != len(
+                set(self.selected_period_indices)
+            ):
+                raise ValueError("Selected Trends periods must be unique")
+            if any(index < 0 for index in self.selected_period_indices):
+                raise ValueError("Selected Trends period is out of range")
+        if len(self.excluded_group_indices) != len(
+            set(self.excluded_group_indices)
+        ):
+            raise ValueError("Excluded Trends groups must be unique")
+        if any(index < 0 for index in self.excluded_group_indices):
+            raise ValueError("Excluded Trends group is out of range")
+        return self
+
+
 class ConcordanceDocumentDataBlockCreationSource(_StrictModel):
     """One source and exact Review filter for document-wise Data Block Creation."""
 
@@ -396,6 +418,11 @@ class ConcordanceDocumentDataBlockCreationAnalysisRequest(_StrictModel):
 class QuotationResultDataBlockCreationAnalysisRequest(_StrictModel):
     kind: Literal["quotation_result_data_block_creation"] = "quotation_result_data_block_creation"
     source: DataBlockCreationSource
+
+
+class SequentialDataBlockCreationAnalysisRequest(_StrictModel):
+    kind: Literal["sequential_data_block_creation"] = "sequential_data_block_creation"
+    source: SequentialDataBlockCreationSource
 
 
 class AnnotationRunAllAnalysisRequest(_StrictModel):
@@ -477,6 +504,7 @@ SupportingAnalysisRequest = Annotated[
     | ConcordanceMatchDataBlockCreationAnalysisRequest
     | ConcordanceDocumentDataBlockCreationAnalysisRequest
     | QuotationResultDataBlockCreationAnalysisRequest
+    | SequentialDataBlockCreationAnalysisRequest
     | AnnotationRunAllAnalysisRequest
     | TopicModelingDataBlockCreationAnalysisRequest,
     Field(discriminator="kind"),
@@ -496,6 +524,7 @@ AnalysisSubmission = Annotated[
     | ConcordanceMatchDataBlockCreationAnalysisRequest
     | ConcordanceDocumentDataBlockCreationAnalysisRequest
     | QuotationResultDataBlockCreationAnalysisRequest
+    | SequentialDataBlockCreationAnalysisRequest
     | AnnotationRunAllSubmission
     | TopicModelingDataBlockCreationAnalysisRequest,
     Field(discriminator="kind"),
@@ -507,6 +536,7 @@ SupportingAnalysisSubmission = Annotated[
     | ConcordanceMatchDataBlockCreationAnalysisRequest
     | ConcordanceDocumentDataBlockCreationAnalysisRequest
     | QuotationResultDataBlockCreationAnalysisRequest
+    | SequentialDataBlockCreationAnalysisRequest
     | AnnotationRunAllSubmission
     | TopicModelingDataBlockCreationAnalysisRequest,
     Field(discriminator="kind"),
@@ -539,7 +569,11 @@ def analysis_input_ids(request: AnalysisRequest) -> tuple[uuid.UUID, ...]:
         ),
     ):
         return tuple(source.source_node_id for source in request.sources)
-    if isinstance(request, QuotationResultDataBlockCreationAnalysisRequest):
+    if isinstance(
+        request,
+        QuotationResultDataBlockCreationAnalysisRequest
+        | SequentialDataBlockCreationAnalysisRequest,
+    ):
         return (request.source.source_node_id,)
     if isinstance(
         request,
@@ -862,6 +896,8 @@ __all__ = [
     "PreviewAnalysisRequest",
     "PreviewAnalysisSubmission",
     "SequentialAnalysisRequest",
+    "SequentialDataBlockCreationAnalysisRequest",
+    "SequentialDataBlockCreationSource",
     "DataBlockCreationSource",
     "TokenFrequencyAnalysisRequest",
     "TopicModelingAnalysisRequest",

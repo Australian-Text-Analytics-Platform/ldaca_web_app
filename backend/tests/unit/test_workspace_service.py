@@ -12,10 +12,13 @@ import polars as pl
 import pytest
 
 from ldaca_wordflow.shared.errors import (
+    AppError,
     BackendCapacityExceededError,
     InvalidWorkspaceArchiveError,
     WorkspaceClosingError,
     WorkspaceCorruptError,
+    WorkspaceInUseError,
+    WorkspaceLockUnavailableError,
     WorkspaceNotFoundError,
     WorkspaceNotOpenError,
 )
@@ -32,6 +35,7 @@ from ldaca_wordflow.services.workspace import (
 from ldaca_wordflow.services.events import EventHub
 from ldaca_wordflow.infrastructure.storage.layout import (
     user_root,
+    workspace_locks_root,
     workspaces_root,
 )
 from ldaca_wordflow.settings import Settings
@@ -174,7 +178,7 @@ async def test_incompatible_workspace_versions_are_distinct_catalogue_entries(
         (record.stored_schema_version, record.supported_schema_version)
         for record in unavailable
         if isinstance(record, UnavailableWorkspaceRecord)
-    } == {(17, 19), (18, 19)}
+    } == {(17, 21), (18, 21)}
     assert all(
         isinstance(record, UnavailableWorkspaceRecord)
         and record.reason == "incompatible_format"
@@ -300,6 +304,71 @@ async def test_workspace_creation_stays_closed_until_explicit_open(
 
 
 @pytest.mark.anyio
+async def test_independent_services_cannot_open_the_same_workspace(
+    tmp_path: Path,
+) -> None:
+    """A Workspace open in one backend is unavailable to another backend."""
+
+    first = _service(tmp_path)
+    second = _service(tmp_path)
+    created = await first.create_workspace("user", "Exclusive")
+    await first.open_workspace("user", created.id)
+
+    with pytest.raises(AppError) as exc_info:
+        await second.open_workspace("user", created.id)
+
+    assert exc_info.value.status_code == 409
+    assert exc_info.value.code == "workspace_in_use"
+    assert exc_info.value.message == (
+        "Workspace is open in another Wordflow backend process"
+    )
+
+
+@pytest.mark.anyio
+async def test_delete_rejects_external_owner_then_succeeds_after_close(
+    tmp_path: Path,
+) -> None:
+    """Deletion shares the same per-Workspace process-ownership boundary."""
+
+    holder = _service(tmp_path)
+    other = _service(tmp_path)
+    created = await holder.create_workspace("user", "Delete safely")
+    await holder.open_workspace("user", created.id)
+
+    with pytest.raises(WorkspaceInUseError):
+        async with other.deletion_context("user", created.id):
+            pass
+    assert (workspaces_root(holder.settings) / created.id).is_dir()
+
+    await holder.close()
+    async with other.deletion_context("user", created.id):
+        pass
+    assert not (workspaces_root(holder.settings) / created.id).exists()
+
+
+@pytest.mark.anyio
+async def test_startup_reconciliation_skips_locked_workspace_and_repairs_sibling(
+    tmp_path: Path,
+) -> None:
+    """One live Workspace does not block reconciliation of unlocked siblings."""
+
+    holder = _service(tmp_path)
+    reconciler = _service(tmp_path)
+    locked = await holder.create_workspace("user", "Locked")
+    sibling = await holder.create_workspace("user", "Sibling")
+    await holder.open_workspace("user", locked.id)
+
+    def mark_reconciled(workspace: Workspace) -> bool:
+        workspace.description = "reconciled"
+        return True
+
+    await reconciler.reconcile_durable_workspaces(mark_reconciled)
+
+    assert (await holder.get_workspace("user", locked.id)).description == ""
+    assert (await holder.get_workspace("user", sibling.id)).description == "reconciled"
+
+
+@pytest.mark.anyio
 async def test_concurrent_open_loads_one_aggregate_and_reuses_it(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -353,6 +422,79 @@ async def test_failed_open_remains_closed_and_can_be_retried(
     opened = await service.open_workspace("user", created.id)
     assert opened.runtime_state == "open"
     assert calls == 2
+
+
+@pytest.mark.anyio
+async def test_failed_open_releases_process_ownership(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    failing = _service(tmp_path)
+    replacement = _service(tmp_path)
+    created = await failing.create_workspace("user", "Release after failure")
+
+    def fail_load(_path: Path) -> tuple[Workspace, int, int]:
+        raise WorkspaceCorruptError("temporary load failure")
+
+    monkeypatch.setattr(failing, "_load_sync", fail_load)
+    with pytest.raises(WorkspaceCorruptError):
+        await failing.open_workspace("user", created.id)
+
+    assert (
+        await replacement.open_workspace("user", created.id)
+    ).runtime_state == "open"
+
+
+@pytest.mark.anyio
+async def test_cancelled_open_reservation_releases_process_ownership(
+    tmp_path: Path,
+) -> None:
+    service = _service(tmp_path)
+    replacement = _service(tmp_path)
+    created = await service.create_workspace("user", "Cancelled reservation")
+    ready = anyio.Event()
+    finished = anyio.Event()
+    scopes: list[anyio.CancelScope] = []
+
+    async def reserve_until_cancelled() -> None:
+        with anyio.CancelScope() as scope:
+            scopes.append(scope)
+            async with service.reserve_open("user", created.id):
+                ready.set()
+                await anyio.sleep_forever()
+        finished.set()
+
+    async with anyio.create_task_group() as task_group:
+        task_group.start_soon(reserve_until_cancelled)
+        await ready.wait()
+        scopes[0].cancel()
+        await finished.wait()
+
+    assert (
+        await replacement.open_workspace("user", created.id)
+    ).runtime_state == "open"
+
+
+@pytest.mark.anyio
+async def test_unsafe_workspace_lock_entry_fails_closed_without_following_link(
+    tmp_path: Path,
+) -> None:
+    service = _service(tmp_path)
+    created = await service.create_workspace("user", "Unsafe lock")
+    outside = tmp_path / "outside.txt"
+    outside.write_text("do not modify", encoding="utf-8")
+    lock_root = workspace_locks_root(service.settings)
+    lock_root.mkdir(parents=True)
+    lock_path = lock_root / f"{created.id}.lock"
+    try:
+        lock_path.symlink_to(outside)
+    except OSError as exc:
+        pytest.skip(f"symlinks are unavailable: {exc}")
+
+    with pytest.raises(WorkspaceLockUnavailableError):
+        await service.open_workspace("user", created.id)
+
+    assert outside.read_text(encoding="utf-8") == "do not modify"
 
 
 @pytest.mark.anyio
@@ -417,9 +559,15 @@ async def test_close_is_immediate_when_idle_and_open_cancels_deferred_close(
     active = True
     closing = await service.request_close("user", created.id, has_work)
     assert closing is not None and closing.runtime_state == "closing"
+    competitor = _service(tmp_path)
+    with pytest.raises(WorkspaceInUseError):
+        await competitor.open_workspace("user", created.id)
     active = False
     await service.finalize_close_if_idle("user", created.id, has_work)
     assert (await service.get_workspace("user", created.id)).runtime_state == "closed"
+    assert (
+        await competitor.open_workspace("user", created.id)
+    ).runtime_state == "open"
 
 
 @pytest.mark.anyio
@@ -605,6 +753,20 @@ async def test_shutdown_does_not_create_a_workspace_revision(tmp_path: Path) -> 
     replacement = _service(tmp_path)
     restored = await replacement.get_workspace("user", created.id)
     assert restored.revision == created.revision
+
+
+@pytest.mark.anyio
+async def test_shutdown_releases_workspace_process_ownership(tmp_path: Path) -> None:
+    service = _service(tmp_path)
+    created = await service.create_workspace("user", "Shutdown release")
+    await service.open_workspace("user", created.id)
+
+    await service.close()
+
+    replacement = _service(tmp_path)
+    assert (
+        await replacement.open_workspace("user", created.id)
+    ).runtime_state == "open"
 
 
 @pytest.mark.anyio

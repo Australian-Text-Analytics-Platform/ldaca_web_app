@@ -16,8 +16,7 @@ def run_result_data_block_creation(
     artifact_dir: str,
     request_payload: dict[str, Any],
     result_paths: dict[str, str],
-    document_columns: dict[str, str],
-    source_colors: dict[str, str | None],
+    document_columns: dict[str, str | None],
     progress_callback: Callable[[float, str], None] | None = None,
 ) -> dict[str, Any]:
     """Create private output files for one atomic Data Block Creation."""
@@ -35,6 +34,9 @@ def run_result_data_block_creation(
             DerivationProvenance,
             QuotationResultDataBlockCreationAnalysisRequest,
             QuotationResultDataBlockCreationDerivation,
+            SequentialDataBlockCreationAnalysisRequest,
+            SequentialDataBlockCreationDerivation,
+            SequentialDataBlockCreationSource,
             node_reference,
         )
         from ..infrastructure.storage.node_store import write_published_frame
@@ -61,6 +63,13 @@ def run_result_data_block_creation(
             selections = [request.source]
             operation = QuotationResultDataBlockCreationDerivation()
             nested_column = "quotation"
+        elif kind == "sequential_data_block_creation":
+            request = SequentialDataBlockCreationAnalysisRequest.model_validate(
+                request_payload
+            )
+            selections = [request.source]
+            operation = SequentialDataBlockCreationDerivation()
+            nested_column = None
         else:
             raise ValueError("Data Block Creation kind is unsupported")
 
@@ -69,9 +78,39 @@ def run_result_data_block_creation(
             source_id = str(selection.source_node_id)
             path = result_paths.get(source_id)
             document_column = document_columns.get(source_id)
-            if path is None or document_column is None:
+            if path is None or (
+                document_column is None
+                and not isinstance(selection, SequentialDataBlockCreationSource)
+            ):
                 raise ValueError("Data Block Creation source artifact is unavailable")
-            if isinstance(selection, ConcordanceDocumentDataBlockCreationSource):
+            if isinstance(selection, SequentialDataBlockCreationSource):
+                from ..analysis.sequential_core import (
+                    SEQUENTIAL_PUBLICATION_GROUP_INDEX_COLUMN,
+                    SEQUENTIAL_PUBLICATION_PERIOD_INDEX_COLUMN,
+                )
+
+                frame = pl.scan_parquet(path)
+                schema = frame.collect_schema()
+                if (
+                    SEQUENTIAL_PUBLICATION_PERIOD_INDEX_COLUMN not in schema
+                    or SEQUENTIAL_PUBLICATION_GROUP_INDEX_COLUMN not in schema
+                ):
+                    raise ValueError("Trends selection identity is unavailable")
+                if selection.selected_period_indices is not None:
+                    frame = frame.filter(
+                        pl.col(SEQUENTIAL_PUBLICATION_PERIOD_INDEX_COLUMN).is_in(
+                            selection.selected_period_indices
+                        )
+                    )
+                if selection.excluded_group_indices:
+                    frame = frame.filter(
+                        ~pl.col(SEQUENTIAL_PUBLICATION_GROUP_INDEX_COLUMN).is_in(
+                            selection.excluded_group_indices
+                        )
+                    )
+                output_columns = selection.selected_columns
+            elif isinstance(selection, ConcordanceDocumentDataBlockCreationSource):
+                assert document_column is not None
                 from ..analysis.concordance_projection import (
                     filter_concordance_documents,
                 )
@@ -152,8 +191,12 @@ def run_result_data_block_creation(
                         )
                     ],
                 ),
-                document=document_column,
-                color=source_colors.get(source_id),
+                document=(
+                    document_column
+                    if document_column is not None
+                    and document_column in output_columns
+                    else None
+                ),
             )
             outputs.append(
                 {

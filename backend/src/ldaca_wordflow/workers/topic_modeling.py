@@ -241,7 +241,7 @@ def run_topic_modeling_data_block_creation(
                         "document": source.document
                         if source.document in selected_columns
                         else None,
-                        "color": source.color,
+                        "color": None,
                     },
                     "parquet_path": str(topic_data_path),
                     "output_columns": output_columns,
@@ -253,7 +253,7 @@ def run_topic_modeling_data_block_creation(
                         "name": f"{topic_name} topic meanings",
                         "provenance": topic_meanings_provenance,
                         "document": None,
-                        "color": source.color,
+                        "color": None,
                     },
                     "parquet_path": str(topic_meanings_output_path),
                     "output_columns": [TOPIC_COLUMN, TOPIC_MEANING_COLUMN],

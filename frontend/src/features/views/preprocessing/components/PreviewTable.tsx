@@ -94,16 +94,30 @@ export function PreviewTable({
   loadingBadge,
   documentColumn,
 }: PreviewTableProps) {
-  const {
-    detailPayload,
-    detailOpen,
-    setDetailOpen,
-    openDetail: openRowDetail,
-  } = useRowDetailDialog();
   const columnsToRender = columns;
   const tableColSpan = Math.max(columnsToRender.length, 1);
   const currentPage = pagination?.page ?? page;
   const hasNext = pagination?.has_next ?? false;
+
+  const { detailPayload, detailOpen, setDetailOpen, openDetailAt, navigation } = useRowDetailDialog(
+    {
+      sequenceKey: `${documentColumn ?? ''}\0${String(pageSize)}\0${columns.join('\0')}`,
+      items: data,
+      page: currentPage,
+      hasPreviousPage: currentPage > 1,
+      hasNextPage: hasNext,
+      loading,
+      error,
+      onPageChange,
+      toPayload: (row) => ({
+        record: { ...row },
+        textColumn:
+          documentColumn && Object.prototype.hasOwnProperty.call(row, documentColumn)
+            ? documentColumn
+            : undefined,
+      }),
+    },
+  );
 
   const columnDefs = buildColumnDefs(columnsToRender);
 
@@ -231,17 +245,7 @@ export function PreviewTable({
                       key={row.id}
                       className="cursor-pointer transition-colors duration-150 hover:bg-panel/40"
                       onClick={() => {
-                        const original = row.original;
-                        const detailTextColumn =
-                          documentColumn &&
-                          Object.prototype.hasOwnProperty.call(original, documentColumn)
-                            ? documentColumn
-                            : undefined;
-
-                        openRowDetail({
-                          record: Object.assign({}, original),
-                          textColumn: detailTextColumn,
-                        });
+                        openDetailAt(row.index);
                       }}
                     >
                       {row.getVisibleCells().map((cell) => {
@@ -295,7 +299,12 @@ export function PreviewTable({
         </CardFooter>
       )}
 
-      <RowDetailPanel open={detailOpen} onOpenChange={setDetailOpen} payload={detailPayload} />
+      <RowDetailPanel
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        payload={detailPayload}
+        navigation={navigation}
+      />
     </Card>
   );
 }

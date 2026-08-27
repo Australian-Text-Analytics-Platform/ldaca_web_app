@@ -1,6 +1,7 @@
 import type { NodeResultView } from '../../tokenFrequencyAdapters';
 import { createTokenFilterMatcher } from '../../tokenFrequencyAdapters';
-import { memo, useRef } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import { memo, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Download } from 'lucide-react';
@@ -35,6 +36,9 @@ const BAR_ROW_HEIGHT_REM = 2;
 const BAR_ROW_GAP_REM = 0.5;
 const BAR_LIST_MAX_HEIGHT_REM =
   VISIBLE_BAR_ROWS * BAR_ROW_HEIGHT_REM + (VISIBLE_BAR_ROWS - 1) * BAR_ROW_GAP_REM;
+const ESTIMATED_BAR_ROW_HEIGHT_PX = 40;
+const ESTIMATED_BAR_LIST_HEIGHT_PX = 392;
+const BAR_ROW_OVERSCAN = 5;
 
 // Aspect ratio applied when the per-card cloud is sized from the container
 // width — keeps the cloud landscape-ish without dominating tall layouts.
@@ -78,6 +82,144 @@ const SingleNodeWordCloud = memo(
 );
 SingleNodeWordCloud.displayName = 'SingleNodeWordCloud';
 
+type TokenFrequencyListRow = NodeResultView['filteredRows'][number];
+
+interface RankedTokenFrequencyRow {
+  row: TokenFrequencyListRow;
+  rank: number;
+}
+
+interface VirtualizedTokenListProps {
+  nodeKey: string;
+  displayName: string;
+  rows: RankedTokenFrequencyRow[];
+  rankWidthCh: number;
+  color: string;
+  registerScrollElement: (element: HTMLDivElement | null) => void;
+  onScroll: (event: React.UIEvent<HTMLDivElement>) => void;
+  onTokenClick: (token: string) => void;
+  onTokenRightClick: (token: string, event?: React.MouseEvent) => void;
+}
+
+/** Returns the largest frequency without spreading a potentially full vocabulary into function arguments. */
+const maxFrequencyForRows = (rows: RankedTokenFrequencyRow[]): number => {
+  let maximum = 1;
+  for (const { row } of rows) {
+    const frequency = row.frequency || 0;
+    if (frequency > maximum) maximum = frequency;
+  }
+  return maximum;
+};
+
+/**
+ * Renders one bounded token-list window while preserving the full scroll range.
+ * TanStack Virtual owns visible-row selection and measurement; the parent owns
+ * cross-card scroll synchronization and the offset retained across view swaps.
+ */
+const VirtualizedTokenList = ({
+  nodeKey,
+  displayName,
+  rows,
+  rankWidthCh,
+  color,
+  registerScrollElement,
+  onScroll,
+  onTokenClick,
+  onTokenRightClick,
+}: VirtualizedTokenListProps) => {
+  const scrollElementRef = useRef<HTMLDivElement | null>(null);
+  const listMaxFrequency = maxFrequencyForRows(rows);
+  // TanStack Virtual is an identity-sensitive external store. React Compiler deliberately
+  // skips this child because the hook returns imperative methods that must not be memoized.
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const rowVirtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => scrollElementRef.current,
+    estimateSize: () => ESTIMATED_BAR_ROW_HEIGHT_PX,
+    initialRect: { width: 0, height: ESTIMATED_BAR_LIST_HEIGHT_PX },
+    measureElement: (element) => {
+      const measuredHeight = element.getBoundingClientRect().height;
+      return measuredHeight > 0 ? measuredHeight : ESTIMATED_BAR_ROW_HEIGHT_PX;
+    },
+    overscan: BAR_ROW_OVERSCAN,
+    useFlushSync: false,
+  });
+
+  return (
+    <div
+      ref={(element) => {
+        scrollElementRef.current = element;
+        registerScrollElement(element);
+      }}
+      onScroll={onScroll}
+      className="overflow-y-auto pr-1"
+      style={{ maxHeight: `${String(BAR_LIST_MAX_HEIGHT_REM)}rem` }}
+      role="list"
+      aria-label={`${displayName} token frequencies`}
+      data-testid={`token-frequency-list-${nodeKey}`}
+    >
+      <div
+        className="relative w-full"
+        style={{ height: `${String(rowVirtualizer.getTotalSize())}px` }}
+      >
+        {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+          const rankedRow = rows[virtualRow.index];
+          if (!rankedRow) return null;
+          const { row, rank } = rankedRow;
+          const frequency = row.frequency || 0;
+          const widthPct = Math.max(3, Math.round((frequency / listMaxFrequency) * 100));
+
+          return (
+            <div
+              key={virtualRow.key}
+              ref={rowVirtualizer.measureElement}
+              data-index={virtualRow.index}
+              role="listitem"
+              aria-posinset={virtualRow.index + 1}
+              aria-setsize={rows.length}
+              className="absolute top-0 left-0 grid w-full items-center gap-2 pb-2"
+              style={{
+                gridTemplateColumns: `${String(rankWidthCh)}ch minmax(0,1fr) 90px`,
+                transform: `translateY(${String(virtualRow.start)}px)`,
+              }}
+            >
+              <span className="text-right text-label-secondary tabular-nums text-description">
+                {rank}.
+              </span>
+              <button
+                type="button"
+                className="group relative h-8 overflow-hidden rounded-sm border text-left"
+                onClick={() => {
+                  onTokenClick(row.token);
+                }}
+                onContextMenu={(event) => {
+                  event.preventDefault();
+                  onTokenRightClick(row.token, event);
+                }}
+                title="Click to inspect in concordance. Right-click to add to stop words."
+              >
+                <span
+                  className="absolute inset-y-0 left-0 rounded-sm bg-button/20 group-hover:bg-button/30"
+                  style={{
+                    width: `${String(widthPct)}%`,
+                    backgroundColor: toBgColor(color),
+                  }}
+                />
+                <span className="relative z-10 block truncate px-2 text-body font-medium">
+                  {row.token}
+                </span>
+              </button>
+              <span className="text-right text-label-secondary tabular-nums text-description">
+                {frequency}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 /**
  * Rendered by: TokenFrequencyResultsPanel to show per-node word clouds or synchronized token lists.
  */
@@ -98,6 +240,16 @@ const TokenFrequencySingleTokenSectionInner = ({
   // component (not on each Card) so the parent can broadcast scroll events.
   const listScrollRefs = useRef<(HTMLDivElement | null)[]>([]);
   const isSyncingScrollRef = useRef(false);
+  const retainedListScrollOffsetRef = useRef(0);
+
+  useEffect(() => {
+    retainedListScrollOffsetRef.current = 0;
+    for (const scrollElement of listScrollRefs.current) {
+      if (scrollElement && scrollElement.scrollTop !== 0) {
+        scrollElement.scrollTop = 0;
+      }
+    }
+  }, [listLimit, nodeDisplayResults, tokenFilter]);
 
   /**
    * Called by: per-node token list scroll containers to keep rows visually aligned across cards.
@@ -109,6 +261,7 @@ const TokenFrequencySingleTokenSectionInner = ({
       return;
     }
     const source = event.currentTarget;
+    retainedListScrollOffsetRef.current = source.scrollTop;
     isSyncingScrollRef.current = true;
     try {
       for (let i = 0; i < listScrollRefs.current.length; i += 1) {
@@ -159,20 +312,18 @@ const TokenFrequencySingleTokenSectionInner = ({
         const matchingRankedRows = filteredRowsAll
           .map((row, rowIndex) => ({ row, rank: rowIndex + 1 }))
           .filter(({ row }) => matchesTokenFilter(row.token));
-        const filteredListRows = matchingRankedRows.slice(0, listSliceCap);
+        const filteredListRows = view === 'list' ? matchingRankedRows.slice(0, listSliceCap) : [];
         const matchingRows = matchingRankedRows.map(({ row }) => row);
         // displayRows already embodies the cloud-side limit. Reuse its length
         // after filtering the full vocabulary so matching tail rows can fill
         // the same number of cloud slots.
-        const cloudRows = matchingRows.slice(0, displayRows.length);
-        const listMaxFrequency = Math.max(
-          1,
-          ...filteredListRows.map(({ row }) => row.frequency || 0),
-        );
-        const words = cloudRows.map((item) => ({
-          text: item.token,
-          value: item.frequency || 0,
-        }));
+        const words =
+          view === 'cloud'
+            ? matchingRows.slice(0, displayRows.length).map((item) => ({
+                text: item.token,
+                value: item.frequency || 0,
+              }))
+            : [];
 
         return (
           <Card key={`${result.nodeId || result.displayName}-${String(index)}`} className="h-full">
@@ -216,75 +367,35 @@ const TokenFrequencySingleTokenSectionInner = ({
             </CardHeader>
 
             <CardContent className="space-y-2">
-              <div
-                className={
-                  view === 'cloud' ? 'mb-4 flex w-full justify-center overflow-visible' : 'hidden'
-                }
-              >
-                <SingleNodeWordCloud
+              {view === 'cloud' ? (
+                <div className="mb-4 flex w-full justify-center overflow-visible">
+                  <SingleNodeWordCloud
+                    nodeKey={nodeKey}
+                    words={words}
+                    color={color}
+                    registerWordCloudRef={registerWordCloudRef}
+                    onTokenClick={onTokenClick}
+                    onTokenRightClick={onTokenRightClick}
+                  />
+                </div>
+              ) : (
+                <VirtualizedTokenList
                   nodeKey={nodeKey}
-                  words={words}
+                  displayName={result.displayName}
+                  rows={filteredListRows}
+                  rankWidthCh={rankWidthCh}
                   color={color}
-                  registerWordCloudRef={registerWordCloudRef}
+                  registerScrollElement={(element) => {
+                    listScrollRefs.current[index] = element;
+                    if (element && element.scrollTop !== retainedListScrollOffsetRef.current) {
+                      element.scrollTop = retainedListScrollOffsetRef.current;
+                    }
+                  }}
+                  onScroll={handleListScroll(index)}
                   onTokenClick={onTokenClick}
                   onTokenRightClick={onTokenRightClick}
                 />
-              </div>
-
-              <div
-                ref={(element) => {
-                  listScrollRefs.current[index] = element;
-                }}
-                onScroll={handleListScroll(index)}
-                className={view === 'list' ? 'space-y-2 overflow-y-auto pr-1' : 'hidden'}
-                style={
-                  view === 'list'
-                    ? { maxHeight: `${String(BAR_LIST_MAX_HEIGHT_REM)}rem` }
-                    : undefined
-                }
-              >
-                {filteredListRows.map(({ row, rank }) => {
-                  const frequency = row.frequency || 0;
-                  const widthPct = Math.max(3, Math.round((frequency / listMaxFrequency) * 100));
-                  return (
-                    <div
-                      key={`${result.nodeId}-${row.token}`}
-                      className="grid items-center gap-2"
-                      style={{ gridTemplateColumns: `${String(rankWidthCh)}ch minmax(0,1fr) 90px` }}
-                    >
-                      <span className="text-right text-label-secondary tabular-nums text-description">
-                        {rank}.
-                      </span>
-                      <button
-                        type="button"
-                        className="group relative h-8 overflow-hidden rounded-sm border text-left"
-                        onClick={() => {
-                          onTokenClick(row.token);
-                        }}
-                        onContextMenu={(event) => {
-                          event.preventDefault();
-                          onTokenRightClick(row.token, event);
-                        }}
-                        title="Click to inspect in concordance. Right-click to add to stop words."
-                      >
-                        <span
-                          className="absolute inset-y-0 left-0 rounded-sm bg-button/20 group-hover:bg-button/30"
-                          style={{
-                            width: `${String(widthPct)}%`,
-                            backgroundColor: toBgColor(color),
-                          }}
-                        />
-                        <span className="relative z-10 block truncate px-2 text-body font-medium">
-                          {row.token}
-                        </span>
-                      </button>
-                      <span className="text-right text-label-secondary tabular-nums text-description">
-                        {frequency}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
+              )}
             </CardContent>
           </Card>
         );

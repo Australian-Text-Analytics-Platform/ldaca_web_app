@@ -1,14 +1,18 @@
 import React from 'react';
 
-import { Button } from '@/components/ui/button';
 import { MultiSeriesChart } from '@/features/views/common/components/MultiSeriesChart';
+import { FilterableSeriesControls } from '@/features/views/common/components/FilterableSeriesControls';
 import type { SequentialChartModel } from '../hooks/sequentialChartModel';
 
 interface SequentialChartProps {
   model: SequentialChartModel;
-  onToggleKey: (key: string) => void;
+  onToggleGroupIndices: (groupIndices: readonly number[]) => void;
+  onUncasedChange: (value: boolean) => void;
   onPeriodClick: (index: number, shiftHeld: boolean) => void;
+  onPeriodRangeSelect: (startIndex: number, endIndex: number, shiftHeld: boolean) => void;
   onClearSelection: () => void;
+  dataResetKey: string;
+  toolbarStart?: React.ReactNode;
   containerRef?: React.RefObject<HTMLDivElement | null>;
 }
 
@@ -18,14 +22,18 @@ const CHART_HEIGHT_PX = 400;
  * Renders the chart and interaction controls from a canonical Sequential model.
  *
  * Rendered by: `SequentialAnalysisResultsPanel`. The pure model already owns
- * row/axis/series/legend shaping; this component only binds Recharts selection,
+ * row/axis/series/legend shaping; this component only binds ECharts selection,
  * legend clicks, resize container identity, and chart selection controls.
  */
 export function SequentialChart({
   model,
-  onToggleKey,
+  onToggleGroupIndices,
+  onUncasedChange,
   onPeriodClick,
+  onPeriodRangeSelect,
   onClearSelection,
+  dataResetKey,
+  toolbarStart,
   containerRef,
 }: SequentialChartProps) {
   // A refreshed result can invalidate indices held by the interaction hook.
@@ -56,61 +64,41 @@ export function SequentialChart({
         series={model.series}
         chartType={model.chartType}
         xAxis={model.xAxis}
-        margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
         height={CHART_HEIGHT_PX}
         tooltip={{
-          shadcn: true,
-          className: 'min-w-50',
-          indicator: model.tooltip.indicator,
-          labelFormatter: model.tooltip.labelFormatter as never,
+          labelFormatter: model.tooltip.labelFormatter,
         }}
-        selection={{ selectedIndices: model.selection.selectedIndices, onSelect: onPeriodClick }}
-        interactive
+        selection={{
+          selectedIndices: model.selection.selectedIndices,
+          onSelect: onPeriodClick,
+          onSelectRange: onPeriodRangeSelect,
+        }}
+        ariaLabel="Trends and Sequence chart"
+        dataResetKey={`${dataResetKey}:${model.chartData
+          .map((row) => (typeof row.__period_key__ === 'string' ? row.__period_key__ : ''))
+          .join('|')}`}
+        toolbarStart={toolbarStart}
       />
-      <div className="mt-4 flex flex-wrap items-center justify-center gap-4 px-4">
-        {model.groups.map((group) => {
-          const isHidden = group.hidden;
-          return (
-            <button
-              key={group.id}
-              type="button"
-              className="flex cursor-pointer items-center gap-2 rounded-sm px-1 py-0.5 transition-opacity hover:bg-panel/60"
-              style={{ opacity: isHidden ? 0.4 : 1 }}
-              onClick={() => {
-                onToggleKey(group.id);
-              }}
-              aria-pressed={!isHidden}
-              aria-label={isHidden ? `Show ${group.label}` : `Hide ${group.label}`}
-            >
-              {model.chartType === 'line' ? (
-                <div className="flex items-center">
-                  <div className="h-2 w-2 rounded-full" style={{ backgroundColor: group.color }} />
-                  <div className="h-0.5 w-3" style={{ backgroundColor: group.color }} />
-                  <div className="h-2 w-2 rounded-full" style={{ backgroundColor: group.color }} />
-                </div>
-              ) : (
-                <div className="h-3 w-3 rounded-sm" style={{ backgroundColor: group.color }} />
-              )}
-              <span
-                className="text-body font-medium text-description"
-                style={{ textDecoration: isHidden ? 'line-through' : 'none' }}
-              >
-                {group.label}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-      <div className="mt-4 flex justify-end px-4 pb-2">
-        <Button
-          type="button"
-          variant="outline"
-          className="w-full sm:w-auto"
-          disabled={!hasSelection}
-          onClick={onClearSelection}
-        >
-          Clear Selection
-        </Button>
+      <div className="mt-4">
+        <FilterableSeriesControls
+          items={model.groups.map((group) => ({
+            key: group.id,
+            color: group.color,
+            text: group.legendText,
+            label: group.label,
+            hidden: group.hidden,
+            marker: model.chartType === 'bar' ? 'bar' : model.chartType,
+          }))}
+          ariaLabel="Trends groups"
+          uncased={model.uncased}
+          onUncasedChange={model.supportsUncased ? onUncasedChange : undefined}
+          onClearSelection={onClearSelection}
+          clearSelectionDisabled={!hasSelection}
+          onToggle={(key) => {
+            const group = model.groups.find((candidate) => candidate.id === key);
+            if (group) onToggleGroupIndices(group.memberGroupIndices);
+          }}
+        />
       </div>
     </div>
   );

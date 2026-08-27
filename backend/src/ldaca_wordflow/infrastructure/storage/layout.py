@@ -68,6 +68,12 @@ def workspace_trash_root(settings: Settings) -> Path:
     return workspaces_root(settings) / ".trash"
 
 
+def workspace_locks_root(settings: Settings) -> Path:
+    """Return the private registry containing one lock file per Workspace."""
+
+    return workspaces_root(settings) / ".locks"
+
+
 def user_root(settings: Settings, user_id: str) -> Path:
     """Return the stable private root for one validated user identity."""
 
@@ -112,5 +118,6 @@ __all__ = [
     "validate_workspace_name",
     "workspace_staging_root",
     "workspace_trash_root",
+    "workspace_locks_root",
     "workspaces_root",
 ]

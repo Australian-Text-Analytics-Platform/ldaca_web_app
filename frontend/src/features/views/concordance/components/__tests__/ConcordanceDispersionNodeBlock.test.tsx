@@ -111,6 +111,7 @@ const baseProps: ConcordanceDispersionNodeBlockProps = {
     nodeColor: '#2563eb',
   },
   searchWord: 'alpha',
+  caseSensitive: false,
   showMetadata: false,
   selectedMetadataColumns: [],
   reviewRowUnit: 'documents',
@@ -142,7 +143,6 @@ const baseProps: ConcordanceDispersionNodeBlockProps = {
   onBinRangeSelect: vi.fn(),
   onClearBinSelection: vi.fn(),
   handlePageChange: vi.fn(),
-  handleRowClick: vi.fn(),
   setCombinedPage: vi.fn(),
 };
 

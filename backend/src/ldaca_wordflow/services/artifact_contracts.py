@@ -46,7 +46,10 @@ def token_frequency_artifacts(result: BaseModel) -> list[ArtifactProjection]:
 
 def sequential_artifacts(result: BaseModel) -> list[ArtifactProjection]:
     value = SequentialWorkerResult.model_validate(result)
-    return [(("table", "artifact"), value.table.artifact)]
+    return [
+        (("table", "artifact"), value.table.artifact),
+        (("publication_artifact",), value.publication_artifact),
+    ]
 
 
 def topic_modeling_artifacts(result: BaseModel) -> list[ArtifactProjection]:

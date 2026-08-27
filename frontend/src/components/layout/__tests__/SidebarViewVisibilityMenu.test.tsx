@@ -13,6 +13,11 @@ const preferenceFixture = vi.hoisted(() => ({
   hiddenViews: [] as string[],
   mutate: vi.fn(),
 }));
+const workspaceFixture = vi.hoisted(() => ({
+  nodes: [] as { id: string; name: string }[],
+  selectedNodeIds: [] as string[],
+  clearSelection: vi.fn(),
+}));
 
 vi.mock('sonner', () => ({
   /** Used by: sidebar menu tests to assert toast feedback. */
@@ -29,18 +34,18 @@ const authState = {
 };
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
-  /** Used by: Sidebar tests to provide an empty workspace graph fixture. */
+  /** Used by: Sidebar tests to provide mutable workspace graph fixtures. */
   useWorkspaceData: () => ({
     workspaces: [],
-    workspaceGraph: { nodes: [] },
+    workspaceGraph: { nodes: workspaceFixture.nodes },
     currentWorkspaceId: 'ws-1',
   }),
 }));
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceSelection', () => ({
-  /** Used by: Sidebar tests to keep node-selection state empty. */
+  /** Used by: Sidebar tests to provide mutable node-selection fixtures. */
   useWorkspaceSelection: () => ({
-    selectedNodeIds: [],
+    selectedNodeIds: workspaceFixture.selectedNodeIds,
   }),
 }));
 
@@ -48,6 +53,7 @@ vi.mock('@/features/workspace/common/hooks/useWorkspaceActions', () => ({
   /** Used by: Sidebar tests to stub child component workspace actions. */
   useWorkspaceActions: () => ({
     toggleNode: vi.fn(),
+    clearSelection: workspaceFixture.clearSelection,
     setCurrentWorkspace: vi.fn(),
   }),
 }));
@@ -152,6 +158,9 @@ describe('Sidebar view visibility menu', () => {
     }));
     preferenceFixture.hiddenViews = [];
     preferenceFixture.mutate.mockReset();
+    workspaceFixture.nodes = [];
+    workspaceFixture.selectedNodeIds = [];
+    workspaceFixture.clearSelection.mockReset();
     useGuidanceAcknowledgmentsStore.setState({ byUser: {} });
     toastMock.mockReset();
   });
@@ -211,6 +220,33 @@ describe('Sidebar view visibility menu', () => {
     expect(screen.getByTestId('sidebar-section-nodes')).toBeInTheDocument();
     expect(screen.getByTestId('sidebar-section-tasks')).toBeInTheDocument();
     expect(screen.getByTestId('sidebar-help-feedback')).toBeInTheDocument();
+  });
+
+  it('clears the Data Blocks selection from the control before the selected count', async () => {
+    const user = userEvent.setup();
+    workspaceFixture.nodes = [
+      { id: 'node-1', name: 'Alpha' },
+      { id: 'node-2', name: 'Beta' },
+    ];
+    workspaceFixture.selectedNodeIds = ['node-1'];
+    renderSidebar();
+
+    const nodesHeader = screen.getByTestId('sidebar-section-header-nodes');
+    const clearButton = within(nodesHeader).getByRole('button', { name: 'Clear selection' });
+    const count = within(nodesHeader).getByText('1/2');
+
+    expect(clearButton).toBeEnabled();
+    expect(within(clearButton).getByTestId('clear-selection-icon')).toHaveClass(
+      'lucide-circle-off',
+    );
+    expect(clearButton.compareDocumentPosition(count)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+
+    await user.hover(clearButton);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Clear');
+    await user.click(clearButton);
+
+    expect(workspaceFixture.clearSelection).toHaveBeenCalledOnce();
+    expect(within(nodesHeader).getByRole('button', { expanded: true })).toBeInTheDocument();
   });
 
   it('allows hiding and showing optional views from the views editor', async () => {

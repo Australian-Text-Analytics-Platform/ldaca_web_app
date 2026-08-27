@@ -24,6 +24,7 @@ from ..domain.workspace import (
     QuotationResultDataBlockCreationAnalysisRequest,
     QuotationRunAllAnalysisRequest,
     SequentialAnalysisRequest,
+    SequentialDataBlockCreationAnalysisRequest,
     TokenFrequencyAnalysisRequest,
     TopicModelingAnalysisRequest,
     TopicModelingDataBlockCreationAnalysisRequest,
@@ -35,6 +36,7 @@ from ..models.quotation import QuotationEngineType, ResolvedQuotationEngine
 from ..models.analysis_results import (
     ConcordanceRunAllStoredResult,
     QuotationRunAllStoredResult,
+    SequentialStoredResult,
     TopicModelingStoredResult,
 )
 from ..settings import Settings
@@ -306,6 +308,7 @@ class AnalysisExecutionPreparer:
                 ConcordanceMatchDataBlockCreationAnalysisRequest,
                 ConcordanceDocumentDataBlockCreationAnalysisRequest,
                 QuotationResultDataBlockCreationAnalysisRequest,
+                SequentialDataBlockCreationAnalysisRequest,
             ),
         ):
             if parent is None or parent.result_payload is None:
@@ -322,7 +325,7 @@ class AnalysisExecutionPreparer:
                 else [request.source]
             )
             result_paths: dict[str, str] = {}
-            document_columns: dict[str, str] = {}
+            document_columns: dict[str, str | None] = {}
             if isinstance(
                 request,
                 (
@@ -380,7 +383,9 @@ class AnalysisExecutionPreparer:
                     document_columns[str(selection.source_node_id)] = (
                         descriptor.document_column
                     )
-            else:
+            elif isinstance(
+                request, QuotationResultDataBlockCreationAnalysisRequest
+            ):
                 if not isinstance(parent_request, QuotationRunAllAnalysisRequest):
                     raise InvalidInputError(
                         "Quotation Data Block Creation parent is invalid"
@@ -405,6 +410,46 @@ class AnalysisExecutionPreparer:
                 document_columns[str(selection.source_node_id)] = (
                     stored.source.document_column
                 )
+            else:
+                if not isinstance(parent_request, SequentialAnalysisRequest):
+                    raise InvalidInputError(
+                        "Trends Data Block Creation parent is invalid"
+                    )
+                stored = SequentialStoredResult.model_validate(parent.result_payload)
+                selection = request.source
+                if selection.source_node_id != stored.source.node_id:
+                    raise InvalidInputError("Data Block Creation source is unavailable")
+                if any(
+                    column not in stored.source.columns
+                    for column in selection.selected_columns
+                ):
+                    raise InvalidInputError(
+                        "Data Block Creation column is unavailable"
+                    )
+                if parent_request.time_column not in selection.selected_columns:
+                    raise InvalidInputError(
+                        "Trends Data Block Creation requires the axis column"
+                    )
+                if selection.selected_period_indices is not None and any(
+                    index >= stored.source.period_count
+                    for index in selection.selected_period_indices
+                ):
+                    raise InvalidInputError("Selected Trends period is out of range")
+                if any(
+                    index >= stored.source.group_count
+                    for index in selection.excluded_group_indices
+                ):
+                    raise InvalidInputError("Excluded Trends group is out of range")
+                result_paths[str(selection.source_node_id)] = str(
+                    _analysis_artifact_path(
+                        workspace_path,
+                        parent,
+                        stored.publication_artifact.name,
+                    )
+                )
+                document_columns[str(selection.source_node_id)] = (
+                    stored.source.document_column
+                )
             return owned(
                 result_data_block_creation_process,
                 {
@@ -412,22 +457,6 @@ class AnalysisExecutionPreparer:
                     "request_payload": request.model_dump(mode="json"),
                     "result_paths": result_paths,
                     "document_columns": document_columns,
-                    "source_colors": {
-                        str(selection.source_node_id): descriptors[
-                            selection.source_node_id
-                        ].color
-                        for selection in selections
-                    }
-                    if isinstance(
-                        request,
-                        (
-                            ConcordanceMatchDataBlockCreationAnalysisRequest,
-                            ConcordanceDocumentDataBlockCreationAnalysisRequest,
-                        ),
-                    )
-                    else {
-                        str(selections[0].source_node_id): stored.source.color
-                    },
                 },
             )
         if isinstance(request, ConcordanceRunAllAnalysisRequest):

@@ -9,7 +9,7 @@ import { startThemeStorageSync } from './features/theme/themeRuntime';
 // overlay) gets a chance to surface it. The browser raises this when a RO
 // callback's work doesn't finish in one animation frame — the spec marks
 // it benign and the next frame redelivers — but it still trips Vite's
-// unhandled-error overlay during dev. Recharts + our own RO consumers in
+// unhandled-error overlay during dev. ECharts + our own RO consumers in
 // chart/sidebar/hint code legitimately hit it on rapid re-layout.
 if (typeof window !== 'undefined') {
   startThemeStorageSync();

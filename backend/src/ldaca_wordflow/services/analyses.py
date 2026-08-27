@@ -34,6 +34,7 @@ from ..domain.workspace import (
     InvalidAnalysisIntegrity,
     Progress,
     QuotationResultDataBlockCreationAnalysisRequest,
+    SequentialDataBlockCreationAnalysisRequest,
     ValidAnalysisIntegrity,
     Workspace,
     analysis_input_ids,
@@ -213,6 +214,7 @@ class AnalysisService:
             "concordance_document_data_block_creation": "concordance",
             "quotation_run_all": "quotation",
             "quotation_result_data_block_creation": "quotation",
+            "sequential_data_block_creation": "sequential",
             "topic_modeling_data_block_creation": "topic_modeling",
         }.get(kind, kind)
 
@@ -314,6 +316,7 @@ class AnalysisService:
                     ConcordanceMatchDataBlockCreationAnalysisRequest,
                     ConcordanceDocumentDataBlockCreationAnalysisRequest,
                     QuotationResultDataBlockCreationAnalysisRequest,
+                    SequentialDataBlockCreationAnalysisRequest,
                 ),
             ):
                 if (
@@ -324,17 +327,20 @@ class AnalysisService:
                     raise AnalysisParentInvalidError(
                         "Data Block Creation requires a successful Run All parent"
                     )
-                expected_parent_kind = (
-                    "concordance_run_all"
-                    if isinstance(
-                        request,
-                        (
-                            ConcordanceMatchDataBlockCreationAnalysisRequest,
-                            ConcordanceDocumentDataBlockCreationAnalysisRequest,
-                        ),
-                    )
-                    else "quotation_run_all"
-                )
+                if isinstance(
+                    request,
+                    (
+                        ConcordanceMatchDataBlockCreationAnalysisRequest,
+                        ConcordanceDocumentDataBlockCreationAnalysisRequest,
+                    ),
+                ):
+                    expected_parent_kind = "concordance_run_all"
+                elif isinstance(
+                    request, QuotationResultDataBlockCreationAnalysisRequest
+                ):
+                    expected_parent_kind = "quotation_run_all"
+                else:
+                    expected_parent_kind = "sequential"
                 if parent.request.kind != expected_parent_kind:
                     raise AnalysisParentInvalidError(
                         "Data Block Creation parent kind is invalid"

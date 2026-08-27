@@ -336,18 +336,40 @@ class QuotationResult(PreviewReadyStoredResult):
     kind: Literal["quotation"] = "quotation"
 
 
+class SequentialSourceDescriptor(_StrictModel):
+    node_id: uuid.UUID
+    node_name: NodeName
+    document_column: str | None = Field(default=None, max_length=500)
+    columns: list[str] = Field(min_length=1)
+    period_count: int = Field(ge=0)
+    group_count: int = Field(ge=0)
+
+    @model_validator(mode="after")
+    def validate_columns(self) -> "SequentialSourceDescriptor":
+        if len(self.columns) != len(set(self.columns)):
+            raise ValueError("Sequential source columns must be unique")
+        if self.document_column is not None and self.document_column not in self.columns:
+            raise ValueError("Sequential document column is unavailable")
+        return self
+
+
 class SequentialWorkerResult(_StrictModel):
     state: Literal["successful"]
     table: CompleteTableIdentity[PrivateArtifactPath]
+    publication_artifact: PrivateArtifactPath
+    source: SequentialSourceDescriptor
 
 
 class SequentialStoredResult(_StrictModel):
     table: CompleteTableIdentity[StoredArtifactIdentity]
+    publication_artifact: StoredArtifactIdentity
+    source: SequentialSourceDescriptor
 
 
-class SequentialResult(SequentialStoredResult):
+class SequentialResult(_StrictModel):
     kind: Literal["sequential"] = "sequential"
     table: CompleteTableResource
+    source: SequentialSourceDescriptor
 
 
 class PublishedDataBlockMetadata(_StrictModel):
@@ -667,6 +689,10 @@ class QuotationResultDataBlockCreationResult(DataBlockCreationStoredResult):
     kind: Literal["quotation_result_data_block_creation"] = "quotation_result_data_block_creation"
 
 
+class SequentialDataBlockCreationResult(DataBlockCreationStoredResult):
+    kind: Literal["sequential_data_block_creation"] = "sequential_data_block_creation"
+
+
 AnalysisResult = Annotated[
     TokenFrequencyResult
     | TopicModelingResult
@@ -680,7 +706,8 @@ AnalysisResult = Annotated[
     | TopicModelingDataBlockCreationResult
     | ConcordanceMatchDataBlockCreationResult
     | ConcordanceDocumentDataBlockCreationResult
-    | QuotationResultDataBlockCreationResult,
+    | QuotationResultDataBlockCreationResult
+    | SequentialDataBlockCreationResult,
     Field(discriminator="kind"),
 ]
 
@@ -698,6 +725,7 @@ ANALYSIS_WORKER_RESULT_MODELS: dict[str, type[BaseModel]] = {
     "concordance_match_data_block_creation": DataBlockCreationWorkerResult,
     "concordance_document_data_block_creation": DataBlockCreationWorkerResult,
     "quotation_result_data_block_creation": DataBlockCreationWorkerResult,
+    "sequential_data_block_creation": DataBlockCreationWorkerResult,
 }
 
 ANALYSIS_STORED_RESULT_MODELS: dict[str, type[BaseModel]] = {
@@ -714,6 +742,7 @@ ANALYSIS_STORED_RESULT_MODELS: dict[str, type[BaseModel]] = {
     "concordance_match_data_block_creation": DataBlockCreationStoredResult,
     "concordance_document_data_block_creation": DataBlockCreationStoredResult,
     "quotation_result_data_block_creation": DataBlockCreationStoredResult,
+    "sequential_data_block_creation": DataBlockCreationStoredResult,
 }
 
 
@@ -776,6 +805,8 @@ __all__ = [
     "PreviewReadyStoredResult",
     "ResultPagination",
     "SequentialResult",
+    "SequentialDataBlockCreationResult",
+    "SequentialSourceDescriptor",
     "SequentialStoredResult",
     "SequentialWorkerResult",
     "StoredArtifactIdentity",

@@ -281,11 +281,25 @@ source to page one, and filter before sorting, counting, and paging. Separated
 mode keeps those filters per source. Combined mode owns one frontend-only filter
 and sends it independently to each source.
 
+Trends uses the same session-only case-folded visibility contract for result
+groups. Run All always returns exact group tuples and stable backend
+`group_index` values. The frontend may fold string tuple elements for display,
+while each merged series retains every exact member index for legend filtering
+and Trends Data Block Creation. Changing Uncased clears exact group exclusions
+but preserves period selection and chart presentation state.
+
+Concordance, Quotation, and Topic Modelling adapt their typed Result contracts
+to one shared **Add to Workspace** dialog. The dialog owns transient source
+inclusion, names, ordered column selections, and exact-name synchronization
+across checked sources. Required columns remain selected and are not
+synchronized; feature adapters may also show a required generated column, such
+as `TOPIC_top1`, without including it in the selected source-column payload.
+
 Two-source Concordance Run All appears as one thin Run All root with one
 Supporting Analysis per source. The forest projection keeps that relationship
-generic; Concordance interprets the group for progress and ordered Review.
-**Add to Workspace** opens the shared Derived Data Block Creation dialog and submits one
-typed Supporting Analysis under the successful Run All parent. Table View
+generic; Concordance interprets the group for progress and ordered Review. The
+shared dialog submits one typed Supporting Analysis under the successful Run
+All parent. Table View
 submits Concordance Match Data Block Creation; Dispersion View submits
 Concordance Document Data Block Creation with its active term and bin filter.
 Concordance lets the user include or exclude each source before submitting the

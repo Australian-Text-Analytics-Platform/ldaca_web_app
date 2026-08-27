@@ -157,7 +157,8 @@ reinterpreted under new boundaries.
 
 <h4 id="help-concordance-bin-selection">Selecting bins</h4>
 
-In Review, click a chart bin to select it; Shift-click another bin to extend
+In Review, click anywhere inside the plot to select the bin nearest the vertical
+axis pointer; Shift-click another bin to extend
 the range. **Clear Selection** removes the bin filter. Click a legend term to
 hide or show it. Visible terms intersected with selected bins control the
 displayed documents, match markers, legend counts, and Concordance Document

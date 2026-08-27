@@ -51,7 +51,7 @@ Issue: [#61](https://github.com/Australian-Text-Analytics-Platform/ldaca-wordflo
 - A Tab owns one nullable `topic_modeling_projection_selection` containing the
   successful Analysis ID, K, and Top N. Null represents both defaults. A new
   successful Analysis starts at natural K and default Top 2.
-- Native Workspace schema 19 and archive format 18 strictly reject older
+- Native Workspace schema 21 and archive format 20 strictly reject older
   layouts without migration.
 
 ## Frontend behavior

@@ -42,7 +42,13 @@ def run_sequential_analysis(
             progress_callback(0.05, "Loading sequential analysis input...")
 
         from .input_snapshots import load_snapshot_node
-        from ..analysis.sequential_core import _run_sequential_analysis
+        from ..analysis.sequential_core import (
+            SEQUENTIAL_GROUP_INDEX_COLUMN,
+            SEQUENTIAL_PERIOD_INDEX_COLUMN,
+            SEQUENTIAL_PUBLICATION_GROUP_INDEX_COLUMN,
+            SEQUENTIAL_PUBLICATION_PERIOD_INDEX_COLUMN,
+            _build_sequential_result_frames,
+        )
         from ..domain.workspace import SequentialAnalysisRequest
         from ..shared.table_transport import write_ipc_stream
 
@@ -55,7 +61,7 @@ def run_sequential_analysis(
         if progress_callback:
             progress_callback(0.25, "Running sequential analysis...")
 
-        result_df = _run_sequential_analysis(
+        result_df, publication_df = _build_sequential_result_frames(
             snapshot_node.data,
             time_column=request.time_column,
             group_by_columns=request.group_by_columns,
@@ -66,18 +72,42 @@ def run_sequential_analysis(
             numeric_interval=request.numeric_interval,
             custom_interval_value=request.custom_interval_value,
             custom_interval_unit=request.custom_interval_unit,
-            case_sensitive=request.case_sensitive,
         )
 
         result_path = Path(artifact_dir) / "result.arrows"
+        publication_path = Path(artifact_dir) / "publication.parquet"
         result_path.parent.mkdir(parents=True, exist_ok=True)
         write_ipc_stream(result_df, str(result_path))
+        publication_df.write_parquet(publication_path)
+
+        source_columns = [
+            column
+            for column in publication_df.columns
+            if column
+            not in {
+                SEQUENTIAL_PUBLICATION_PERIOD_INDEX_COLUMN,
+                SEQUENTIAL_PUBLICATION_GROUP_INDEX_COLUMN,
+            }
+        ]
 
         return {
             "state": "successful",
             "table": {
                 "table_id": "result",
                 "artifact": str(result_path),
+            },
+            "publication_artifact": str(publication_path),
+            "source": {
+                "node_id": snapshot_node.id,
+                "node_name": snapshot_node.name,
+                "document_column": snapshot_node.document,
+                "columns": source_columns,
+                "period_count": result_df.get_column(
+                    SEQUENTIAL_PERIOD_INDEX_COLUMN
+                ).n_unique(),
+                "group_count": result_df.get_column(
+                    SEQUENTIAL_GROUP_INDEX_COLUMN
+                ).n_unique(),
             },
         }
     except Exception:

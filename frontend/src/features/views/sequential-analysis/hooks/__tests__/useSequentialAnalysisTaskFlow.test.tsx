@@ -46,7 +46,6 @@ describe('useSequentialAnalysisTaskFlow', () => {
           numericOriginInput: '',
           customIntervalValue: null,
           customIntervalUnit: null,
-          caseSensitive: false,
         },
         actions: {
           runAnalysis,
@@ -62,5 +61,12 @@ describe('useSequentialAnalysisTaskFlow', () => {
     await act(async () => result.current.handleAnalyze());
 
     expect(runAnalysis).toHaveBeenCalledWith(expect.objectContaining({ action: 'run_all' }));
+    expect(submitTabAnalysis).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: expect.objectContaining({
+          request: expect.not.objectContaining({ case_sensitive: expect.anything() }),
+        }),
+      }),
+    );
   });
 });

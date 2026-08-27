@@ -1,5 +1,9 @@
 import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import {
+  createCaseFoldedSeriesVisibility,
+  reduceCaseFoldedSeriesVisibility,
+} from '../../common/caseFoldedSeriesVisibility';
+import {
   type ConcordanceDispersionChartMode,
   DISPERSION_DEFAULT_BIN_COUNT,
   type DispersionDisplayBinCount,
@@ -52,8 +56,9 @@ export function useConcordanceDispersionControls(): UseConcordanceDispersionCont
   const [dispersionChartMode, setDispersionChartMode] =
     useState<ConcordanceDispersionChartMode>('density-line');
   const [selectedBinIndices, setSelectedBinIndices] = useState<Record<string, Set<number>>>({});
-  const [excludedMatchedTexts, setExcludedMatchedTexts] = useState<Set<string>>(new Set());
-  const [uncasedMatchedTexts, setRawUncasedMatchedTexts] = useState(false);
+  const [seriesVisibility, setSeriesVisibility] = useState(() =>
+    createCaseFoldedSeriesVisibility<string>(),
+  );
   const lastSelectedBinRef = useRef<Record<string, number | null>>({});
 
   /** Updates a block's bin set from a click or shift-click range gesture. */
@@ -117,29 +122,26 @@ export function useConcordanceDispersionControls(): UseConcordanceDispersionCont
 
   /** Hides or restores every exact spelling represented by one legend entry. */
   const toggleMatchedTexts = (matchedTexts: readonly string[]) => {
-    setExcludedMatchedTexts((current) => {
-      const next = new Set(current);
-      const restore = matchedTexts.every((matchedText) => next.has(matchedText));
-      for (const matchedText of matchedTexts) {
-        if (restore) next.delete(matchedText);
-        else next.add(matchedText);
-      }
-      return next;
-    });
+    setSeriesVisibility((current) =>
+      reduceCaseFoldedSeriesVisibility(current, {
+        type: 'toggle-members',
+        keys: matchedTexts,
+      }),
+    );
   };
 
   /** Changes case-grouping semantics and clears exact exclusions that cannot map unambiguously. */
   const setUncasedMatchedTexts = (value: boolean) => {
-    setRawUncasedMatchedTexts(value);
-    setExcludedMatchedTexts(new Set());
+    setSeriesVisibility((current) =>
+      reduceCaseFoldedSeriesVisibility(current, { type: 'set-uncased', value }),
+    );
   };
 
   // Stable identity is required because ConcordanceFeature resets filters from
   // an effect keyed only by the immutable Run All identity.
   const resetDispersionFilters = useCallback(() => {
     setSelectedBinIndices({});
-    setExcludedMatchedTexts(new Set());
-    setRawUncasedMatchedTexts(false);
+    setSeriesVisibility(createCaseFoldedSeriesVisibility<string>());
     lastSelectedBinRef.current = {};
   }, []);
 
@@ -154,8 +156,8 @@ export function useConcordanceDispersionControls(): UseConcordanceDispersionCont
     dispersionChartMode,
     setDispersionChartMode,
     selectedBinIndices,
-    excludedMatchedTexts,
-    uncasedMatchedTexts,
+    excludedMatchedTexts: seriesVisibility.excludedKeys,
+    uncasedMatchedTexts: seriesVisibility.uncased,
     setUncasedMatchedTexts,
     toggleMatchedTexts,
     handleBinSelect,

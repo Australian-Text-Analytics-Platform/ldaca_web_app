@@ -6,6 +6,7 @@ import type {
   ConcordanceMatchDataBlockCreationAnalysisRequest,
   QuotationResultDataBlockCreationAnalysisRequest,
   QuotationRunAllAnalysisRequest,
+  SequentialDataBlockCreationAnalysisRequest,
   TopicModelingDataBlockCreationAnalysisRequest,
 } from '@/api';
 import { queryKeys } from '@/lib/queryKeys';
@@ -25,7 +26,10 @@ type DataBlockCreationRequest =
     } & ConcordanceDocumentDataBlockCreationAnalysisRequest)
   | ({
       kind: 'quotation_result_data_block_creation';
-    } & QuotationResultDataBlockCreationAnalysisRequest);
+    } & QuotationResultDataBlockCreationAnalysisRequest)
+  | ({
+      kind: 'sequential_data_block_creation';
+    } & SequentialDataBlockCreationAnalysisRequest);
 
 /** Owns supporting and Run All Analysis commands exposed by Workspace actions. */
 export const useWorkspaceAnalysisMutations = ({

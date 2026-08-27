@@ -1,5 +1,9 @@
 import { useRef, useState } from 'react';
 
+import {
+  createCaseFoldedSeriesVisibility,
+  reduceCaseFoldedSeriesVisibility,
+} from '../../common/caseFoldedSeriesVisibility';
 import type { SequentialXAxisType } from './sequentialChartModel';
 
 /**
@@ -11,26 +15,64 @@ import type { SequentialXAxisType } from './sequentialChartModel';
  * result-bound controls when results refresh, and fully reset chart controls
  * when results are cleared.
  */
-export function useSequentialChartControls() {
+export function useSequentialChartControls(resultKey?: string | null) {
   const [xAxisType, setXAxisType] = useState<SequentialXAxisType>('category');
-  const [hiddenKeys, setHiddenKeys] = useState<Set<string>>(new Set());
+  const [seriesVisibilityState, setSeriesVisibilityState] = useState<{
+    resultKey: string | null | undefined;
+    value: ReturnType<typeof createCaseFoldedSeriesVisibility<number>>;
+  }>({ resultKey, value: createCaseFoldedSeriesVisibility<number>() });
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
-  const [selectedPeriodIndices, setSelectedPeriodIndices] = useState<Set<number>>(new Set());
-  const lastClickedIndexRef = useRef<number | null>(null);
+  const [selectionState, setSelectionState] = useState<{
+    resultKey: string | null | undefined;
+    values: Set<number>;
+  }>({ resultKey, values: new Set() });
+  const lastClickedIndexRef = useRef<{
+    resultKey: string | null | undefined;
+    value: number | null;
+  }>({ resultKey, value: null });
+  const seriesVisibility =
+    seriesVisibilityState.resultKey === resultKey
+      ? seriesVisibilityState.value
+      : createCaseFoldedSeriesVisibility<number>();
+  const selectedPeriodIndices =
+    selectionState.resultKey === resultKey ? selectionState.values : new Set<number>();
+  const lastClickedIndex = () =>
+    lastClickedIndexRef.current.resultKey === resultKey ? lastClickedIndexRef.current.value : null;
+  const setLastClickedIndex = (value: number | null) => {
+    lastClickedIndexRef.current = { resultKey, value };
+  };
 
   /**
    * Toggles chart series visibility without losing the underlying result rows.
    * Called by: SequentialAnalysisResultsPanel legend controls.
    */
-  const toggleKey = (key: string) => {
-    setHiddenKeys((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) {
-        next.delete(key);
-      } else {
-        next.add(key);
-      }
-      return next;
+  const toggleGroupIndices = (groupIndices: readonly number[]) => {
+    setSeriesVisibilityState((previous) => {
+      const current =
+        previous.resultKey === resultKey
+          ? previous.value
+          : createCaseFoldedSeriesVisibility<number>();
+      return {
+        resultKey,
+        value: reduceCaseFoldedSeriesVisibility(current, {
+          type: 'toggle-members',
+          keys: groupIndices,
+        }),
+      };
+    });
+  };
+
+  /** Changes case folding and restores all exact groups, matching Concordance. */
+  const setUncasedGroups = (value: boolean) => {
+    setSeriesVisibilityState((previous) => {
+      const current =
+        previous.resultKey === resultKey
+          ? previous.value
+          : createCaseFoldedSeriesVisibility<number>();
+      return {
+        resultKey,
+        value: reduceCaseFoldedSeriesVisibility(current, { type: 'set-uncased', value }),
+      };
     });
   };
 
@@ -42,12 +84,14 @@ export function useSequentialChartControls() {
   const selectPeriod = (index: number, shiftHeld: boolean, chartDataLength: number) => {
     if (index < 0 || index >= chartDataLength) return;
 
-    setSelectedPeriodIndices((prev) => {
-      const next = new Set(prev);
+    setSelectionState((previous) => {
+      const current = previous.resultKey === resultKey ? previous.values : new Set<number>();
+      const next = new Set(current);
+      const anchor = lastClickedIndex();
 
-      if (shiftHeld && lastClickedIndexRef.current !== null) {
-        const lower = Math.min(lastClickedIndexRef.current, index);
-        const upper = Math.max(lastClickedIndexRef.current, index);
+      if (shiftHeld && anchor !== null) {
+        const lower = Math.min(anchor, index);
+        const upper = Math.max(anchor, index);
         for (let cursor = lower; cursor <= upper; cursor += 1) {
           next.add(cursor);
         }
@@ -57,11 +101,31 @@ export function useSequentialChartControls() {
         } else {
           next.add(index);
         }
-        lastClickedIndexRef.current = index;
+        setLastClickedIndex(index);
       }
 
-      return next;
+      return { resultKey, values: next };
     });
+  };
+
+  /** Replaces or extends the selected periods with a brushed inclusive range. */
+  const selectPeriodRange = (
+    startIndex: number,
+    endIndex: number,
+    shiftHeld: boolean,
+    chartDataLength: number,
+  ) => {
+    if (chartDataLength <= 0) return;
+    const lower = Math.max(0, Math.min(startIndex, endIndex));
+    const upper = Math.min(chartDataLength - 1, Math.max(startIndex, endIndex));
+    if (lower > upper) return;
+    setSelectionState((previous) => {
+      const current = previous.resultKey === resultKey ? previous.values : new Set<number>();
+      const next = shiftHeld ? new Set(current) : new Set<number>();
+      for (let index = lower; index <= upper; index += 1) next.add(index);
+      return { resultKey, values: next };
+    });
+    setLastClickedIndex(endIndex);
   };
 
   /**
@@ -70,8 +134,8 @@ export function useSequentialChartControls() {
    * Called by: SequentialAnalysisResultsPanel and result refresh handlers.
    */
   const clearPeriodSelection = () => {
-    setSelectedPeriodIndices(new Set());
-    lastClickedIndexRef.current = null;
+    setSelectionState({ resultKey, values: new Set() });
+    setLastClickedIndex(null);
   };
 
   /**
@@ -90,19 +154,25 @@ export function useSequentialChartControls() {
    * clears the active task result.
    */
   const resetAfterClear = () => {
-    setHiddenKeys(new Set());
+    setSeriesVisibilityState({
+      resultKey,
+      value: createCaseFoldedSeriesVisibility<number>(),
+    });
     resetResultSelection();
   };
 
   return {
     xAxisType,
     setXAxisType,
-    hiddenKeys,
+    uncasedGroups: seriesVisibility.uncased,
+    excludedGroupIndices: seriesVisibility.excludedKeys,
     downloadDialogOpen,
     setDownloadDialogOpen,
     selectedPeriodIndices,
-    toggleKey,
+    toggleGroupIndices,
+    setUncasedGroups,
     selectPeriod,
+    selectPeriodRange,
     clearPeriodSelection,
     resetResultSelection,
     resetAfterClear,

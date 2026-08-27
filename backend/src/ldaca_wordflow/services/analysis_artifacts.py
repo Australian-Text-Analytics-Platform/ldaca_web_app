@@ -47,12 +47,10 @@ from ..models.analysis_results import (
     ANALYSIS_WORKER_RESULT_MODELS,
     AnnotationRunAllStoredResult,
     AnnotationRunAllWorkerResult,
-    ConcordanceRunAllStoredResult,
     PublishedDataBlockMetadata,
     PublishedDataBlockStoredResult,
     PublishedDataBlockWorkerResult,
     PreviewReadyStoredResult,
-    QuotationRunAllStoredResult,
     DataBlockCreationOutput,
     DataBlockCreationStoredResult,
     DataBlockCreationWorkerResult,
@@ -631,7 +629,7 @@ def _validate_published_data_block_identity(
                 metadata.name != request.new_node_names[source_uuid]
                 or metadata.document
                 != (source.document if source.document in selected else None)
-                or metadata.color != source.color
+                or metadata.color is not None
                 or str(metadata.id) in workspace.nodes
             ):
                 raise ValueError("Topic Modeling Data Block metadata is invalid")
@@ -641,7 +639,7 @@ def _validate_published_data_block_identity(
             topic_data is None
             or metadata.name != f"{topic_data.name} topic meanings"
             or metadata.document is not None
-            or metadata.color != topic_data.color
+            or metadata.color is not None
             or str(metadata.id) in workspace.nodes
         ):
             raise ValueError("Topic meanings Data Block metadata is invalid")
@@ -663,42 +661,10 @@ def _validate_published_data_block_identity(
         or metadata.name != requested_name
         or metadata.provenance != expected_provenance
         or metadata.document != document
-        or metadata.color
-        != _data_block_creation_source_color(workspace, record, source_node_id)
+        or metadata.color is not None
         or str(metadata.id) in workspace.nodes
     ):
         raise ValueError("Child Analysis Data Block metadata is invalid")
-
-
-def _data_block_creation_source_color(
-    workspace: Workspace,
-    record: AnalysisRecord,
-    source_node_id: uuid.UUID,
-) -> str | None:
-    parent = workspace.analyses.get(str(record.parent_analysis_id))
-    if parent is None or parent.result_payload is None:
-        raise ValueError("Data Block Creation parent is unavailable")
-    if isinstance(
-        record.request,
-        (
-            ConcordanceMatchDataBlockCreationAnalysisRequest,
-            ConcordanceDocumentDataBlockCreationAnalysisRequest,
-        ),
-    ):
-        group = ConcordanceRunAllStoredResult.model_validate(parent.result_payload)
-        if group.sources is None:
-            raise ValueError("Concordance Data Block Creation parent is invalid")
-        descriptor = next(
-            (item for item in group.sources if item.node_id == source_node_id),
-            None,
-        )
-        if descriptor is None:
-            raise ValueError("Concordance Data Block Creation source is unavailable")
-        return descriptor.color
-    if isinstance(record.request, QuotationResultDataBlockCreationAnalysisRequest):
-        result = QuotationRunAllStoredResult.model_validate(parent.result_payload)
-        return result.source.color
-    raise ValueError("Analysis is not a Data Block Creation")
 
 
 def _publish_result(
