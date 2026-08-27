@@ -2,7 +2,7 @@ import { DataBlockName } from '@/components/DataBlockName';
 import { CardHeader, CardTitle } from '@/components/ui/card';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import { GREY, foregroundForVizColor } from '@/features/views/common/vizPalette';
-import { normalizeNodeColor } from '@/lib/nodeColor';
+import { normalizeNodeColor, toNodeSurfaceColor } from '@/lib/nodeColor';
 
 interface SourceHeaderProps {
   name: string;
@@ -10,20 +10,21 @@ interface SourceHeaderProps {
   testId: string;
 }
 
-/** Shared saturated Data Block header for separated Concordance results. */
+/** Shared quiet Data Block identity header for separated Concordance results. */
 export function ConcordanceSourceResultHeader({ name, color, testId }: SourceHeaderProps) {
   const sourceColor = normalizeNodeColor(color) ?? GREY;
+  const sourceSurfaceColor = toNodeSurfaceColor(sourceColor);
 
   return (
     <CardHeader
       data-testid={testId}
-      className="space-y-0 px-4 py-3"
-      style={{ backgroundColor: sourceColor, color: foregroundForVizColor(sourceColor) }}
+      className="space-y-0 px-4 py-3 text-foreground"
+      style={{ backgroundColor: sourceSurfaceColor }}
     >
       <CardTitle className="min-w-0 text-body">
         <DataBlockName
           name={name}
-          backgroundColor={sourceColor}
+          backgroundColor={sourceSurfaceColor}
           maxLines={2}
           fadeEdge="head"
           className="font-semibold leading-snug"

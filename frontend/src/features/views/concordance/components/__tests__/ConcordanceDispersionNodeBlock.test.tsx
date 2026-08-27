@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import { GREY, foregroundForVizColor } from '@/features/views/common/vizPalette';
+import { toNodeSurfaceColor } from '@/lib/nodeColor';
 import { CONCORDANCE_COMBINED_NODE_KEY } from '../../concordanceTableDomain';
 import {
   ConcordanceDispersionNodeBlock,
@@ -147,7 +148,7 @@ const baseProps: ConcordanceDispersionNodeBlockProps = {
 };
 
 describe('ConcordanceDispersionNodeBlock', () => {
-  it('uses one saturated source header above neutral table and plot cards', () => {
+  it('uses one quiet Data Block source header above neutral table and plot cards', () => {
     const longName = 'qldelection2020_candidate_tweets_filtered_by_username_in_AnnastaciaMP';
     render(
       <ConcordanceDispersionNodeBlock
@@ -159,9 +160,9 @@ describe('ConcordanceDispersionNodeBlock', () => {
     const card = screen.getByTestId('concordance-dispersion-source-card');
     const header = within(card).getByTestId('concordance-dispersion-source-header');
     expect(header).toHaveStyle({
-      backgroundColor: '#2563eb',
-      color: foregroundForVizColor('#2563eb'),
+      backgroundColor: toNodeSurfaceColor('#2563eb'),
     });
+    expect(header).toHaveClass('text-foreground');
     expect(within(header).getByTitle(longName)).toBeInTheDocument();
     expect(within(card).getByTestId('dispersion-table-card').style.borderLeftWidth).toBe('');
     const table = within(card).getByTestId('dispersion-table-card');
@@ -188,8 +189,7 @@ describe('ConcordanceDispersionNodeBlock', () => {
     );
 
     expect(screen.getByTestId('concordance-dispersion-source-header')).toHaveStyle({
-      backgroundColor: GREY,
-      color: foregroundForVizColor(GREY),
+      backgroundColor: toNodeSurfaceColor(GREY),
     });
   });
 

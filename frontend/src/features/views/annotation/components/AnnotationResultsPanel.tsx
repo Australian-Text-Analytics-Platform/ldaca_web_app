@@ -424,7 +424,7 @@ export function AnnotationResultsPanel({
                   </TableCell>
                 </TableRow>
               ) : null}
-              {rows.map((row) => {
+              {rows.map((row, index) => {
                 const rowPosition = Number(row[sourceRowIndexColumn]);
                 const seeded =
                   row[annotationColumn] == null ? null : cellText(row[annotationColumn]);
@@ -451,7 +451,10 @@ export function AnnotationResultsPanel({
                 );
                 const differenceColor = toBgColor(sourceColor);
                 return (
-                  <TableRow key={rowPosition} className="align-top hover:bg-transparent">
+                  <TableRow
+                    key={rowPosition}
+                    className={`align-top ${index % 2 === 0 ? 'bg-surface hover:bg-surface' : 'bg-panel hover:bg-panel'}`}
+                  >
                     <TableCell className="break-words whitespace-pre-wrap">
                       {cellText(row[textColumn])}
                     </TableCell>

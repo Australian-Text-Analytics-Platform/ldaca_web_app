@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { ConcordanceNodeResult } from '@/api';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import { GREY, foregroundForVizColor, toBgColor } from '@/features/views/common/vizPalette';
+import { toNodeSurfaceColor } from '@/lib/nodeColor';
 import {
   ConcordanceTableNodeBlock,
   type ConcordanceTableNodeBlockProps,
@@ -130,7 +131,7 @@ describe('ConcordanceTableNodeBlock', () => {
     expect(within(dialog).getByRole('button', { name: 'Next row' })).toBeDisabled();
   });
 
-  it('uses a saturated source header above a neutral table body', () => {
+  it('uses the quiet Data Block surface color above a neutral table body', () => {
     const longName = 'qldelection2020_candidate_tweets_filtered_by_username_in_AnnastaciaMP';
     const props = buildProps(vi.fn());
     render(
@@ -142,9 +143,9 @@ describe('ConcordanceTableNodeBlock', () => {
 
     const header = screen.getByTestId('concordance-table-source-header');
     expect(header).toHaveStyle({
-      backgroundColor: '#2563eb',
-      color: foregroundForVizColor('#2563eb'),
+      backgroundColor: toNodeSurfaceColor('#2563eb'),
     });
+    expect(header).toHaveClass('text-foreground');
     expect(header).toContainElement(screen.getByTitle(longName));
     expect(screen.getByTestId('analysis-table-scroll-area').style.borderLeftWidth).toBe('');
   });
@@ -159,8 +160,7 @@ describe('ConcordanceTableNodeBlock', () => {
     );
 
     expect(screen.getByTestId('concordance-table-source-header')).toHaveStyle({
-      backgroundColor: GREY,
-      color: foregroundForVizColor(GREY),
+      backgroundColor: toNodeSurfaceColor(GREY),
     });
   });
 
