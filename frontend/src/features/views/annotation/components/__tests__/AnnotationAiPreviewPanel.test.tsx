@@ -84,7 +84,7 @@ const preview = ({
 const correction = (column: string | null = null) => ({
   nodeId: 'node-1',
   column,
-  classOptions: ['replacement', 'new value'],
+  classOptions: ['replacement', 'new value', 'previous correction'],
   onCreate: vi.fn(),
   onUseAsExample: vi.fn(),
 });
@@ -111,6 +111,8 @@ function PreviewPanel({
         onMetricChange: setMetric,
       }}
       metadata={{ columns: metadataColumns, onColumnsChange: setMetadataColumns }}
+      tableHeight={null}
+      onTableHeightChange={vi.fn()}
       correction={{
         ...correctionValue,
         column: correctionColumn,
@@ -168,7 +170,11 @@ describe('AnnotationAiPreviewPanel', () => {
     );
 
     expect(screen.getByTestId('analysis-table-scroll-area')).toBeInTheDocument();
-    expect(within(screen.getByRole('table')).getAllByRole('rowgroup')[0]).toHaveClass(
+    const table = screen.getByRole('table');
+    expect(table).toHaveClass('table-auto');
+    expect(screen.getByRole('columnheader', { name: 'text' })).not.toHaveClass('w-px');
+    expect(screen.getByRole('columnheader', { name: 'annotation (preview)' })).toHaveClass('w-px');
+    expect(within(table).getAllByRole('rowgroup')[0]).toHaveClass(
       'sticky',
       'top-0',
       'z-10',
@@ -189,8 +195,16 @@ describe('AnnotationAiPreviewPanel', () => {
     await user.click(screen.getByRole('menuitemcheckbox', { name: 'review' }));
     await user.keyboard('{Escape}');
 
-    expect(screen.queryByRole('button', { name: /Cohen’s Kappa/ })).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', {
+        name: 'Cohen’s Kappa 0.333 for annotation (preview) versus review',
+      }),
+    ).toBeInTheDocument();
     expect(screen.getAllByLabelText('Comparison value hidden')).toHaveLength(2);
+    const maskedRow = screen.getByRole('row', {
+      name: 'Second text new value Comparison value hidden',
+    });
+    expect(within(maskedRow).getAllByRole('cell')[1]).not.toHaveAttribute('style');
     expect(
       screen.getByRole('button', { name: 'Show comparison values for review' }),
     ).toBeInTheDocument();
@@ -201,7 +215,7 @@ describe('AnnotationAiPreviewPanel', () => {
         name: 'Cohen’s Kappa 0.333 for annotation (preview) versus review',
       }),
     ).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Filter difference/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Filter rows/ })).not.toBeInTheDocument();
     const secondRow = screen.getByRole('row', {
       name: 'Second text new value previous correction',
     });
@@ -284,7 +298,7 @@ describe('AnnotationAiPreviewPanel', () => {
     expect(within(headers[4]).getByText('review')).toBeInTheDocument();
     expect(within(headers[4]).getByRole('button', { name: /Cohen’s Kappa/ })).toBeInTheDocument();
     const firstRow = within(previewTable).getByRole('row', { name: /First text/ });
-    expect(within(firstRow).getByText('replacement', { selector: 'td:last-child' })).toBeVisible();
+    expect(within(firstRow).getAllByRole('cell').at(-1)).toHaveTextContent('replacement');
     expect(within(firstRow).getAllByRole('combobox')).toHaveLength(1);
   });
 
@@ -399,5 +413,39 @@ describe('AnnotationAiPreviewPanel', () => {
     expect(within(firstRow).getByText('replacement')).toBeInTheDocument();
     expect(within(firstRow).getByText('new value')).toBeInTheDocument();
     expect(within(firstRow).getByRole('img', { name: 'corrected to' })).toBeInTheDocument();
+  });
+
+  it('keeps an invalid persisted correction visible and replaceable', async () => {
+    const user = userEvent.setup();
+    render(
+      <PreviewPanel
+        preview={preview({
+          labels: ['replacement'],
+          isFetching: false,
+          rows: [
+            {
+              text: 'First text',
+              annotation: null,
+              correction: ' legacy ',
+              review: null,
+            },
+          ],
+        })}
+        correction={correction('correction')}
+      />,
+    );
+
+    const trigger = screen.getByRole('combobox', { name: 'Correct prediction for row 1' });
+    expect(trigger).toHaveTextContent('legacy');
+    expect(trigger).toHaveClass('italic', 'text-description');
+    await user.click(trigger);
+    expect(screen.getByRole('option', { name: 'legacy' })).toHaveClass(
+      'italic',
+      'text-description',
+    );
+    await user.click(screen.getByRole('option', { name: 'new value' }));
+    await waitFor(() => {
+      expect(mocks.setCell).toHaveBeenCalledWith('node-1', 'correction', 0, 'new value');
+    });
   });
 });

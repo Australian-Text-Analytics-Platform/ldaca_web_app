@@ -103,8 +103,9 @@ code, and saving a Codebook are ordinary Data Block Edits. Its
 **Compare To** selection is shared with Preview and Review for the same Data
 Block. Compare To and Show metadata are disjoint roles, and the active
 correction column is eligible for neither. A selected comparison is masked
-when each table mounts and contributes no reliability query, score, matrix,
-difference tint, or filter until explicitly revealed from its header. Only
+when each table mounts: its reliability query, score, matrix, and row filter
+are available immediately, while its per-row values and difference tint appear
+only after it is explicitly revealed from its header. Only
 string and categorical columns are comparison targets. Percent Agreement,
 Cohen's Kappa, and nominal Krippendorff's Alpha are available; Cohen's Kappa is
 the default. The selections and metric are device-local presentation state
@@ -164,12 +165,22 @@ The shared table footer provides rows-per-page selection and direct numbered pag
 table columns after the optional correction column in Manual and Run All
 Review. Each selected column starts masked; its header can reveal the values,
 selected reliability score, exact confusion-matrix counts, difference tint,
-and per-column difference filter. A hidden column's filter remains visible but
-disabled. Hiding or deselecting the filtered column clears that mount-local
-filter. Filtered pages and counts are evaluated by Workspace SQL before server
-pagination. The metric is shared with Manual and Preview. Revealed-column
-counts and scores cover the complete current Data Block rather than only the
-visible Review page.
+and row filter. The annotation column header carries the same filter menu. A
+filter holds two independent conditions, a difference toggle and an existence
+choice (has value or empty), combined with AND; on the annotation column the
+difference means "differs from at least one selected comparison column". At most
+one column in a table carries a filter, filters work while the column is masked,
+and deselecting the filtered column clears that mount-local filter. Filtered
+pages and counts are evaluated by Workspace SQL before server pagination. The
+metric is shared with Manual and Preview. Selected-column counts and scores
+cover the complete current Data Block rather than only the visible Review page.
+
+A cell holds a valid label only when its trimmed text exactly matches a Codebook
+class. Null, blank, and non-Codebook values are empty for every comparison
+purpose: they never count as differences, are excluded from reliability counts,
+and match the empty existence condition. Without a Codebook only the blank rule
+applies. Manual, Preview, and Review share one device-local table height per Tab,
+bounded between the default height and three quarters of the viewport.
 
 ## Concordance And Quotation
 
