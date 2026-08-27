@@ -142,12 +142,19 @@ export const queryKeys = {
     sql: string,
     referenceColumn: string,
     comparisonColumn: string,
+    classOptions: readonly string[],
   ) =>
     [
       'workspaces',
       workspaceId,
       'annotation-column-comparisons',
-      { nodeIds: [...nodeIds], sql, referenceColumn, comparisonColumn },
+      {
+        nodeIds: [...nodeIds],
+        sql,
+        referenceColumn,
+        comparisonColumn,
+        classOptions: [...classOptions],
+      },
     ] as const,
 
   /** Authoritative Arrow schema for one data block. */

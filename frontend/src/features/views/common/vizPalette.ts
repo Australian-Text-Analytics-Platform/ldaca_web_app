@@ -41,7 +41,7 @@ export const GREY = '#6b7280';
 export const VIZ_TINT_FOREGROUND = '#111827';
 
 /** Light foreground candidate for saturated Data Block identity surfaces. */
-export const VIZ_LIGHT_FOREGROUND = '#ffffff';
+const VIZ_LIGHT_FOREGROUND = '#ffffff';
 
 /** FG colours eligible for random allocation to a freshly-analysed block (grey excluded). */
 export const RANDOMIZABLE_FG: string[] = VIZ_PALETTE.filter((color) => color !== GREY);

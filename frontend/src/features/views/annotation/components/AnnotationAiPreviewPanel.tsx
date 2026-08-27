@@ -17,7 +17,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { AnalysisTableFrame } from '@/features/views/common/components/AnalysisTableScrollArea';
 import {
   ColumnComparisonHeader,
   ColumnComparisonSelector,
@@ -30,9 +29,15 @@ import { ServerPaginationFooter } from '@/features/views/common/components/Serve
 import { type ServerColumnDef, useServerTable } from '@/features/views/common/hooks/useServerTable';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { toBgColor } from '@/features/views/common/vizPalette';
-import { annotationValuesDiffer } from '../annotationDifferenceQuery';
+import {
+  annotationValuesDiffer,
+  isInvalidAnnotationLabel,
+  normalizeAnnotationLabel,
+} from '../annotationRowFilter';
 import type { AnnotationAiPreview, AnnotationPreviewRow } from '../hooks/useAnnotationAiPreview';
 import { AnnotationCorrectionColumnControl } from './AnnotationCorrectionColumnControl';
+import { AnnotationTableFrame } from './AnnotationTableFrame';
+import { InvalidAnnotationClassItem } from './InvalidAnnotationClassItem';
 
 const NO_CORRECTION_VALUE = '__no_correction__';
 
@@ -57,6 +62,9 @@ interface AnnotationAiPreviewPanelProps {
     columns: string[];
     onColumnsChange: (columns: string[]) => void;
   };
+  /** Shared per-tab result-table height; null keeps the default. */
+  tableHeight: number | null;
+  onTableHeightChange: (height: number | null) => void;
   correction: {
     nodeId: string;
     column: string | null;
@@ -75,18 +83,23 @@ interface AnnotationAiPreviewPanelProps {
  * Rendered by: `AnnotationFeature` while preview is open.
  * `useAnnotationAiPreview` supplies page data, fresh labels, and query state;
  * this component never writes preview labels into the selected annotation
- * column. Comparisons start masked and contribute to page-local reliability
- * and tinting only after reveal. A reviewer's explicit correction is a separate
- * set_cell edit in the configured correction column.
+ * column. Comparisons start masked: their page-local reliability is always
+ * shown, but per-row values and difference tint appear only after reveal.
+ * Empty, blank, and non-Codebook cells never count as differences. A
+ * reviewer's explicit correction is a separate set_cell edit in the
+ * configured correction column.
  */
 export function AnnotationAiPreviewPanel({
   preview,
   sourceColor,
   comparison,
   metadata,
+  tableHeight,
+  onTableHeightChange,
   correction,
 }: AnnotationAiPreviewPanelProps) {
   const { page, predictions, columns } = preview;
+  const classOptions = correction.classOptions;
   const { setCell } = useWorkspaceActions();
   const [selections, setSelections] = useState<Record<string, string>>({});
   const [savingRows, setSavingRows] = useState<Set<string>>(new Set());
@@ -121,17 +134,17 @@ export function AnnotationAiPreviewPanel({
   const supplementalColumns = [...activeComparisonColumns, ...activeMetadataColumns];
   const previewColumn = `${columns.annotation} (preview)`;
   const comparisonRows = new Map<string, ConfusionCount[]>();
-  revealedActiveComparisonColumns.forEach((targetColumn) => {
+  activeComparisonColumns.forEach((targetColumn) => {
     const counts = new Map<string, ConfusionCount>();
     page.rows.forEach((row, index) => {
-      const reference = predictions.labels[index];
+      const reference = normalizeAnnotationLabel(predictions.labels[index], classOptions);
       const rowPosition = page.pagination.pageIndex * page.pagination.pageSize + index;
       const selectionKey = `${targetColumn}:${String(rowPosition)}`;
       const targetValue = Object.hasOwn(selections, selectionKey)
         ? selections[selectionKey]
         : row[targetColumn];
-      if (reference == null || targetValue == null) return;
-      const comparison = cellText(targetValue);
+      const comparison = normalizeAnnotationLabel(targetValue, classOptions);
+      if (reference === null || comparison === null) return;
       const key = JSON.stringify([reference, comparison]);
       const existing = counts.get(key);
       counts.set(key, {
@@ -259,8 +272,9 @@ export function AnnotationAiPreviewPanel({
           />
         </div>
       </div>
-      <AnalysisTableFrame
-        maxHeightClass="max-h-96"
+      <AnnotationTableFrame
+        height={tableHeight}
+        onHeightChange={onTableHeightChange}
         contentClassName="min-w-full"
         belowTable={
           <>
@@ -311,7 +325,7 @@ export function AnnotationAiPreviewPanel({
       >
         <Table className="w-full table-auto" disableContainer>
           <TableHeader className="sticky top-0 z-10 bg-surface">
-            <TableRow>
+            <TableRow className="[&>th]:align-bottom">
               <TableHead>{columns.text}</TableHead>
               <TableHead className="w-px whitespace-nowrap">
                 {columns.annotation} (preview)
@@ -388,7 +402,7 @@ export function AnnotationAiPreviewPanel({
                   return correctionValue || null;
                 };
                 const predictionDiffers = revealedActiveComparisonColumns.some((column) =>
-                  annotationValuesDiffer(value || null, comparisonValue(column)),
+                  annotationValuesDiffer(value, comparisonValue(column), classOptions),
                 );
                 const differenceColor = toBgColor(sourceColor);
                 return (
@@ -452,6 +466,10 @@ export function AnnotationAiPreviewPanel({
                               <SelectItem value={NO_CORRECTION_VALUE} className="text-description">
                                 None
                               </SelectItem>
+                              <InvalidAnnotationClassItem
+                                value={correctionValue || null}
+                                classOptions={classOptions}
+                              />
                               {correction.classOptions.map((name) => (
                                 <SelectItem key={name} value={name}>
                                   {name}
@@ -463,23 +481,35 @@ export function AnnotationAiPreviewPanel({
                       </>
                     ) : null}
                     {supplementalColumns.map((column) => {
+                      const isComparison = activeComparisonColumns.includes(column);
                       const comparisonRevealed =
-                        activeComparisonColumns.includes(column) &&
-                        revealedComparisonColumns.has(column);
+                        isComparison && revealedComparisonColumns.has(column);
                       const comparisonDiffers =
-                        comparisonRevealed && annotationValuesDiffer(value || null, row[column]);
+                        comparisonRevealed &&
+                        annotationValuesDiffer(value, row[column], classOptions);
+                      const invalid =
+                        comparisonRevealed && isInvalidAnnotationLabel(row[column], classOptions);
                       return (
                         <TableCell
                           key={column}
-                          className="w-px whitespace-pre-wrap"
+                          className={isComparison ? 'w-px whitespace-nowrap' : 'w-px'}
                           style={
                             comparisonDiffers ? { backgroundColor: differenceColor } : undefined
                           }
                         >
-                          {activeComparisonColumns.includes(column) && !comparisonRevealed ? (
+                          {isComparison && !comparisonRevealed ? (
                             <span aria-label="Comparison value hidden">•••</span>
+                          ) : isComparison ? (
+                            <span
+                              className={invalid ? 'italic text-description' : undefined}
+                              title={invalid ? 'Not a Codebook class; treated as empty' : undefined}
+                            >
+                              {cellText(row[column]) || '—'}
+                            </span>
                           ) : (
-                            cellText(row[column]) || '—'
+                            <div className="w-max max-w-64 break-words whitespace-pre-wrap">
+                              {cellText(row[column]) || '—'}
+                            </div>
                           )}
                         </TableCell>
                       );
@@ -490,7 +520,7 @@ export function AnnotationAiPreviewPanel({
             )}
           </TableBody>
         </Table>
-      </AnalysisTableFrame>
+      </AnnotationTableFrame>
     </section>
   );
 }

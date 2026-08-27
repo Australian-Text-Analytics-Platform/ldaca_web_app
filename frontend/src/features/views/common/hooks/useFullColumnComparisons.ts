@@ -1,5 +1,6 @@
 import { useQueries } from '@tanstack/react-query';
 import { queryWorkspaceSqlTable, sqlIdentifier } from '@/api';
+import { annotationLabelSql } from '@/features/views/annotation/annotationRowFilter';
 import type { ConfusionCount } from '@/features/views/common/columnComparisonModel';
 import { queryKeys } from '@/lib/queryKeys';
 
@@ -29,10 +30,13 @@ const fullColumnComparisonSql = (
   sql: string,
   referenceColumn: string,
   comparisonColumn: string,
+  classOptions: readonly string[],
 ): string => {
-  const reference = sqlIdentifier(referenceColumn);
-  const comparison = sqlIdentifier(comparisonColumn);
-  return `SELECT ${reference} AS ${sqlIdentifier(REFERENCE_ALIAS)}, ${comparison} AS ${sqlIdentifier(COMPARISON_ALIAS)}, COUNT(*) AS ${sqlIdentifier(COUNT_ALIAS)} FROM (${sql}) AS ${sqlIdentifier('__annotation_comparison_source')} WHERE ${reference} IS NOT NULL AND ${comparison} IS NOT NULL GROUP BY ${reference}, ${comparison} ORDER BY ${reference} ASC NULLS FIRST, ${comparison} ASC NULLS FIRST`;
+  const reference = annotationLabelSql(referenceColumn, classOptions);
+  const comparison = annotationLabelSql(comparisonColumn, classOptions);
+  const referenceAlias = sqlIdentifier(REFERENCE_ALIAS);
+  const comparisonAlias = sqlIdentifier(COMPARISON_ALIAS);
+  return `SELECT ${reference} AS ${referenceAlias}, ${comparison} AS ${comparisonAlias}, COUNT(*) AS ${sqlIdentifier(COUNT_ALIAS)} FROM (${sql}) AS ${sqlIdentifier('__annotation_comparison_source')} WHERE ${reference} IS NOT NULL AND ${comparison} IS NOT NULL GROUP BY ${referenceAlias}, ${comparisonAlias} ORDER BY ${referenceAlias} ASC, ${comparisonAlias} ASC`;
 };
 
 interface FullColumnComparisonArgs {
@@ -41,6 +45,8 @@ interface FullColumnComparisonArgs {
   sql: string;
   referenceColumn: string;
   comparisonColumns: string[];
+  /** Codebook classes defining valid labels; empty, blank, and non-Codebook cells are excluded. */
+  classOptions: readonly string[];
 }
 
 /** Loads complete grouped counts for one reference column and each selected target column. */
@@ -50,6 +56,7 @@ export function useFullColumnComparisons({
   sql,
   referenceColumn,
   comparisonColumns,
+  classOptions,
 }: FullColumnComparisonArgs) {
   return useQueries({
     queries: comparisonColumns.map((comparisonColumn) => ({
@@ -59,10 +66,16 @@ export function useFullColumnComparisons({
         sql,
         referenceColumn,
         comparisonColumn,
+        classOptions,
       ),
       queryFn: async ({ signal }: { signal: AbortSignal }) => {
         if (!workspaceId) throw new Error('Missing workspace ID');
-        const aggregateSql = fullColumnComparisonSql(sql, referenceColumn, comparisonColumn);
+        const aggregateSql = fullColumnComparisonSql(
+          sql,
+          referenceColumn,
+          comparisonColumn,
+          classOptions,
+        );
         const rows: ConfusionCount[] = [];
         let page = 1;
         let initialEtag: string | null | undefined;

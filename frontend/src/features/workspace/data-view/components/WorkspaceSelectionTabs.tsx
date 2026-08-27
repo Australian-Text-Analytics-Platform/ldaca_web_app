@@ -1,5 +1,10 @@
 import { EditorTabs, type EditorTabItem } from '@/components/tabs';
+import { GREY, VIZ_TINT_FOREGROUND, toBgColor } from '@/features/views/common/vizPalette';
+import { normalizeNodeAccentColor } from '@/lib/nodeColor';
 import type { WorkspaceSelectionTabsState } from '../hooks/useWorkspaceDataTable';
+
+/** Lighter mix used for inactive tabs so the active Data Block tint stands out. */
+const INACTIVE_TAB_TINT_MIX = 0.08;
 
 type WorkspaceSelectionTabsProps = WorkspaceSelectionTabsState;
 
@@ -10,8 +15,9 @@ type WorkspaceSelectionTabsProps = WorkspaceSelectionTabsState;
  * active table without touching graph selection internals — reusing the same
  * ``EditorTabs`` strip (drag-reorder + close) as the analysis views.
  * Flow: skip rendering when there is a single selection, otherwise adapt the
- * node tabs to the shared component and route activate/close/reorder back to the
- * data-table view model.
+ * node tabs to the shared component, colour each tab with its Data Block tint
+ * (the standard tint when active, a lighter one when inactive), and route
+ * activate/close/reorder back to the data-table view model.
  */
 export const WorkspaceSelectionTabs = ({
   shouldShowTabs,
@@ -24,7 +30,18 @@ export const WorkspaceSelectionTabs = ({
     return null;
   }
 
-  const items: EditorTabItem[] = tabs.map((tab) => ({ id: tab.id, title: tab.label }));
+  const items: EditorTabItem[] = tabs.map((tab) => {
+    const color = normalizeNodeAccentColor(tab.color) ?? GREY;
+    return {
+      id: tab.id,
+      title: tab.label,
+      fill: {
+        active: toBgColor(color),
+        inactive: toBgColor(color, INACTIVE_TAB_TINT_MIX),
+        foreground: VIZ_TINT_FOREGROUND,
+      },
+    };
+  });
   const activeTabId = tabs.find((tab) => tab.isActive)?.id ?? null;
 
   return (

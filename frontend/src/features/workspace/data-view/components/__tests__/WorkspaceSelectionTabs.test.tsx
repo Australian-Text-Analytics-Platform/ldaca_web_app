@@ -1,11 +1,12 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
+import { GREY, VIZ_TINT_FOREGROUND, toBgColor } from '@/features/views/common/vizPalette';
 import { WorkspaceSelectionTabs } from '../WorkspaceSelectionTabs';
 
 const tabs = [
-  { id: 'node-1', label: 'Data Block 1', isActive: true },
-  { id: 'node-2', label: 'Data Block 2', isActive: false },
+  { id: 'node-1', label: 'Data Block 1', color: '#2563eb', isActive: true },
+  { id: 'node-2', label: 'Data Block 2', color: null, isActive: false },
 ];
 
 beforeAll(() => {
@@ -63,6 +64,20 @@ describe('WorkspaceSelectionTabs', () => {
     const tablist = screen.getByRole('tablist', { name: /selected node tabs/i });
     expect(tablist).toHaveClass('px-[8px]', 'pt-[8px]');
     expect(tablist).not.toHaveClass('border-b', 'bg-panel/30');
+  });
+
+  it('tints each tab with its Data Block colour, lighter when inactive', () => {
+    renderSelectionTabs();
+
+    const [activeTab, inactiveTab] = screen.getAllByRole('tab');
+    const [activeFill, inactiveFill] = screen.getAllByTestId('editor-tab-fill');
+    expect(activeTab).toHaveStyle({ color: VIZ_TINT_FOREGROUND });
+    expect(inactiveTab).toHaveStyle({ color: VIZ_TINT_FOREGROUND });
+    expect(activeFill?.style.getPropertyValue('--editor-tab-fill')).toBe(toBgColor('#2563eb'));
+    expect(inactiveFill?.style.getPropertyValue('--editor-tab-fill')).toBe(toBgColor(GREY, 0.08));
+    expect(inactiveFill?.style.getPropertyValue('--editor-tab-fill-hover')).toBe(toBgColor(GREY));
+    expect(activeFill).toHaveClass('bg-(--editor-tab-fill)');
+    expect(activeFill).not.toHaveClass('bg-editor-tab-active-background');
   });
 
   it('wires activate, close, and reorder intents to the selection owner', () => {

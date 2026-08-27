@@ -1,7 +1,10 @@
 import { readdir, readFile } from 'node:fs/promises';
-import { extname, join, relative } from 'node:path';
+import { extname, join, relative, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const root = new URL('../src/', import.meta.url);
+// fileURLToPath, not URL.pathname: on Windows the pathname is "/D:/..." and
+// resolving it against the current drive yields "D:\D:\...".
+const root = fileURLToPath(new URL('../src/', import.meta.url));
 const allowedFunctionalGradients = new Set([
   'features/workspace/data-view/components/WorkspaceDataHeader.tsx',
 ]);
@@ -70,9 +73,10 @@ async function sourceFiles(directory) {
 }
 
 const violations = [];
-for (const path of await sourceFiles(root.pathname)) {
+for (const path of await sourceFiles(root)) {
   const source = await readFile(path, 'utf8');
-  const displayPath = relative(root.pathname, path);
+  // Allow-lists use forward slashes; normalise Windows separators before lookup.
+  const displayPath = relative(root, path).split(sep).join('/');
   for (const [label, pattern] of checks) {
     if (label === 'non-overlay elevation') {
       const withoutApprovedOverlay = source

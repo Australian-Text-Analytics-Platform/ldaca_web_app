@@ -35,6 +35,8 @@ function ReviewTable({
   | 'onMetadataColumnsChange'
   | 'reliabilityMetric'
   | 'onReliabilityMetricChange'
+  | 'tableHeight'
+  | 'onTableHeightChange'
   | 'correction'
 > & { correctionColumn?: string }) {
   const [comparisonColumns, setComparisonColumns] = useState<string[]>([]);
@@ -53,9 +55,11 @@ function ReviewTable({
       onMetadataColumnsChange={setMetadataColumns}
       reliabilityMetric={reliabilityMetric}
       onReliabilityMetricChange={setReliabilityMetric}
+      tableHeight={null}
+      onTableHeightChange={vi.fn()}
       correction={{
         column: selectedCorrectionColumn,
-        classOptions: ['label', 'corrected'],
+        classOptions: ['label', 'corrected', 'covid', 'job', 'other'],
         onColumnChange: setSelectedCorrectionColumn,
         onCreate: vi.fn(),
         onUseAsExample: vi.fn(),
@@ -346,21 +350,25 @@ describe('RunAllReviewTable', () => {
     await user.keyboard('{Escape}');
 
     expect(screen.getAllByLabelText('Comparison value hidden')).toHaveLength(2);
-    expect(screen.queryByRole('button', { name: /Cohen’s Kappa/ })).not.toBeInTheDocument();
-    await user.click(
-      screen.getByRole('button', { name: 'Show comparison values for reviewer_one' }),
-    );
-
     expect(
       await screen.findByRole('button', {
         name: 'Cohen’s Kappa 0.727 for annotation versus reviewer_one',
       }),
     ).toBeVisible();
     expect(
-      screen.queryByRole('button', {
+      await screen.findByRole('button', {
         name: 'Cohen’s Kappa 0.000 for annotation versus reviewer_two',
       }),
-    ).not.toBeInTheDocument();
+    ).toBeVisible();
+    await user.click(
+      screen.getByRole('button', { name: 'Show comparison values for reviewer_one' }),
+    );
+
+    expect(
+      screen.getByRole('button', {
+        name: 'Cohen’s Kappa 0.727 for annotation versus reviewer_one',
+      }),
+    ).toBeVisible();
     expect(
       screen.queryByRole('heading', { name: /annotation vs reviewer/ }),
     ).not.toBeInTheDocument();
@@ -372,16 +380,22 @@ describe('RunAllReviewTable', () => {
     expect(within(headers[3]).getByText('reviewer_one')).toBeInTheDocument();
     expect(within(headers[4]).getByText('reviewer_two')).toBeInTheDocument();
     expect(
-      within(headers[3]).getByRole('button', { name: 'Filter difference for reviewer_one' }),
+      within(headers[1]).getByRole('button', { name: 'Filter rows by annotation' }),
+    ).toBeEnabled();
+    expect(
+      within(headers[3]).getByRole('button', { name: 'Filter rows by reviewer_one' }),
     ).toHaveAttribute('aria-pressed', 'false');
     expect(
-      within(headers[4]).getByRole('button', { name: 'Filter difference for reviewer_two' }),
-    ).toBeDisabled();
-    await user.click(screen.getByRole('button', { name: 'Filter difference for reviewer_one' }));
+      within(headers[4]).getByRole('button', { name: 'Filter rows by reviewer_two' }),
+    ).toBeEnabled();
+    await user.click(screen.getByRole('button', { name: 'Filter rows by reviewer_one' }));
+    await user.click(screen.getByRole('menuitemcheckbox', { name: 'Differs from annotation' }));
+    await user.keyboard('{Escape}');
     await waitFor(() => {
-      expect(
-        screen.getByRole('button', { name: 'Filter difference for reviewer_one' }),
-      ).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByRole('button', { name: 'Filter rows by reviewer_one' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
     });
     const filteredReviewTable = screen.getAllByRole('table')[0];
     expect(

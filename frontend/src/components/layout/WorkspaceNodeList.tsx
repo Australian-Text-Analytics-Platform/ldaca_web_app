@@ -1,7 +1,7 @@
 import type React from 'react';
 import { cn } from '@/lib/utils';
 import { normalizeNodeAccentColor } from '@/lib/nodeColor';
-import { GREY, foregroundForVizColor } from '@/features/views/common/vizPalette';
+import { GREY, VIZ_TINT_FOREGROUND, toBgColor } from '@/features/views/common/vizPalette';
 import { DataBlockName } from '@/components/DataBlockName';
 import { useFreshNodesStore } from '@/stores/freshNodesStore';
 import { usePinnedNodesStore } from '@/stores/pinnedNodesStore';
@@ -87,10 +87,13 @@ function WorkspaceNodeList({
                 const isPinned = pinnedIdSet.has(node.id);
                 const pinnedRowAction = isPinned ? renderPinnedRowAction(node) : null;
                 const rowActions = renderRowActions(node);
-                // Saturated block colour owns the row's identity. Selection is
+                // Block colour: the row is filled with the light background tint of
+                // the block's colour (grey for unset / un-analysed blocks) with a 4px
+                // full-colour spine on the left. The tint is theme-independent, so
+                // the name always uses the dark tint foreground. Selection is
                 // independent and uses one detached theme-inverse outline.
                 const effectiveColor = normalizeNodeAccentColor(node.color) ?? GREY;
-                const identityForeground = foregroundForVizColor(effectiveColor);
+                const rowBackgroundColor = toBgColor(effectiveColor);
 
                 return (
                   <Tooltip key={node.id}>
@@ -112,7 +115,7 @@ function WorkspaceNodeList({
                         aria-label={`${checked ? 'Deselect' : 'Select'} ${displayName}`}
                         className="group/row relative block w-full rounded-md text-left focus-visible:outline-hidden"
                       >
-                        {/* Inner box carries the identity surface and selection halo. */}
+                        {/* Inner box carries the tinted surface, colour spine, and selection halo. */}
                         <div
                           className={cn(
                             'relative flex min-h-control items-center gap-2 overflow-visible rounded-md border border-surface-border px-3 py-1 text-body group-focus-visible/row:ring-1 group-focus-visible/row:ring-inset group-focus-visible/row:ring-focus',
@@ -122,8 +125,11 @@ function WorkspaceNodeList({
                           )}
                           data-testid={`workspace-node-row-${node.id}`}
                           style={{
-                            backgroundColor: effectiveColor,
-                            color: identityForeground,
+                            backgroundColor: rowBackgroundColor,
+                            color: VIZ_TINT_FOREGROUND,
+                            borderLeftColor: effectiveColor,
+                            borderLeftWidth: 4,
+                            borderLeftStyle: 'solid',
                           }}
                         >
                           {pinnedRowAction && (
@@ -145,7 +151,7 @@ function WorkspaceNodeList({
                           )}
                           <DataBlockName
                             name={displayName}
-                            backgroundColor={effectiveColor}
+                            backgroundColor={rowBackgroundColor}
                             maxLines={1}
                             fadeEdge="head"
                             className="min-w-0 flex-1 text-body font-semibold leading-snug"
