@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SettingsDialog } from '../SettingsDialog';
+import { DataRootContext } from '@/features/bootstrap/DataRootContext';
 
 const mocks = vi.hoisted(() => ({
   isTauri: vi.fn(),
@@ -63,7 +64,23 @@ function renderSettingsDialog(queryClient = makeQueryClient()) {
     queryClient,
     ...render(
       <QueryClientProvider client={queryClient}>
-        <SettingsDialog open onOpenChange={vi.fn()} />
+        <DataRootContext.Provider
+          value={{
+            resource: {
+              state: 'ready',
+              source: 'config',
+              data_root: '/srv/wordflow',
+              suggested_data_root: '/srv/recommended',
+              mutable: true,
+              runtime_generation: 1,
+              error: null,
+              change_token: 'token',
+            },
+            configureDataRoot: vi.fn(),
+          }}
+        >
+          <SettingsDialog open onOpenChange={vi.fn()} />
+        </DataRootContext.Provider>
       </QueryClientProvider>,
     ),
   };
@@ -136,14 +153,13 @@ describe('SettingsDialog', () => {
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
   });
 
-  it('keeps the working directory server-owned outside Tauri', async () => {
+  it('offers the backend-owned server path outside Tauri', async () => {
     const user = userEvent.setup();
     renderSettingsDialog();
 
     await user.click(screen.getByRole('tab', { name: 'Workspace' }));
 
-    expect(screen.getByText('Managed by server')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Path')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Folder on the server')).toHaveValue('/srv/wordflow');
   });
 
   it('renders the AI providers panel in the AI tab', async () => {

@@ -4,22 +4,27 @@ import { getGeneratedApiBase } from '@/lib/backend/generatedClientConfig';
 import { setRuntimeBackendUrl } from '@/lib/backend/runtimeBackend';
 import { isTauri } from '@/lib/isTauri';
 
-/** The URLs one application load uses for generated requests and readiness checks. */
+/** The URLs one application load uses for generated requests and bootstrap checks. */
 export interface ResolvedBackendConnection {
   apiBaseUrl: string;
   clientBaseUrl: string;
-  healthUrl: string;
+  liveUrl: string;
+  readyUrl: string;
+  dataRootUrl: string;
 }
 
 const connectionFromApiBase = (apiBaseUrl: string): ResolvedBackendConnection => {
   const normalizedApiBase = apiBaseUrl.replace(/\/$/, '');
   const clientBaseUrl = getGeneratedApiBase(normalizedApiBase);
+  const controlBase = normalizedApiBase.endsWith('/api')
+    ? normalizedApiBase.slice(0, -4)
+    : normalizedApiBase;
   return {
     apiBaseUrl: normalizedApiBase,
     clientBaseUrl,
-    healthUrl: normalizedApiBase.endsWith('/api')
-      ? normalizedApiBase.replace(/\/api$/, '/health')
-      : `${normalizedApiBase}/health`,
+    liveUrl: `${controlBase}/health/live`,
+    readyUrl: `${controlBase}/health/ready`,
+    dataRootUrl: `${normalizedApiBase}/data-root`,
   };
 };
 

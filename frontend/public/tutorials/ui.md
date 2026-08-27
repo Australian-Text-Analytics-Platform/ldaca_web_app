@@ -101,12 +101,12 @@ The centre column is the main working area and shows the interface of whichever 
 
 <h2 id="help-ui-working-directory">7. Working Directory</h2>
 
-The **Working Directory** indicator at the bottom of the left sidebar shows the local file-system path where workspace data is stored.
+The Data Root is the filesystem directory where Wordflow stores durable application data.
 
-- Click the edit icon to change the directory.
-- All workspaces, uploaded files, and exported outputs are stored under this path.
-- The default location is `~/Documents/ldaca`. This applies when running the app locally — via self-hosting, the Tauri desktop app, or UVX.
-- This section is not available in multi-user mode, where storage is managed server-side.
+- On first launch without `DATA_ROOT` or saved configuration, use the setup screen's recommended location or choose another folder.
+- The desktop app opens the operating system's native folder picker. In a browser, enter an absolute path on the server that runs Wordflow.
+- Change an existing single-user Data Root under **Settings → Workspace → Working Directory**. Wordflow does not copy data from the previous root.
+- Environment-managed and multi-user deployments show operator guidance instead of allowing a client-side change.
 
 <h2 id="help-ui-appearance">8. Appearance</h2>
 

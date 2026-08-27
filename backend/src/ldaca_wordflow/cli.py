@@ -76,8 +76,6 @@ def main(argv: list[str] | None = None) -> None:
     )
     setup_logging(
         level=cli_settings.log_level,
-        log_file=cli_settings.log_file,
-        data_root=cli_settings.get_data_root(),
     )
     start_parent_watchdog()
 

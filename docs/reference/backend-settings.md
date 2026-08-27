@@ -10,7 +10,7 @@ Unknown settings are rejected.
 
 | Setting | Meaning |
 |---|---|
-| `DATA_ROOT` | Canonical process-owned storage root |
+| `DATA_ROOT` | Optional canonical operator-owned storage root; non-empty values are immutable at runtime |
 | `MAX_FILE_UPLOAD_BYTES` | Per-upload byte limit |
 | `MAX_WORKSPACE_ARCHIVE_BYTES` | Compressed import limit |
 | `MAX_WORKSPACE_EXPORT_BYTES` | Export expanded/compressed limit |
@@ -46,6 +46,15 @@ policy in `deployment.sqlite3`, not an environment setting. `NULL` means
 unlimited; new hosted users receive the database default of 30 GiB. There are
 no file-count, directory-count, Analysis-count, or queue-count quotas.
 
+When `DATA_ROOT` is absent, Wordflow reads
+`<platform config directory>/au.edu.ldaca.text-analytics/settings.json` with
+schema `{ "schema_version": 1, "data_root": "..." }`. If no setting exists,
+the HTTP control plane starts unconfigured and suggests
+`<platform local application-data directory>/au.edu.ldaca.text-analytics/data`.
+Single-user clients may configure or switch this value through the backend;
+multi-user clients may not. The backend does not read or migrate Tauri's former
+`backend.json` file.
+
 Each `users/<user-id>/` root contains `files/`, `imports/`, and schema-versioned
 non-secret `preferences.toml`. In single-user mode, the only root is
 `users/root/`, and its write-only Provider Credentials are stored separately in
@@ -72,7 +81,7 @@ failed or invalid projections are never retained.
 | Setting | Meaning |
 |---|---|
 | `SERVER_HOST` / `BACKEND_PORT` | Bind host and positive listening port |
-| `LOG_LEVEL` / `LOG_FILE` | Process log level and optional Data Root-relative file |
+| `LOG_LEVEL` / `LOG_FILE` | Process log level and optional Runtime-active Data Root-relative file |
 | `CORS_ALLOWED_ORIGINS` | Exact browser Origin allowlist |
 | `TRUSTED_HOSTS` | Exact HTTP Host allowlist |
 | `QUOTATION_SERVICE_TIMEOUT` | Remote quotation timeout |

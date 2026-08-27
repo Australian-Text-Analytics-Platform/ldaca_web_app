@@ -342,4 +342,5 @@ def test_read_only_collection_routes_do_not_advertise_unrelated_errors() -> None
     paths = app.openapi()["paths"]
     assert set(paths["/api/workspaces"]["get"]["responses"]) == {"200", "401"}
     assert set(paths["/api/events"]["get"]["responses"]) == {"200", "401"}
-    assert set(paths["/health"]["get"]["responses"]) == {"200", "503"}
+    assert set(paths["/health/live"]["get"]["responses"]) == {"200"}
+    assert set(paths["/health/ready"]["get"]["responses"]) == {"200", "503"}

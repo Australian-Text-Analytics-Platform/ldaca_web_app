@@ -23,7 +23,7 @@ struct StartupRecord {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct ReadyBackend {
+pub(crate) struct LiveBackend {
     pub(crate) url: String,
 }
 
@@ -42,11 +42,7 @@ impl BackendProcess {
     ///
     /// Called during Tauri setup. Environment construction consumes manifest
     /// fields directly; no path scanning or venv fallback occurs here.
-    pub(crate) fn spawn(
-        runtime: &BackendRuntime,
-        startup_file: &Path,
-        data_root: Option<&Path>,
-    ) -> io::Result<Self> {
+    pub(crate) fn spawn(runtime: &BackendRuntime, startup_file: &Path) -> io::Result<Self> {
         let mut command = runtime_command(runtime);
         command
             .arg("-m")
@@ -58,9 +54,6 @@ impl BackendProcess {
             .arg(startup_file)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
-        if let Some(data_root) = data_root {
-            command.env("DATA_ROOT", data_root);
-        }
         platform::configure_backend_command(&mut command);
 
         println!(
@@ -90,7 +83,7 @@ impl BackendProcess {
     ///
     /// This runs before the process enters shared Tauri state, so no mutex is
     /// held while polling the filesystem or child status.
-    pub(crate) fn wait_until_ready(&mut self, startup_file: &Path) -> io::Result<ReadyBackend> {
+    pub(crate) fn wait_until_live(&mut self, startup_file: &Path) -> io::Result<LiveBackend> {
         let deadline = Instant::now() + STARTUP_TIMEOUT;
         loop {
             if let Some(status) = self
@@ -100,7 +93,7 @@ impl BackendProcess {
                 .try_wait()?
             {
                 return Err(io::Error::other(format!(
-                    "Backend exited before readiness with {status}"
+                    "Backend exited before liveness with {status}"
                 )));
             }
             if startup_file.is_file() {
@@ -132,13 +125,13 @@ impl BackendProcess {
                         "Backend startup record is incomplete",
                     ));
                 };
-                if record.status != "ready" || record.host.as_deref() != Some(BACKEND_HOST) {
+                if record.status != "live" || record.host.as_deref() != Some(BACKEND_HOST) {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidData,
                         "Backend startup record is incomplete",
                     ));
                 }
-                return Ok(ReadyBackend {
+                return Ok(LiveBackend {
                     url: format!("http://{BACKEND_HOST}:{port}"),
                 });
             }
@@ -434,32 +427,31 @@ print(sys.version)
             "packaged tokenization downloaded a DuckDB extension"
         );
 
-        let data_root = fixture.join("data");
-        std::fs::create_dir_all(&data_root).expect("create packaged data root");
         let startup_file = fixture.join("startup.json");
-        let mut process = BackendProcess::spawn(&runtime, &startup_file, Some(&data_root))
-            .expect("spawn packaged backend");
-        let ready = process
-            .wait_until_ready(&startup_file)
-            .expect("packaged backend readiness");
-        let port = ready
+        std::fs::create_dir_all(&fixture).expect("create packaged fixture");
+        let mut process =
+            BackendProcess::spawn(&runtime, &startup_file).expect("spawn packaged backend");
+        let live = process
+            .wait_until_live(&startup_file)
+            .expect("packaged backend liveness");
+        let port = live
             .url
             .rsplit_once(':')
-            .expect("ready URL port")
+            .expect("live URL port")
             .1
             .parse::<u16>()
             .expect("numeric port");
         let mut connection =
-            std::net::TcpStream::connect((BACKEND_HOST, port)).expect("connect ready backend");
+            std::net::TcpStream::connect((BACKEND_HOST, port)).expect("connect live backend");
         connection
-            .write_all(b"GET /health HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n")
+            .write_all(b"GET /health/live HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n")
             .expect("write health request");
         let mut response = String::new();
         connection
             .read_to_string(&mut response)
             .expect("read health response");
         assert!(response.starts_with("HTTP/1.1 200"), "{response}");
-        assert!(response.contains(r#""status":"ready""#), "{response}");
+        assert!(response.contains(r#""status":"live""#), "{response}");
         process.shutdown().expect("shutdown packaged backend");
         std::fs::remove_dir_all(fixture).expect("clean packaged fixture");
     }

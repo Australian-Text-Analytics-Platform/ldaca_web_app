@@ -172,6 +172,12 @@ class AnalysisScheduler(AnalysisExecutionControl):
         async with self._lock:
             return set(self._active)
 
+    async def has_work(self) -> bool:
+        """Return whether queued or running Analysis execution still exists."""
+
+        async with self._lock:
+            return bool(self._pending or self._active)
+
     async def wait_idle(self) -> None:
         """Wait until every selected runner has left its capacity slot."""
 

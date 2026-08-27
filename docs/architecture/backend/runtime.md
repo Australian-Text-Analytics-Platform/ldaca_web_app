@@ -7,10 +7,11 @@ registers middleware, handlers, routers, OpenAPI metadata, health, and optional
 SPA serving without allocating stateful resources. OpenAPI export therefore
 does not enter lifespan or require a Data Root.
 
-The CLI configures process logging and delegates to `server_launcher.py`. For a
+The CLI configures stderr bootstrap logging and delegates to `server_launcher.py`. For a
 desktop port-zero launch, the launcher binds and retains the socket before
 constructing final settings, then publishes a private startup record only after
-ASGI lifespan has succeeded.
+ASGI lifespan has succeeded. The startup record reports control-plane
+liveness; a Data Root is not required at that point.
 
 Browser development is intentionally split: Uvicorn imports the API-only ASGI
 application with reload enabled, while Vite owns the frontend development
@@ -40,7 +41,13 @@ development or hosted production. The executable setup is documented in the
 
 ## Lifespan Ownership
 
-`runtime_context` uses `AsyncExitStack` and yields typed `LifespanState`. Startup
+`runtime_manager_context` is the lifespan owner. A non-empty `DATA_ROOT` has
+immutable environment authority. Otherwise the manager reads versioned
+platform configuration from `settings.json`; without either source it yields
+an unconfigured control plane. The manager dynamically enters
+`runtime_context` only while a root is active.
+
+`runtime_context` uses `AsyncExitStack`. Runtime startup
 initializes storage and SQLite, creates the task group and
 I/O limiter, verifies hosted filesystem-allocation accounting, constructs
 services, reconciles Workspaces, Analyses, User File Imports, response snapshots,
@@ -49,7 +56,9 @@ maintenance. A distinct resource stack owns provider clients, Workspace open
 state and the event hub. The runtime task-group owner is
 registered above that stack so no application task can outlive a dependency.
 
-Requests retrieve the runtime from `request.state`. There is no settings or
+Finite API requests acquire a manager lease and retrieve that pinned Runtime
+from `request.state`. Control-plane routes remain available without a Runtime.
+There is no settings or
 service singleton and no fallback when lifespan is inactive, allowing tests to
 run independent apps with separate roots in one process.
 
@@ -65,7 +74,9 @@ sequenceDiagram
 
     Bootstrap->>FastAPI: create_app(validated Settings)
     Note over Bootstrap,FastAPI: No stateful resources are allocated
-    FastAPI->>Storage: enter lifespan and initialize the Data Root
+    FastAPI->>Runtime: enter lifespan-owned Runtime manager
+    alt Data Root configured
+    Runtime->>Storage: probe and initialize the Data Root
     Storage-->>Runtime: database, task group, I/O limiter
     Runtime->>Storage: verify hosted quota allocation metrics
     Runtime->>Runtime: construct services in dependency order
@@ -74,7 +85,10 @@ sequenceDiagram
     Runtime->>Runtime: reconcile snapshots, User Files, and transient storage
     Runtime->>Maintenance: start bounded cleanup
     Runtime-->>FastAPI: yield typed LifespanState
-    Note over FastAPI,Runtime: Requests resolve request.state.runtime
+    else No Data Root
+    Runtime-->>FastAPI: yield live unconfigured control plane
+    end
+    Note over FastAPI,Runtime: Normal requests lease request.state.runtime
     FastAPI->>Maintenance: begin shutdown
     Maintenance-->>Runtime: stop maintenance
     Runtime->>Runtime: readiness becomes stopping and submissions close
@@ -91,8 +105,7 @@ sequenceDiagram
 
 ## Shutdown
 
-The task-group owner first marks `RuntimeReadiness` as `stopping`, so `/health`
-returns HTTP 503 with the same minimal readiness payload, and closes Analysis
+The task-group owner first marks `RuntimeReadiness` as `stopping` and closes Analysis
 and User File Import submission. It stops maintenance, then gives both
 execution owners the same absolute deadline derived from the positive finite
 `shutdown_grace_seconds` setting. Queued resources commit interrupted Failure;
@@ -129,6 +142,12 @@ process-supervised. All profiles share the same application factory and
 lifespan ownership; only socket/bootstrap, frontend mounting, supervision, and
 externally visible `root_path` handling differ.
 
-`GET /health` is public and reports only `ready` or `stopping` plus the installed
-package version. `stopping` uses HTTP 503. The route does not claim per-component
-health or database latency.
+`GET /health/live` is public and returns HTTP 200 while the HTTP control plane
+functions. `GET /health/ready` returns HTTP 200 only when the complete Runtime
+is ready and HTTP 503 for every other manager state. `GET /api/data-root` is
+the bootstrap state resource. In single-user mode, a same-origin token permits
+`PUT /api/data-root`; the manager blocks new work, drains finite requests,
+closes streams through Runtime teardown, opens and probes the candidate, and
+persists only after successful initialization. Failed changes reconstruct the
+previous Runtime when possible. Environment and multi-user roots are immutable
+through this API.

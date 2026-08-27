@@ -58,8 +58,8 @@ flowchart LR
 
 In a hosted deployment, FastAPI normally serves the SPA on the same site. In a
 desktop deployment, Tauri launches the packaged Python runtime on a private
-loopback port, injects the URL into the same SPA, and owns process restart and
-Data Root selection.
+loopback port and exposes its URL to the same SPA. The backend owns Data Root
+bootstrap and switching; Tauri contributes the native directory picker.
 
 ## Dependency Direction
 

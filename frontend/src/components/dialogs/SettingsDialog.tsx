@@ -25,7 +25,6 @@ import { AiProvidersPreferencesPanel } from '@/features/views/annotation/compone
 import { DataPortalCredentialPanel } from '@/features/settings/DataPortalCredentialPanel';
 import { toast } from 'sonner';
 import { Bot, Eye, FolderOpen, Hash, KeyRound, Moon, RotateCcw, Sparkles, Sun } from 'lucide-react';
-import { isTauri } from '@/lib/isTauri';
 import {
   applyColorTheme,
   DARK_THEME,
@@ -59,7 +58,6 @@ const SETTINGS_TABS = [
 export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const { workspaces } = useWorkspaceData();
   const userId = useAuth().user?.id ?? null;
-  const desktopRuntime = isTauri();
   const visibleViews = useVisibleViews();
   const acknowledgments = useGuidanceAcknowledgmentsStore((state) =>
     userId ? state.byUser[userId] : undefined,
@@ -231,16 +229,11 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                   <div>
                     <h3 className="text-body font-semibold">Working Directory</h3>
                     <p className="text-body text-description">
-                      {desktopRuntime
-                        ? 'The desktop runtime owns this setting and restarts the local backend after a change.'
-                        : 'The backend launcher owns this setting for hosted and notebook deployments.'}
+                      The backend validates and owns the Data Root used for all durable application
+                      data.
                     </p>
                   </div>
-                  {desktopRuntime ? (
-                    <DataFolderSettingsPanel />
-                  ) : (
-                    <Badge variant="secondary">Managed by server</Badge>
-                  )}
+                  <DataFolderSettingsPanel />
                 </section>
                 <section className="space-y-3 border-t border-surface-border/60 pt-4">
                   <h3 className="text-body font-semibold">Favorite Workspaces</h3>

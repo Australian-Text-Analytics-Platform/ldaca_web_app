@@ -74,7 +74,10 @@ server state and Zustand owns transient client state.
 
 ### Desktop Shell
 
-The desktop app uses Tauri v2. The Rust shell launches the packaged backend as a child process and injects the backend URL into the webview.
+The desktop app uses Tauri v2. The Rust shell launches the packaged backend as
+a child process, exposes its random-port URL to the webview, and provides the
+native directory picker. The Python backend owns Data Root configuration and
+Runtime switching.
 
 ## Development Setup
 

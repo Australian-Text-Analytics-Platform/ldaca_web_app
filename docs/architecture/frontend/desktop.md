@@ -1,9 +1,9 @@
 # Desktop Architecture
 
 Tauri is a native supervisor around the same React frontend and FastAPI
-backend. Rust owns runtime discovery, the local child process, Data Root
-configuration, native downloads, signed application updates, restart, and
-shutdown.
+backend. Rust owns runtime discovery, the local child process, native folder
+selection, native downloads, signed application updates, and shutdown. Python
+owns Data Root validation, persistence, and Runtime switching.
 
 ## Runtime Contract
 
@@ -15,39 +15,39 @@ complete manifest and never recursively guesses a runtime.
 ```mermaid
 sequenceDiagram
     participant App as Tauri application
-    participant Config as Desktop configuration
     participant Runtime as Packaged Python runtime
     participant Backend as FastAPI child process
     participant Webview
 
-    App->>Config: load configured Data Root
     App->>Runtime: validate runtime-manifest.json
     App->>Backend: launch with port zero and private startup record
     Backend->>Backend: enter ASGI lifespan
-    Backend-->>App: publish ready port, identity, and version
+    Backend-->>App: publish live port, identity, and version
     App->>App: validate startup identity, version, and loopback address
     App->>Webview: show window
     Webview->>App: request current backend URL
-    App-->>Webview: return ready URL from managed state
-    Webview->>Backend: configure generated client and check health
+    App-->>Webview: return live URL from managed state
+    Webview->>Backend: check liveness and Data Root state
+    alt Runtime unconfigured or recoverable error
+    Webview->>App: open native directory picker
+    App-->>Webview: selected path or cancellation
+    Webview->>Backend: PUT /api/data-root
+    Backend->>Backend: probe, initialize, then persist
+    end
+    Webview->>Backend: check readiness
     Webview->>Webview: mount authentication and Workspace consumers
-    Webview->>App: request validated Data Root switch
-    App->>Backend: bounded shutdown
-    App->>Backend: launch candidate or roll back to previous root
-    Backend-->>App: publish replacement ready port
-    App-->>Webview: return ready URL for client rebinding
     Webview->>App: close request
     App->>Backend: bounded process-tree termination
     App-->>Webview: allow window close
 ```
 
-At startup, Tauri loads the desktop Data Root, launches the backend with port
-zero and a private startup record, waits for
-ASGI lifespan readiness, validates process identity and package version,
+At startup, Tauri launches the backend with port zero and a private startup
+record, waits for ASGI control-plane liveness, validates process identity and package version,
 installs the assigned URL in managed Rust state, and only then shows the window.
 The frontend connection gate obtains that URL through `get_backend_url`,
-configures the generated client, and verifies `/health` before mounting
-authentication or Workspace consumers. Reloading repeats IPC discovery, so a
+configures the generated client, checks `/health/live`, obtains
+`/api/data-root`, and verifies `/health/ready` before mounting authentication
+or Workspace consumers. Reloading repeats IPC discovery, so a
 stale JavaScript value cannot select an old backend port.
 
 Each desktop process owns only its own backend child. The backend parent
@@ -59,13 +59,11 @@ The packaged backend runs with Python bytecode writes disabled. Python may use
 bytecode included before signing, but it must not add or update `__pycache__`
 content inside the sealed application bundle at runtime.
 
-The supervisor owns `starting`, `ready`, `restarting`, `failed`, and `stopped`
-states. It never holds its mutex over process or filesystem work. A closing app
-changes the lifecycle away from `restarting`, so a late candidate is shut down
-instead of installed.
+The supervisor owns `starting`, `live`, `failed`, and `stopped` process states.
+It never restarts the child for a Data Root change.
 
-The main window remains hidden until backend readiness. If runtime resolution,
-Data Root configuration, or backend startup fails, Tauri schedules a native
+The main window remains hidden until backend liveness. If runtime resolution or
+backend startup fails, Tauri schedules a native
 error dialog without blocking setup and exits after the user acknowledges it.
 This keeps startup failures visible even though the webview is not yet usable.
 
@@ -78,12 +76,13 @@ Desktop builds dynamically load the Tauri API, treat `get_backend_url` as the
 source of truth, and retry both discovery and health checks with bounded
 backoff. Rust does not inject JavaScript or guess a fixed backend port.
 
-Data Root switching is a restart transaction: probe the candidate, stop the
-old backend, verify the candidate, persist configuration atomically, and roll
-back to the prior root on failure. The command returns the currently ready URL,
-which the webview uses to rebind raw URL consumers, the generated client, and
-server-state queries. An unexpected child exit is surfaced as backend
-unavailability; the supervisor does not hide it behind speculative retry.
+The native directory picker returns only a selected path. The webview submits
+that path to `PUT /api/data-root`; acceptance comes only from the Python
+backend's filesystem probe and successful Runtime initialization. A generation
+change remounts application providers and caches. The current notarized build
+is not App-Sandboxed, so this native selection plus the child-process probe is
+the supported macOS access model. Security-scoped bookmarks and Mac App Store
+sandbox support are outside this contract.
 
 Page zoom is owned by Tauri. The desktop shell leaves the webview at its default
 100% scale and enables Tauri's platform zoom shortcuts. On macOS and Linux, the

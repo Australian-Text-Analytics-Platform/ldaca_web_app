@@ -4077,6 +4077,129 @@
         "title": "DataPortalUserFileImportResult",
         "type": "object"
       },
+      "DataRootErrorResource": {
+        "additionalProperties": false,
+        "description": "Safe failure detail suitable for an unauthenticated loading screen.",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "DataRootErrorResource",
+        "type": "object"
+      },
+      "DataRootResource": {
+        "additionalProperties": false,
+        "description": "Current process-wide Data Root and Runtime state.",
+        "properties": {
+          "change_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Token"
+          },
+          "data_root": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Root"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DataRootErrorResource"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "mutable": {
+            "title": "Mutable",
+            "type": "boolean"
+          },
+          "runtime_generation": {
+            "minimum": 0.0,
+            "title": "Runtime Generation",
+            "type": "integer"
+          },
+          "source": {
+            "enum": [
+              "environment",
+              "config",
+              "none"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "unconfigured",
+              "initializing",
+              "ready",
+              "reconfiguring",
+              "configuration_error",
+              "stopping"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "suggested_data_root": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggested Data Root"
+          }
+        },
+        "required": [
+          "state",
+          "source",
+          "mutable",
+          "runtime_generation"
+        ],
+        "title": "DataRootResource",
+        "type": "object"
+      },
+      "DataRootUpdateRequest": {
+        "additionalProperties": false,
+        "description": "One absolute server filesystem path selected by a single-user client.",
+        "properties": {
+          "data_root": {
+            "format": "path",
+            "title": "Data Root",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data_root"
+        ],
+        "title": "DataRootUpdateRequest",
+        "type": "object"
+      },
       "DeleteColumnNodeEditRequest": {
         "additionalProperties": false,
         "description": "Delete one column from the target Data Block.",
@@ -5095,30 +5218,6 @@
         "title": "FilterNodeEditRequest",
         "type": "object"
       },
-      "HealthResponse": {
-        "additionalProperties": false,
-        "description": "Minimal public readiness payload for probes and uptime monitors.",
-        "properties": {
-          "status": {
-            "enum": [
-              "ready",
-              "stopping"
-            ],
-            "title": "Status",
-            "type": "string"
-          },
-          "version": {
-            "title": "Version",
-            "type": "string"
-          }
-        },
-        "required": [
-          "status",
-          "version"
-        ],
-        "title": "HealthResponse",
-        "type": "object"
-      },
       "InvalidAnalysisIntegrity": {
         "additionalProperties": false,
         "properties": {
@@ -5393,6 +5492,27 @@
           "value"
         ],
         "title": "LiteralExpression",
+        "type": "object"
+      },
+      "LivenessResponse": {
+        "additionalProperties": false,
+        "description": "Minimal public process-liveness payload.",
+        "properties": {
+          "status": {
+            "const": "live",
+            "title": "Status",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "version"
+        ],
+        "title": "LivenessResponse",
         "type": "object"
       },
       "MoveFileRequest": {
@@ -5872,6 +5992,34 @@
           "source"
         ],
         "title": "QuotationRunAllResult",
+        "type": "object"
+      },
+      "ReadinessResponse": {
+        "additionalProperties": false,
+        "description": "Public Runtime readiness without component or filesystem details.",
+        "properties": {
+          "status": {
+            "enum": [
+              "unconfigured",
+              "initializing",
+              "ready",
+              "reconfiguring",
+              "configuration_error",
+              "stopping"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "version"
+        ],
+        "title": "ReadinessResponse",
         "type": "object"
       },
       "RenameColumnNodeEditRequest": {
@@ -10418,6 +10566,99 @@
         "summary": "Search Data Portal",
         "tags": [
           "data-portal"
+        ]
+      }
+    },
+    "/api/data-root": {
+      "get": {
+        "description": "Return the bootstrap state without exposing multi-user filesystem paths.",
+        "operationId": "get_data_root",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRootResource"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Data Root",
+        "tags": [
+          "data-root"
+        ]
+      },
+      "put": {
+        "description": "Configure or switch the complete single-user Runtime synchronously.",
+        "operationId": "update_data_root",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Data-Root-Token",
+            "required": true,
+            "schema": {
+              "title": "X-Data-Root-Token",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DataRootUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRootResource"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Origin, CSRF, or access check failed"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Resource state conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          }
+        },
+        "summary": "Update Data Root",
+        "tags": [
+          "data-root"
         ]
       }
     },
@@ -18480,16 +18721,38 @@
         ]
       }
     },
-    "/health": {
+    "/health/live": {
       "get": {
-        "description": "Report only process readiness and the installed package version.",
-        "operationId": "health_check",
+        "description": "Report that the HTTP control plane is responsive.",
+        "operationId": "liveness_check",
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HealthResponse"
+                  "$ref": "#/components/schemas/LivenessResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Liveness Check",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "description": "Report whether the complete Data Root Runtime accepts requests.",
+        "operationId": "readiness_check",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessResponse"
                 }
               }
             },
@@ -18499,14 +18762,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HealthResponse"
+                  "$ref": "#/components/schemas/ReadinessResponse"
                 }
               }
             },
-            "description": "Stopping"
+            "description": "Not ready"
           }
         },
-        "summary": "Health Check",
+        "summary": "Readiness Check",
         "tags": [
           "health"
         ]

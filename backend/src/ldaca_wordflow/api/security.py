@@ -18,7 +18,7 @@ from starlette.requests import Request as StarletteRequest
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from ..models.session import SessionUser
-from ..runtime import Runtime, get_runtime
+from ..runtime import Runtime, RuntimeManager, get_runtime
 from ..services.sessions import SessionPrincipal
 from ..shared.errors import UnauthenticatedError
 from .error_response import api_error_response
@@ -109,13 +109,28 @@ class CsrfOriginMiddleware:
             return
 
         state = cast(dict[str, object], scope.get("state", {}))
+        manager = state.get("runtime_manager")
+        if path == "/api/data-root":
+            if not isinstance(manager, RuntimeManager) or not manager.validate_change_token(
+                headers.get("x-data-root-token")
+            ):
+                await api_error_response(
+                    request_id=str(request_id),
+                    status_code=403,
+                    code="csrf_failed",
+                    message="CSRF validation failed",
+                )(scope, receive, send)
+                return
+            await self.app(scope, receive, send)
+            return
+
         runtime = state.get("runtime")
         if not isinstance(runtime, Runtime):
             await api_error_response(
                 request_id=str(request_id),
-                status_code=500,
+                status_code=503,
                 code="runtime_unavailable",
-                message="Internal server error",
+                message="The Data Root runtime is not ready",
             )(scope, receive, send)
             return
         request = StarletteRequest(scope, receive=receive)

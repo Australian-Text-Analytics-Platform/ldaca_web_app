@@ -2038,6 +2038,71 @@ export type DataPortalUserFileImportResult = {
 };
 
 /**
+ * DataRootErrorResource
+ *
+ * Safe failure detail suitable for an unauthenticated loading screen.
+ */
+export type DataRootErrorResource = {
+    /**
+     * Code
+     */
+    code: string;
+    /**
+     * Message
+     */
+    message: string;
+};
+
+/**
+ * DataRootResource
+ *
+ * Current process-wide Data Root and Runtime state.
+ */
+export type DataRootResource = {
+    /**
+     * Change Token
+     */
+    change_token?: string | null;
+    /**
+     * Data Root
+     */
+    data_root?: string | null;
+    error?: DataRootErrorResource | null;
+    /**
+     * Mutable
+     */
+    mutable: boolean;
+    /**
+     * Runtime Generation
+     */
+    runtime_generation: number;
+    /**
+     * Source
+     */
+    source: 'environment' | 'config' | 'none';
+    /**
+     * State
+     */
+    state: 'unconfigured' | 'initializing' | 'ready' | 'reconfiguring' | 'configuration_error' | 'stopping';
+    /**
+     * Suggested Data Root
+     */
+    suggested_data_root?: string | null;
+};
+
+/**
+ * DataRootUpdateRequest
+ *
+ * One absolute server filesystem path selected by a single-user client.
+ */
+export type DataRootUpdateRequest = {
+    /**
+     * Data Root
+     */
+    data_root: string;
+};
+
+/**
  * DeleteColumnNodeEditRequest
  *
  * Delete one column from the target Data Block.
@@ -2522,22 +2587,6 @@ export type FilterNodeEditRequest = {
 };
 
 /**
- * HealthResponse
- *
- * Minimal public readiness payload for probes and uptime monitors.
- */
-export type HealthResponse = {
-    /**
-     * Status
-     */
-    status: 'ready' | 'stopping';
-    /**
-     * Version
-     */
-    version: string;
-};
-
-/**
  * InvalidAnalysisIntegrity
  */
 export type InvalidAnalysisIntegrity = {
@@ -2633,6 +2682,22 @@ export type LiteralExpression = {
      * Value
      */
     value: string | number | number | boolean | Array<string | number | number | boolean | null> | null;
+};
+
+/**
+ * LivenessResponse
+ *
+ * Minimal public process-liveness payload.
+ */
+export type LivenessResponse = {
+    /**
+     * Status
+     */
+    status: 'live';
+    /**
+     * Version
+     */
+    version: string;
 };
 
 /**
@@ -2906,6 +2971,22 @@ export type QuotationRunAllResult = {
      */
     kind?: 'quotation_run_all';
     source: RunAllSourceTableResource;
+};
+
+/**
+ * ReadinessResponse
+ *
+ * Public Runtime readiness without component or filesystem details.
+ */
+export type ReadinessResponse = {
+    /**
+     * Status
+     */
+    status: 'unconfigured' | 'initializing' | 'ready' | 'reconfiguring' | 'configuration_error' | 'stopping';
+    /**
+     * Version
+     */
+    version: string;
 };
 
 /**
@@ -5532,6 +5613,61 @@ export type SearchDataPortalResponses = {
 };
 
 export type SearchDataPortalResponse = SearchDataPortalResponses[keyof SearchDataPortalResponses];
+
+export type GetDataRootData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/data-root';
+};
+
+export type GetDataRootResponses = {
+    /**
+     * Successful Response
+     */
+    200: DataRootResource;
+};
+
+export type GetDataRootResponse = GetDataRootResponses[keyof GetDataRootResponses];
+
+export type UpdateDataRootData = {
+    body: DataRootUpdateRequest;
+    headers: {
+        /**
+         * X-Data-Root-Token
+         */
+        'X-Data-Root-Token': string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/data-root';
+};
+
+export type UpdateDataRootErrors = {
+    /**
+     * Origin, CSRF, or access check failed
+     */
+    403: ApiError;
+    /**
+     * Resource state conflict
+     */
+    409: ApiError;
+    /**
+     * Request validation failed
+     */
+    422: ApiError;
+};
+
+export type UpdateDataRootError = UpdateDataRootErrors[keyof UpdateDataRootErrors];
+
+export type UpdateDataRootResponses = {
+    /**
+     * Successful Response
+     */
+    200: DataRootResource;
+};
+
+export type UpdateDataRootResponse = UpdateDataRootResponses[keyof UpdateDataRootResponses];
 
 export type BackendEventsData = {
     body?: never;
@@ -9469,27 +9605,43 @@ export type SubmitTabAnalysisResponses = {
 
 export type SubmitTabAnalysisResponse = SubmitTabAnalysisResponses[keyof SubmitTabAnalysisResponses];
 
-export type HealthCheckData = {
+export type LivenessCheckData = {
     body?: never;
     path?: never;
     query?: never;
-    url: '/health';
+    url: '/health/live';
 };
 
-export type HealthCheckErrors = {
-    /**
-     * Stopping
-     */
-    503: HealthResponse;
-};
-
-export type HealthCheckError = HealthCheckErrors[keyof HealthCheckErrors];
-
-export type HealthCheckResponses = {
+export type LivenessCheckResponses = {
     /**
      * Successful Response
      */
-    200: HealthResponse;
+    200: LivenessResponse;
 };
 
-export type HealthCheckResponse = HealthCheckResponses[keyof HealthCheckResponses];
+export type LivenessCheckResponse = LivenessCheckResponses[keyof LivenessCheckResponses];
+
+export type ReadinessCheckData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/health/ready';
+};
+
+export type ReadinessCheckErrors = {
+    /**
+     * Not ready
+     */
+    503: ReadinessResponse;
+};
+
+export type ReadinessCheckError = ReadinessCheckErrors[keyof ReadinessCheckErrors];
+
+export type ReadinessCheckResponses = {
+    /**
+     * Successful Response
+     */
+    200: ReadinessResponse;
+};
+
+export type ReadinessCheckResponse = ReadinessCheckResponses[keyof ReadinessCheckResponses];

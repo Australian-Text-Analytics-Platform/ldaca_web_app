@@ -15,6 +15,8 @@ from ldaca_wordflow.spa import _runtime_config_js
 
 HTTP_METHODS = {"delete", "get", "patch", "post", "put"}
 EXPECTED_OPERATIONS = {
+    ("GET", "/api/data-root", "get_data_root"),
+    ("PUT", "/api/data-root", "update_data_root"),
     ("POST", "/api/annotation-providers/models", "list_annotation_models"),
     ("GET", "/api/auth/cilogon/callback", "cilogon_callback"),
     ("GET", "/api/auth/cilogon/login", "cilogon_login"),
@@ -209,7 +211,8 @@ EXPECTED_OPERATIONS = {
         "/api/workspaces/{workspace_id}/tabs/{tab_id}/analyses",
         "clear_tab_analysis",
     ),
-    ("GET", "/health", "health_check"),
+    ("GET", "/health/live", "liveness_check"),
+    ("GET", "/health/ready", "readiness_check"),
 }
 
 
@@ -240,7 +243,10 @@ def test_cookie_security_is_explicit_and_no_bearer_or_query_token_is_advertised(
     }
 
     public = {
-        ("GET", "/health"),
+        ("GET", "/health/live"),
+        ("GET", "/health/ready"),
+        ("GET", "/api/data-root"),
+        ("PUT", "/api/data-root"),
         ("GET", "/api/auth/cilogon/login"),
         ("GET", "/api/auth/cilogon/callback"),
         ("POST", "/api/auth/google/callback"),

@@ -36,7 +36,8 @@ Packaging must fail when the staged manifest or any declared path is missing,
 absolute, escaping, corrupt, or for another platform/ABI. After bundling, the
 ignored package probe must resolve the final resource directory, import the
 backend and both compiled extensions, exercise DuckDB-backed cached tokenization,
-launch the packaged backend, verify `/health`, and shut down its process tree.
+launch the packaged backend without a Data Root, verify `/health/live`, and shut
+down its process tree.
 The cached-tokenization probe uses the built-in tokenizer so it verifies that
 DuckDB's JSON support is statically linked in a clean temporary home without
 downloading a model or DuckDB extension. Run
@@ -115,11 +116,20 @@ downloads, verifies, installs, and relaunches into the new version. In a current
 build, the same menu action must show the native up-to-date dialog. Failed checks
 must show a native error dialog within the Rust-owned 15-second request timeout.
 
-Verify the packaged application reaches the Workspace after startup, then
-reload the webview repeatedly and confirm each load discovers the current
-random-port backend and passes the health gate. Switch the Data Root to exercise
-the supervised backend restart, reload again, and confirm requests use the
-replacement URL rather than the retired port. Perform the reload check with
+Verify the final macOS bundle is signed, notarized, and has no App Sandbox
+entitlement. On a clean launch, use the recommended app-private root without a
+permission prompt. Then select Documents through the native picker and verify
+the Python child can create, read, write, and delete its probe file. Exercise
+denial followed by reselection, revoked permission, unavailable volumes, and a
+moved or deleted directory; each recoverable failure must return to folder
+selection while `/health/live` remains available. Relaunch and confirm the
+saved selected directory is restored.
+
+Verify the packaged application reaches the Workspace after setup, then reload
+the webview repeatedly and confirm each load discovers the current random-port
+backend and passes the bootstrap gate. Switch the Data Root through Settings,
+confirm the backend port and child PID do not change, and verify application
+providers remount for the new `runtime_generation`. Perform the reload check with
 Command-R on macOS and Ctrl-R on Windows. The packaged application must never
 fall back to port `8001`; that port remains only the documented split web
 development default.

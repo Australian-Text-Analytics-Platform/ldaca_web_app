@@ -34,10 +34,12 @@ class Settings(BaseSettings):
     runtime reload path exists.
     """
 
-    # Root for all data-related storage (folders and DB)
-    data_root: Path = Field(
-        default=Path.home() / "Documents" / "ldaca",
-        description="Root data folder",
+    # Root for all data-related storage (folders and DB). ``None`` keeps only
+    # the HTTP control plane live until the Data Root manager resolves config
+    # or accepts a single-user setup request.
+    data_root: Path | None = Field(
+        default=None,
+        description="Operator-provided root data folder",
     )
 
     max_file_upload_bytes: int = Field(
@@ -264,10 +266,10 @@ class Settings(BaseSettings):
 
     @field_validator("data_root")
     @classmethod
-    def canonicalize_data_root(cls, value: Path) -> Path:
+    def canonicalize_data_root(cls, value: Path | None) -> Path | None:
         """Store one absolute, normalized root before runtime construction."""
 
-        return value.expanduser().resolve(strict=False)
+        return value.expanduser().resolve(strict=False) if value is not None else None
 
     @field_validator("log_file")
     @classmethod
@@ -480,7 +482,9 @@ class Settings(BaseSettings):
 
     def get_data_root(self) -> Path:
         """Return the canonical data root validated during construction."""
-        return Path(self.data_root)
+        if self.data_root is None:
+            raise RuntimeError("Data Root is not configured")
+        return self.data_root
 
     def get_allowed_origins(self) -> tuple[str, ...]:
         """Return exact browser origins for the validated deployment profile."""

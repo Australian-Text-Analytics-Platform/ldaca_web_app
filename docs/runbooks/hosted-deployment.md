@@ -113,7 +113,7 @@ long read timeouts for SSE, and disable buffering for `/api/events`.
 Forward to `127.0.0.1:8001` and verify:
 
 ```bash
-curl --fail --silent https://analytics.ldaca.edu.au/health
+curl --fail --silent https://analytics.ldaca.edu.au/health/ready
 ```
 
 The response must report `status: ready` and the intended package version.
@@ -130,7 +130,7 @@ pnpm install --frozen-lockfile
 pnpm deploy_frontend_to_backend
 uv sync --project backend --frozen --no-dev --no-editable
 sudo systemctl restart ldaca-wordflow
-curl --fail --silent https://analytics.ldaca.edu.au/health
+curl --fail --silent https://analytics.ldaca.edu.au/health/ready
 ```
 
 If startup fails, inspect `journalctl -u ldaca-wordflow` before changing files

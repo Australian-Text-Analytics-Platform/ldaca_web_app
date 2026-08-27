@@ -93,13 +93,14 @@ the asynchronous notebook launcher on the same port at the same time.
 From a terminal inside the Binder container:
 
 ```bash
-curl --fail --silent http://127.0.0.1:8001/health
+curl --fail --silent http://127.0.0.1:8001/health/ready
 ```
 
 In the browser, verify the proxied Wordflow URL loads, reloads, and keeps API,
 health, authentication, and event-stream requests below the same proxy prefix.
 The compiled frontend must contain no fixed local API URL.
 
-Binder storage is normally ephemeral. The default Data Root is writable for
-the session; deployments requiring persistence must mount durable storage and
-set `DATA_ROOT` to a directory inside that mount before launching Wordflow.
+Binder storage is normally ephemeral. Without `DATA_ROOT`, the setup screen can
+use the platform-recommended session location. Deployments requiring persistence
+must mount durable storage and set `DATA_ROOT` to a directory inside that mount
+before launching Wordflow.

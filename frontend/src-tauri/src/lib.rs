@@ -1,5 +1,4 @@
 mod backend_process;
-mod data_root;
 mod desktop_updater;
 mod download;
 mod platform;
@@ -11,8 +10,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use backend_process::{BackendProcess, ReadyBackend};
-use runtime::BackendRuntime;
+use backend_process::BackendProcess;
 use tauri::menu::{Menu, MenuItemBuilder};
 #[cfg(not(target_os = "macos"))]
 use tauri::menu::{PredefinedMenuItem, HELP_SUBMENU_ID};
@@ -31,18 +29,14 @@ pub(crate) struct BackendState {
 
 struct BackendSupervisor {
     lifecycle: BackendLifecycle,
-    runtime: Option<BackendRuntime>,
-    config_path: Option<PathBuf>,
-    data_root: Option<PathBuf>,
 }
 
 enum BackendLifecycle {
     Starting,
-    Ready {
+    Live {
         url: String,
         process: BackendProcess,
     },
-    Restarting,
     Failed {
         message: String,
     },
@@ -51,38 +45,21 @@ enum BackendLifecycle {
 
 #[tauri::command]
 fn get_backend_url(state: State<'_, BackendState>) -> Result<String, String> {
-    ready_backend_url(&state)
+    live_backend_url(&state)
 }
 
-#[tauri::command]
-fn get_data_root(state: State<'_, BackendState>) -> Result<Option<String>, String> {
-    let supervisor = state
-        .supervisor
-        .lock()
-        .map_err(|_| "backend_unavailable".to_owned())?;
-    supervisor
-        .data_root
-        .as_ref()
-        .map(|path| {
-            path.to_str()
-                .map(str::to_owned)
-                .ok_or_else(|| "data_root_not_utf8".to_owned())
-        })
-        .transpose()
-}
-
-pub(crate) fn ready_backend_url(state: &BackendState) -> Result<String, String> {
+pub(crate) fn live_backend_url(state: &BackendState) -> Result<String, String> {
     let supervisor = state
         .supervisor
         .lock()
         .map_err(|_| "backend_unavailable".to_owned())?;
     match &supervisor.lifecycle {
-        BackendLifecycle::Ready { url, .. } => Ok(url.clone()),
+        BackendLifecycle::Live { url, .. } => Ok(url.clone()),
         BackendLifecycle::Failed { message } => {
             eprintln!("Backend unavailable: {message}");
             Err("backend_unavailable".to_owned())
         }
-        BackendLifecycle::Starting | BackendLifecycle::Restarting | BackendLifecycle::Stopped => {
+        BackendLifecycle::Starting | BackendLifecycle::Stopped => {
             Err("backend_unavailable".to_owned())
         }
     }
@@ -131,17 +108,13 @@ fn startup_file(app: &tauri::AppHandle) -> Result<PathBuf, Box<dyn std::error::E
     Ok(directory.join(format!("{}-{nonce}.json", std::process::id())))
 }
 
-fn data_root_config_path(app: &tauri::AppHandle) -> Result<PathBuf, Box<dyn std::error::Error>> {
-    Ok(app.path().app_config_dir()?.join("backend.json"))
-}
-
 fn take_backend_process(state: &BackendState) -> Option<BackendProcess> {
     state
         .supervisor
         .lock()
         .map(|mut supervisor| {
             match std::mem::replace(&mut supervisor.lifecycle, BackendLifecycle::Stopped) {
-                BackendLifecycle::Ready { process, .. } => Some(process),
+                BackendLifecycle::Live { process, .. } => Some(process),
                 _ => None,
             }
         })
@@ -162,192 +135,6 @@ fn show_startup_error(app: &tauri::AppHandle, detail: &str) {
         .show(move |_| handle.exit(1));
 }
 
-fn launch_backend(
-    runtime: &BackendRuntime,
-    startup_path: &std::path::Path,
-    data_root: Option<&std::path::Path>,
-) -> io::Result<(BackendProcess, ReadyBackend)> {
-    if startup_path.exists() {
-        std::fs::remove_file(startup_path)?;
-    }
-    let mut process = BackendProcess::spawn(runtime, startup_path, data_root)?;
-    match process.wait_until_ready(startup_path) {
-        Ok(ready) => {
-            let _ = std::fs::remove_file(startup_path);
-            Ok((process, ready))
-        }
-        Err(error) => {
-            let _ = process.shutdown();
-            let _ = std::fs::remove_file(startup_path);
-            Err(error)
-        }
-    }
-}
-
-enum SwitchOutcome {
-    Ready {
-        process: BackendProcess,
-        ready: ReadyBackend,
-    },
-    RolledBack {
-        process: BackendProcess,
-        ready: ReadyBackend,
-        error: String,
-    },
-    Failed(String),
-}
-
-/// Validate, restart, persist, and roll back a desktop data-root change.
-#[tauri::command]
-async fn set_data_root(
-    app: tauri::AppHandle,
-    state: State<'_, BackendState>,
-    data_root: String,
-) -> Result<String, String> {
-    let candidate = tauri::async_runtime::spawn_blocking(move || {
-        data_root::validate_data_root(&PathBuf::from(data_root))
-    })
-    .await
-    .map_err(|_| "data_root_validation_failed".to_owned())?
-    .map_err(|_| "data_root_invalid".to_owned())?;
-
-    let candidate_startup = startup_file(&app).map_err(|_| "backend_unavailable".to_owned())?;
-    let rollback_startup = startup_file(&app).map_err(|_| "backend_unavailable".to_owned())?;
-    let (mut previous_process, runtime, previous_root, config_path) = {
-        let mut supervisor = state
-            .supervisor
-            .lock()
-            .map_err(|_| "backend_unavailable".to_owned())?;
-        let runtime = supervisor
-            .runtime
-            .clone()
-            .ok_or_else(|| "backend_unavailable".to_owned())?;
-        let config_path = supervisor
-            .config_path
-            .clone()
-            .ok_or_else(|| "backend_unavailable".to_owned())?;
-        let lifecycle = std::mem::replace(&mut supervisor.lifecycle, BackendLifecycle::Restarting);
-        let process = match lifecycle {
-            BackendLifecycle::Ready { process, .. } => process,
-            other => {
-                supervisor.lifecycle = other;
-                return Err("backend_unavailable".to_owned());
-            }
-        };
-        (process, runtime, supervisor.data_root.clone(), config_path)
-    };
-
-    let candidate_for_switch = candidate.clone();
-    let outcome = tauri::async_runtime::spawn_blocking(move || {
-        if let Err(error) = previous_process.shutdown() {
-            drop(previous_process);
-            return match launch_backend(&runtime, &rollback_startup, previous_root.as_deref()) {
-                Ok((process, ready)) => SwitchOutcome::RolledBack {
-                    process,
-                    ready,
-                    error: format!("Backend shutdown was uncertain: {error}"),
-                },
-                Err(rollback_error) => SwitchOutcome::Failed(format!(
-                    "Backend shutdown and clean rollback failed: {error}; {rollback_error}"
-                )),
-            };
-        }
-
-        let candidate_backend =
-            launch_backend(&runtime, &candidate_startup, Some(&candidate_for_switch));
-        match candidate_backend {
-            Ok((mut process, ready)) => {
-                if let Err(error) = data_root::write_config(&config_path, &candidate_for_switch) {
-                    let _ = process.shutdown();
-                    return match launch_backend(
-                        &runtime,
-                        &rollback_startup,
-                        previous_root.as_deref(),
-                    ) {
-                        Ok((process, ready)) => SwitchOutcome::RolledBack {
-                            process,
-                            ready,
-                            error: format!("Data-root config persistence failed: {error}"),
-                        },
-                        Err(rollback_error) => SwitchOutcome::Failed(format!(
-                            "Data-root persistence and rollback failed: {error}; {rollback_error}"
-                        )),
-                    };
-                }
-                SwitchOutcome::Ready { process, ready }
-            }
-            Err(error) => {
-                match launch_backend(&runtime, &rollback_startup, previous_root.as_deref()) {
-                    Ok((process, ready)) => SwitchOutcome::RolledBack {
-                        process,
-                        ready,
-                        error: format!("Candidate backend failed: {error}"),
-                    },
-                    Err(rollback_error) => SwitchOutcome::Failed(format!(
-                        "Candidate and rollback backends failed: {error}; {rollback_error}"
-                    )),
-                }
-            }
-        }
-    })
-    .await
-    .map_err(|_| "backend_restart_failed".to_owned())?;
-
-    let mut supervisor = match state.supervisor.lock() {
-        Ok(supervisor) => supervisor,
-        Err(_) => {
-            match outcome {
-                SwitchOutcome::Ready { mut process, .. }
-                | SwitchOutcome::RolledBack { mut process, .. } => {
-                    let _ = process.shutdown();
-                }
-                SwitchOutcome::Failed(_) => {}
-            }
-            return Err("backend_unavailable".to_owned());
-        }
-    };
-    if !matches!(supervisor.lifecycle, BackendLifecycle::Restarting) {
-        match outcome {
-            SwitchOutcome::Ready { mut process, .. }
-            | SwitchOutcome::RolledBack { mut process, .. } => {
-                let _ = process.shutdown();
-            }
-            SwitchOutcome::Failed(_) => {}
-        }
-        return Err("backend_unavailable".to_owned());
-    }
-    match outcome {
-        SwitchOutcome::Ready { process, ready } => {
-            let url = ready.url;
-            supervisor.data_root = Some(candidate);
-            supervisor.lifecycle = BackendLifecycle::Ready {
-                url: url.clone(),
-                process,
-            };
-            Ok(url)
-        }
-        SwitchOutcome::RolledBack {
-            process,
-            ready,
-            error,
-        } => {
-            eprintln!("Data-root restart rolled back: {error}");
-            supervisor.lifecycle = BackendLifecycle::Ready {
-                url: ready.url,
-                process,
-            };
-            Err("data_root_restart_rolled_back".to_owned())
-        }
-        SwitchOutcome::Failed(error) => {
-            eprintln!("Data-root restart failed: {error}");
-            supervisor.lifecycle = BackendLifecycle::Failed {
-                message: error.clone(),
-            };
-            Err("backend_restart_failed".to_owned())
-        }
-    }
-}
-
 /// Assemble and run the desktop shell around the React app and local backend.
 ///
 /// Called only by `main.rs`. Runtime resolution, process lifecycle, platform
@@ -357,9 +144,6 @@ pub fn run() {
     let state = BackendState {
         supervisor: Mutex::new(BackendSupervisor {
             lifecycle: BackendLifecycle::Starting,
-            runtime: None,
-            config_path: None,
-            data_root: None,
         }),
         closing: AtomicBool::new(false),
     };
@@ -373,8 +157,6 @@ pub fn run() {
         .manage(desktop_updater::DesktopUpdaterState::default())
         .invoke_handler(tauri::generate_handler![
             get_backend_url,
-            get_data_root,
-            set_data_root,
             download::download_to_downloads
         ])
         .setup(|app| {
@@ -395,24 +177,14 @@ pub fn run() {
                     return Ok(());
                 }
             };
-            let config_path = data_root_config_path(app.handle())?;
-            let configured_data_root = match data_root::read_config(&config_path) {
-                Ok(root) => root,
-                Err(error) => {
-                    eprintln!("Data-root configuration failed: {error}");
-                    show_startup_error(app.handle(), &error.to_string());
-                    return Ok(());
-                }
-            };
             let startup_file = startup_file(app.handle())?;
             if startup_file.exists() {
                 std::fs::remove_file(&startup_file)?;
             }
-            let mut process =
-                BackendProcess::spawn(&layout, &startup_file, configured_data_root.as_deref())?;
+            let mut process = BackendProcess::spawn(&layout, &startup_file)?;
             let pid = process.pid();
-            let ready = match process.wait_until_ready(&startup_file) {
-                Ok(ready) => ready,
+            let live = match process.wait_until_live(&startup_file) {
+                Ok(live) => live,
                 Err(error) => {
                     eprintln!("Backend startup failed: {error}");
                     let _ = process.shutdown();
@@ -436,13 +208,10 @@ pub fn run() {
                     return Err(boxed_error("Backend lifecycle lock is poisoned"));
                 }
             };
-            supervisor.lifecycle = BackendLifecycle::Ready {
-                url: ready.url.clone(),
+            supervisor.lifecycle = BackendLifecycle::Live {
+                url: live.url.clone(),
                 process,
             };
-            supervisor.runtime = Some(layout);
-            supervisor.config_path = Some(config_path);
-            supervisor.data_root = configured_data_root;
             drop(supervisor);
             if let Err(error) = window.show() {
                 if let Some(mut process) = take_backend_process(&state) {
@@ -450,7 +219,7 @@ pub fn run() {
                 }
                 return Err(error.into());
             }
-            println!("Backend ready at {} (pid {pid})", ready.url);
+            println!("Backend live at {} (pid {pid})", live.url);
             Ok(())
         })
         .on_window_event(|window, event| {

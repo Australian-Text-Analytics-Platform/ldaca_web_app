@@ -7,7 +7,7 @@ import { LAG_HINT_DELAY_MS } from '@/config/timings';
 import { loadRemoteRegistry } from '@/tutorials/remoteRegistry';
 import { WorkspaceShell } from '@/components/layout/WorkspaceShell';
 import { GlobalHosts } from '@/components/layout/GlobalHosts';
-import { BackendConnectionGate } from '@/components/layout/BackendConnectionGate';
+import { BackendBootstrapGate } from '@/components/layout/BackendBootstrapGate';
 import { Button } from '@/components/ui/button';
 
 function App() {
@@ -21,12 +21,12 @@ function AppContent() {
 
   return (
     <>
-      <BackendConnectionGate>
+      <BackendBootstrapGate>
         <>
           <AuthBootstrap />
           <AuthGate />
         </>
-      </BackendConnectionGate>
+      </BackendBootstrapGate>
       <GlobalHosts />
     </>
   );
