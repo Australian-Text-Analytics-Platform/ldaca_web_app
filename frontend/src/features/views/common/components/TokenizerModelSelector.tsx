@@ -168,7 +168,11 @@ function TokenizerModelSelector({
                   Recommended
                 </SelectLabel>
                 {recommended.map((option) => (
-                  <SelectItem key={option.model} value={option.model}>
+                  <SelectItem
+                    key={option.model}
+                    value={option.model}
+                    className="!h-auto min-h-control-sm py-1"
+                  >
                     <span className="flex min-w-0 flex-col">
                       <span className="truncate">{option.label}</span>
                       <span className="truncate font-mono text-label-secondary text-description">
@@ -180,7 +184,11 @@ function TokenizerModelSelector({
               </SelectGroup>
             ) : null}
             {other.map((option) => (
-              <SelectItem key={option.model} value={option.model}>
+              <SelectItem
+                key={option.model}
+                value={option.model}
+                className="!h-auto min-h-control-sm py-1"
+              >
                 <span className="flex min-w-0 flex-col">
                   <span className="truncate">{option.label}</span>
                   <span className="truncate font-mono text-label-secondary text-description">

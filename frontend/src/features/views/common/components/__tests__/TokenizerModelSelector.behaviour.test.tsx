@@ -110,6 +110,14 @@ describe('TokenizerModelSelector', () => {
     expect(screen.getByText('Plain words (English)')).toBeInTheDocument();
     expect(screen.getByText('BERT base uncased')).toBeInTheDocument();
     expect(screen.getByText('IPADIC')).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /BERT base uncased/ })).toHaveClass(
+      '!h-auto',
+      'min-h-control-sm',
+    );
+    expect(screen.getByRole('option', { name: /IPADIC/ })).toHaveClass(
+      '!h-auto',
+      'min-h-control-sm',
+    );
   });
 
   it('offers None as a clearing option', async () => {
