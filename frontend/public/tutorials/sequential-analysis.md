@@ -74,18 +74,34 @@ capitalisation should be displayed and filtered as one group.
 Click **Run** to start the analysis. The label always remains **Run**. Parameters
 lock only while the Analysis is submitting, queued, or running. After success,
 change an execution input to enable Run again; reverting to the submitted values
-disables it. Chart type, axis, selection, visibility, and Uncased controls do not
-enable Run because they only change result presentation or filtering.
+disables it. Minimum group count, chart type, axis, selection, visibility, and
+Uncased controls do not enable Run because they only change result presentation
+or filtering.
 
 <h2 id="help-sequential-results">Result panel</h2>
 
 ![Trends and Sequence results](tutorials/assets/sequential_analysis/trends_results.png)
 
 The result panel follows the Concordance dispersion layout: result actions in
-the header, chart presentation controls directly above the plot, then the chart,
-legend, and period-selection controls. Time column, frequency or interval, and
+the header, chart presentation controls directly above the plot, then the chart
+and its legend card. The legend card keeps the Uncased, minimum group count, and
+period-selection controls together. Time column, frequency or interval, and
 Group By settings remain visible in the parameter panel instead of being
 repeated in the result.
+
+<h3 id="help-sequential-minimum-group-count">Minimum group count</h3>
+
+For grouped results, **Minimum group count** hides any group whose total count
+across the complete result is below the entered value. The default is **10**;
+enter **0** to show every group. A group whose count equals the threshold remains
+visible. The control appears in the legend card immediately after **Uncased**.
+
+The filter removes small groups from the chart, legend, chart export, displayed
+counts, and Add to Workspace. It does not change manual legend visibility: if a
+filtered group was struck out, lowering the threshold restores it still struck
+out. Selected periods do not change which groups meet the threshold. With
+**Uncased** enabled, case variants are merged before their total is compared
+with the threshold.
 
 <h3 id="help-sequential-chart-type">Chart type</h3>
 
@@ -112,7 +128,13 @@ Click the download button (↓ icon) in the results header to export the chart. 
 
 <h3 id="help-sequential-legend">Legend and group visibility</h3>
 
-The legend below the chart lists all groups with their colours, full-result count, and share of the counts among currently visible groups. Percentages use one decimal place and do not change when periods are selected. When periods are selected, each visible label shows *selected / total* before the percentage. Click any legend item to hide or show that group. Hidden groups retain their count detail, show **Hidden**, and use a strikethrough label with reduced opacity.
+The legend below the chart lists groups that meet the minimum group count, with
+their colours, full-result count, and share of the counts among currently
+visible groups. Percentages use one decimal place and do not change when periods
+are selected. When periods are selected, each visible label shows *selected /
+total* before the percentage. Click any legend item to hide or show that group.
+Hidden groups retain their count detail, show **Hidden**, and use a strikethrough
+label with reduced opacity.
 
 Use this to focus on a subset of groups. Hidden groups are not plotted and are
 marked hidden in chart exports, while their legend entry retains its
@@ -144,9 +166,10 @@ Use **Clear Selection** to deselect all periods without losing any other setting
 
 Click **Add to Workspace** to create a Data Block containing original source
 rows represented by the current Trends result. If periods are selected, only
-those periods are included; with no selection, all periods are included. Hidden
-legend groups are always excluded. Zoom changes only the viewport and never the
-rows added to the Workspace.
+those periods are included; with no selection, all periods are included. Groups
+removed by Minimum group count and groups hidden through the legend are always
+excluded. Zoom changes only the viewport and never the rows added to the
+Workspace.
 
 When Uncased is enabled, hiding a merged legend entry excludes every exact
 spelling represented by that entry.
@@ -161,7 +184,9 @@ name to the source name followed by `_trends`.
 The tab keeps its current Trends and Sequence Analysis in the backend so it can
 reload its lifecycle and Result. **Clear Results** removes that Analysis and
 resets the tab. After a failure or cancellation, parameters remain editable but
-Run stays disabled until you choose Clear Results.
+Run stays disabled until you choose Clear Results. Clearing or replacing the
+result restores Minimum group count to **10** and clears manual legend
+visibility.
 
 <h2 id="help-sequential-troubleshooting">Troubleshooting</h2>
 
@@ -169,6 +194,7 @@ Run stays disabled until you choose Clear Results.
 |---|---|---|
 | Chart shows only one bar / point | Frequency too coarse for the date range | Try a finer frequency (e.g. daily instead of yearly) |
 | Too many series, chart is unreadable | Too many distinct values in group-by column(s) | Remove a group-by column, or filter the data block first |
+| No groups meet the minimum group count | Every grouped total is below the filter | Lower Minimum group count, or enter 0 to show all groups |
 | "No sequential analysis data available" | Column type or interval is incompatible with the data | Check the column contains valid dates or numbers; check the interval is > 0 |
 
 <h2 id="help-sequential-defaults">Quick-reference defaults</h2>
@@ -181,6 +207,7 @@ Run stays disabled until you choose Clear Results.
 | Numeric Interval | 1 | Required; must be > 0 |
 | Group By | None | Up to 3 columns |
 | Case Sensitive | Off | Only appears when a group-by column is added |
+| Minimum group count | 10 | Grouped results only; enter 0 to show all groups |
 | Chart Type | Line Chart | — |
 | X-axis | Categorical | Switch to Linear for time-proportional spacing |
 | Zoom | Full range | Use Reset zoom to restore the complete result |

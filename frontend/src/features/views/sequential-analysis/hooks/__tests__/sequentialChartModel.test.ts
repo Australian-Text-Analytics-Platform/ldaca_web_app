@@ -68,6 +68,7 @@ const build = (
     fallbacks: overrides.fallbacks ?? fallbacks,
     chartType: overrides.chartType ?? 'line',
     xAxisType: overrides.xAxisType ?? 'category',
+    minimumGroupCount: overrides.minimumGroupCount ?? 0,
     uncased: overrides.uncased ?? false,
     excludedGroupIndices: overrides.excludedGroupIndices ?? new Set(),
     selectedPeriodIndices: overrides.selectedPeriodIndices ?? new Set(),
@@ -332,6 +333,137 @@ describe('buildSequentialChartModel', () => {
 
     expect(forward.groups).toEqual(reversed.groups);
     expect(forward.series).toEqual(reversed.series);
+  });
+
+  it('filters grouped series by full-result count without changing period rows or colors', () => {
+    const result = {
+      data: [
+        {
+          time_period: '2024-01',
+          period_start: '2024-01-01',
+          period_end: '2024-02-01',
+          group: 'A',
+          sequential_count: 4,
+        },
+        {
+          time_period: '2024-02',
+          period_start: '2024-02-01',
+          period_end: '2024-03-01',
+          group: 'A',
+          sequential_count: 5,
+        },
+        {
+          time_period: '2024-01',
+          period_start: '2024-01-01',
+          period_end: '2024-02-01',
+          group: 'B',
+          sequential_count: 5,
+        },
+        {
+          time_period: '2024-02',
+          period_start: '2024-02-01',
+          period_end: '2024-03-01',
+          group: 'B',
+          sequential_count: 5,
+        },
+        {
+          time_period: '2024-01',
+          period_start: '2024-01-01',
+          period_end: '2024-02-01',
+          group: 'C',
+          sequential_count: 6,
+        },
+        {
+          time_period: '2024-02',
+          period_start: '2024-02-01',
+          period_end: '2024-03-01',
+          group: 'C',
+          sequential_count: 6,
+        },
+      ],
+      analysis_params: { column_type: 'datetime' as const, group_by_columns: ['group'] },
+    };
+    const unfiltered = build(result);
+    const cIndex = unfiltered.groups.find((group) => group.label === 'C')?.memberGroupIndices[0];
+    const filtered = build(result, {
+      minimumGroupCount: 10,
+      excludedGroupIndices: new Set(cIndex === undefined ? [] : [cIndex]),
+      selectedPeriodIndices: new Set([0]),
+    });
+
+    expect(filtered.chartData).toHaveLength(2);
+    expect(filtered.groups.map((group) => group.label)).toEqual(['B', 'C']);
+    expect(filtered.series.map((series) => series.label)).toEqual(['B']);
+    expect(filtered.groups.find((group) => group.label === 'B')?.color).toBe(
+      unfiltered.groups.find((group) => group.label === 'B')?.color,
+    );
+    expect(filtered.groupFilter).toEqual({
+      minimumCount: 10,
+      filteredGroupCount: 1,
+      totalGroupCount: 3,
+    });
+    expect(filtered.counts).toEqual({
+      totalPointCount: 6,
+      totalDocumentCount: 31,
+      shownPointCount: 2,
+      shownDocumentCount: 10,
+      chosenPointCount: 1,
+      chosenDocumentCount: 5,
+    });
+    expect(filtered.excludedGroupIndices).toEqual([0, 2]);
+
+    const restored = build(result, {
+      minimumGroupCount: 0,
+      excludedGroupIndices: new Set(cIndex === undefined ? [] : [cIndex]),
+    });
+    expect(restored.groups.map((group) => [group.label, group.hidden])).toEqual([
+      ['A', false],
+      ['B', false],
+      ['C', true],
+    ]);
+  });
+
+  it('uses merged Uncased totals and bypasses the filter for ungrouped results', () => {
+    const grouped = {
+      data: [
+        {
+          time_period: '2024-01',
+          period_start: '2024-01-01',
+          period_end: '2024-02-01',
+          group: 'Jobs',
+          sequential_count: 6,
+        },
+        {
+          time_period: '2024-01',
+          period_start: '2024-01-01',
+          period_end: '2024-02-01',
+          group: 'jobs',
+          sequential_count: 6,
+        },
+      ],
+      analysis_params: { column_type: 'datetime' as const, group_by_columns: ['group'] },
+    };
+    const exact = build(grouped, { minimumGroupCount: 10 });
+    const uncased = build(grouped, { minimumGroupCount: 10, uncased: true });
+    const ungrouped = build(
+      {
+        data: [
+          {
+            time_period: '2024-01',
+            period_start: '2024-01-01',
+            period_end: '2024-02-01',
+            sequential_count: 4,
+          },
+        ],
+        analysis_params: { column_type: 'datetime' },
+      },
+      { minimumGroupCount: 10 },
+    );
+
+    expect(exact.groups).toEqual([]);
+    expect(uncased.groups.map((group) => group.label)).toEqual(['jobs/Jobs']);
+    expect(ungrouped.groups.map((group) => group.label)).toEqual(['Sequential Count']);
+    expect(ungrouped.excludedGroupIndices).toEqual([]);
   });
 
   it('derives visibility, selection, and counts from canonical rows', () => {

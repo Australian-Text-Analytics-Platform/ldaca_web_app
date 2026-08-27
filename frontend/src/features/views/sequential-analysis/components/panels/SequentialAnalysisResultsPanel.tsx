@@ -22,6 +22,8 @@ import type {
 export interface SequentialAnalysisResultsPanelProps {
   resultsSummary: string;
   model: SequentialChartModel;
+  minimumGroupCount: number;
+  onMinimumGroupCountChange: (value: number) => void;
   onChartTypeChange: (value: ChartTypeOption) => void;
   onXAxisTypeChange: (value: SequentialXAxisType) => void;
   onDownloadClick: () => void;
@@ -46,6 +48,8 @@ export interface SequentialAnalysisResultsPanelProps {
 export function SequentialAnalysisResultsPanel({
   resultsSummary,
   model,
+  minimumGroupCount,
+  onMinimumGroupCountChange,
   onChartTypeChange,
   onXAxisTypeChange,
   onDownloadClick,
@@ -81,6 +85,8 @@ export function SequentialAnalysisResultsPanel({
       <CardContent className="space-y-4">
         <SequentialChart
           model={model}
+          minimumGroupCount={minimumGroupCount}
+          onMinimumGroupCountChange={onMinimumGroupCountChange}
           onToggleGroupIndices={onToggleGroupIndices}
           onUncasedChange={onUncasedChange}
           onPeriodClick={onPeriodClick}

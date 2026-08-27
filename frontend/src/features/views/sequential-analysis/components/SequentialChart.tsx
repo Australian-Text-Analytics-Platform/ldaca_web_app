@@ -2,12 +2,15 @@ import React from 'react';
 
 import { MultiSeriesChart } from '@/features/views/common/components/MultiSeriesChart';
 import { FilterableSeriesControls } from '@/features/views/common/components/FilterableSeriesControls';
+import { Input } from '@/components/ui/input';
 import type { SequentialChartModel } from '../hooks/sequentialChartModel';
 
 interface SequentialChartProps {
   model: SequentialChartModel;
   onToggleGroupIndices: (groupIndices: readonly number[]) => void;
   onUncasedChange: (value: boolean) => void;
+  minimumGroupCount: number;
+  onMinimumGroupCountChange: (value: number) => void;
   onPeriodClick: (index: number, shiftHeld: boolean) => void;
   onPeriodRangeSelect: (startIndex: number, endIndex: number, shiftHeld: boolean) => void;
   onClearSelection: () => void;
@@ -29,6 +32,8 @@ export function SequentialChart({
   model,
   onToggleGroupIndices,
   onUncasedChange,
+  minimumGroupCount,
+  onMinimumGroupCountChange,
   onPeriodClick,
   onPeriodRangeSelect,
   onClearSelection,
@@ -40,6 +45,9 @@ export function SequentialChart({
   // Keep Clear enabled for that stale state even though the model deliberately
   // excludes invalid indices from rendering.
   const hasSelection = model.selection.selectedCount > 0 || model.selection.hasInvalidSelection;
+  const allGroupsFiltered =
+    model.groupFilter.totalGroupCount > 0 &&
+    model.groupFilter.filteredGroupCount === model.groupFilter.totalGroupCount;
   if (!model.chartData.length) {
     return (
       <div className="flex h-40 items-center justify-center rounded-md border border-dashed border-surface-border-foreground/30 text-body text-description">
@@ -58,27 +66,34 @@ export function SequentialChart({
           {model.diagnostics.length === 1 ? '' : 's'}).
         </div>
       ) : null}
-      <MultiSeriesChart
-        data={model.axisData}
-        xKey={model.xKey}
-        series={model.series}
-        chartType={model.chartType}
-        xAxis={model.xAxis}
-        height={CHART_HEIGHT_PX}
-        tooltip={{
-          labelFormatter: model.tooltip.labelFormatter,
-        }}
-        selection={{
-          selectedIndices: model.selection.selectedIndices,
-          onSelect: onPeriodClick,
-          onSelectRange: onPeriodRangeSelect,
-        }}
-        ariaLabel="Trends and Sequence chart"
-        dataResetKey={`${dataResetKey}:${model.chartData
-          .map((row) => (typeof row.__period_key__ === 'string' ? row.__period_key__ : ''))
-          .join('|')}`}
-        toolbarStart={toolbarStart}
-      />
+      {allGroupsFiltered ? (
+        <div className="flex h-40 items-center justify-center rounded-md border border-dashed border-surface-border-foreground/30 px-4 text-center text-body text-description">
+          No groups meet the minimum group count of {String(model.groupFilter.minimumCount)}. Lower
+          the filter to show groups.
+        </div>
+      ) : (
+        <MultiSeriesChart
+          data={model.axisData}
+          xKey={model.xKey}
+          series={model.series}
+          chartType={model.chartType}
+          xAxis={model.xAxis}
+          height={CHART_HEIGHT_PX}
+          tooltip={{
+            labelFormatter: model.tooltip.labelFormatter,
+          }}
+          selection={{
+            selectedIndices: model.selection.selectedIndices,
+            onSelect: onPeriodClick,
+            onSelectRange: onPeriodRangeSelect,
+          }}
+          ariaLabel="Trends and Sequence chart"
+          dataResetKey={`${dataResetKey}:${model.chartData
+            .map((row) => (typeof row.__period_key__ === 'string' ? row.__period_key__ : ''))
+            .join('|')}`}
+          toolbarStart={toolbarStart}
+        />
+      )}
       <div className="mt-4">
         <FilterableSeriesControls
           items={model.groups.map((group) => ({
@@ -92,6 +107,24 @@ export function SequentialChart({
           ariaLabel="Trends groups"
           uncased={model.uncased}
           onUncasedChange={model.supportsUncased ? onUncasedChange : undefined}
+          controlsAfterUncased={
+            model.summary.groupBy.length > 0 ? (
+              <label className="flex items-center gap-2 text-label-secondary text-foreground">
+                <span className="shrink-0">Minimum group count</span>
+                <Input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={minimumGroupCount}
+                  aria-label="Minimum group count"
+                  className="w-20"
+                  onChange={(event) => {
+                    onMinimumGroupCountChange(event.currentTarget.valueAsNumber);
+                  }}
+                />
+              </label>
+            ) : null
+          }
           onClearSelection={onClearSelection}
           clearSelectionDisabled={!hasSelection}
           onToggle={(key) => {

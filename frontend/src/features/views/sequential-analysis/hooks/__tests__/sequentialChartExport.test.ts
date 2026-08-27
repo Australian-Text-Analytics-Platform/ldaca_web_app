@@ -47,6 +47,7 @@ describe('buildSequentialChartExportMetadata', () => {
       fallbacks,
       chartType: 'area',
       xAxisType: 'category',
+      minimumGroupCount: 0,
       uncased: false,
       excludedGroupIndices: new Set(),
       selectedPeriodIndices: new Set(),
@@ -84,6 +85,7 @@ describe('buildSequentialChartExportMetadata', () => {
       fallbacks,
       chartType: 'area',
       xAxisType: 'category',
+      minimumGroupCount: 3,
       uncased: false,
       excludedGroupIndices: new Set(graceIndex === undefined ? [] : [graceIndex]),
       selectedPeriodIndices: new Set(),
@@ -96,12 +98,11 @@ describe('buildSequentialChartExportMetadata', () => {
       { label: 'Time Column', value: 'date' },
       { label: 'Frequency', value: 'monthly' },
       { label: 'Total', value: '2/5' },
-      { label: 'Shown', value: '1/2' },
+      { label: 'Shown', value: '0/0' },
       { label: 'Chosen', value: '0/0' },
       { label: 'Groups', value: 'speaker' },
     ]);
     expect(metadata.legend).toEqual([
-      { label: 'Ada (2 · 100.0%)', color: '#2563eb', type: 'area', hidden: false },
       { label: 'Grace (3 · Hidden)', color: '#16a34a', type: 'area', hidden: true },
     ]);
   });
