@@ -8,6 +8,7 @@
  */
 
 import { Plus, X } from 'lucide-react';
+import type React from 'react';
 import {
   type KeyboardEvent,
   type ReactNode,
@@ -32,10 +33,21 @@ import {
   TAB_MAX_WIDTH,
 } from './editorTabsLayout';
 
+/** Optional per-tab identity colours that replace the theme's tab fills. */
+export interface EditorTabFill {
+  /** Fill behind the active tab; also the hover fill of an inactive tab. */
+  active: string;
+  /** Fill behind an inactive tab. */
+  inactive: string;
+  /** Text colour legible on both fills. */
+  foreground: string;
+}
+
 export interface EditorTabItem {
   id: string;
   title: string;
   icon?: ReactNode;
+  fill?: EditorTabFill;
   tabDomId?: string;
   panelDomId?: string;
   'data-guidance'?: string;
@@ -297,6 +309,7 @@ export function EditorTabs({
             const displayTitle = tab.title || 'Untitled';
             const slotLeft = positions[index] ?? 0;
             const translateX = isDragging ? dragHomeLeft + dragDeltaX : slotLeft;
+            const fill = tab.fill;
 
             return (
               <Tooltip key={id}>
@@ -326,6 +339,7 @@ export function EditorTabs({
                     style={{
                       width: widths[index],
                       transform: `translateX(${String(translateX)}px)`,
+                      ...(fill ? { color: fill.foreground } : {}),
                     }}
                     className={cn(
                       'group absolute top-0 left-0 flex h-[32px] items-center text-[13px] select-none',
@@ -335,17 +349,29 @@ export function EditorTabs({
                             'z-1 transition-[transform,color] duration-150 ease-out',
                             onReorder ? 'cursor-grab' : 'cursor-default',
                           ),
-                      isActive ? 'z-10 text-foreground' : 'text-description hover:text-foreground',
+                      isActive ? 'z-10' : 'hover:text-foreground',
+                      !fill && (isActive ? 'text-foreground' : 'text-description'),
+                      fill && !isActive && 'opacity-80 hover:opacity-100',
                     )}
                   >
                     <span
                       aria-hidden="true"
                       data-testid="editor-tab-fill"
+                      style={
+                        fill
+                          ? ({
+                              '--editor-tab-fill': isActive ? fill.active : fill.inactive,
+                              '--editor-tab-fill-hover': fill.active,
+                            } as React.CSSProperties)
+                          : undefined
+                      }
                       className={cn(
                         'pointer-events-none absolute inset-x-[2px] inset-y-[4px] rounded-[4px] transition-colors duration-150',
-                        isActive
-                          ? 'bg-editor-tab-active-background'
-                          : 'bg-transparent group-hover:bg-editor-tab-hover-background group-focus-within:bg-editor-tab-hover-background',
+                        fill
+                          ? 'bg-(--editor-tab-fill) group-hover:bg-(--editor-tab-fill-hover) group-focus-within:bg-(--editor-tab-fill-hover)'
+                          : isActive
+                            ? 'bg-editor-tab-active-background'
+                            : 'bg-transparent group-hover:bg-editor-tab-hover-background group-focus-within:bg-editor-tab-hover-background',
                       )}
                     />
 

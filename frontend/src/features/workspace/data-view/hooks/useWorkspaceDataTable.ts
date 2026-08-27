@@ -29,6 +29,8 @@ interface WorkspaceDataTableNodeActions {
 interface WorkspaceSelectionTab {
   id: string;
   label: string;
+  /** Persisted Data Block colour, when set; the tab strip derives its tints from it. */
+  color: string | null;
   isActive: boolean;
 }
 
@@ -67,21 +69,25 @@ const EMPTY_NODE_DATA: NodeDataResponse = Object.freeze({
 /**
  * Creates one tab descriptor for the multi-selected-node tab strip.
  * Called while mapping selected node ids into WorkspaceSelectionTabs props.
- * Flow: accept a selected node id, fall back to that id when no label is available, and attach the active-tab flag.
+ * Flow: accept a selected node id, fall back to that id when no label is available, carry the
+ * block colour, and attach the active-tab flag.
  */
 const buildTabDescriptor = (
   node: WorkspaceSelectionTab['id'],
   label?: string,
+  color: string | null = null,
   isActive = false,
-) => ({
+): WorkspaceSelectionTab => ({
   id: node,
   label: label ?? node,
+  color,
   isActive,
 });
 
 interface WorkspaceNodeDisplayLike {
   id?: string;
   name?: string;
+  color?: string | null;
   shape?: [number | null, number | null] | number[];
 }
 
@@ -293,7 +299,12 @@ export const useWorkspaceDataTable = (): WorkspaceDataTableViewModel => {
   const tabs: WorkspaceSelectionTabsState = {
     shouldShowTabs,
     tabs: displayTabIds.map((id) =>
-      buildTabDescriptor(id, resolveNodeDisplayLabel(nodeById.get(id)) ?? id, id === activeNodeId),
+      buildTabDescriptor(
+        id,
+        resolveNodeDisplayLabel(nodeById.get(id)) ?? id,
+        nodeById.get(id)?.color ?? null,
+        id === activeNodeId,
+      ),
     ),
     tabPosition,
     totalTabs: selectedNodeIds.length,
