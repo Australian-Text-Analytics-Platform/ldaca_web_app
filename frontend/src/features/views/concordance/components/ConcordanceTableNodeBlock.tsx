@@ -15,7 +15,7 @@ import { CONCORDANCE_COMBINED_NODE_KEY } from '../concordanceTableDomain';
 import type { PaginationState } from '../hooks/useConcordanceTaskFlow';
 import { concordanceHeaderMode } from '../concordanceTablePresentation';
 import { GREY } from '../../common/vizPalette';
-import { normalizeNodeAccentColor } from '@/lib/nodeColor';
+import { normalizeNodeColor } from '@/lib/nodeColor';
 import { ConcordancePlainHeader, ConcordanceRowsTable } from './ConcordanceRowsTable';
 import {
   ConcordanceCombinedResultHeader,
@@ -341,7 +341,7 @@ function PerNodeConcordanceTable({
 
   // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty-string display name must fall back to the node key
   const dataBlockLabel = context.displayName || nodeKey;
-  const sourceColor = normalizeNodeAccentColor(context.nodeColor) ?? GREY;
+  const sourceColor = normalizeNodeColor(context.nodeColor) ?? GREY;
   const pageSizeSummary = (
     <GroupedResultsPageSizeSummary
       groups={nodeData.data}

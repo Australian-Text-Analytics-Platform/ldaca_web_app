@@ -1,23 +1,31 @@
 import { describe, expect, it } from 'vitest';
 
-import { normalizeNodeAccentColor } from '../nodeColor';
+import { normalizeNodeColor, toNodeSurfaceColor } from '../nodeColor';
 
-describe('normalizeNodeAccentColor', () => {
+describe('normalizeNodeColor', () => {
   it('accepts #rrggbb strings and lower-cases them', () => {
-    expect(normalizeNodeAccentColor('#2563EB')).toBe('#2563eb');
-    expect(normalizeNodeAccentColor('#abcdef')).toBe('#abcdef');
+    expect(normalizeNodeColor('#2563EB')).toBe('#2563eb');
+    expect(normalizeNodeColor('#abcdef')).toBe('#abcdef');
   });
 
   it('rejects null, undefined and non-string values', () => {
-    expect(normalizeNodeAccentColor(null)).toBeNull();
-    expect(normalizeNodeAccentColor(undefined)).toBeNull();
-    expect(normalizeNodeAccentColor(123)).toBeNull();
+    expect(normalizeNodeColor(null)).toBeNull();
+    expect(normalizeNodeColor(undefined)).toBeNull();
+    expect(normalizeNodeColor(123)).toBeNull();
   });
 
   it('rejects non-hex or malformed colour strings', () => {
-    expect(normalizeNodeAccentColor('blue')).toBeNull();
-    expect(normalizeNodeAccentColor('#abc')).toBeNull();
-    expect(normalizeNodeAccentColor('#12345g')).toBeNull();
-    expect(normalizeNodeAccentColor('2563eb')).toBeNull();
+    expect(normalizeNodeColor('blue')).toBeNull();
+    expect(normalizeNodeColor('#abc')).toBeNull();
+    expect(normalizeNodeColor('#12345g')).toBeNull();
+    expect(normalizeNodeColor('2563eb')).toBeNull();
+  });
+});
+
+describe('toNodeSurfaceColor', () => {
+  it('mixes a normalized identity colour into the active theme surface', () => {
+    expect(toNodeSurfaceColor('#2563eb')).toBe(
+      'color-mix(in srgb, #2563eb 24%, var(--vscode-surface-background))',
+    );
   });
 });

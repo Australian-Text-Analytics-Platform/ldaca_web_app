@@ -2,7 +2,7 @@ import { DataBlockName } from '@/components/DataBlockName';
 import { CardHeader, CardTitle } from '@/components/ui/card';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import { GREY, foregroundForVizColor } from '@/features/views/common/vizPalette';
-import { normalizeNodeAccentColor } from '@/lib/nodeColor';
+import { normalizeNodeColor } from '@/lib/nodeColor';
 
 interface SourceHeaderProps {
   name: string;
@@ -12,7 +12,7 @@ interface SourceHeaderProps {
 
 /** Shared saturated Data Block header for separated Concordance results. */
 export function ConcordanceSourceResultHeader({ name, color, testId }: SourceHeaderProps) {
-  const sourceColor = normalizeNodeAccentColor(color) ?? GREY;
+  const sourceColor = normalizeNodeColor(color) ?? GREY;
 
   return (
     <CardHeader
@@ -64,7 +64,7 @@ export function ConcordanceCombinedResultHeader({
             sourceColorMap[node.id.toLowerCase()] ??
             sourceColorMap[node.name.toLowerCase()] ??
             defaultPalette[index % defaultPalette.length];
-          const color = normalizeNodeAccentColor(mappedColor) ?? GREY;
+          const color = normalizeNodeColor(mappedColor) ?? GREY;
           return (
             <div
               key={node.id}

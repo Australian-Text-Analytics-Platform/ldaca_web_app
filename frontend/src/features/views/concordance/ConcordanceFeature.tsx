@@ -200,7 +200,11 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
     shape: [source.document_count, null],
     tokenizerModel: null,
   }));
-  const { nodeColorOverrides, setNodeColor, ensureNodeColors } = useNodeColorControls({
+  const {
+    nodeColors: nodeColorOverrides,
+    setNodeColor,
+    ensureNodeColors,
+  } = useNodeColorControls({
     nodeIds: activeNodeIds,
     nodes: panelSelectedNodes,
     persistNodeColor,

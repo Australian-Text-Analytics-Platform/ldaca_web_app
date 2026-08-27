@@ -10,12 +10,14 @@ import {
   PopoverTitle,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import { normalizeNodeColor } from '@/lib/nodeColor';
 import { cn } from '@/lib/utils';
 
-const HEX_COLOR_RE = /^#[0-9a-f]{6}$/i;
-
-const normalizeHexColor = (value: string, fallback: string) =>
-  HEX_COLOR_RE.test(value) ? value.toLowerCase() : fallback;
+const requireNodeColor = (value: string): string => {
+  const normalized = normalizeNodeColor(value);
+  if (!normalized) throw new Error(`Expected a #rrggbb node color, received "${value}"`);
+  return normalized;
+};
 
 interface NodeColorPickerProps {
   nodeName: string;
@@ -41,17 +43,18 @@ export function NodeColorPicker({
   onChange,
   disabled = false,
 }: NodeColorPickerProps) {
-  const normalizedColor = normalizeHexColor(color, presets[0] ?? '#000000');
+  const normalizedColor = requireNodeColor(color);
   const [open, setOpen] = useState(false);
   const [customOpen, setCustomOpen] = useState(false);
   const [customText, setCustomText] = useState(normalizedColor);
 
   const applyCustomText = () => {
-    if (!HEX_COLOR_RE.test(customText)) {
+    const normalizedCustomColor = normalizeNodeColor(customText);
+    if (!normalizedCustomColor) {
       setCustomText(normalizedColor);
       return;
     }
-    onChange(customText.toLowerCase());
+    onChange(normalizedCustomColor);
   };
 
   return (
@@ -89,7 +92,7 @@ export function NodeColorPicker({
           </PopoverHeader>
           <div className="mt-3 grid grid-cols-6 gap-1.5">
             {presets.map((preset) => {
-              const presetColor = normalizeHexColor(preset, '#000000');
+              const presetColor = requireNodeColor(preset);
               const selected = presetColor === normalizedColor;
               return (
                 <button
