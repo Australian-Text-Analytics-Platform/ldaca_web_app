@@ -5,15 +5,21 @@
   "packageManager": "pnpm@11.24.0",
   "description": "Root workspace for LDaCA Wordflow",
   "scripts": {
-    "dev": "pnpm -C frontend dev",
+    "dev": "node scripts/dev.mjs",
+    "dev:backend": "node scripts/dev.mjs --backend",
+    "dev:frontend": "node scripts/dev.mjs --frontend",
+    "test:dev": "node --test scripts/dev.test.mjs",
     "build": "pnpm -C frontend build",
     "bump-version": "node scripts/bump-version.mjs",
     "check-versions": "node scripts/check-versions.mjs",
     "docs:links": "node --test scripts/check-markdown-links.test.mjs && node scripts/check-markdown-links.mjs",
     "deploy_frontend_to_backend": "pnpm -C frontend build && node scripts/deploy-frontend-to-backend.mjs",
-    "desktop:dev": "pnpm -C frontend desktop:dev",
+    "dev:desktop": "pnpm -C frontend dev:desktop",
     "desktop:build:mac": "pnpm -C frontend desktop:build:mac",
     "desktop:build:windows": "pnpm -C frontend desktop:build:windows",
     "prepare:backend-runtime": "pnpm -C frontend prepare:backend-runtime"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.5"
   }
 }

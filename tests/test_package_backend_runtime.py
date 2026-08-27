@@ -183,7 +183,7 @@ def test_frontend_desktop_dev_uses_packaged_runtime_path() -> None:
     assert scripts["prepare:backend-runtime"] == (
         "node ../scripts/prepare-backend-runtime.mjs"
     )
-    assert scripts["desktop:dev"].startswith("pnpm prepare:backend-runtime")
+    assert scripts["dev:desktop"].startswith("pnpm prepare:backend-runtime")
     assert scripts["desktop:build:mac"] == (
         "pnpm prepare:backend-runtime && CI=true tauri build --bundles app,dmg"
     )

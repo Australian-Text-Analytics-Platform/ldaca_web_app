@@ -101,20 +101,31 @@ Do not set `PYTHONPATH` manually for normal development. `uv` handles editable i
 
 ## Common Commands
 
-### Frontend
+### Web Development
 
 ```sh
-pnpm -C frontend dev
+pnpm dev
+```
+
+This starts the FastAPI backend with reload enabled and the Vite frontend in one
+supervised terminal. To run either process independently:
+
+```sh
+pnpm dev:backend
+pnpm dev:frontend
+```
+
+### Frontend Commands
+
+```sh
 pnpm -C frontend build
 pnpm -C frontend test -- --run
 ```
 
-### Backend Commands
+### Backend Checks
 
 ```sh
 cd backend
-CORS_ALLOWED_ORIGINS='["http://localhost:3000","http://127.0.0.1:3000"]' \
-  uv run uvicorn ldaca_wordflow.asgi:app --reload --port 8001
 uv run ruff check .
 uv run ty check
 uv run pytest -q

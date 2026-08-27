@@ -21,7 +21,7 @@ staging script validates and copies that complete runtime into Tauri resources
 without rewriting the manifest.
 
 Do not set `PYTHONPATH` manually or create a separate desktop development
-runtime. `pnpm desktop:dev` and release builds use the same packaging contract.
+runtime. `pnpm dev:desktop` and release builds use the same packaging contract.
 
 ## Validate
 

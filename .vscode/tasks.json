@@ -4,20 +4,32 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "Start Backend",
+            "label": "Start Wordflow",
             "type": "shell",
-            "command": "uv run uvicorn ldaca_wordflow.asgi:app --reload --port 8001",
+            "command": "pnpm dev",
             "options": {
-                "cwd": "${workspaceFolder}/backend",
-                "env": {
-                    "CORS_ALLOWED_ORIGINS": "[\"http://localhost:3000\",\"http://127.0.0.1:3000\"]"
-                }
+                "cwd": "${workspaceFolder}"
             },
             "problemMatcher": [],
             "isBackground": true,
-            "runOptions": {
-                "runOn": "folderOpen"
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            }
+        },
+        {
+            "label": "Start Backend",
+            "type": "shell",
+            "command": "pnpm dev:backend",
+            "options": {
+                "cwd": "${workspaceFolder}"
             },
+            "problemMatcher": [],
+            "isBackground": true,
             "presentation": {
                 "echo": true,
                 "reveal": "always",
@@ -30,15 +42,12 @@
         {
             "label": "Start Frontend",
             "type": "shell",
-            "command": "pnpm dev",
+            "command": "pnpm dev:frontend",
             "options": {
-                "cwd": "${workspaceFolder}/frontend"
+                "cwd": "${workspaceFolder}"
             },
             "problemMatcher": [],
             "isBackground": true,
-            "runOptions": {
-                "runOn": "folderOpen"
-            },
             "presentation": {
                 "echo": true,
                 "reveal": "always",

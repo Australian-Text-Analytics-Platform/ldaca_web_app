@@ -86,7 +86,7 @@
     "clean": "cd src-tauri && cargo clean",
     "clean:desktop:mac-bundles": "node scripts/clean-desktop-mac-bundles.mjs",
     "prepare:backend-runtime": "node ../scripts/prepare-backend-runtime.mjs",
-    "desktop:dev": "pnpm prepare:backend-runtime && tauri dev",
+    "dev:desktop": "pnpm prepare:backend-runtime && tauri dev",
     "desktop:build:mac": "pnpm clean:desktop:mac-bundles && pnpm prepare:backend-runtime && CI=true tauri build --bundles app,dmg --target aarch64-apple-darwin",
     "desktop:build:windows": "pnpm prepare:backend-runtime && tauri build"
   },

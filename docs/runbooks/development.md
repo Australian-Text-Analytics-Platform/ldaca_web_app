@@ -32,32 +32,59 @@ git submodule update --init --recursive
 Do not force deinitialization. Stop if the first command reports local changes
 or commits that have not been backed up or pushed.
 
-## Backend
+## Web Application
 
 ```bash
-cd backend
-uv run ruff check .
-uv run pytest -q
-uv run ty check
-CORS_ALLOWED_ORIGINS='["http://localhost:3000","http://127.0.0.1:3000"]' \
-  uv run uvicorn ldaca_wordflow.asgi:app --reload --port 8001
+pnpm dev
 ```
 
-## Frontend
+The root command supervises the FastAPI reload process and Vite together,
+prefixes their output, and stops the remaining process when either exits. It
+uses the local frontend origins as the backend CORS default without setting a
+Data Root. Environment variables supplied by the caller, including `DATA_ROOT`
+and `CORS_ALLOWED_ORIGINS`, remain available to the backend.
+
+Run either side independently when needed:
 
 ```bash
-pnpm -C frontend dev
-pnpm -C frontend check
+pnpm dev:backend
+pnpm dev:frontend
 ```
 
-Run the backend and frontend commands in separate terminals. Vite serves the
-frontend on port `3000` and connects directly to the backend on port `8001`.
+For a second checkout, use the frontend variables already consumed by Vite to
+give both processes a distinct port pair:
+
+```bash
+FRONTEND_PORT=3100 VITE_BACKEND_PORT=8101 pnpm dev
+```
+
+The launcher derives its default CORS origins from `FRONTEND_PORT` and starts
+the backend on `VITE_BACKEND_PORT` so the two processes stay aligned.
+
+Vite serves the frontend on port `3000` and connects directly to the backend on
+port `8001`.
 Use either `http://localhost:3000` or `http://127.0.0.1:3000`; the frontend
 preserves that hostname when it selects `localhost:8001` or `127.0.0.1:8001`.
 Both exact frontend origins must therefore remain in the backend allowlist for
 unsafe CSRF-protected requests. Production does not use this split arrangement:
 the release workflow builds the SPA into the backend package and the backend
 serves both surfaces from one origin.
+
+## Package Checks
+
+Run backend checks from `backend/`:
+
+```bash
+uv run ruff check .
+uv run pytest -q
+uv run ty check
+```
+
+Run the complete frontend check from the repository root:
+
+```bash
+pnpm -C frontend check
+```
 
 Use `pnpm -C frontend docs:check` for the bundled user-document registry. After
 an OpenAPI change, export the backend schema and regenerate the frontend client
