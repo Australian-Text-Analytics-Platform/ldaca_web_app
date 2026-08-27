@@ -37,6 +37,7 @@ import {
 import type { AnnotationAiPreview, AnnotationPreviewRow } from '../hooks/useAnnotationAiPreview';
 import { AnnotationCorrectionColumnControl } from './AnnotationCorrectionColumnControl';
 import { AnnotationTableFrame } from './AnnotationTableFrame';
+import { InvalidAnnotationClassItem } from './InvalidAnnotationClassItem';
 
 const NO_CORRECTION_VALUE = '__no_correction__';
 
@@ -465,6 +466,10 @@ export function AnnotationAiPreviewPanel({
                               <SelectItem value={NO_CORRECTION_VALUE} className="text-description">
                                 None
                               </SelectItem>
+                              <InvalidAnnotationClassItem
+                                value={correctionValue || null}
+                                classOptions={classOptions}
+                              />
                               {correction.classOptions.map((name) => (
                                 <SelectItem key={name} value={name}>
                                   {name}

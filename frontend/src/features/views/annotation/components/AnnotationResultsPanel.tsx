@@ -49,6 +49,7 @@ import { useAnnotationClassDescriptions } from '../hooks/useAnnotationClassDescr
 import { type AnnotationNodePageRow, useAnnotationNodePage } from '../hooks/useAnnotationNodePage';
 import { AnnotationCorrectionColumnControl } from './AnnotationCorrectionColumnControl';
 import { AnnotationTableFrame } from './AnnotationTableFrame';
+import { InvalidAnnotationClassItem } from './InvalidAnnotationClassItem';
 
 const ANNOTATION_RESULT_PAGE_SIZE = 10;
 // Radix `Select` rejects an empty-string item value, so the "clear" option uses
@@ -166,12 +167,19 @@ export function AnnotationResultsPanel({
   const queryComparisonColumns = comparisonColumns.filter(
     (column) => column !== textColumn && column !== annotationColumn && column !== correctionColumn,
   );
-  const activeFilter =
-    filter &&
-    isAnnotationRowFilterActive(filter) &&
-    (filter.column === annotationColumn || queryComparisonColumns.includes(filter.column))
-      ? filter
-      : null;
+  // Derived, not stored: a difference filter on the annotation column needs at least one
+  // comparator, so losing the last one (deselected, or reassigned as the correction column)
+  // downgrades the filter instead of leaving a stale active state.
+  const activeFilter = (() => {
+    if (!filter) return null;
+    const owned =
+      filter.column === annotationColumn || queryComparisonColumns.includes(filter.column);
+    if (!owned) return null;
+    const differs =
+      filter.differs && (filter.column !== annotationColumn || queryComparisonColumns.length > 0);
+    const resolved = { ...filter, differs };
+    return isAnnotationRowFilterActive(resolved) ? resolved : null;
+  })();
   const filterValueFor = (column: string): AnnotationRowFilterValue =>
     activeFilter?.column === column
       ? { differs: activeFilter.differs, existence: activeFilter.existence }
@@ -577,6 +585,10 @@ export function AnnotationResultsPanel({
                           <SelectItem value={NO_CLASS_VALUE} className="text-description">
                             None
                           </SelectItem>
+                          <InvalidAnnotationClassItem
+                            value={committedValue}
+                            classOptions={classOptions}
+                          />
                           {classOptions.map((name) => (
                             <SelectItem key={name} value={name}>
                               {name}
@@ -644,6 +656,10 @@ export function AnnotationResultsPanel({
                               <SelectItem value={NO_CLASS_VALUE} className="text-description">
                                 None
                               </SelectItem>
+                              <InvalidAnnotationClassItem
+                                value={correctionValue}
+                                classOptions={classOptions}
+                              />
                               {classOptions.map((name) => (
                                 <SelectItem key={name} value={name}>
                                   {name}

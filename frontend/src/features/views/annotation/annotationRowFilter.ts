@@ -46,13 +46,16 @@ const cellText = (value: unknown): string => {
 };
 
 /** Trimmed, de-duplicated Codebook classes; an empty list means "no Codebook rule". */
-export const normalizeAnnotationClassOptions = (classOptions: readonly string[]): string[] =>
+const normalizeAnnotationClassOptions = (classOptions: readonly string[]): string[] =>
   Array.from(new Set(classOptions.map((name) => name.trim()).filter((name) => name.length > 0)));
 
 /**
  * Returns the valid label held by one cell, or null when the cell is empty.
  * Null, blank, and whitespace-only values are empty. When the Codebook supplies classes, a value
  * is valid only if its trimmed text exactly matches one class; anything else is treated as empty.
+ * An empty class list (no Codebook attached, or one that is still loading or has no classes)
+ * deliberately applies only the blank rule: there is nothing to validate against, and the
+ * comparison queries re-run once classes arrive because they are keyed by the class list.
  */
 export function normalizeAnnotationLabel(
   value: unknown,

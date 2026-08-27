@@ -168,12 +168,9 @@ export function useAnnotationTabSettings({
     [commitSettings],
   );
 
-  const setAnnotationTableHeight = useCallback(
-    (annotationTableHeight: number | null) => {
-      commitSettings({ annotationTableHeight });
-    },
-    [commitSettings],
-  );
+  const setAnnotationTableHeight = (annotationTableHeight: number | null) => {
+    commitSettings({ annotationTableHeight });
+  };
 
   const uniqueRoleColumns = useCallback(
     (nodeId: string, columns: string[]) =>

@@ -160,6 +160,58 @@ describe('AnnotationResultsPanel', () => {
     ];
   });
 
+  it('keeps an existing non-Codebook annotation visible in its dropdown', async () => {
+    const user = userEvent.setup();
+    queryWorkspaceSqlTable.mockResolvedValue({
+      columns: ['__reference', '__comparison', '__count'],
+      rows: [],
+      hasNext: false,
+      etag: 'revision-1',
+    });
+    nodePageRows.value = [{ ...nodePageRows.value[0], annotation: 'P', correction: '2026-08-28' }];
+
+    renderPanel('correction');
+
+    const classSelect = screen.getByRole('combobox', { name: 'Class for row 1' });
+    expect(classSelect).toHaveTextContent('P');
+    expect(screen.getByRole('combobox', { name: 'Correction for row 1' })).toHaveTextContent(
+      '2026-08-28',
+    );
+    await user.click(classSelect);
+    const invalidOption = screen.getByRole('option', { name: 'P' });
+    expect(invalidOption).toHaveClass('italic', 'text-description');
+    expect(screen.getByRole('option', { name: 'job' })).toBeInTheDocument();
+  });
+
+  it('downgrades an annotation-column difference filter when its last comparator goes away', async () => {
+    const user = userEvent.setup();
+    queryWorkspaceSqlTable.mockResolvedValue({
+      columns: ['__reference', '__comparison', '__count'],
+      rows: [],
+      hasNext: false,
+      etag: 'revision-1',
+    });
+
+    renderPanel();
+
+    const annotationFilter = screen.getByRole('button', { name: 'Filter rows by annotation' });
+    await user.click(annotationFilter);
+    await user.click(
+      screen.getByRole('menuitemcheckbox', { name: 'Differs from any comparison column' }),
+    );
+    await user.keyboard('{Escape}');
+    expect(annotationFilter).toHaveAttribute('aria-pressed', 'true');
+
+    await user.click(screen.getByRole('button', { name: 'Compare To' }));
+    await user.click(screen.getByRole('menuitemcheckbox', { name: 'reviewer' }));
+    await user.keyboard('{Escape}');
+
+    expect(screen.getByRole('button', { name: 'Filter rows by annotation' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+  });
+
   it('keeps the headers and filter controls mounted when a filter matches no rows', async () => {
     const user = userEvent.setup();
     queryWorkspaceSqlTable.mockResolvedValue({

@@ -33,7 +33,7 @@ export interface AnnotationTabSettings {
   annotationTableHeight: number | null;
 }
 
-export const ANNOTATION_TABLE_MIN_HEIGHT = 384;
+const ANNOTATION_TABLE_MIN_HEIGHT = 384;
 
 export const DEFAULT_ANNOTATION_TAB_SETTINGS: AnnotationTabSettings = {
   annotationMode: 'manual',

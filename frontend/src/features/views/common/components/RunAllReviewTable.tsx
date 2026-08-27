@@ -38,6 +38,7 @@ import { useAnnotationNodePage } from '@/features/views/annotation/hooks/useAnno
 import { toBgColor } from '@/features/views/common/vizPalette';
 import { AnnotationCorrectionColumnControl } from '@/features/views/annotation/components/AnnotationCorrectionColumnControl';
 import { AnnotationTableFrame } from '@/features/views/annotation/components/AnnotationTableFrame';
+import { InvalidAnnotationClassItem } from '@/features/views/annotation/components/InvalidAnnotationClassItem';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { isArrowDictionaryField, isArrowStringField } from '@/lib/arrow/arrowTable';
 
@@ -126,12 +127,19 @@ export function RunAllReviewTable({
   const queryComparisonColumns = comparisonColumns.filter(
     (column) => column !== textColumn && column !== comparisonColumn && column !== correctionColumn,
   );
-  const activeFilter =
-    filter &&
-    isAnnotationRowFilterActive(filter) &&
-    (filter.column === comparisonColumn || queryComparisonColumns.includes(filter.column))
-      ? filter
-      : null;
+  // Derived, not stored: a difference filter on the annotation column needs at least one
+  // comparator, so losing the last one (deselected, or reassigned as the correction column)
+  // downgrades the filter instead of leaving a stale active state.
+  const activeFilter = (() => {
+    if (!filter) return null;
+    const owned =
+      filter.column === comparisonColumn || queryComparisonColumns.includes(filter.column);
+    if (!owned) return null;
+    const differs =
+      filter.differs && (filter.column !== comparisonColumn || queryComparisonColumns.length > 0);
+    const resolved = { ...filter, differs };
+    return isAnnotationRowFilterActive(resolved) ? resolved : null;
+  })();
   const filterValueFor = (column: string): AnnotationRowFilterValue =>
     activeFilter?.column === column
       ? { differs: activeFilter.differs, existence: activeFilter.existence }
@@ -537,6 +545,10 @@ export function RunAllReviewTable({
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value={NO_CORRECTION_VALUE}>None</SelectItem>
+                              <InvalidAnnotationClassItem
+                                value={correctionValue}
+                                classOptions={classOptions}
+                              />
                               {correction.classOptions.map((name) => (
                                 <SelectItem key={name} value={name}>
                                   {name}
