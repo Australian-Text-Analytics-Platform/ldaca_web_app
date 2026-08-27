@@ -288,6 +288,59 @@ describe('useWorkspaceGraph', () => {
     );
   });
 
+  it('ignores clicks that bubble from portaled node content such as the rename dialog', () => {
+    const toggleNode = vi.fn();
+    useWorkspaceActionsMock.mockReturnValue({
+      deleteNode: vi.fn(),
+      copyNode: vi.fn(),
+      renameNode: vi.fn(),
+      undoNode,
+      redoNode,
+      toggleNode,
+      toggleNodeSelection: vi.fn(),
+      clearSelection: vi.fn(),
+    });
+    const { result } = renderHook(() => useWorkspaceGraph());
+    const nodeElement = document.createElement('div');
+    const dialogButton = document.createElement('button');
+    document.body.append(nodeElement, dialogButton);
+    const portalEvent = {
+      preventDefault: vi.fn(),
+      stopPropagation: vi.fn(),
+      currentTarget: nodeElement,
+      target: dialogButton,
+    };
+    const nodeEvent = {
+      preventDefault: vi.fn(),
+      stopPropagation: vi.fn(),
+      currentTarget: nodeElement,
+      target: nodeElement,
+    };
+    const node = { id: 'node-1' } as unknown as Parameters<
+      typeof result.current.handleNodeClick
+    >[1];
+
+    act(() => {
+      result.current.handleNodeClick(
+        portalEvent as unknown as Parameters<typeof result.current.handleNodeClick>[0],
+        node,
+      );
+    });
+    expect(portalEvent.preventDefault).not.toHaveBeenCalled();
+    expect(toggleNode).not.toHaveBeenCalled();
+
+    act(() => {
+      result.current.handleNodeClick(
+        nodeEvent as unknown as Parameters<typeof result.current.handleNodeClick>[0],
+        node,
+      );
+    });
+    expect(nodeEvent.preventDefault).toHaveBeenCalled();
+    expect(toggleNode).toHaveBeenCalledWith('node-1');
+    nodeElement.remove();
+    dialogButton.remove();
+  });
+
   it('adds a Data Block to the active tool on double-click, mirroring the + button', () => {
     const { result } = renderHook(() => useWorkspaceGraph());
     const event = {
