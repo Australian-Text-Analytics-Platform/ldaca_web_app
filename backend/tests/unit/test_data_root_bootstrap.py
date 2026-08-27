@@ -55,7 +55,7 @@ def _store(tmp_path: Path) -> DataRootConfigStore:
 
 def test_platform_paths_use_the_wordflow_identifier_and_expected_leaf_names() -> None:
     paths = platform_data_root_paths()
-    assert "au.edu.ldaca.text-analytics" in str(paths.config_file)
+    assert "au.edu.ldaca.wordflow" in str(paths.config_file)
     assert paths.config_file.name == "settings.json"
     assert paths.suggested_data_root.name == "data"
 

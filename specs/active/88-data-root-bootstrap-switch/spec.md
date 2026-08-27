@@ -16,7 +16,7 @@ deployments remain operator-managed.
   an absolute server path and same-origin change token, and completes only when
   the new Runtime is ready.
 - Configuration is schema 1 `settings.json` under platformdirs identifier
-  `au.edu.ldaca.text-analytics`. Tauri `backend.json` is never read or migrated.
+  `au.edu.ldaca.wordflow`. Tauri `backend.json` is never read or migrated.
 - Root changes never copy data. They reject queued/running Analysis or User
   File Import work, drain finite requests, close event streams, replace the
   Runtime, and reconstruct the prior Runtime after failure when possible.

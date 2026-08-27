@@ -7,6 +7,12 @@ const repoRoot = resolve(frontendRoot, '..');
 const read = (path) => readFileSync(resolve(repoRoot, path), 'utf8');
 
 describe('desktop configuration contracts', () => {
+  it('uses the Wordflow application identifier', () => {
+    const tauri = JSON.parse(read('frontend/src-tauri/tauri.conf.json'));
+
+    expect(tauri.identifier).toBe('au.edu.ldaca.wordflow');
+  });
+
   it('uses one strict Tauri development port command', () => {
     const tauri = JSON.parse(read('frontend/src-tauri/tauri.conf.json'));
     const packageJson = JSON.parse(read('frontend/package.json'));

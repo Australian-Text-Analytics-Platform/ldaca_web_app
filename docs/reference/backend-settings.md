@@ -47,10 +47,10 @@ unlimited; new hosted users receive the database default of 30 GiB. There are
 no file-count, directory-count, Analysis-count, or queue-count quotas.
 
 When `DATA_ROOT` is absent, Wordflow reads
-`<platform config directory>/au.edu.ldaca.text-analytics/settings.json` with
+`<platform config directory>/au.edu.ldaca.wordflow/settings.json` with
 schema `{ "schema_version": 1, "data_root": "..." }`. If no setting exists,
 the HTTP control plane starts unconfigured and suggests
-`<platform local application-data directory>/au.edu.ldaca.text-analytics/data`.
+`<platform local application-data directory>/au.edu.ldaca.wordflow/data`.
 Single-user clients may configure or switch this value through the backend;
 multi-user clients may not. The backend does not read or migrate Tauri's former
 `backend.json` file.

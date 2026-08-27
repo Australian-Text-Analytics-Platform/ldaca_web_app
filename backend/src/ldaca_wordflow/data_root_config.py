@@ -16,7 +16,7 @@ from .infrastructure.storage.durable_fs import (
     mkdir_durable,
 )
 
-APP_IDENTIFIER = "au.edu.ldaca.text-analytics"
+APP_IDENTIFIER = "au.edu.ldaca.wordflow"
 CONFIG_SCHEMA_VERSION = 1
 
 
