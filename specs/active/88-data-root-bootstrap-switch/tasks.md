@@ -3,6 +3,8 @@
 - [x] Implement backend configuration precedence and platform persistence.
 - [x] Implement liveness, readiness, Data Root resource, transition barrier,
   rollback, and multi-user redaction.
+- [x] Keep Runtime replacement on one owner task and cover cross-task HTTP
+  switching without a backend restart.
 - [x] Implement frontend bootstrap, recovery, recommended path, server-path
   input, native picker, Settings reuse, and generation remount.
 - [x] Remove Tauri Data Root IPC and restart ownership.

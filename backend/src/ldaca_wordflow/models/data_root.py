@@ -40,11 +40,25 @@ class DataRootResource(BaseModel):
 
 
 class DataRootUpdateRequest(BaseModel):
-    """One absolute server filesystem path selected by a single-user client."""
+    """One server filesystem path selected by a single-user client."""
 
     model_config = ConfigDict(extra="forbid")
 
     data_root: Path
+
+    @field_validator("data_root", mode="before")
+    @classmethod
+    def expand_current_user_home(cls, value: object) -> object:
+        """Expand only ``~`` for the account running the backend process."""
+
+        if not isinstance(value, (str, Path)):
+            return value
+        raw_path = str(value)
+        if raw_path == "~":
+            return Path.home()
+        if raw_path.startswith("~/"):
+            return Path(f"{Path.home()}{raw_path[1:]}")
+        return value
 
     @field_validator("data_root")
     @classmethod

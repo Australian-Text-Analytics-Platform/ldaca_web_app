@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import AsyncContextManager, Literal, TypedDict, cast
 
 import anyio
-from anyio.abc import TaskGroup
+from anyio.abc import ObjectReceiveStream, ObjectSendStream, TaskGroup, TaskStatus
 from anyio.to_thread import run_sync as run_sync_in_worker_thread
 from fastapi import Request
 
@@ -284,6 +284,64 @@ class RuntimeManagerSnapshot:
     change_token: str | None
 
 
+@dataclass(slots=True)
+class _RuntimeOwnerRequest:
+    """One command completed entirely by the Runtime owner task."""
+
+    action: Literal["initialize", "configure", "shutdown"]
+    data_root: Path | None = None
+    completed: anyio.Event = field(default_factory=anyio.Event)
+    result: RuntimeManagerSnapshot | None = None
+    error: Exception | None = None
+
+
+class _RuntimeSlot:
+    """Enter and exit one managed Runtime from the same owner task."""
+
+    def __init__(
+        self,
+        base_settings: Settings,
+        runtime_factory: ManagedRuntimeFactory,
+    ) -> None:
+        self._base_settings = base_settings
+        self._runtime_factory = runtime_factory
+        self._stack: AsyncExitStack | None = None
+
+    async def open(self, data_root: Path) -> tuple[Runtime, Path]:
+        if self._stack is not None:
+            raise RuntimeError("A managed Runtime is already open")
+        canonical = await run_sync_in_worker_thread(
+            probe_data_root,
+            data_root,
+            abandon_on_cancel=False,
+        )
+        effective_settings = Settings.model_validate(
+            {**self._base_settings.model_dump(), "data_root": canonical}
+        )
+        stack = AsyncExitStack()
+        await stack.__aenter__()
+        try:
+            runtime = await stack.enter_async_context(
+                self._runtime_factory(effective_settings)
+            )
+            setup_logging(
+                level=effective_settings.log_level,
+                log_file=effective_settings.log_file,
+                data_root=canonical,
+            )
+        except BaseException:
+            await stack.aclose()
+            raise
+        self._stack = stack
+        return runtime, canonical
+
+    async def close(self) -> None:
+        stack = self._stack
+        self._stack = None
+        if stack is not None:
+            await stack.aclose()
+
+
 class RuntimeManager:
     """Own an optional complete Runtime behind a live HTTP control plane."""
 
@@ -291,14 +349,16 @@ class RuntimeManager:
         self,
         settings: Settings,
         runtime_factory: ManagedRuntimeFactory,
+        owner_group: TaskGroup,
         *,
         config_store: DataRootConfigStore | None = None,
     ) -> None:
         self._base_settings = settings
         self._runtime_factory = runtime_factory
+        self._owner_group = owner_group
         self._config_store = config_store or DataRootConfigStore()
         self._runtime: Runtime | None = None
-        self._runtime_stack: AsyncExitStack | None = None
+        self._owner_send: ObjectSendStream[_RuntimeOwnerRequest] | None = None
         self._state: RuntimeManagerState = "unconfigured"
         self._source: DataRootSource = "none"
         self._data_root: Path | None = None
@@ -367,6 +427,7 @@ class RuntimeManager:
     async def start(self) -> None:
         """Resolve environment/config precedence and initialize when configured."""
 
+        await self._start_owner()
         if self._base_settings.data_root is not None:
             self._source = "environment"
             selected = self._base_settings.data_root
@@ -388,31 +449,25 @@ class RuntimeManager:
         if selected is None:
             self._state = "unconfigured"
             return
-        self._data_root = selected
-        self._state = "initializing"
-        try:
-            stack, runtime, canonical = await self._open_runtime(selected)
-        except Exception:
-            logger.exception("Configured Data Root could not initialize")
-            self._state = "configuration_error"
-            self._error = RuntimeManagerError(
-                "data_root_unavailable",
-                "The configured Data Root could not be opened",
-            )
-            return
-        self._runtime_stack = stack
-        self._runtime = runtime
-        self._data_root = canonical
-        self._generation = 1
-        self._state = "ready"
+        await self._submit_owner(_RuntimeOwnerRequest("initialize", selected))
 
     async def close(self) -> None:
         """Stop admission, drain finite requests, and close the active Runtime."""
 
-        self._state = "stopping"
-        await self._wait_for_leases()
-        await self._close_active_runtime()
-        self._use_bootstrap_logging()
+        send = self._owner_send
+        if send is None:
+            return
+        error: BaseException | None = None
+        with anyio.CancelScope(shield=True):
+            try:
+                await self._submit_owner(_RuntimeOwnerRequest("shutdown"))
+            except BaseException as exc:
+                error = exc
+            finally:
+                await send.aclose()
+        self._owner_send = None
+        if error is not None:
+            raise error
 
     async def configure(self, candidate: Path) -> RuntimeManagerSnapshot:
         """Validate and transactionally select one single-user Data Root."""
@@ -424,11 +479,96 @@ class RuntimeManager:
         except (anyio.WouldBlock, RuntimeError):
             raise DataRootTransitionError()
         try:
-            return await self._configure_locked(candidate)
+            with anyio.CancelScope(shield=True):
+                result = await self._submit_owner(
+                    _RuntimeOwnerRequest("configure", candidate)
+                )
+            if result is None:
+                raise RuntimeError("Runtime owner returned no configuration result")
+            return result
         finally:
             self._transition_lock.release()
 
-    async def _configure_locked(self, candidate: Path) -> RuntimeManagerSnapshot:
+    async def _start_owner(self) -> None:
+        if self._owner_send is not None:
+            raise RuntimeError("Runtime owner is already active")
+        send, receive = anyio.create_memory_object_stream[_RuntimeOwnerRequest](1)
+        try:
+            await self._owner_group.start(self._run_owner, receive)
+        except BaseException:
+            await send.aclose()
+            await receive.aclose()
+            raise
+        self._owner_send = send
+
+    async def _run_owner(
+        self,
+        receive: ObjectReceiveStream[_RuntimeOwnerRequest],
+        *,
+        task_status: TaskStatus[None],
+    ) -> None:
+        slot = _RuntimeSlot(self._base_settings, self._runtime_factory)
+        task_status.started()
+        async with receive:
+            async for request in receive:
+                stop = request.action == "shutdown"
+                try:
+                    if request.action == "initialize":
+                        if request.data_root is None:
+                            raise RuntimeError("Runtime initialization requires a Data Root")
+                        await self._initialize_owned(slot, request.data_root)
+                    elif request.action == "configure":
+                        if request.data_root is None:
+                            raise RuntimeError("Runtime configuration requires a Data Root")
+                        request.result = await self._configure_owned(
+                            slot,
+                            request.data_root,
+                        )
+                    else:
+                        await self._close_owned(slot)
+                except Exception as exc:
+                    request.error = exc
+                finally:
+                    request.completed.set()
+                if stop:
+                    return
+
+    async def _submit_owner(
+        self,
+        request: _RuntimeOwnerRequest,
+    ) -> RuntimeManagerSnapshot | None:
+        send = self._owner_send
+        if send is None:
+            raise RuntimeError("Runtime owner is not active")
+        await send.send(request)
+        await request.completed.wait()
+        if request.error is not None:
+            raise request.error
+        return request.result
+
+    async def _initialize_owned(self, slot: _RuntimeSlot, selected: Path) -> None:
+        self._data_root = selected
+        self._state = "initializing"
+        try:
+            runtime, canonical = await slot.open(selected)
+        except Exception:
+            logger.exception("Configured Data Root could not initialize")
+            self._state = "configuration_error"
+            self._error = RuntimeManagerError(
+                "data_root_unavailable",
+                "The configured Data Root could not be opened",
+            )
+            return
+        self._runtime = runtime
+        self._data_root = canonical
+        self._generation = 1
+        self._state = "ready"
+
+    async def _configure_owned(
+        self,
+        slot: _RuntimeSlot,
+        candidate: Path,
+    ) -> RuntimeManagerSnapshot:
         """Run one transition after non-blocking ownership is established."""
 
         try:
@@ -451,14 +591,15 @@ class RuntimeManager:
             self._state = "ready"
             raise DataRootBusyError()
 
-        await self._close_active_runtime()
+        await self._close_active_runtime(slot)
         try:
-            stack, runtime, canonical = await self._open_runtime(canonical)
+            runtime, canonical = await slot.open(canonical)
         except Exception as exc:
             logger.exception("Candidate Data Root could not initialize")
-            await self._restore_or_fail(old_root, old_source)
+            await self._restore_or_fail(slot, old_root, old_source)
             raise InternalServiceError("Data Root initialization failed") from exc
 
+        self._runtime = runtime
         try:
             await run_sync_in_worker_thread(
                 self._config_store.write,
@@ -467,13 +608,10 @@ class RuntimeManager:
             )
         except Exception as exc:
             logger.exception("Data Root configuration could not be persisted")
-            await stack.aclose()
-            self._use_bootstrap_logging()
-            await self._restore_or_fail(old_root, old_source)
+            await self._close_active_runtime(slot)
+            await self._restore_or_fail(slot, old_root, old_source)
             raise InternalServiceError("Data Root persistence failed") from exc
 
-        self._runtime_stack = stack
-        self._runtime = runtime
         self._data_root = canonical
         self._source = "config"
         self._generation += 1
@@ -482,42 +620,14 @@ class RuntimeManager:
         self._change_token = secrets.token_urlsafe(32)
         return self.snapshot()
 
-    async def _open_runtime(
-        self,
-        data_root: Path,
-    ) -> tuple[AsyncExitStack, Runtime, Path]:
-        canonical = await run_sync_in_worker_thread(
-            probe_data_root,
-            data_root,
-            abandon_on_cancel=False,
-        )
-        effective_settings = Settings.model_validate(
-            {**self._base_settings.model_dump(), "data_root": canonical}
-        )
-        stack = AsyncExitStack()
-        await stack.__aenter__()
-        try:
-            runtime = await stack.enter_async_context(
-                self._runtime_factory(effective_settings)
-            )
-            setup_logging(
-                level=effective_settings.log_level,
-                log_file=effective_settings.log_file,
-                data_root=canonical,
-            )
-        except BaseException:
-            await stack.aclose()
-            raise
-        return stack, runtime, canonical
-
     async def _restore_or_fail(
         self,
+        slot: _RuntimeSlot,
         old_root: Path | None,
         old_source: DataRootSource,
     ) -> None:
         if old_root is None:
             self._runtime = None
-            self._runtime_stack = None
             self._data_root = None
             self._source = "none"
             self._state = "configuration_error"
@@ -527,11 +637,10 @@ class RuntimeManager:
             )
             return
         try:
-            stack, runtime, canonical = await self._open_runtime(old_root)
+            runtime, canonical = await slot.open(old_root)
         except Exception:
             logger.exception("Previous Data Root could not be restored")
             self._runtime = None
-            self._runtime_stack = None
             self._data_root = old_root
             self._source = old_source
             self._state = "configuration_error"
@@ -540,7 +649,6 @@ class RuntimeManager:
                 "Neither the selected nor previous Data Root could be initialized",
             )
             return
-        self._runtime_stack = stack
         self._runtime = runtime
         self._data_root = canonical
         self._source = old_source
@@ -564,13 +672,15 @@ class RuntimeManager:
             while self._active_leases:
                 await self._lease_condition.wait()
 
-    async def _close_active_runtime(self) -> None:
-        stack = self._runtime_stack
+    async def _close_active_runtime(self, slot: _RuntimeSlot) -> None:
         self._runtime = None
-        self._runtime_stack = None
-        if stack is not None:
-            await stack.aclose()
-            self._use_bootstrap_logging()
+        await slot.close()
+        self._use_bootstrap_logging()
+
+    async def _close_owned(self, slot: _RuntimeSlot) -> None:
+        self._state = "stopping"
+        await self._wait_for_leases()
+        await self._close_active_runtime(slot)
 
     def _use_bootstrap_logging(self) -> None:
         setup_logging(level=self._base_settings.log_level)
@@ -585,12 +695,19 @@ async def runtime_manager_context(
 ) -> AsyncIterator[RuntimeManager]:
     """Own one optional Runtime manager for the complete ASGI lifespan."""
 
-    manager = RuntimeManager(settings, runtime_factory, config_store=config_store)
-    await manager.start()
-    try:
-        yield manager
-    finally:
-        await manager.close()
+    async with anyio.create_task_group() as owner_group:
+        manager = RuntimeManager(
+            settings,
+            runtime_factory,
+            owner_group,
+            config_store=config_store,
+        )
+        await manager.start()
+        try:
+            yield manager
+        finally:
+            with anyio.CancelScope(shield=True):
+                await manager.close()
 
 
 class LifespanState(TypedDict):

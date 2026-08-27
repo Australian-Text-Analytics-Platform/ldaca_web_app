@@ -195,6 +195,50 @@ def test_two_app_instances_can_share_one_data_root(tmp_path: Path) -> None:
         assert client_b.get("/health/ready").status_code == 200
 
 
+def test_data_root_switch_replaces_the_production_runtime_in_one_process(
+    tmp_path: Path,
+) -> None:
+    """An HTTP transition preserves the process while replacing all resources."""
+
+    from ldaca_wordflow.data_root_config import DataRootConfigStore, DataRootPaths
+    from ldaca_wordflow.main import create_app
+    from ldaca_wordflow.settings import Settings
+
+    original = (tmp_path / "original").resolve()
+    candidate = (tmp_path / "candidate").resolve()
+    store = DataRootConfigStore(
+        DataRootPaths(
+            config_file=tmp_path / "config" / "settings.json",
+            suggested_data_root=tmp_path / "suggested",
+        )
+    )
+    store.write(original)
+    app = create_app(
+        Settings(),
+        serve_frontend=False,
+        data_root_config_store=store,
+    )
+
+    with TestClient(app, base_url="http://localhost") as client:
+        initial = client.get("/api/data-root").json()
+        response = client.put(
+            "/api/data-root",
+            headers={
+                "Origin": "http://localhost",
+                "X-Data-Root-Token": initial["change_token"],
+            },
+            json={"data_root": str(candidate)},
+        )
+
+        assert response.status_code == 200, response.text
+        assert response.json()["state"] == "ready"
+        assert response.json()["data_root"] == str(candidate)
+        assert response.json()["runtime_generation"] == 2
+        assert client.get("/health/live").status_code == 200
+        assert client.get("/health/ready").status_code == 200
+        assert store.read() == candidate
+
+
 def test_two_app_instances_keep_settings_runtime_and_overrides_isolated(
     tmp_path: Path,
 ) -> None:

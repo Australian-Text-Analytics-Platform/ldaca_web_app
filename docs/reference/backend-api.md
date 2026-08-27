@@ -350,8 +350,9 @@ other Runtime-manager state.
 `suggested_data_root`, `mutable`, `runtime_generation`, optional typed `error`,
 and a same-origin `change_token` when mutation is allowed. Multi-user responses
 redact paths and the token. `PUT /api/data-root` accepts one absolute server
-path and requires `X-Data-Root-Token`. It returns `403` for operator-managed
-roots, `409` for active work or another transition, and `422` for invalid or
+path or `~`/`~/...` resolved for the account running the backend, and requires
+`X-Data-Root-Token`. It returns `403` for operator-managed roots, `409` for
+active work or another transition, and `422` for other relative, invalid, or
 inaccessible paths. There is no legacy `/health` route or Data Root alias.
 
 - Addressable creation returns `201` and relative `Location`; accepted import

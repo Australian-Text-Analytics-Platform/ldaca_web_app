@@ -1,7 +1,8 @@
 # Implementation Plan
 
-1. Add platform configuration, probing, the lifespan Runtime manager, request
-   admission barrier, and clean health/Data Root APIs.
+1. Add platform configuration, probing, the lifespan Runtime manager, a
+   dedicated Runtime owner task, request admission barrier, and clean
+   health/Data Root APIs.
 2. Replace the frontend connection gate with the bootstrap state machine and
    reuse its mutation path in Settings.
 3. Remove Tauri Data Root persistence, IPC, validation, restart, and rollback;

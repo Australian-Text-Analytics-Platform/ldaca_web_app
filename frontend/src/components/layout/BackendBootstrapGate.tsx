@@ -164,6 +164,17 @@ export function BackendBootstrapGate({ children }: { children: ReactNode }) {
     );
   }
 
+  if (resource.state === 'stopping') {
+    return (
+      <BlockingScreen
+        title="Backend shutting down"
+        description="Wordflow is closing its active Data Root runtime."
+        status="Stopping…"
+        hint="Wordflow will reconnect automatically if the backend starts again."
+      />
+    );
+  }
+
   if (resource.state !== 'ready') {
     if (resource.mutable) {
       return (

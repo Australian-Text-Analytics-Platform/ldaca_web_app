@@ -167,6 +167,30 @@ describe('BackendBootstrapGate', () => {
     expect(screen.getByText('Configured root is unavailable')).toBeInTheDocument();
   });
 
+  it('shows shutdown progress without offering Data Root setup while stopping', async () => {
+    vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(liveResponse())
+      .mockResolvedValueOnce(
+        rootResponse({
+          state: 'stopping',
+          source: 'config',
+          data_root: '/srv/data',
+          runtime_generation: 3,
+        }),
+      );
+
+    render(
+      <BackendBootstrapGate>
+        <p>Application ready</p>
+      </BackendBootstrapGate>,
+    );
+
+    expect(await screen.findByText('Backend shutting down')).toBeInTheDocument();
+    expect(screen.getByText('Stopping…')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Choose folder' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Set up Wordflow')).not.toBeInTheDocument();
+  });
+
   it('remounts application providers when the Runtime generation changes', async () => {
     const user = userEvent.setup();
     const onMount = vi.fn();

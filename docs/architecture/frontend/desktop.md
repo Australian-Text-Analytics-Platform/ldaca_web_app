@@ -52,7 +52,8 @@ sequenceDiagram
     Webview->>App: open native directory picker
     App-->>Webview: selected path or cancellation
     Webview->>Backend: PUT /api/data-root
-    Backend->>Backend: probe, initialize, then persist
+    Backend->>Backend: owner task drains and replaces Runtime
+    Backend->>Backend: initialize candidate, then persist
     end
     Webview->>Backend: check readiness
     Webview->>Webview: mount authentication and Workspace consumers
@@ -73,6 +74,11 @@ configures the generated client, checks `/health/live`, obtains
 `/api/data-root`, and verifies `/health/ready` before mounting authentication
 or Workspace consumers. Reloading repeats IPC discovery, so a
 stale JavaScript value cannot select an old backend port.
+
+The bootstrap gate offers directory selection only while unconfigured or after
+a recoverable configuration error. Initialization and replacement render
+progress, and process shutdown renders non-interactive shutdown progress;
+`stopping` is never presented as first-run setup.
 
 Each desktop process owns only its own backend child. The backend parent
 watchdog exits if that desktop process disappears, so multiple desktop
