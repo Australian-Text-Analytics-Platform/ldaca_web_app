@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { ConcordanceNodeResult } from '@/api';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
-import { GREY, foregroundForVizColor, toBgColor } from '@/features/views/common/vizPalette';
+import { GREY, VIZ_TINT_FOREGROUND, toBgColor } from '@/features/views/common/vizPalette';
 import {
   ConcordanceTableNodeBlock,
   type ConcordanceTableNodeBlockProps,
@@ -119,7 +119,7 @@ const cellFor = (columnName: string): HTMLTableCellElement => {
 };
 
 describe('ConcordanceTableNodeBlock', () => {
-  it('uses a saturated source header above a neutral table body', () => {
+  it('uses a tinted source header with a colour spine above a neutral table body', () => {
     const longName = 'qldelection2020_candidate_tweets_filtered_by_username_in_AnnastaciaMP';
     const props = buildProps(vi.fn());
     render(
@@ -131,8 +131,8 @@ describe('ConcordanceTableNodeBlock', () => {
 
     const header = screen.getByTestId('concordance-table-source-header');
     expect(header).toHaveStyle({
-      backgroundColor: '#2563eb',
-      color: foregroundForVizColor('#2563eb'),
+      backgroundColor: toBgColor('#2563eb'),
+      color: VIZ_TINT_FOREGROUND,
     });
     expect(header).toContainElement(screen.getByTitle(longName));
     expect(screen.getByTestId('analysis-table-scroll-area').style.borderLeftWidth).toBe('');
@@ -148,8 +148,8 @@ describe('ConcordanceTableNodeBlock', () => {
     );
 
     expect(screen.getByTestId('concordance-table-source-header')).toHaveStyle({
-      backgroundColor: GREY,
-      color: foregroundForVizColor(GREY),
+      backgroundColor: toBgColor(GREY),
+      color: VIZ_TINT_FOREGROUND,
     });
   });
 
@@ -277,12 +277,12 @@ describe('ConcordanceTableNodeBlock', () => {
     const header = screen.getByTestId('concordance-table-combined-header');
     expect(header.style.backgroundColor).toBe('');
     expect(screen.getByTestId('concordance-source-chip-node-1')).toHaveStyle({
-      backgroundColor: '#2563eb',
-      color: foregroundForVizColor('#2563eb'),
+      backgroundColor: toBgColor('#2563eb'),
+      color: VIZ_TINT_FOREGROUND,
     });
     expect(screen.getByTestId('concordance-source-chip-node-2')).toHaveStyle({
-      backgroundColor: '#dc2626',
-      color: foregroundForVizColor('#dc2626'),
+      backgroundColor: toBgColor('#dc2626'),
+      color: VIZ_TINT_FOREGROUND,
     });
     expect(screen.getByText('alpha', { selector: 'td' })).toHaveStyle({
       backgroundColor: toBgColor('#dc2626', 0.24),

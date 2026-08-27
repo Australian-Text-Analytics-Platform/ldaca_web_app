@@ -3,7 +3,7 @@ import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
-import { GREY, foregroundForVizColor } from '@/features/views/common/vizPalette';
+import { GREY, VIZ_TINT_FOREGROUND, toBgColor } from '@/features/views/common/vizPalette';
 import { CONCORDANCE_COMBINED_NODE_KEY } from '../../concordanceTableDomain';
 import {
   ConcordanceDispersionNodeBlock,
@@ -147,7 +147,7 @@ const baseProps: ConcordanceDispersionNodeBlockProps = {
 };
 
 describe('ConcordanceDispersionNodeBlock', () => {
-  it('uses one saturated source header above neutral table and plot cards', () => {
+  it('uses one tinted source header with a colour spine above neutral table and plot cards', () => {
     const longName = 'qldelection2020_candidate_tweets_filtered_by_username_in_AnnastaciaMP';
     render(
       <ConcordanceDispersionNodeBlock
@@ -159,8 +159,8 @@ describe('ConcordanceDispersionNodeBlock', () => {
     const card = screen.getByTestId('concordance-dispersion-source-card');
     const header = within(card).getByTestId('concordance-dispersion-source-header');
     expect(header).toHaveStyle({
-      backgroundColor: '#2563eb',
-      color: foregroundForVizColor('#2563eb'),
+      backgroundColor: toBgColor('#2563eb'),
+      color: VIZ_TINT_FOREGROUND,
     });
     expect(within(header).getByTitle(longName)).toBeInTheDocument();
     expect(within(card).getByTestId('dispersion-table-card').style.borderLeftWidth).toBe('');
@@ -188,8 +188,8 @@ describe('ConcordanceDispersionNodeBlock', () => {
     );
 
     expect(screen.getByTestId('concordance-dispersion-source-header')).toHaveStyle({
-      backgroundColor: GREY,
-      color: foregroundForVizColor(GREY),
+      backgroundColor: toBgColor(GREY),
+      color: VIZ_TINT_FOREGROUND,
     });
   });
 
@@ -200,7 +200,7 @@ describe('ConcordanceDispersionNodeBlock', () => {
     expect(screen.queryByTestId('dispersion-summary')).not.toBeInTheDocument();
   });
 
-  it('uses a neutral combined header with colored source chips and source-tinted rows', () => {
+  it('uses a neutral combined header with tinted source chips and source-tinted rows', () => {
     render(
       <ConcordanceDispersionNodeBlock
         {...baseProps}
@@ -232,12 +232,12 @@ describe('ConcordanceDispersionNodeBlock', () => {
     expect(header.style.backgroundColor).toBe('');
     expect(within(header).getByText('Combined Results')).toBeInTheDocument();
     expect(within(header).getByTestId('concordance-source-chip-node-1')).toHaveStyle({
-      backgroundColor: '#2563eb',
-      color: foregroundForVizColor('#2563eb'),
+      backgroundColor: toBgColor('#2563eb'),
+      color: VIZ_TINT_FOREGROUND,
     });
     expect(within(header).getByTestId('concordance-source-chip-node-2')).toHaveStyle({
-      backgroundColor: '#dc2626',
-      color: foregroundForVizColor('#dc2626'),
+      backgroundColor: toBgColor('#dc2626'),
+      color: VIZ_TINT_FOREGROUND,
     });
     expect(screen.getByTestId('dispersion-rows')).toHaveAttribute(
       'data-row-background',
