@@ -9,6 +9,8 @@ export type SequentialXAxisType = 'category' | 'number';
 type SequentialFrequency = NonNullable<SequentialAnalysisRequest['frequency']>;
 type SequentialCustomIntervalUnit = NonNullable<SequentialAnalysisRequest['custom_interval_unit']>;
 
+export const DEFAULT_MINIMUM_GROUP_COUNT = 10;
+
 const NUMERIC_X_KEY = '__x_numeric__';
 const CATEGORY_X_KEY = '__period_key__';
 
@@ -150,6 +152,7 @@ export interface BuildSequentialChartModelInput {
   fallbacks: SequentialResultSummaryFallbacks;
   chartType: ChartTypeOption;
   xAxisType: SequentialXAxisType;
+  minimumGroupCount: number;
   uncased: boolean;
   excludedGroupIndices: Set<number>;
   selectedPeriodIndices: Set<number>;
@@ -170,6 +173,11 @@ export interface SequentialChartModel {
     labelFormatter: (value: string | number) => string;
   };
   groups: SequentialChartGroup[];
+  groupFilter: {
+    minimumCount: number;
+    filteredGroupCount: number;
+    totalGroupCount: number;
+  };
   supportsUncased: boolean;
   series: MultiSeriesChartSeries[];
   legend: ChartExportLegendItem[];
@@ -452,6 +460,7 @@ export function buildSequentialChartModel({
   fallbacks,
   chartType,
   xAxisType,
+  minimumGroupCount,
   uncased,
   excludedGroupIndices,
   selectedPeriodIndices,
@@ -511,6 +520,34 @@ export function buildSequentialChartModel({
     .sort((left, right) => left.index - right.index)
     .map(({ labels: _labels, ...group }) => group);
 
+  const normalizedMinimumGroupCount = Number.isFinite(minimumGroupCount)
+    ? Math.max(0, Math.floor(minimumGroupCount))
+    : 0;
+  const groupTotals = new Map<string, number>();
+  canonicalRows.forEach((row) => {
+    const displayId = displayIdByExactId.get(row.groupId) ?? row.groupId;
+    groupTotals.set(displayId, (groupTotals.get(displayId) ?? 0) + row.count);
+  });
+  const countFilteredGroupIds = new Set(
+    summary.groupBy.length === 0 || normalizedMinimumGroupCount === 0
+      ? []
+      : groupBases
+          .filter((group) => (groupTotals.get(group.id) ?? 0) < normalizedMinimumGroupCount)
+          .map((group) => group.id),
+  );
+  const countFilteredGroupIndices = new Set(
+    groupBases
+      .filter((group) => countFilteredGroupIds.has(group.id))
+      .flatMap((group) => group.memberGroupIndices),
+  );
+  const effectiveExcludedGroupIndices = new Set([
+    ...excludedGroupIndices,
+    ...countFilteredGroupIndices,
+  ]);
+  const filterEligibleGroupBases = groupBases.filter(
+    (group) => !countFilteredGroupIds.has(group.id),
+  );
+
   const buckets = new Map<string, SequentialAnalysisDatum>();
   canonicalRows.forEach((row) => {
     const existing = buckets.get(row.periodKey);
@@ -523,7 +560,7 @@ export function buildSequentialChartModel({
       period_end: row.periodEnd,
     };
     const displayId = displayIdByExactId.get(row.groupId) ?? row.groupId;
-    if (!excludedGroupIndices.has(row.groupIndex)) {
+    if (!effectiveExcludedGroupIndices.has(row.groupIndex)) {
       entry[displayId] = Number(entry[displayId] ?? 0) + row.count;
     }
     if (existing) {
@@ -546,7 +583,7 @@ export function buildSequentialChartModel({
     return Number(left.__period_index__) - Number(right.__period_index__);
   });
   chartData.forEach((row) => {
-    groupBases.forEach((group) => {
+    filterEligibleGroupBases.forEach((group) => {
       if (row[group.id] === undefined) row[group.id] = 0;
     });
   });
@@ -578,24 +615,25 @@ export function buildSequentialChartModel({
   const selectedPeriodIdSet = new Set(selectedPeriodIds);
   const sumCounts = (rows: SequentialCanonicalRow[]) =>
     rows.reduce((total, row) => total + row.count, 0);
-  const groupTotals = new Map<string, number>();
   const selectedGroupTotals = new Map<string, number>();
   canonicalRows.forEach((row) => {
     const displayId = displayIdByExactId.get(row.groupId) ?? row.groupId;
-    groupTotals.set(displayId, (groupTotals.get(displayId) ?? 0) + row.count);
     if (selectedPeriodIdSet.has(row.periodIndex)) {
       selectedGroupTotals.set(displayId, (selectedGroupTotals.get(displayId) ?? 0) + row.count);
     }
   });
-  const visibleTotal = groupBases.reduce(
+  const visibleTotal = filterEligibleGroupBases.reduce(
     (total, group) =>
       group.memberGroupIndices.every((index) => excludedGroupIndices.has(index))
         ? total
         : total + (groupTotals.get(group.id) ?? 0),
     0,
   );
-  const groups: SequentialChartGroup[] = groupBases.map((group, index) => {
-    const color = getSequentialPaletteColor(index);
+  const groupColorById = new Map(
+    groupBases.map((group, index) => [group.id, getSequentialPaletteColor(index)]),
+  );
+  const groups: SequentialChartGroup[] = filterEligibleGroupBases.map((group) => {
+    const color = groupColorById.get(group.id) ?? SEQUENTIAL_ANALYSIS_PALETTE[0];
     const hidden = group.memberGroupIndices.every((memberIndex) =>
       excludedGroupIndices.has(memberIndex),
     );
@@ -660,7 +698,9 @@ export function buildSequentialChartModel({
     hidden: group.hidden,
   }));
 
-  const shownRows = canonicalRows.filter((row) => !excludedGroupIndices.has(row.groupIndex));
+  const shownRows = canonicalRows.filter(
+    (row) => !effectiveExcludedGroupIndices.has(row.groupIndex),
+  );
   const chosenRows = shownRows.filter((row) => selectedPeriodIdSet.has(row.periodIndex));
   const counts: SequentialVisibilityCounts = {
     totalPointCount: canonicalRows.length,
@@ -693,6 +733,11 @@ export function buildSequentialChartModel({
             },
     },
     groups,
+    groupFilter: {
+      minimumCount: normalizedMinimumGroupCount,
+      filteredGroupCount: countFilteredGroupIds.size,
+      totalGroupCount: groupBases.length,
+    },
     supportsUncased,
     series,
     legend,
@@ -702,7 +747,7 @@ export function buildSequentialChartModel({
       hasInvalidSelection,
       selectedPeriodIds,
     },
-    excludedGroupIndices: Array.from(excludedGroupIndices)
+    excludedGroupIndices: Array.from(effectiveExcludedGroupIndices)
       .filter((index) => exactGroupBases.some((group) => group.index === index))
       .sort((left, right) => left - right),
     eligibleDocumentCount:

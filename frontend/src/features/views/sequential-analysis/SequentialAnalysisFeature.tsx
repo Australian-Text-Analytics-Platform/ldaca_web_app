@@ -122,6 +122,7 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
     setXAxisType,
     uncasedGroups,
     excludedGroupIndices,
+    minimumGroupCount,
     downloadDialogOpen,
     setDownloadDialogOpen,
     selectedPeriodIndices,
@@ -344,6 +345,7 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
     },
     chartType,
     xAxisType,
+    minimumGroupCount,
     uncased: uncasedGroups,
     excludedGroupIndices,
     selectedPeriodIndices,
@@ -511,6 +513,8 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
         <SequentialAnalysisResultsPanel
           resultsSummary={resultsSummary}
           model={chartModel}
+          minimumGroupCount={minimumGroupCount}
+          onMinimumGroupCountChange={chartControls.setMinimumGroupCount}
           onChartTypeChange={(value) => {
             handleChartTypeChange(value);
           }}

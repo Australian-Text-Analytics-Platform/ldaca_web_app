@@ -43,6 +43,7 @@ const model = buildSequentialChartModel({
   },
   chartType: 'line',
   xAxisType: 'category',
+  minimumGroupCount: 0,
   uncased: false,
   excludedGroupIndices: new Set(),
   selectedPeriodIndices: new Set([0]),
@@ -55,6 +56,8 @@ describe('SequentialChart', () => {
     render(
       <SequentialChart
         model={model}
+        minimumGroupCount={0}
+        onMinimumGroupCountChange={vi.fn()}
         onToggleGroupIndices={vi.fn()}
         onUncasedChange={vi.fn()}
         onPeriodClick={vi.fn()}
@@ -114,15 +117,19 @@ describe('SequentialChart', () => {
       },
       chartType: 'line',
       xAxisType: 'category',
+      minimumGroupCount: 0,
       uncased: true,
       excludedGroupIndices: new Set(),
       selectedPeriodIndices: new Set(),
     });
 
     const onToggleGroupIndices = vi.fn();
+    const onMinimumGroupCountChange = vi.fn();
     render(
       <SequentialChart
         model={groupedModel}
+        minimumGroupCount={0}
+        onMinimumGroupCountChange={onMinimumGroupCountChange}
         onToggleGroupIndices={onToggleGroupIndices}
         onUncasedChange={vi.fn()}
         onPeriodClick={vi.fn()}
@@ -132,8 +139,73 @@ describe('SequentialChart', () => {
       />,
     );
 
-    expect(screen.getByRole('checkbox', { name: 'Uncased' })).toBeChecked();
+    const controls = within(screen.getByTestId('filterable-series-controls'));
+    const uncased = controls.getByRole('checkbox', { name: 'Uncased' });
+    const minimumCount = controls.getByRole('spinbutton', { name: 'Minimum group count' });
+    expect(uncased).toBeChecked();
+    expect(minimumCount).toHaveValue(0);
+    expect(screen.getByTestId('filterable-series-controls')).toHaveTextContent(
+      /Uncased.*Minimum group count/s,
+    );
+    fireEvent.change(minimumCount, { target: { value: '4' } });
+    expect(onMinimumGroupCountChange).toHaveBeenCalledWith(4);
     fireEvent.click(screen.getByRole('button', { name: 'jobs/Jobs (3 · 100.0%)' }));
     expect(onToggleGroupIndices).toHaveBeenCalledWith([0, 1]);
+  });
+
+  it('shows guidance when the minimum count filters every grouped series', () => {
+    const filteredModel = buildSequentialChartModel({
+      results: {
+        data: [
+          {
+            time_period: '2024-01',
+            period_index: 0,
+            group_index: 0,
+            period_start: '2024-01-01',
+            period_end: '2024-02-01',
+            group: 'Small',
+            sequential_count: 9,
+          },
+        ],
+      },
+      parameters: { column_type: 'datetime', group_by_columns: ['group'] },
+      fallbacks: {
+        timeColumn: 'date',
+        groupBy: ['group'],
+        columnType: 'datetime',
+        numericOrigin: null,
+        numericInterval: null,
+        frequency: 'monthly',
+        customIntervalValue: null,
+        customIntervalUnit: null,
+      },
+      chartType: 'line',
+      xAxisType: 'category',
+      minimumGroupCount: 10,
+      uncased: false,
+      excludedGroupIndices: new Set(),
+      selectedPeriodIndices: new Set(),
+    });
+
+    render(
+      <SequentialChart
+        model={filteredModel}
+        minimumGroupCount={10}
+        onMinimumGroupCountChange={vi.fn()}
+        onToggleGroupIndices={vi.fn()}
+        onUncasedChange={vi.fn()}
+        onPeriodClick={vi.fn()}
+        onPeriodRangeSelect={vi.fn()}
+        onClearSelection={vi.fn()}
+        dataResetKey="task-filtered"
+      />,
+    );
+
+    expect(
+      screen.getByText(
+        'No groups meet the minimum group count of 10. Lower the filter to show groups.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Small/ })).not.toBeInTheDocument();
   });
 });

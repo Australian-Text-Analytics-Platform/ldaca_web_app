@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { useId, type ReactNode } from 'react';
 
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,7 @@ interface Props {
   pressedWhenHidden?: boolean;
   uncased?: boolean;
   onUncasedChange?: (value: boolean) => void;
+  controlsAfterUncased?: ReactNode;
   onClearSelection?: () => void;
   clearSelectionDisabled?: boolean;
 }
@@ -24,6 +25,7 @@ export function FilterableSeriesControls({
   pressedWhenHidden = false,
   uncased = false,
   onUncasedChange,
+  controlsAfterUncased,
   onClearSelection,
   clearSelectionDisabled = false,
 }: Props) {
@@ -39,7 +41,7 @@ export function FilterableSeriesControls({
           className="flex flex-wrap items-center gap-3 text-label-secondary text-description"
           onToggle={onToggle}
         />
-        {onUncasedChange || onClearSelection ? (
+        {onUncasedChange || controlsAfterUncased || onClearSelection ? (
           <div className="flex flex-wrap items-center gap-3">
             {onUncasedChange ? (
               <label
@@ -56,6 +58,7 @@ export function FilterableSeriesControls({
                 <span>Uncased</span>
               </label>
             ) : null}
+            {controlsAfterUncased}
             {onClearSelection ? (
               <Button
                 type="button"

@@ -20,6 +20,21 @@ describe('useSequentialChartControls', () => {
     expect(result.current.excludedGroupIndices.size).toBe(0);
   });
 
+  it('stores the minimum group count with result-bound legend visibility', () => {
+    const { result } = renderHook(() => useSequentialChartControls('analysis-1'));
+
+    expect(result.current.minimumGroupCount).toBe(10);
+    act(() => {
+      result.current.toggleGroupIndices([2]);
+      result.current.setMinimumGroupCount(3);
+      result.current.selectPeriod(0, false, 2);
+    });
+
+    expect(result.current.minimumGroupCount).toBe(3);
+    expect(result.current.excludedGroupIndices).toEqual(new Set([2]));
+    expect(result.current.selectedPeriodIndices).toEqual(new Set([0]));
+  });
+
   it('selects individual periods and shift-click ranges', () => {
     const { result } = renderHook(() => useSequentialChartControls());
 
@@ -87,6 +102,7 @@ describe('useSequentialChartControls', () => {
 
     expect(result.current.excludedGroupIndices.size).toBe(0);
     expect(result.current.selectedPeriodIndices.size).toBe(0);
+    expect(result.current.minimumGroupCount).toBe(10);
   });
 
   it('restores groups when Uncased changes without clearing period selection', () => {
@@ -121,5 +137,6 @@ describe('useSequentialChartControls', () => {
     expect(result.current.excludedGroupIndices.size).toBe(0);
     expect(result.current.selectedPeriodIndices.size).toBe(0);
     expect(result.current.xAxisType).toBe('number');
+    expect(result.current.minimumGroupCount).toBe(10);
   });
 });

@@ -4,14 +4,14 @@ import {
   createCaseFoldedSeriesVisibility,
   reduceCaseFoldedSeriesVisibility,
 } from '../../common/caseFoldedSeriesVisibility';
-import type { SequentialXAxisType } from './sequentialChartModel';
+import { DEFAULT_MINIMUM_GROUP_COUNT, type SequentialXAxisType } from './sequentialChartModel';
 
 /**
- * Owns chart interaction state for sequential analysis: hidden series, selected
- * periods, x-axis mode, and the export dialog.
+ * Owns chart interaction state for sequential analysis: hidden series, the
+ * minimum group count, selected periods, x-axis mode, and the export dialog.
  * Used by: SequentialAnalysisFeature so task lifecycle and request parameters
  * stay separate from chart-only interaction state.
- * Flow: toggle legend keys, support single/range period selection, clear
+ * Flow: filter and toggle legend keys, support single/range period selection, clear
  * result-bound controls when results refresh, and fully reset chart controls
  * when results are cleared.
  */
@@ -20,7 +20,12 @@ export function useSequentialChartControls(resultKey?: string | null) {
   const [seriesVisibilityState, setSeriesVisibilityState] = useState<{
     resultKey: string | null | undefined;
     value: ReturnType<typeof createCaseFoldedSeriesVisibility<number>>;
-  }>({ resultKey, value: createCaseFoldedSeriesVisibility<number>() });
+    minimumGroupCount: number;
+  }>({
+    resultKey,
+    value: createCaseFoldedSeriesVisibility<number>(),
+    minimumGroupCount: DEFAULT_MINIMUM_GROUP_COUNT,
+  });
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
   const [selectionState, setSelectionState] = useState<{
     resultKey: string | null | undefined;
@@ -34,6 +39,10 @@ export function useSequentialChartControls(resultKey?: string | null) {
     seriesVisibilityState.resultKey === resultKey
       ? seriesVisibilityState.value
       : createCaseFoldedSeriesVisibility<number>();
+  const minimumGroupCount =
+    seriesVisibilityState.resultKey === resultKey
+      ? seriesVisibilityState.minimumGroupCount
+      : DEFAULT_MINIMUM_GROUP_COUNT;
   const selectedPeriodIndices =
     selectionState.resultKey === resultKey ? selectionState.values : new Set<number>();
   const lastClickedIndex = () =>
@@ -58,8 +67,25 @@ export function useSequentialChartControls(resultKey?: string | null) {
           type: 'toggle-members',
           keys: groupIndices,
         }),
+        minimumGroupCount:
+          previous.resultKey === resultKey
+            ? previous.minimumGroupCount
+            : DEFAULT_MINIMUM_GROUP_COUNT,
       };
     });
+  };
+
+  /** Updates the result-bound count filter without changing manual legend visibility. */
+  const setMinimumGroupCount = (value: number) => {
+    const normalized = Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
+    setSeriesVisibilityState((previous) => ({
+      resultKey,
+      value:
+        previous.resultKey === resultKey
+          ? previous.value
+          : createCaseFoldedSeriesVisibility<number>(),
+      minimumGroupCount: normalized,
+    }));
   };
 
   /** Changes case folding and restores all exact groups, matching Concordance. */
@@ -72,6 +98,10 @@ export function useSequentialChartControls(resultKey?: string | null) {
       return {
         resultKey,
         value: reduceCaseFoldedSeriesVisibility(current, { type: 'set-uncased', value }),
+        minimumGroupCount:
+          previous.resultKey === resultKey
+            ? previous.minimumGroupCount
+            : DEFAULT_MINIMUM_GROUP_COUNT,
       };
     });
   };
@@ -157,6 +187,7 @@ export function useSequentialChartControls(resultKey?: string | null) {
     setSeriesVisibilityState({
       resultKey,
       value: createCaseFoldedSeriesVisibility<number>(),
+      minimumGroupCount: DEFAULT_MINIMUM_GROUP_COUNT,
     });
     resetResultSelection();
   };
@@ -166,6 +197,8 @@ export function useSequentialChartControls(resultKey?: string | null) {
     setXAxisType,
     uncasedGroups: seriesVisibility.uncased,
     excludedGroupIndices: seriesVisibility.excludedKeys,
+    minimumGroupCount,
+    setMinimumGroupCount,
     downloadDialogOpen,
     setDownloadDialogOpen,
     selectedPeriodIndices,
