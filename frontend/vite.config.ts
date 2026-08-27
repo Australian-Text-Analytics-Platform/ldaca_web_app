@@ -50,7 +50,8 @@ process.env.VITE_APP_BUILD_DATE ??= (() => {
   return `${day}/${month}/${String(now.getFullYear())}`;
 })();
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
+  clearScreen: false,
   base: './',
   plugins: [
     react(),
@@ -74,8 +75,12 @@ export default defineConfig({
     outDir: 'build',
   },
   server: {
-    port: Number(process.env.FRONTEND_PORT ?? 3000),
-    host: '0.0.0.0',
+    port: mode === 'tauri' ? 3001 : Number(process.env.FRONTEND_PORT ?? 3000),
+    host: mode === 'tauri' ? '127.0.0.1' : '0.0.0.0',
+    strictPort: mode === 'tauri',
+    watch: {
+      ignored: ['**/src-tauri/**'],
+    },
     forwardConsole: {
       unhandledErrors: true,
       logLevels: ['warn', 'error'],
@@ -88,4 +93,4 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
   },
-});
+}));

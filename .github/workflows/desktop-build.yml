@@ -113,6 +113,7 @@ jobs:
           set -Eeuo pipefail
           node --test ../scripts/prepare-backend-runtime.test.mjs
           node --test scripts/stage-backend-runtime.test-node.mjs
+          pnpm exec vitest run scripts/desktop-contract.test.mjs src/lib/download.test.ts
           cargo fmt --manifest-path src-tauri/Cargo.toml --check
           cargo test --manifest-path src-tauri/Cargo.toml --lib
           cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --all-features --locked -- -D warnings
@@ -143,9 +144,9 @@ jobs:
           Set-StrictMode -Version Latest
           [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
           if ($env:TAURI_BUILD_FLAGS) {
-            pnpm tauri build $env:TAURI_BUILD_FLAGS
+            pnpm tauri:build $env:TAURI_BUILD_FLAGS
           } else {
-            pnpm tauri build
+            pnpm tauri:build
           }
 
       - name: Import Apple code-signing certificate
@@ -170,7 +171,7 @@ jobs:
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: pnpm tauri build --bundles app --target aarch64-apple-darwin
+        run: pnpm tauri:build --bundles app --target aarch64-apple-darwin
 
       - name: Deep-sign embedded backend runtime and application
         if: inputs.platform == 'macos'

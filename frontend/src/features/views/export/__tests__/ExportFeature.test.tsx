@@ -18,7 +18,8 @@ import ExportFeature from '../ExportFeature';
 const mocks = vi.hoisted(() => ({
   exportDataBlocks: vi.fn(),
   exportWorkspaceArchive: vi.fn(),
-  saveBlob: vi.fn(),
+  saveBackendDownload: vi.fn(),
+  saveDataBlockDownload: vi.fn(),
   reachContextualHint: vi.fn(),
   useWorkspaceData: vi.fn(),
   useWorkspaceSelection: vi.fn(),
@@ -31,7 +32,11 @@ vi.mock('@/api', () => ({
 }));
 vi.mock('@/lib/download', async (importOriginal) => {
   const actual = await importOriginal<typeof DownloadModule>();
-  return { ...actual, saveBlob: mocks.saveBlob };
+  return {
+    ...actual,
+    saveBackendDownload: mocks.saveBackendDownload,
+    saveDataBlockDownload: mocks.saveDataBlockDownload,
+  };
 });
 vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
   useWorkspaceData: mocks.useWorkspaceData,
@@ -68,7 +73,8 @@ describe('ExportFeature', () => {
       }),
     });
     mocks.exportWorkspaceArchive.mockResolvedValue({ data: new Blob(['zip']) });
-    mocks.saveBlob.mockResolvedValue(undefined);
+    mocks.saveBackendDownload.mockResolvedValue(undefined);
+    mocks.saveDataBlockDownload.mockResolvedValue(undefined);
   });
 
   it('exports one selected Data Block directly in the chosen format', async () => {
@@ -88,14 +94,14 @@ describe('ExportFeature', () => {
 
     await user.click(screen.getByRole('button', { name: 'Export 1 Data Block' }));
 
-    await waitFor(() => expect(mocks.exportDataBlocks).toHaveBeenCalledTimes(1));
-    expect(mocks.exportDataBlocks).toHaveBeenCalledWith({
-      parseAs: 'blob',
-      path: { workspace_id: 'workspace-1' },
-      body: { node_ids: ['node-1'], format: 'parquet' },
-      throwOnError: true,
+    await waitFor(() => expect(mocks.saveDataBlockDownload).toHaveBeenCalledTimes(1));
+    expect(mocks.saveDataBlockDownload).toHaveBeenCalledWith({
+      workspaceId: 'workspace-1',
+      nodeIds: ['node-1'],
+      format: 'parquet',
+      filename: 'Corpus_One.parquet',
+      loadBrowserDownload: expect.any(Function),
     });
-    expect(mocks.saveBlob).toHaveBeenCalledWith(expect.any(Blob), 'Corpus_One.parquet');
     expect(mocks.reachContextualHint).toHaveBeenCalledWith('export.data-block-success');
   });
 
@@ -117,14 +123,14 @@ describe('ExportFeature', () => {
 
     await user.click(screen.getByRole('button', { name: 'Export 2 Data Blocks' }));
 
-    await waitFor(() => expect(mocks.exportDataBlocks).toHaveBeenCalledTimes(1));
-    expect(mocks.exportDataBlocks).toHaveBeenCalledWith({
-      parseAs: 'blob',
-      path: { workspace_id: 'workspace-1' },
-      body: { node_ids: ['node-1', 'node-2'], format: 'csv' },
-      throwOnError: true,
+    await waitFor(() => expect(mocks.saveDataBlockDownload).toHaveBeenCalledTimes(1));
+    expect(mocks.saveDataBlockDownload).toHaveBeenCalledWith({
+      workspaceId: 'workspace-1',
+      nodeIds: ['node-1', 'node-2'],
+      format: 'csv',
+      filename: 'Main_Workspace_data_blocks.zip',
+      loadBrowserDownload: expect.any(Function),
     });
-    expect(mocks.saveBlob).toHaveBeenCalledWith(expect.any(Blob), 'Main_Workspace_data_blocks.zip');
     expect(screen.getByRole('button', { name: 'Add All' })).toBeDisabled();
   });
 
@@ -132,14 +138,12 @@ describe('ExportFeature', () => {
     render(<ExportFeature />);
     fireEvent.click(screen.getByRole('button', { name: 'Export workspace archive' }));
 
-    await waitFor(() => expect(mocks.exportWorkspaceArchive).toHaveBeenCalledTimes(1));
-    expect(mocks.exportWorkspaceArchive).toHaveBeenCalledWith({
-      parseAs: 'blob',
-      path: { workspace_id: 'workspace-1' },
-      throwOnError: true,
-    });
     await waitFor(() =>
-      expect(mocks.saveBlob).toHaveBeenCalledWith(expect.any(Blob), 'Main_Workspace.zip'),
+      expect(mocks.saveBackendDownload).toHaveBeenCalledWith(
+        '/api/workspaces/workspace-1/archive',
+        'Main_Workspace.zip',
+        expect.any(Function),
+      ),
     );
     expect(mocks.reachContextualHint).toHaveBeenCalledWith('export.workspace-success');
   });

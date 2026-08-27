@@ -6,7 +6,7 @@ import { useWorkspaceDownloads } from '../WorkspaceDownloadsContext';
 
 const mocks = vi.hoisted(() => ({
   exportWorkspaceArchive: vi.fn(),
-  saveBlob: vi.fn(),
+  saveBackendDownload: vi.fn(),
   toast: { error: vi.fn(), success: vi.fn() },
 }));
 
@@ -14,7 +14,7 @@ vi.mock('@/api', async (importOriginal) => ({
   ...(await importOriginal()),
   exportWorkspaceArchive: mocks.exportWorkspaceArchive,
 }));
-vi.mock('@/lib/download', () => ({ saveBlob: mocks.saveBlob }));
+vi.mock('@/lib/download', () => ({ saveBackendDownload: mocks.saveBackendDownload }));
 vi.mock('sonner', () => ({ toast: mocks.toast }));
 
 function DownloadStarter() {
@@ -36,7 +36,7 @@ describe('WorkspaceDownloadsProvider', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.exportWorkspaceArchive.mockResolvedValue({ data: new Blob(['zip']) });
-    mocks.saveBlob.mockResolvedValue(undefined);
+    mocks.saveBackendDownload.mockResolvedValue(undefined);
   });
 
   it('downloads the canonical workspace archive and keeps the command shell-owned', async () => {
@@ -47,20 +47,18 @@ describe('WorkspaceDownloadsProvider', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Start download' }));
-    await waitFor(() => expect(mocks.exportWorkspaceArchive).toHaveBeenCalledTimes(1));
-    expect(mocks.exportWorkspaceArchive).toHaveBeenCalledWith({
-      parseAs: 'blob',
-      path: { workspace_id: 'workspace-1' },
-      throwOnError: true,
-    });
     await waitFor(() =>
-      expect(mocks.saveBlob).toHaveBeenCalledWith(expect.any(Blob), 'Main_Workspace.zip'),
+      expect(mocks.saveBackendDownload).toHaveBeenCalledWith(
+        '/api/workspaces/workspace-1/archive',
+        'Main_Workspace.zip',
+        expect.any(Function),
+      ),
     );
     expect(screen.getByText('idle')).toBeInTheDocument();
   });
 
   it('reports archive failures without leaving a pending marker', async () => {
-    mocks.exportWorkspaceArchive.mockRejectedValue(new Error('archive unavailable'));
+    mocks.saveBackendDownload.mockRejectedValue(new Error('archive unavailable'));
     render(
       <WorkspaceDownloadsProvider>
         <DownloadStarter />

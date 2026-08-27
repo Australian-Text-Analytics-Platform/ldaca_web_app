@@ -33,7 +33,6 @@
     "@tanstack/react-virtual": "^3.14.10",
     "@tauri-apps/api": "^2.11.1",
     "@tauri-apps/plugin-dialog": "^2.7.2",
-    "@tauri-apps/plugin-fs": "^2.5.1",
     "@tauri-apps/plugin-opener": "^2.5.4",
     "@uiw/react-codemirror": "^4.25.11",
     "@visx/text": "^4.0.0",
@@ -64,7 +63,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "dev:tauri": "vite --host 0.0.0.0 --port 3001 --strictPort",
+    "dev:tauri": "vite --mode tauri",
     "build": "pnpm theme:check && pnpm theme:audit && tsc --noEmit && vite build && node scripts/verify-build.mjs",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck:tooling && pnpm test && pnpm knip && pnpm build && pnpm docs:check && pnpm versions:check",
     "theme:generate": "node scripts/generate-vscode-theme.mjs",
@@ -83,12 +82,13 @@
     "docs:sync-publish": "node --experimental-strip-types scripts/sync-published-docs.mjs",
     "versions:check": "node ../scripts/check-versions.mjs && node --test ../scripts/check-versions.test.mjs ../scripts/prepare-backend-runtime.test.mjs scripts/stage-backend-runtime.test-node.mjs",
     "tauri": "tauri",
+    "tauri:build": "tauri build --config src-tauri/tauri.bundle.conf.json",
     "clean": "cd src-tauri && cargo clean",
     "clean:desktop:mac-bundles": "node scripts/clean-desktop-mac-bundles.mjs",
     "prepare:backend-runtime": "node ../scripts/prepare-backend-runtime.mjs",
-    "dev:desktop": "pnpm prepare:backend-runtime && tauri dev",
-    "desktop:build:mac": "pnpm clean:desktop:mac-bundles && pnpm prepare:backend-runtime && CI=true tauri build --bundles app,dmg --target aarch64-apple-darwin",
-    "desktop:build:windows": "pnpm prepare:backend-runtime && tauri build"
+    "dev:desktop": "pnpm prepare:backend-runtime && tauri dev --features dev-runtime",
+    "desktop:build:mac": "pnpm clean:desktop:mac-bundles && pnpm prepare:backend-runtime && CI=true pnpm tauri:build --bundles app,dmg --target aarch64-apple-darwin",
+    "desktop:build:windows": "pnpm prepare:backend-runtime && pnpm tauri:build"
   },
   "devDependencies": {
     "@babel/core": "^8.0.1",

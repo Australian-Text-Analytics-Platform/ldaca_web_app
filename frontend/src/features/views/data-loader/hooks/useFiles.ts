@@ -8,7 +8,7 @@ import {
   listUserFiles,
   uploadFile,
 } from '@/api';
-import { saveBlob } from '@/lib/download';
+import { saveBackendDownload } from '@/lib/download';
 import { type FileTreeNode } from '../types';
 import { queryKeys } from '@/lib/queryKeys';
 import { refreshFilePathQuery } from './fileCache';
@@ -99,13 +99,19 @@ export const useFiles = ({ enabled = true }: UseFilesProps = {}) => {
   /** Returned to: `DataLoaderFeature` for the file-tree download action. */
   const handleDownloadFile = async (filename: string) => {
     try {
-      const { data } = await downloadFile({
-        parseAs: 'blob',
-        query: { path: filename },
-        throwOnError: true,
-      });
-      const blob = data;
-      await saveBlob(new Blob([blob]), filename);
+      const query = new URLSearchParams({ path: filename });
+      await saveBackendDownload(
+        `/api/user-files/content?${query.toString()}`,
+        filename,
+        async () => {
+          const { data } = await downloadFile({
+            parseAs: 'blob',
+            query: { path: filename },
+            throwOnError: true,
+          });
+          return { blob: data instanceof Blob ? data : new Blob([data]) };
+        },
+      );
       return true;
     } catch (error) {
       console.error('Failed to download file:', error);

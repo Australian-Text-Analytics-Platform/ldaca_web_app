@@ -5,6 +5,7 @@ use std::fs;
 use std::io::{self, BufRead, BufReader};
 use std::path::Path;
 use std::process::{Child, Command, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 pub(crate) const BACKEND_HOST: &str = "127.0.0.1";
@@ -40,8 +41,8 @@ pub(crate) struct BackendProcess {
 impl BackendProcess {
     /// Launch the packaged backend with the already-resolved runtime layout.
     ///
-    /// Called during Tauri setup. Environment construction consumes manifest
-    /// fields directly; no path scanning or venv fallback occurs here.
+    /// Called by the blocking startup worker. Environment construction consumes
+    /// manifest fields directly; no path scanning or venv fallback occurs here.
     pub(crate) fn spawn(runtime: &BackendRuntime, startup_file: &Path) -> io::Result<Self> {
         let mut command = runtime_command(runtime);
         command
@@ -81,11 +82,21 @@ impl BackendProcess {
 
     /// Wait for the Python launcher record that is published after ASGI lifespan.
     ///
-    /// This runs before the process enters shared Tauri state, so no mutex is
-    /// held while polling the filesystem or child status.
-    pub(crate) fn wait_until_live(&mut self, startup_file: &Path) -> io::Result<LiveBackend> {
+    /// The startup worker owns the process while polling, and cancellation is
+    /// checked between every non-blocking child/status probe.
+    pub(crate) fn wait_until_live(
+        &mut self,
+        startup_file: &Path,
+        cancelled: &AtomicBool,
+    ) -> io::Result<LiveBackend> {
         let deadline = Instant::now() + STARTUP_TIMEOUT;
         loop {
+            if cancelled.load(Ordering::Acquire) {
+                return Err(io::Error::new(
+                    io::ErrorKind::Interrupted,
+                    "Backend startup was cancelled",
+                ));
+            }
             if let Some(status) = self
                 .child
                 .as_mut()
@@ -198,7 +209,6 @@ fn runtime_command(runtime: &BackendRuntime) -> Command {
     command
         .current_dir(&runtime.root)
         .env("PYTHONUNBUFFERED", "1")
-        .env("LDACA_BACKEND_RUNTIME", &runtime.root)
         .env("LDACA_PARENT_PID", std::process::id().to_string())
         .env("PYTHONHOME", &runtime.python_home)
         .env("PYTHONPATH", &runtime.site_packages)
@@ -329,6 +339,21 @@ mod tests {
         assert_ne!(unsafe { libc::kill(descendant as libc::pid_t, 0) }, 0);
         let _ = std::fs::remove_file(pidfile);
     }
+
+    #[test]
+    fn startup_wait_returns_immediately_when_cancelled() {
+        let mut process = shell_process("while :; do sleep 1; done");
+        let startup_file =
+            std::env::temp_dir().join(format!("ldaca-cancelled-startup-{}", std::process::id()));
+        let cancelled = AtomicBool::new(true);
+
+        let error = process
+            .wait_until_live(&startup_file, &cancelled)
+            .expect_err("cancelled startup must stop waiting");
+
+        assert_eq!(error.kind(), io::ErrorKind::Interrupted);
+        process.shutdown().expect("cancelled process shutdown");
+    }
 }
 
 #[cfg(test)]
@@ -431,8 +456,9 @@ print(sys.version)
         std::fs::create_dir_all(&fixture).expect("create packaged fixture");
         let mut process =
             BackendProcess::spawn(&runtime, &startup_file).expect("spawn packaged backend");
+        let cancelled = AtomicBool::new(false);
         let live = process
-            .wait_until_live(&startup_file)
+            .wait_until_live(&startup_file, &cancelled)
             .expect("packaged backend liveness");
         let port = live
             .url

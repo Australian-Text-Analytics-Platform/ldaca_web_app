@@ -112,6 +112,9 @@ def test_runtime_manifest_owns_a_relative_relocatable_layout(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     module = _load_package_backend_runtime_module()
+    backend_version = tomllib.loads(
+        (module.BACKEND_PROJECT_ROOT / "pyproject.toml").read_text("utf-8")
+    )["project"]["version"]
     runtime_root = tmp_path / "build" / "backend-runtime"
     python_home = runtime_root / "managed-python" / "cpython-3.14-test"
     python_bin = python_home / "bin" / "python3"
@@ -125,6 +128,7 @@ def test_runtime_manifest_owns_a_relative_relocatable_layout(
         stdout = json.dumps(
             {
                 "version": "3.14.0",
+                "backend_version": backend_version,
                 "free_threaded": False,
                 "platform": __import__("sys").platform,
                 "machine": __import__("platform").machine().lower(),
@@ -140,7 +144,8 @@ def test_runtime_manifest_owns_a_relative_relocatable_layout(
     )
 
     manifest = json.loads((runtime_root / "runtime-manifest.json").read_text())
-    assert manifest["schema_version"] == 2
+    assert manifest["schema_version"] == 3
+    assert manifest["backend_version"] == backend_version
     assert manifest["python_selector"] == "3.14"
     assert manifest["python_version"] == "3.14.0"
     assert manifest["python_free_threaded"] is False
@@ -173,7 +178,7 @@ def test_relative_runtime_path_rejects_build_machine_paths(tmp_path: Path) -> No
         module.relative_runtime_path(outside, runtime_root)
 
 
-def test_frontend_desktop_dev_uses_packaged_runtime_path() -> None:
+def test_frontend_desktop_commands_use_the_staged_runtime_contract() -> None:
     repo_root = Path(__file__).resolve().parents[1]
     package_json = __import__("json").loads(
         (repo_root / "frontend" / "package.json").read_text("utf-8")
@@ -185,7 +190,11 @@ def test_frontend_desktop_dev_uses_packaged_runtime_path() -> None:
     )
     assert scripts["dev:desktop"].startswith("pnpm prepare:backend-runtime")
     assert scripts["desktop:build:mac"] == (
-        "pnpm prepare:backend-runtime && CI=true tauri build --bundles app,dmg"
+        "pnpm clean:desktop:mac-bundles && pnpm prepare:backend-runtime && "
+        "CI=true pnpm tauri:build --bundles app,dmg --target aarch64-apple-darwin"
+    )
+    assert scripts["desktop:build:windows"] == (
+        "pnpm prepare:backend-runtime && pnpm tauri:build"
     )
     assert not any(name.startswith("package:backend-runtime") for name in scripts)
 

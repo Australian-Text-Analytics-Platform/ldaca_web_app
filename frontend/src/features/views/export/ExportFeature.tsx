@@ -24,7 +24,7 @@ import {
   DATA_BLOCK_EXPORT_FORMATS,
   downloadDataBlocks,
 } from '@/features/workspace/common/dataBlockExport';
-import { safeDownloadStem, saveBlob } from '@/lib/download';
+import { safeDownloadStem, saveBackendDownload } from '@/lib/download';
 import { toast } from 'sonner';
 
 const EXPORT_CONSTRAINTS = {};
@@ -84,14 +84,18 @@ function ExportFeature() {
     if (!currentWorkspaceId || exportingWorkspace) return;
     setExportingWorkspace(true);
     try {
-      const { data } = await exportWorkspaceArchive({
-        parseAs: 'blob',
-        path: { workspace_id: currentWorkspaceId },
-        throwOnError: true,
-      });
-      await saveBlob(
-        data,
-        `${safeDownloadStem(currentWorkspace?.name ?? '', currentWorkspaceId)}.zip`,
+      const filename = `${safeDownloadStem(currentWorkspace?.name ?? '', currentWorkspaceId)}.zip`;
+      await saveBackendDownload(
+        `/api/workspaces/${encodeURIComponent(currentWorkspaceId)}/archive`,
+        filename,
+        async () => {
+          const { data } = await exportWorkspaceArchive({
+            parseAs: 'blob',
+            path: { workspace_id: currentWorkspaceId },
+            throwOnError: true,
+          });
+          return { blob: data };
+        },
       );
       reachContextualHint(CONTEXTUAL_HINT_IDS.export.workspaceSuccess);
       toast.success('Workspace archive exported');

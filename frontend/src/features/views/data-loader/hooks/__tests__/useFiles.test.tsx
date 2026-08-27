@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   createFolder: vi.fn(),
   deleteFile: vi.fn(),
   downloadFile: vi.fn(),
+  saveBackendDownload: vi.fn(),
   getUserFileResource: vi.fn(),
   listUserFiles: vi.fn(),
   uploadFile: vi.fn(),
@@ -23,6 +24,7 @@ vi.mock('@/api', async (importOriginal) => ({
   listUserFiles: mocks.listUserFiles,
   uploadFile: mocks.uploadFile,
 }));
+vi.mock('@/lib/download', () => ({ saveBackendDownload: mocks.saveBackendDownload }));
 
 /** Creates the real query-cache boundary used by useFiles mutation tests. */
 function makeWrapper(queryClient: QueryClient) {
@@ -41,6 +43,7 @@ describe('useFiles cache policy', () => {
       data: { type: 'directory', path: 'corpus' },
     });
     mocks.deleteFile.mockResolvedValue({ data: { message: 'deleted' } });
+    mocks.saveBackendDownload.mockResolvedValue(undefined);
   });
 
   it('keeps coordinated uploads path-aware and defers refresh until the batch ends', async () => {
@@ -159,5 +162,25 @@ describe('useFiles cache policy', () => {
         },
       ]);
     });
+  });
+
+  it('routes User File downloads through the backend streaming boundary', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const { result } = renderHook(() => useFiles(), {
+      wrapper: makeWrapper(queryClient),
+    });
+    await waitFor(() => expect(mocks.listUserFiles).toHaveBeenCalledTimes(1));
+
+    await act(async () => {
+      await result.current.handleDownloadFile('folder/report 1.csv');
+    });
+
+    expect(mocks.saveBackendDownload).toHaveBeenCalledWith(
+      '/api/user-files/content?path=folder%2Freport+1.csv',
+      'folder/report 1.csv',
+      expect.any(Function),
+    );
   });
 });

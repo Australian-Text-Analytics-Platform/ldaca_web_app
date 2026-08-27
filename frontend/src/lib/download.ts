@@ -13,32 +13,6 @@ import { isTauri } from '@/lib/isTauri';
 export const safeDownloadStem = (value: string, fallback: string): string =>
   (value.trim() || fallback).replace(/[^\p{L}\p{N}_-]+/gu, '_').replace(/^_+|_+$/g, '') || fallback;
 
-/**
- * Append a numeric suffix before the extension if `filename` already exists
- * in the Downloads directory: `report.csv` → `report (1).csv`.
- *
- * Lookups use the `fs` plugin's `exists` command (download scope, recursive).
- * Caps attempts at 1000 to avoid pathological loops.
- */
-/**
- * Called by: saveBlob in this library module.
- */
-const resolveUniqueFilename = async (
-  filename: string,
-  exists: (path: string, opts: { baseDir: number }) => Promise<boolean>,
-  baseDir: number,
-): Promise<string> => {
-  if (!(await exists(filename, { baseDir }))) return filename;
-  const dot = filename.lastIndexOf('.');
-  const stem = dot > 0 ? filename.slice(0, dot) : filename;
-  const ext = dot > 0 ? filename.slice(dot) : '';
-  for (let i = 1; i < 1000; i++) {
-    const candidate = `${stem} (${String(i)})${ext}`;
-    if (!(await exists(candidate, { baseDir }))) return candidate;
-  }
-  return `${stem}-${String(Date.now())}${ext}`;
-};
-
 /** Uses native browser download UI for web builds where destination/progress are already visible. */
 /**
  * Called by: saveBlob in this library module.
@@ -63,8 +37,8 @@ const browserDownload = (blob: Blob, filename: string) => {
 /**
  * Reduce a path-like filename to its basename. The backend may return paths
  * with slashes (e.g. `sample_data/ADO/reddit/reddit_comments.csv`); browsers
- * strip these for `<a download>`, but Tauri's `writeFile` would interpret
- * them as nested directories under Downloads (which don't exist) and fail.
+ * strip these for `<a download>`, while the native command accepts only one
+ * safe filename rather than a caller-controlled filesystem path.
  */
 /** Called by: saveBlob in this library module. */
 const toBasename = (filename: string): string => {
@@ -73,34 +47,122 @@ const toBasename = (filename: string): string => {
   return idx >= 0 ? trimmed.slice(idx + 1) : trimmed;
 };
 
-/** Writes bytes through Tauri plugins so desktop users get a real file in Downloads. */
-/**
- * Called by: saveBlob in this library module.
- */
-const tauriDownload = async (blob: Blob, filename: string) => {
-  // Dynamic imports keep these out of browser bundles.
-  const [{ writeFile, exists, BaseDirectory }, { downloadDir, join }, opener] = await Promise.all([
-    import('@tauri-apps/plugin-fs'),
-    import('@tauri-apps/api/path'),
-    import('@tauri-apps/plugin-opener'),
-  ]);
-
-  const finalName = await resolveUniqueFilename(
-    toBasename(filename),
-    exists,
-    BaseDirectory.Download,
-  );
-  const bytes = new Uint8Array(await blob.arrayBuffer());
-  await writeFile(finalName, bytes, { baseDir: BaseDirectory.Download });
-
-  const fullPath = await join(await downloadDir(), finalName);
-  return { fullPath, opener };
-};
-
 export interface SaveBlobOptions {
   /** When true, suppress toasts even in Tauri (e.g. for caller-controlled flows). */
   silent?: boolean;
 }
+
+interface BrowserDownload {
+  blob: Blob;
+  filename?: string;
+}
+
+type BrowserDownloadLoader = () => Promise<BrowserDownload>;
+
+interface DataBlockDownload {
+  workspaceId: string;
+  nodeIds: string[];
+  format: string;
+  filename: string;
+  loadBrowserDownload: BrowserDownloadLoader;
+  options?: SaveBlobOptions;
+}
+
+type NativeDownloadCommand =
+  | 'download_backend_to_downloads'
+  | 'export_data_blocks_to_downloads'
+  | 'save_bytes_to_downloads';
+
+const invokeNativeDownload = async (
+  command: NativeDownloadCommand,
+  args: Record<string, unknown>,
+): Promise<string> => {
+  const { invoke } = await import('@tauri-apps/api/core');
+  return invoke<string>(command, args);
+};
+
+const showNativeDownloadSuccess = (filename: string, fullPath: string, silent: boolean) => {
+  if (silent) return;
+  toast.success(`Saved ${toBasename(filename)} to your Downloads folder`, {
+    description: fullPath,
+    action: {
+      label: 'Show in folder',
+      onClick: () => {
+        void import('@tauri-apps/plugin-opener')
+          .then(({ revealItemInDir }) => revealItemInDir(fullPath))
+          .catch(() => {
+            // Reveal failures do not invalidate the already installed file.
+          });
+      },
+    },
+  });
+};
+
+const reportDownloadFailure = (filename: string, error: unknown, silent: boolean) => {
+  if (silent) return;
+  const message =
+    error instanceof Error ? error.message : typeof error === 'string' ? error : 'Unknown error';
+  toast.error(`Failed to download ${toBasename(filename)}`, { description: message });
+};
+
+const saveNativeDownload = async (
+  command: NativeDownloadCommand,
+  args: Record<string, unknown>,
+  filename: string,
+  silent: boolean,
+) => {
+  try {
+    const fullPath = await invokeNativeDownload(command, args);
+    showNativeDownloadSuccess(filename, fullPath, silent);
+  } catch (error) {
+    reportDownloadFailure(filename, error, silent);
+    throw error;
+  }
+};
+
+/** Stream one GET backend resource natively, retaining generated-client fetches on the web. */
+export const saveBackendDownload = async (
+  apiPath: string,
+  filename: string,
+  loadBrowserDownload: BrowserDownloadLoader,
+  options: SaveBlobOptions = {},
+): Promise<void> => {
+  const safeFilename = toBasename(filename);
+  if (!isTauri()) {
+    const download = await loadBrowserDownload();
+    browserDownload(download.blob, toBasename(download.filename ?? safeFilename));
+    return;
+  }
+  await saveNativeDownload(
+    'download_backend_to_downloads',
+    { apiPath, filename: safeFilename },
+    safeFilename,
+    options.silent ?? false,
+  );
+};
+
+/** Stream the explicit Data Block POST export natively without exposing a generic HTTP proxy. */
+export const saveDataBlockDownload = async ({
+  workspaceId,
+  nodeIds,
+  format,
+  filename,
+  loadBrowserDownload,
+  options = {},
+}: DataBlockDownload): Promise<void> => {
+  const safeFilename = toBasename(filename);
+  if (!isTauri()) {
+    const download = await loadBrowserDownload();
+    browserDownload(download.blob, toBasename(download.filename ?? safeFilename));
+    return;
+  }
+  await saveNativeDownload(
+    'export_data_blocks_to_downloads',
+    { workspaceId, nodeIds, format, filename: safeFilename },
+    safeFilename,
+    options.silent ?? false,
+  );
+};
 
 /**
  * Save a blob, notifying the user where it landed. In Tauri we write the file
@@ -110,8 +172,8 @@ export interface SaveBlobOptions {
  * shows progress and the destination in the browser chrome — no toast needed.
  */
 /**
- * Used by: chart export, Data Loader file downloads, workspace archive
- * downloads, Export, Token Frequency, and Topic Modeling.
+ * Used by: client-generated chart, table, Token Frequency, and Topic Modeling
+ * exports. Backend resources use the streaming helpers above.
  */
 export const saveBlob = async (
   blob: Blob,
@@ -125,27 +187,11 @@ export const saveBlob = async (
     return;
   }
 
-  try {
-    const { fullPath, opener } = await tauriDownload(blob, filename);
-    if (!silent) {
-      toast.success(`Saved ${toBasename(filename)} to your Downloads folder`, {
-        description: fullPath,
-        action: {
-          label: 'Show in folder',
-          /** Lets desktop users reveal the saved file from the success toast action. */
-          onClick: () => {
-            void opener.revealItemInDir(fullPath).catch(() => {
-              // Reveal failures are non-fatal — the file still exists.
-            });
-          },
-        },
-      });
-    }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    if (!silent) {
-      toast.error(`Failed to download ${toBasename(filename)}`, { description: message });
-    }
-    throw error;
-  }
+  const safeFilename = toBasename(filename);
+  await saveNativeDownload(
+    'save_bytes_to_downloads',
+    { filename: safeFilename, bytes: new Uint8Array(await blob.arrayBuffer()) },
+    safeFilename,
+    silent,
+  );
 };

@@ -1,5 +1,5 @@
 import { exportDataBlocks, type DataBlockExportFormat } from '@/api';
-import { safeDownloadStem, saveBlob } from '@/lib/download';
+import { safeDownloadStem, saveDataBlockDownload } from '@/lib/download';
 
 export const DATA_BLOCK_EXPORT_FORMATS: {
   value: DataBlockExportFormat;
@@ -44,18 +44,27 @@ export const downloadDataBlocks = async ({
   dataBlocks: DataBlockExportSelection[];
   format: DataBlockExportFormat;
 }): Promise<string> => {
-  const { data, response } = await exportDataBlocks({
-    parseAs: 'blob',
-    path: { workspace_id: workspaceId },
-    body: { node_ids: dataBlocks.map((node) => node.id), format },
-    throwOnError: true,
-  });
   const formatSpec = DATA_BLOCK_EXPORT_FORMATS.find((candidate) => candidate.value === format);
   const fallbackFilename =
     dataBlocks.length > 1
       ? `${safeDownloadStem(workspaceName, workspaceId)}_data_blocks.zip`
       : `${safeDownloadStem(dataBlocks[0]?.name ?? '', dataBlocks[0]?.id ?? 'data-block')}.${formatSpec?.extension ?? format}`;
-  const filename = filenameFromResponse(response) ?? fallbackFilename;
-  await saveBlob(data, filename);
+  let filename = fallbackFilename;
+  await saveDataBlockDownload({
+    workspaceId,
+    nodeIds: dataBlocks.map((node) => node.id),
+    format,
+    filename: fallbackFilename,
+    loadBrowserDownload: async () => {
+      const { data, response } = await exportDataBlocks({
+        parseAs: 'blob',
+        path: { workspace_id: workspaceId },
+        body: { node_ids: dataBlocks.map((node) => node.id), format },
+        throwOnError: true,
+      });
+      filename = filenameFromResponse(response) ?? fallbackFilename;
+      return { blob: data, filename };
+    },
+  });
   return filename;
 };
