@@ -35,10 +35,14 @@ cargo clippy --all-targets --all-features -- -D warnings
 Packaging must fail when the staged manifest or any declared path is missing,
 absolute, escaping, corrupt, or for another platform/ABI. After bundling, the
 ignored package probe must resolve the final resource directory, import the
-backend and both compiled extensions, launch the packaged backend, verify
-`/health`, and shut down its process tree. Run macOS signature verification
-again after this probe: the shared launcher disables Python bytecode writes so
-the packaged runtime must not mutate the sealed application resources.
+backend and both compiled extensions, exercise DuckDB-backed cached tokenization,
+launch the packaged backend, verify `/health`, and shut down its process tree.
+The cached-tokenization probe uses the built-in tokenizer so it verifies that
+DuckDB's JSON support is statically linked in a clean temporary home without
+downloading a model or DuckDB extension. Run
+macOS signature verification again after this probe: the shared launcher
+disables Python bytecode writes so the packaged runtime must not mutate the
+sealed application resources.
 
 `LDACA_BACKEND_RUNTIME` may point to one complete alternate manifest root for
 testing. It is not a partial path override and is never silently ignored.

@@ -1951,7 +1951,7 @@ dependencies = [
 
 [[package]]
 name = "ldaca-wordflow"
-version = "0.7.2"
+version = "0.7.3"
 dependencies = [
  "dunce",
  "futures-util",

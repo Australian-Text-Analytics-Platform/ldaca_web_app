@@ -1129,7 +1129,7 @@ wheels = [
 
 [[package]]
 name = "ldaca-wordflow"
-version = "0.7.2"
+version = "0.7.3"
 source = { editable = "." }
 dependencies = [
     { name = "aiosqlite" },
@@ -1594,7 +1594,7 @@ dev = [
 
 [[package]]
 name = "polars-text"
-version = "0.5.0"
+version = "0.5.1"
 source = { editable = "../polars-text" }
 dependencies = [
     { name = "polars" },

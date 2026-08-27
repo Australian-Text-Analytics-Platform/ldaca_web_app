@@ -389,19 +389,6 @@ mod packaged_runtime_test {
         let root = std::env::var_os("LDACA_TEST_RUNTIME_ROOT")
             .expect("LDACA_TEST_RUNTIME_ROOT must point to the bundled runtime");
         let runtime = BackendRuntime::from_root(root).expect("resolve packaged runtime");
-        let output = runtime_command(&runtime)
-            .arg("-c")
-            .arg(
-                "import encodings, ldaca_wordflow, polars_source_utils, polars_text, sys; print(sys.version)",
-            )
-            .output()
-            .expect("launch packaged Python");
-        assert!(
-            output.status.success(),
-            "packaged imports failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-
         let fixture = std::env::temp_dir().join(format!(
             "wordflow-packaged-supervisor-{}-{}",
             std::process::id(),
@@ -410,6 +397,43 @@ mod packaged_runtime_test {
                 .expect("clock")
                 .as_nanos()
         ));
+        let token_cache = fixture.join("tokens.duckdb");
+        std::fs::create_dir_all(&fixture).expect("create packaged fixture");
+        let runtime_probe = format!(
+            r#"
+from pathlib import Path
+import encodings
+import ldaca_wordflow
+import polars as pl
+import polars_source_utils
+import polars_text
+import sys
+
+tokenized = pl.DataFrame({{"text": ["Hello world"]}}).select(
+    pl.col("text")
+    .text.tokenize(model="native:plain_words_en", cache=Path({token_cache:?}))
+    .alias("tokens")
+)
+assert tokenized.to_dicts()[0]["tokens"]
+print(sys.version)
+"#
+        );
+        let output = runtime_command(&runtime)
+            .env("HOME", &fixture)
+            .arg("-c")
+            .arg(runtime_probe)
+            .output()
+            .expect("launch packaged Python");
+        assert!(
+            output.status.success(),
+            "packaged imports and cached tokenization failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(
+            !fixture.join(".duckdb").exists(),
+            "packaged tokenization downloaded a DuckDB extension"
+        );
+
         let data_root = fixture.join("data");
         std::fs::create_dir_all(&data_root).expect("create packaged data root");
         let startup_file = fixture.join("startup.json");
