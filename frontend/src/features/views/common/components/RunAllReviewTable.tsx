@@ -16,7 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { AnalysisTableFrame } from '@/features/views/common/components/AnalysisTableScrollArea';
+import { AnnotationColumnFilterMenu } from '@/features/views/common/components/AnnotationColumnFilterMenu';
 import {
   ColumnComparisonHeader,
   ColumnComparisonSelector,
@@ -26,10 +26,19 @@ import { MetadataColumnSelector } from '@/features/views/common/components/Metad
 import { ServerPaginationFooter } from '@/features/views/common/components/ServerPaginationFooter';
 import { useFullColumnComparisons } from '@/features/views/common/hooks/useFullColumnComparisons';
 import { type ServerColumnDef, useServerTable } from '@/features/views/common/hooks/useServerTable';
-import { annotationValuesDiffer } from '@/features/views/annotation/annotationDifferenceQuery';
+import {
+  type AnnotationRowFilter,
+  type AnnotationRowFilterValue,
+  INACTIVE_ANNOTATION_FILTER,
+  annotationValuesDiffer,
+  isAnnotationRowFilterActive,
+  isInvalidAnnotationLabel,
+} from '@/features/views/annotation/annotationRowFilter';
 import { useAnnotationNodePage } from '@/features/views/annotation/hooks/useAnnotationNodePage';
 import { toBgColor } from '@/features/views/common/vizPalette';
 import { AnnotationCorrectionColumnControl } from '@/features/views/annotation/components/AnnotationCorrectionColumnControl';
+import { AnnotationTableFrame } from '@/features/views/annotation/components/AnnotationTableFrame';
+import { InvalidAnnotationClassItem } from '@/features/views/annotation/components/InvalidAnnotationClassItem';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { isArrowDictionaryField, isArrowStringField } from '@/lib/arrow/arrowTable';
 
@@ -59,6 +68,9 @@ interface RunAllReviewTableProps {
   onReliabilityMetricChange: (metric: IntercoderReliabilityMetric) => void;
   metadataColumns: string[];
   onMetadataColumnsChange: (columns: string[]) => void;
+  /** Shared per-tab result-table height; null keeps the default. */
+  tableHeight: number | null;
+  onTableHeightChange: (height: number | null) => void;
   correction: {
     column: string | null;
     classOptions: string[];
@@ -72,9 +84,11 @@ interface RunAllReviewTableProps {
 
 /**
  * Renders a current Data Block projection for the durable Review phase.
- * Used by: AnnotationFeature after Run All. Flow: query the server-paginated Data Block, keep
- * comparisons masked until revealed, and enable full-table reliability, tint, and one mount-local
- * server-side difference filter only for revealed comparison columns.
+ * Used by: AnnotationFeature after Run All. Flow: query the server-paginated Data Block and keep
+ * comparison values masked until revealed. Full-table reliability and the row filter work while
+ * masked; only per-row values and difference tint wait for reveal. One mount-local row filter
+ * (difference and/or existence) may sit on the annotation column or one comparison column at a
+ * time; empty, blank, and non-Codebook cells never count as differences or as values.
  */
 export function RunAllReviewTable({
   workspaceId,
@@ -92,10 +106,14 @@ export function RunAllReviewTable({
   onReliabilityMetricChange,
   metadataColumns,
   onMetadataColumnsChange,
+  tableHeight,
+  onTableHeightChange,
   correction,
   rowCount,
 }: RunAllReviewTableProps) {
   const correctionColumn = correction.column;
+  const classOptions = correction.classOptions;
+  const textColumn = requiredColumns[0];
   const { setCell } = useWorkspaceActions();
   const [correctionSelections, setCorrectionSelections] = useState<Record<string, string | null>>(
     {},
@@ -104,14 +122,40 @@ export function RunAllReviewTable({
   const [revealedComparisonColumns, setRevealedComparisonColumns] = useState<Set<string>>(
     new Set(),
   );
-  const [differenceColumn, setDifferenceColumn] = useState<string | null>(null);
+  const [filter, setFilter] = useState<AnnotationRowFilter | null>(null);
+  // Columns the annotation-column difference filter compares against; excludes role conflicts.
+  const queryComparisonColumns = comparisonColumns.filter(
+    (column) => column !== textColumn && column !== comparisonColumn && column !== correctionColumn,
+  );
+  // Derived, not stored: a difference filter on the annotation column needs at least one
+  // comparator, so losing the last one (deselected, or reassigned as the correction column)
+  // downgrades the filter instead of leaving a stale active state.
+  const activeFilter = (() => {
+    if (!filter) return null;
+    const owned =
+      filter.column === comparisonColumn || queryComparisonColumns.includes(filter.column);
+    if (!owned) return null;
+    const differs =
+      filter.differs && (filter.column !== comparisonColumn || queryComparisonColumns.length > 0);
+    const resolved = { ...filter, differs };
+    return isAnnotationRowFilterActive(resolved) ? resolved : null;
+  })();
+  const filterValueFor = (column: string): AnnotationRowFilterValue =>
+    activeFilter?.column === column
+      ? { differs: activeFilter.differs, existence: activeFilter.existence }
+      : INACTIVE_ANNOTATION_FILTER;
+  const setColumnFilter = (column: string, value: AnnotationRowFilterValue) => {
+    setFilter(isAnnotationRowFilterActive(value) ? { column, ...value } : null);
+  };
   const page = useAnnotationNodePage({
     workspaceId,
     nodeId,
     sourceSql: sql,
     sourceColumns,
     annotationColumn: comparisonColumn,
-    differenceColumn,
+    comparisonColumns: queryComparisonColumns,
+    classOptions,
+    filter: activeFilter,
     rowCount,
     pageSize: DEFAULT_PAGE_SIZE,
   });
@@ -160,19 +204,16 @@ export function RunAllReviewTable({
   const revealedActiveComparisonColumns = activeComparisonColumns.filter((column) =>
     revealedComparisonColumns.has(column),
   );
-  const activeDifferenceColumn =
-    differenceColumn && revealedActiveComparisonColumns.includes(differenceColumn)
-      ? differenceColumn
-      : null;
   const comparisonQueries = useFullColumnComparisons({
     workspaceId,
     nodeIds: [nodeId],
     sql,
     referenceColumn: comparisonColumn,
-    comparisonColumns: revealedActiveComparisonColumns,
+    comparisonColumns: activeComparisonColumns,
+    classOptions,
   });
   const comparisonQueryByColumn = new Map(
-    revealedActiveComparisonColumns.map((column, index) => [column, comparisonQueries[index]]),
+    activeComparisonColumns.map((column, index) => [column, comparisonQueries[index]]),
   );
   const visibleRequiredColumns = requiredColumns.filter(
     (column) => dataColumns?.includes(column) && column !== correctionColumn,
@@ -222,8 +263,17 @@ export function RunAllReviewTable({
                 setRevealedComparisonColumns(
                   (current) => new Set([...current].filter((column) => selected.includes(column))),
                 );
-                if (differenceColumn && !selected.includes(differenceColumn)) {
-                  setDifferenceColumn(null);
+                if (
+                  filter &&
+                  filter.column !== comparisonColumn &&
+                  !selected.includes(filter.column)
+                ) {
+                  setFilter(null);
+                } else if (filter?.column === comparisonColumn && filter.differs) {
+                  const remaining = selected.filter((column) => column !== correctionColumn);
+                  if (remaining.length === 0) {
+                    setColumnFilter(comparisonColumn, { ...filter, differs: false });
+                  }
                 }
                 onComparisonColumnsChange(selected);
               }}
@@ -247,7 +297,7 @@ export function RunAllReviewTable({
                     next.delete(column);
                     return next;
                   });
-                  if (differenceColumn === column) setDifferenceColumn(null);
+                  if (filter?.column === column) setFilter(null);
                 }
                 correction.onColumnChange(column);
               }}
@@ -269,8 +319,9 @@ export function RunAllReviewTable({
       ) : query.isLoading || countQuery.isLoading || !data ? (
         <p className="text-body text-description">Loading Review...</p>
       ) : (
-        <AnalysisTableFrame
-          maxHeightClass="max-h-96"
+        <AnnotationTableFrame
+          height={tableHeight}
+          onHeightChange={onTableHeightChange}
           belowTable={
             <ServerPaginationFooter
               table={table}
@@ -281,12 +332,29 @@ export function RunAllReviewTable({
             />
           }
         >
-          <Table disableContainer>
+          <Table className="w-full table-auto" disableContainer>
             <TableHeader className="sticky top-0 z-10 bg-surface">
-              <TableRow>
+              <TableRow className="[&>th]:align-bottom">
                 {visibleRequiredColumns.map((column) => (
-                  <TableHead key={column}>
-                    {activeComparisonColumns.includes(column) ? (
+                  <TableHead
+                    key={column}
+                    className={column === textColumn ? undefined : 'w-px whitespace-nowrap'}
+                  >
+                    {column === comparisonColumn ? (
+                      <span className="inline-flex items-center gap-1.5">
+                        <span>{column}</span>
+                        <AnnotationColumnFilterMenu
+                          column={column}
+                          value={filterValueFor(column)}
+                          onChange={(value) => {
+                            setColumnFilter(column, value);
+                          }}
+                          differsLabel="Differs from any comparison column"
+                          differsDisabled={activeComparisonColumns.length === 0}
+                          differsDisabledReason="Select a Compare To column first"
+                        />
+                      </span>
+                    ) : activeComparisonColumns.includes(column) ? (
                       <ColumnComparisonHeader
                         metric={reliabilityMetric}
                         referenceColumn={comparisonColumn}
@@ -302,13 +370,10 @@ export function RunAllReviewTable({
                             else next.delete(column);
                             return next;
                           });
-                          if (!revealed && differenceColumn === column) {
-                            setDifferenceColumn(null);
-                          }
                         }}
-                        differenceFilterActive={activeDifferenceColumn === column}
-                        onDifferenceFilterChange={(active) => {
-                          setDifferenceColumn(active ? column : null);
+                        filter={filterValueFor(column)}
+                        onFilterChange={(value) => {
+                          setColumnFilter(column, value);
                         }}
                       />
                     ) : (
@@ -327,7 +392,7 @@ export function RunAllReviewTable({
                   </>
                 ) : null}
                 {supplementalColumns.map((column) => (
-                  <TableHead key={column}>
+                  <TableHead key={column} className="w-px whitespace-nowrap">
                     {activeComparisonColumns.includes(column) ? (
                       <ColumnComparisonHeader
                         metric={reliabilityMetric}
@@ -344,13 +409,10 @@ export function RunAllReviewTable({
                             else next.delete(column);
                             return next;
                           });
-                          if (!revealed && differenceColumn === column) {
-                            setDifferenceColumn(null);
-                          }
                         }}
-                        differenceFilterActive={activeDifferenceColumn === column}
-                        onDifferenceFilterChange={(active) => {
-                          setDifferenceColumn(active ? column : null);
+                        filter={filterValueFor(column)}
+                        onFilterChange={(value) => {
+                          setColumnFilter(column, value);
                         }}
                       />
                     ) : (
@@ -361,6 +423,16 @@ export function RunAllReviewTable({
               </TableRow>
             </TableHeader>
             <TableBody>
+              {page.rows.length === 0 ? (
+                <TableRow className="hover:bg-transparent">
+                  <TableCell
+                    className="h-24 text-center text-description"
+                    colSpan={tableColumns.length}
+                  >
+                    {activeFilter ? 'No rows match the filter.' : 'No rows to review.'}
+                  </TableCell>
+                </TableRow>
+              ) : null}
               {page.rows.map((row) => {
                 const rowPosition = Number(row[sourceRowIndexColumn]);
                 const referenceValue = row[comparisonColumn];
@@ -379,24 +451,40 @@ export function RunAllReviewTable({
                 const comparisonValue = (column: string): unknown =>
                   column === correctionColumn ? correctionValue : row[column];
                 const referenceDiffers = revealedActiveComparisonColumns.some((column) =>
-                  annotationValuesDiffer(referenceValue, comparisonValue(column)),
+                  annotationValuesDiffer(referenceValue, comparisonValue(column), classOptions),
                 );
                 const differenceColor = toBgColor(sourceColor);
                 return (
-                  <TableRow key={rowPosition}>
+                  <TableRow key={rowPosition} className="align-top">
                     {visibleRequiredColumns.map((column) => {
                       const comparisonDiffers =
                         revealedActiveComparisonColumns.includes(column) &&
-                        annotationValuesDiffer(referenceValue, row[column]);
+                        annotationValuesDiffer(referenceValue, row[column], classOptions);
                       const highlighted =
                         (column === comparisonColumn && referenceDiffers) || comparisonDiffers;
+                      const invalid =
+                        column === comparisonColumn &&
+                        isInvalidAnnotationLabel(row[column], classOptions);
                       return (
                         <TableCell
                           key={column}
-                          className="max-w-96 whitespace-pre-wrap"
+                          className={
+                            column === textColumn
+                              ? 'break-words whitespace-pre-wrap'
+                              : 'w-px whitespace-nowrap'
+                          }
                           style={highlighted ? { backgroundColor: differenceColor } : undefined}
                         >
-                          {displayCell(row[column])}
+                          {invalid ? (
+                            <span
+                              className="italic text-description"
+                              title="Not a Codebook class; treated as empty"
+                            >
+                              {displayCell(row[column])}
+                            </span>
+                          ) : (
+                            displayCell(row[column])
+                          )}
                         </TableCell>
                       );
                     })}
@@ -457,6 +545,10 @@ export function RunAllReviewTable({
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value={NO_CORRECTION_VALUE}>None</SelectItem>
+                              <InvalidAnnotationClassItem
+                                value={correctionValue}
+                                classOptions={classOptions}
+                              />
                               {correction.classOptions.map((name) => (
                                 <SelectItem key={name} value={name}>
                                   {name}
@@ -468,24 +560,40 @@ export function RunAllReviewTable({
                       </>
                     ) : null}
                     {supplementalColumns.map((column) => {
+                      const isComparison = activeComparisonColumns.includes(column);
                       const comparisonRevealed =
-                        activeComparisonColumns.includes(column) &&
-                        revealedComparisonColumns.has(column);
+                        isComparison && revealedComparisonColumns.has(column);
                       const comparisonDiffers =
                         comparisonRevealed &&
-                        annotationValuesDiffer(referenceValue, comparisonValue(column));
+                        annotationValuesDiffer(
+                          referenceValue,
+                          comparisonValue(column),
+                          classOptions,
+                        );
+                      const invalid =
+                        comparisonRevealed &&
+                        isInvalidAnnotationLabel(comparisonValue(column), classOptions);
                       return (
                         <TableCell
                           key={column}
-                          className="max-w-96 whitespace-pre-wrap"
+                          className={isComparison ? 'w-px whitespace-nowrap' : 'w-px'}
                           style={
                             comparisonDiffers ? { backgroundColor: differenceColor } : undefined
                           }
                         >
-                          {activeComparisonColumns.includes(column) && !comparisonRevealed ? (
+                          {isComparison && !comparisonRevealed ? (
                             <span aria-label="Comparison value hidden">•••</span>
+                          ) : isComparison ? (
+                            <span
+                              className={invalid ? 'italic text-description' : undefined}
+                              title={invalid ? 'Not a Codebook class; treated as empty' : undefined}
+                            >
+                              {displayCell(comparisonValue(column))}
+                            </span>
                           ) : (
-                            displayCell(comparisonValue(column))
+                            <div className="w-max max-w-64 break-words whitespace-pre-wrap">
+                              {displayCell(comparisonValue(column))}
+                            </div>
                           )}
                         </TableCell>
                       );
@@ -495,7 +603,7 @@ export function RunAllReviewTable({
               })}
             </TableBody>
           </Table>
-        </AnalysisTableFrame>
+        </AnnotationTableFrame>
       )}
     </section>
   );

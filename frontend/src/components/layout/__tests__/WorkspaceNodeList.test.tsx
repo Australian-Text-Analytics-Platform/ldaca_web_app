@@ -3,11 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import WorkspaceNodeList from '../WorkspaceNodeList';
-import {
-  GREY,
-  VIZ_LIGHT_FOREGROUND,
-  foregroundForVizColor,
-} from '@/features/views/common/vizPalette';
+import { GREY, VIZ_TINT_FOREGROUND, toBgColor } from '@/features/views/common/vizPalette';
 import { usePinnedNodesStore } from '@/stores/pinnedNodesStore';
 
 /** Minimal node fixture used to verify row activation and display-name behavior. */
@@ -71,7 +67,7 @@ describe('WorkspaceNodeList', () => {
     expect(onToggleNodeSelection).toHaveBeenCalledTimes(3);
   });
 
-  it('uses the saturated node color as the identity surface with legible text', () => {
+  it('tints the row with the node colour and paints a left colour spine', () => {
     render(
       <WorkspaceNodeList
         workspaceId="workspace-1"
@@ -84,16 +80,18 @@ describe('WorkspaceNodeList', () => {
 
     const identitySurface = screen.getByTestId('workspace-node-row-node-1');
     expect(identitySurface).toHaveStyle({
-      backgroundColor: '#2563eb',
-      color: VIZ_LIGHT_FOREGROUND,
+      backgroundColor: toBgColor('#2563eb'),
+      color: VIZ_TINT_FOREGROUND,
+      borderLeftWidth: '4px',
     });
-    expect(identitySurface.style.borderLeftWidth).toBe('');
+    expect(identitySurface.style.borderLeftColor).not.toBe('');
+    expect(identitySurface.style.backgroundColor).not.toBe(identitySurface.style.borderLeftColor);
     expect(screen.getByTestId('data-block-name-head-fade').style.backgroundImage).toContain(
       identitySurface.style.backgroundColor,
     );
   });
 
-  it('defaults an uncoloured node to a saturated grey identity surface', () => {
+  it('defaults an uncoloured node to the grey tint and spine', () => {
     render(
       <WorkspaceNodeList
         workspaceId="workspace-1"
@@ -106,10 +104,10 @@ describe('WorkspaceNodeList', () => {
 
     const identitySurface = screen.getByTestId('workspace-node-row-node-1');
     expect(identitySurface).toHaveStyle({
-      backgroundColor: GREY,
-      color: foregroundForVizColor(GREY),
+      backgroundColor: toBgColor(GREY),
+      color: VIZ_TINT_FOREGROUND,
+      borderLeftWidth: '4px',
     });
-    expect(identitySurface.style.borderLeftWidth).toBe('');
   });
 
   it('uses one detached inverse-neutral outline for selection', () => {

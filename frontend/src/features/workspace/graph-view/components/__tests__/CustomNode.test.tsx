@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import CustomNode from '../CustomNode';
+import { VIZ_TINT_FOREGROUND, toBgColor } from '@/features/views/common/vizPalette';
 
 const mocks = vi.hoisted(() => ({
   downloadDataBlocks: vi.fn(),
@@ -206,7 +207,7 @@ describe('CustomNode', () => {
     );
   });
 
-  it('uses a saturated identity header and a detached selection outline', () => {
+  it('tints the header, paints a left colour spine, and keeps the detached selection outline', () => {
     mockZoom = 1;
     const props = {
       id: 'node-1',
@@ -233,8 +234,12 @@ describe('CustomNode', () => {
       'outline-offset-2',
       'outline-data-block-selection',
     );
-    expect(card.style.borderLeftWidth).toBe('');
-    expect(identityHeader).toHaveStyle({ backgroundColor: '#2563eb', color: '#ffffff' });
+    expect(card).toHaveStyle({ borderLeftWidth: '6px' });
+    expect(card.style.borderLeftColor).not.toBe('');
+    expect(identityHeader).toHaveStyle({
+      backgroundColor: toBgColor('#2563eb'),
+      color: VIZ_TINT_FOREGROUND,
+    });
     expect(screen.getByTitle('Corpus')).toHaveClass('max-h-[3lh]');
   });
 
@@ -313,7 +318,13 @@ describe('CustomNode', () => {
     expect(getLatestNodeSettingsButton()).toBeInTheDocument();
 
     const compactCard = screen.getByTestId('custom-node-compact-card');
-    expect(compactCard).toHaveStyle({ minWidth: '220px', maxWidth: '360px' });
+    expect(compactCard).toHaveStyle({
+      minWidth: '220px',
+      maxWidth: '360px',
+      borderLeftWidth: '6px',
+    });
+    expect(compactCard.style.backgroundColor).not.toBe('');
+    expect(compactCard.style.backgroundColor).not.toBe(compactCard.style.borderLeftColor);
     expect(compactCard).toHaveClass(
       'outline-2',
       'outline-offset-2',

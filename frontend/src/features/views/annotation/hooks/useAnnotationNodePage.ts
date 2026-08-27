@@ -6,8 +6,9 @@ import { queryWorkspaceSqlTable } from '@/api';
 import { createNodeDataRequest, queryKeys } from '@/lib/queryKeys';
 import {
   ANNOTATION_FILTERED_ROW_COUNT,
-  buildAnnotationDifferenceQuery,
-} from '../annotationDifferenceQuery';
+  type AnnotationRowFilter,
+  buildAnnotationRowFilterQuery,
+} from '../annotationRowFilter';
 
 export type AnnotationNodePageRow = Record<string, unknown>;
 
@@ -17,7 +18,11 @@ interface UseAnnotationNodePageArgs {
   sourceSql: string;
   sourceColumns: string[];
   annotationColumn: string;
-  differenceColumn: string | null;
+  /** Selected comparison columns; an annotation-column difference filter compares against these. */
+  comparisonColumns: readonly string[];
+  /** Codebook classes that define valid labels; empty when no Codebook is attached. */
+  classOptions: readonly string[];
+  filter: AnnotationRowFilter | null;
   rowCount: number;
   pageSize: number;
   enabled?: boolean;
@@ -38,16 +43,20 @@ export function useAnnotationNodePage({
   sourceSql,
   sourceColumns,
   annotationColumn,
-  differenceColumn,
+  comparisonColumns,
+  classOptions,
+  filter,
   rowCount,
   pageSize,
   enabled = true,
 }: UseAnnotationNodePageArgs) {
-  const differenceQuery = buildAnnotationDifferenceQuery({
+  const differenceQuery = buildAnnotationRowFilterQuery({
     sourceSql,
     sourceColumns,
     annotationColumn,
-    differenceColumn,
+    comparisonColumns,
+    classOptions,
+    filter,
   });
   const scope = JSON.stringify([workspaceId, nodeId, pageSize, differenceQuery.pageSql]);
   const [paginationState, setPaginationState] = useState<{
