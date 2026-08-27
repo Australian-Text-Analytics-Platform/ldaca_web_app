@@ -18,6 +18,12 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent
 BACKEND_PROJECT_ROOT = PROJECT_ROOT / "backend"
 PACKAGED_PYTHON_SELECTOR = "3.14"
+# Optional uv python request used only to *create* the runtime venv, so a CI job
+# can pin the interpreter architecture (for example
+# ``cpython-3.14-windows-aarch64-none`` on a Windows ARM64 runner, where uv would
+# otherwise download the emulated x86_64 build). The packaged version is still
+# validated against PACKAGED_PYTHON_SELECTOR.
+PACKAGED_PYTHON_REQUEST_ENV = "LDACA_PACKAGED_PYTHON_REQUEST"
 
 
 def parse_args() -> argparse.Namespace:
@@ -379,9 +385,16 @@ def main() -> None:
     managed_python_dir = output_dir / "managed-python"
     uv_managed_python_env = create_uv_managed_python_env(managed_python_dir)
 
+    python_request = os.environ.get(PACKAGED_PYTHON_REQUEST_ENV, "").strip() or args.python_version
+    if not python_request.startswith(("cpython-", args.python_version)):
+        raise RuntimeError(
+            f"{PACKAGED_PYTHON_REQUEST_ENV} must request CPython {args.python_version}"
+        )
+
     print("[INFO] Packaging backend runtime")
     print(f"   Output dir:     {output_dir}")
-    print(f"   Python version: {args.python_version}\n")
+    print(f"   Python version: {args.python_version}")
+    print(f"   Python request: {python_request}\n")
 
     if args.clean and dist_root.exists():
         print(f"[INFO] Removing previous dist at {dist_root}")
@@ -397,7 +410,7 @@ def main() -> None:
             "venv",
             str(runtime_python_dir),
             "--python",
-            args.python_version,
+            python_request,
             "--managed-python",
             "--clear",
         ],

@@ -14,7 +14,11 @@ runtime support, and writes `runtime-manifest.json`. The locked sync honors
 `backend/pyproject.toml` source overrides, so checked-out sibling packages are
 built when configured and packages without an override come from their locked
 registry source. Packaging fails when `pyproject.toml` and `uv.lock` disagree;
-it does not use `--no-sources`. The packager removes Finder `._*` and
+it does not use `--no-sources`. `LDACA_PACKAGED_PYTHON_REQUEST` may name an
+explicit uv Python request such as `cpython-3.14-windows-aarch64-none` when the
+runner's default download would be the wrong architecture (uv prefers the
+emulated x86_64 build on Windows ARM64); the packaged interpreter must still be
+CPython 3.14. The packager removes Finder `._*` and
 `.DS_Store` metadata before signing because HFS disk-image installation does
 not preserve those pseudo-files as ordinary sealed resources. The frontend
 staging script validates and copies that complete runtime into Tauri resources

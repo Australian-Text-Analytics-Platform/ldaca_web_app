@@ -61,6 +61,9 @@ jobs:
       # Windows builds always pass an explicit Rust target so bundle paths are
       # uniform across architectures: target/<triple>/<profile>/...
       WINDOWS_ARCH: ${{ inputs.arch == 'aarch64' && 'aarch64' || 'x86_64' }}
+      # uv downloads the emulated x86_64 CPython on Windows ARM64 unless the
+      # architecture is requested explicitly; the packager reads this variable.
+      LDACA_PACKAGED_PYTHON_REQUEST: ${{ inputs.platform == 'windows' && inputs.arch == 'aarch64' && 'cpython-3.14-windows-aarch64-none' || '' }}
       TAURI_TARGET_TRIPLE: ${{ inputs.arch == 'aarch64' && 'aarch64-pc-windows-msvc' || 'x86_64-pc-windows-msvc' }}
       PYTHONUTF8: ${{ inputs.platform == 'windows' && '1' || '' }}
       PYTHONIOENCODING: ${{ inputs.platform == 'windows' && 'utf-8' || '' }}
