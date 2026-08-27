@@ -4186,7 +4186,7 @@
       },
       "DataRootUpdateRequest": {
         "additionalProperties": false,
-        "description": "One absolute server filesystem path selected by a single-user client.",
+        "description": "One server filesystem path selected by a single-user client.",
         "properties": {
           "data_root": {
             "format": "path",
@@ -9964,7 +9964,7 @@
   "info": {
     "description": "Workspace-oriented text analysis API",
     "title": "LDaCA Wordflow API",
-    "version": "0.7.5"
+    "version": "0.7.6"
   },
   "openapi": "3.1.0",
   "paths": {
