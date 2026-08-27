@@ -29,12 +29,35 @@ Start captures the new setup. Switching modes hides but does not rewrite the
 open Manual snapshot.
 
 Use **Compare To** to add another coder or model. Each comparison starts masked
-as `•••`; reveal it from the eye button in its header to show values,
-difference colours, reliability, and its per-column difference filter. Hidden
-columns have a disabled filter, and hiding or removing the filtered column
-clears the filter. Filtered rows and counts are calculated before server
-pagination. Reliability statistics summarize agreement but do not explain why
-labels differ.
+as `•••` so you can code without seeing how individual rows were coded. Its
+header always shows the reliability score (hover or focus it for the confusion
+matrix) and the row-filter menu; reveal the column from the eye button to show
+its values and difference colours. Removing the filtered column clears the
+filter; hiding it does not. Reliability statistics summarize agreement but do
+not explain why labels differ.
+
+The funnel button in the annotation column header and in each comparison header
+opens a filter menu with two independent conditions: **Differs** and a value
+radio (**All rows**, **Has value**, **Empty**). On a comparison column, Differs
+keeps rows whose label differs from the annotation column; on the annotation
+column it keeps rows that differ from at least one selected comparison column.
+Conditions combine, so Differs with Has value narrows further, while Empty greys
+out Differs because an empty cell never differs. Only one column carries a filter
+at a time; setting a filter on another column replaces it. Filtered rows and
+counts are calculated before server pagination. Preview has no row filter
+because its rows are chosen by the AI request.
+
+A cell counts as **empty** when it is blank or holds a value that is not a
+Codebook class (for example `P` instead of `promise`, or a date pasted by
+accident). Such values are still displayed, in muted italics, but they never
+count as differences, never contribute to reliability, and match **Empty**
+rather than **Has value**. Matching is exact after trimming spaces; `Promise`
+is not `promise`. Without a Codebook only the blank rule applies.
+
+Drag the handle under the table to make it taller, up to three quarters of the
+window; double-click the handle to reset. The height is shared by Manual,
+Preview, and Review in the same tab, and the table scrolls inside its frame
+when a page does not fit.
 
 **Compare To** and **Show metadata** are exclusive roles: a selected column is
 disabled in the other menu, and **Select all** skips disabled columns. The
@@ -77,7 +100,7 @@ execution-request change. **Run All** compares against its own submitted request
 Choose **Run All** only after Preview is satisfactory. Run All executes from the
 saved Preview snapshot and writes labels to the selected annotation column. The
 Review table reflects the current Data Block and supports the same hidden-first
-comparisons, per-column differences, reliability, metadata, and correction
+comparisons, row filters, reliability, metadata, resizable frame, and correction
 controls. A reviewed
 correction column can also be selected as the Example annotation column for a
 later run.
