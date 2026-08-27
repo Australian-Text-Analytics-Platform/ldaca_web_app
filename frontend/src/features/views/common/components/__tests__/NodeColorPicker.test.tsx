@@ -4,6 +4,19 @@ import { describe, expect, it, vi } from 'vitest';
 import { NodeColorPicker } from '../NodeColorPicker';
 
 describe('NodeColorPicker', () => {
+  it('rejects an invalid configured color instead of substituting a fallback', () => {
+    expect(() =>
+      render(
+        <NodeColorPicker
+          nodeName="Corpus A"
+          color="not-a-color"
+          presets={['#2563eb']}
+          onChange={vi.fn()}
+        />,
+      ),
+    ).toThrow('Expected a #rrggbb node color');
+  });
+
   it('shows preset colours first and reveals custom controls on demand', async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();

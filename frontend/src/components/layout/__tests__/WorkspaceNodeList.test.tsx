@@ -3,11 +3,8 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import WorkspaceNodeList from '../WorkspaceNodeList';
-import {
-  GREY,
-  VIZ_LIGHT_FOREGROUND,
-  foregroundForVizColor,
-} from '@/features/views/common/vizPalette';
+import { GREY } from '@/features/views/common/vizPalette';
+import { toNodeSurfaceColor } from '@/lib/nodeColor';
 import { usePinnedNodesStore } from '@/stores/pinnedNodesStore';
 
 /** Minimal node fixture used to verify row activation and display-name behavior. */
@@ -71,7 +68,7 @@ describe('WorkspaceNodeList', () => {
     expect(onToggleNodeSelection).toHaveBeenCalledTimes(3);
   });
 
-  it('uses the saturated node color as the identity surface with legible text', () => {
+  it('uses a toned node color as the identity surface with theme text', () => {
     render(
       <WorkspaceNodeList
         workspaceId="workspace-1"
@@ -84,16 +81,17 @@ describe('WorkspaceNodeList', () => {
 
     const identitySurface = screen.getByTestId('workspace-node-row-node-1');
     expect(identitySurface).toHaveStyle({
-      backgroundColor: '#2563eb',
-      color: VIZ_LIGHT_FOREGROUND,
+      backgroundColor: toNodeSurfaceColor('#2563eb'),
     });
+    expect(identitySurface).toHaveClass('text-foreground');
+    expect(identitySurface.style.color).toBe('');
     expect(identitySurface.style.borderLeftWidth).toBe('');
     expect(screen.getByTestId('data-block-name-head-fade').style.backgroundImage).toContain(
       identitySurface.style.backgroundColor,
     );
   });
 
-  it('defaults an uncoloured node to a saturated grey identity surface', () => {
+  it('defaults an uncoloured node to a toned grey identity surface', () => {
     render(
       <WorkspaceNodeList
         workspaceId="workspace-1"
@@ -106,9 +104,9 @@ describe('WorkspaceNodeList', () => {
 
     const identitySurface = screen.getByTestId('workspace-node-row-node-1');
     expect(identitySurface).toHaveStyle({
-      backgroundColor: GREY,
-      color: foregroundForVizColor(GREY),
+      backgroundColor: toNodeSurfaceColor(GREY),
     });
+    expect(identitySurface).toHaveClass('text-foreground');
     expect(identitySurface.style.borderLeftWidth).toBe('');
   });
 

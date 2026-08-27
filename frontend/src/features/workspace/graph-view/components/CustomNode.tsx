@@ -20,8 +20,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import type { WorkspaceGraphNodeCard } from '../graphNodeModel';
 import { cn } from '@/lib/utils';
-import { normalizeNodeAccentColor } from '@/lib/nodeColor';
-import { GREY, foregroundForVizColor } from '@/features/views/common/vizPalette';
+import { normalizeNodeColor, toNodeSurfaceColor } from '@/lib/nodeColor';
+import { GREY } from '@/features/views/common/vizPalette';
 import { DataBlockName } from '@/components/DataBlockName';
 import type { NodeInputPointerPosition } from '@/stores/nodeInputRequestsStore';
 import { CUSTOM_NODE_TOOLBAR_BUTTON_CLASS, CustomNodeActionMenu } from './CustomNodeActionMenu';
@@ -168,9 +168,9 @@ function customNodeUiReducer(
 function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeData>>) {
   const { node, isFresh, onDelete, onRename, onCopy, onUndo, onRedo, onAddToSelection } = data;
   const { currentWorkspaceId, currentWorkspace } = useWorkspaceData();
-  // Selection and identity are deliberately independent: the persisted Data
-  // Block colour fills the name surface, while React Flow selection adds one
-  // detached, theme-inverse outline around the card.
+  // Selection and identity are deliberately independent: a tint of the
+  // persisted Data Block colour fills the name surface, while React Flow
+  // selection adds one detached, theme-inverse outline around the card.
   const isSelected = selected;
   const [uiState, dispatchUi] = useReducer(customNodeUiReducer, initialCustomNodeUiState);
   const {
@@ -199,10 +199,11 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
   const nodeShape = node.shape;
 
   // Per-node colour. A valid ``#rrggbb`` ``Node.color`` is the block's identity
-  // colour; unset / un-analysed blocks default to grey. Saturated colour fills
-  // the identity surface, with the higher-contrast light or dark name colour.
-  const effectiveColor = normalizeNodeAccentColor(node.color) ?? GREY;
-  const identityForeground = foregroundForVizColor(effectiveColor);
+  // colour; unset / un-analysed blocks default to grey. Large identity surfaces
+  // use a theme-aware tint while the exact colour remains available to compact
+  // marks such as chart series and legends.
+  const effectiveColor = normalizeNodeColor(node.color) ?? GREY;
+  const identitySurfaceColor = toNodeSurfaceColor(effectiveColor);
 
   /** Shows this node's toolbar and claims singleton ownership so any other
    * node's hover toolbar hides at once. Called on node/toolbar mouse-enter. */
@@ -509,7 +510,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
   if (isZoomedOut) {
     // Compact view keeps critical controls visible while preserving the compact footprint.
     const compactClasses = cn(
-      'flex items-start rounded-md border border-surface-border p-3',
+      'flex items-start rounded-md border border-surface-border p-3 text-foreground',
       isSelected && 'outline outline-2 outline-offset-2 outline-data-block-selection',
     );
     return (
@@ -524,8 +525,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
           minWidth: '220px',
           maxWidth: '360px',
           position: 'relative',
-          backgroundColor: effectiveColor,
-          color: identityForeground,
+          backgroundColor: identitySurfaceColor,
           // ``isFresh`` red "new" dot rendered below marks newly-created
           // nodes the user hasn't acknowledged yet.
         }}
@@ -534,7 +534,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
         {nodeToolbar}
         <DataBlockName
           name={nodeName}
-          backgroundColor={effectiveColor}
+          backgroundColor={identitySurfaceColor}
           maxLines={3}
           fadeEdge="head"
           className="w-full text-heading-1 font-semibold leading-snug"
@@ -572,17 +572,17 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
       }}
     >
       {newDot}
-      {/* The saturated header is the persistent identity surface; the neutral
-          body keeps metadata quiet and selection stays outside the card. */}
+      {/* The toned header is the persistent identity surface; the neutral body
+          keeps metadata quiet and selection stays outside the card. */}
       <div
         data-testid="custom-node-identity-header"
-        className="relative flex min-h-fit items-start justify-between rounded-t-md border-b border-surface-border px-3 py-2"
-        style={{ backgroundColor: effectiveColor, color: identityForeground }}
+        className="relative flex min-h-fit items-start justify-between rounded-t-md border-b border-surface-border px-3 py-2 text-foreground"
+        style={{ backgroundColor: identitySurfaceColor }}
       >
         <div className="flex min-w-0 flex-1 items-center">
           <DataBlockName
             name={nodeName}
-            backgroundColor={effectiveColor}
+            backgroundColor={identitySurfaceColor}
             maxLines={3}
             className="w-full text-body font-semibold leading-snug"
             title={nodeName}

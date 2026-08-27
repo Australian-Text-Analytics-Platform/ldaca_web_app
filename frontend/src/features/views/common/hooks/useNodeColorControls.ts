@@ -1,19 +1,13 @@
 import { useEffect, useState } from 'react';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
+import { normalizeNodeColor } from '@/lib/nodeColor';
 import { GREY, VIZ_PALETTE, pickRandomColor } from '../vizPalette';
-
-const HEX_COLOR_RE = /^#[0-9a-f]{6}$/i;
 
 interface NodeColorControlsParams {
   nodeIds: readonly string[];
   nodes: readonly WorkspaceNodeMetadata[];
   persistNodeColor?: (nodeId: string, color: string) => Promise<unknown> | undefined;
 }
-
-const normalizeHexColor = (value: unknown): string | null => {
-  if (typeof value !== 'string') return null;
-  return HEX_COLOR_RE.test(value) ? value.toLowerCase() : null;
-};
 
 const withoutNodeColor = (
   colors: Record<string, string>,
@@ -65,12 +59,12 @@ export function useNodeColorControls({
   // Preview colour wins in the tool UI; otherwise the persisted colour; else grey.
   const nodeColors: Record<string, string> = {};
   nodeIds.forEach((nodeId) => {
-    const persisted = normalizeHexColor(nodeById.get(nodeId)?.color);
+    const persisted = normalizeNodeColor(nodeById.get(nodeId)?.color);
     nodeColors[nodeId] = previewColors[nodeId] ?? persisted ?? GREY;
   });
 
   const setNodeColor = (nodeId: string, color: string) => {
-    const normalized = normalizeHexColor(color);
+    const normalized = normalizeNodeColor(color);
     if (!nodeId || !normalized) return;
     // Preview edit only; committed to Node.color on the next run.
     setPreviewColors((prev) =>
@@ -83,7 +77,7 @@ export function useNodeColorControls({
   // preview map changes — so reconciliation runs once per selection change
   // without looping.
   const selectionSignature = nodeIds
-    .map((nodeId) => `${nodeId}:${normalizeHexColor(nodeById.get(nodeId)?.color) ?? ''}`)
+    .map((nodeId) => `${nodeId}:${normalizeNodeColor(nodeById.get(nodeId)?.color) ?? ''}`)
     .join('|');
 
   // Reconcile the preview map with the current selection: keep previews for
@@ -97,7 +91,7 @@ export function useNodeColorControls({
       const selectedSet = new Set(selected);
       const used = new Set<string>();
       selected.forEach((nodeId) => {
-        const persisted = normalizeHexColor(nodeById.get(nodeId)?.color);
+        const persisted = normalizeNodeColor(nodeById.get(nodeId)?.color);
         if (persisted) used.add(persisted.toLowerCase());
       });
       const next: Record<string, string> = {};
@@ -111,7 +105,7 @@ export function useNodeColorControls({
       // Pre-fill a temporary colour for selected blocks that have neither a
       // persisted colour nor a preview yet.
       selected.forEach((nodeId) => {
-        if (next[nodeId] || normalizeHexColor(nodeById.get(nodeId)?.color)) return;
+        if (next[nodeId] || normalizeNodeColor(nodeById.get(nodeId)?.color)) return;
         const color = pickRandomColor(used);
         used.add(color.toLowerCase());
         next[nodeId] = color;
@@ -126,15 +120,15 @@ export function useNodeColorControls({
     const persist = persistNodeColor;
     const used = new Set<string>();
     nodeIds.forEach((nodeId) => {
-      const existing = normalizeHexColor(nodeById.get(nodeId)?.color) ?? previewColors[nodeId];
+      const existing = normalizeNodeColor(nodeById.get(nodeId)?.color) ?? previewColors[nodeId];
       if (existing) used.add(existing.toLowerCase());
     });
     const updates: Promise<void>[] = [];
     nodeIds.forEach((nodeId) => {
       if (!nodeId) return;
-      const persisted = normalizeHexColor(nodeById.get(nodeId)?.color);
-      // The colour the user previewed for this block (falls back to allocating
-      // one if a run happens before the preview settled).
+      const persisted = normalizeNodeColor(nodeById.get(nodeId)?.color);
+      // Use the colour the user previewed, or allocate one if a run happens
+      // before the preview effect settles.
       let target = previewColors[nodeId] ?? persisted;
       if (!target) {
         const allocated = pickRandomColor(used);
@@ -162,7 +156,6 @@ export function useNodeColorControls({
   return {
     defaultPalette: VIZ_PALETTE,
     nodeColors,
-    nodeColorOverrides: nodeColors,
     ensureNodeColors,
     setNodeColor,
   };

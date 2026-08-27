@@ -4,12 +4,12 @@ import {
   GREY,
   RANDOMIZABLE_FG,
   VIZ_PALETTE,
-  VIZ_PALETTE_BG,
-  VIZ_TINT_FOREGROUND,
   foregroundForVizColor,
   pickRandomColor,
   toBgColor,
 } from '../vizPalette';
+
+const VIZ_TINT_FOREGROUND = '#111827';
 
 /** WCAG relative luminance of an #rrggbb colour. */
 function luminance(hex: string): number {
@@ -35,14 +35,6 @@ describe('toBgColor', () => {
       expect(contrast(VIZ_TINT_FOREGROUND, bg)).toBeGreaterThan(7);
     }
   });
-
-  it('is index-aligned with the precomputed VIZ_PALETTE_BG', () => {
-    expect(VIZ_PALETTE_BG).toEqual(VIZ_PALETTE.map((c) => toBgColor(c)));
-  });
-
-  it('returns invalid input unchanged', () => {
-    expect(toBgColor('not-a-color')).toBe('not-a-color');
-  });
 });
 
 describe('foregroundForVizColor', () => {
@@ -51,10 +43,6 @@ describe('foregroundForVizColor', () => {
       const foreground = foregroundForVizColor(background);
       expect(contrast(foreground, background)).toBeGreaterThanOrEqual(4.5);
     }
-  });
-
-  it('falls back to the dark foreground for invalid input', () => {
-    expect(foregroundForVizColor('not-a-color')).toBe(VIZ_TINT_FOREGROUND);
   });
 });
 
@@ -75,7 +63,7 @@ describe('pickRandomColor', () => {
     vi.restoreAllMocks();
   });
 
-  it('falls back to a valid colour when every palette colour is used', () => {
+  it('reuses a valid colour when every palette colour is used', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
     const picked = pickRandomColor(RANDOMIZABLE_FG);
     expect(RANDOMIZABLE_FG).toContain(picked);

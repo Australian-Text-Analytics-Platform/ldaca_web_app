@@ -359,7 +359,6 @@ vi.mock('../../common/hooks/useNodeColorControls', () => ({
   useNodeColorControls: () => ({
     defaultPalette: ['#000000'],
     nodeColors: { 'node-1': '#000000' },
-    nodeColorOverrides: {},
     ensureNodeColors: vi.fn(),
     setNodeColor: vi.fn(),
   }),
