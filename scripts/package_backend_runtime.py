@@ -42,6 +42,11 @@ def parse_args() -> argparse.Namespace:
         choices=(PACKAGED_PYTHON_SELECTOR,),
         help="Python version to vendor inside the runtime",
     )
+    parser.add_argument(
+        "--no-sources",
+        action="store_true",
+        help="Ignore tool.uv.sources and install published wheels",
+    )
     return parser.parse_args()
 
 
@@ -269,23 +274,36 @@ def sync_runtime_environment(
     runtime_python_dir: Path,
     managed_python_dir: Path,
     cargo_target_dir: Path,
+    no_sources: bool,
 ) -> None:
     print("[INFO] Syncing backend runtime environment from backend/uv.lock")
     sync_env = create_uv_managed_python_env(managed_python_dir)
     sync_env["UV_PROJECT_ENVIRONMENT"] = str(runtime_python_dir)
     # The local Rust wheels share the Polars dependency graph.
     sync_env["CARGO_TARGET_DIR"] = str(cargo_target_dir)
+    sync_args = [
+        "uv",
+        "sync",
+        "--no-dev",
+        "--no-editable",
+        "--link-mode",
+        "copy",
+        "--managed-python",
+    ]
+    if no_sources:
+        sync_args.extend(
+            [
+                "--no-sources",
+                "--no-build-package",
+                "polars-text",
+                "--no-build-package",
+                "polars-source-utils",
+            ]
+        )
+    else:
+        sync_args.append("--locked")
     run(
-        [
-            "uv",
-            "sync",
-            "--locked",
-            "--no-dev",
-            "--no-editable",
-            "--link-mode",
-            "copy",
-            "--managed-python",
-        ],
+        sync_args,
         cwd=BACKEND_PROJECT_ROOT,
         extra_env=sync_env,
     )
@@ -423,6 +441,7 @@ def main() -> None:
         runtime_python_dir=runtime_python_dir,
         managed_python_dir=managed_python_dir,
         cargo_target_dir=dist_root / "cargo-target",
+        no_sources=args.no_sources,
     )
     remove_macos_metadata_files(output_dir)
 
@@ -435,7 +454,10 @@ def main() -> None:
     print("[SUCCESS] Backend runtime created")
     print(f"   Runtime folder: {output_dir}")
     print(f"   Python entry:   {python_bin}")
-    print("   Install mode:   uv sync --no-editable --link-mode copy")
+    source_mode = "published wheels" if args.no_sources else "checked-out sources"
+    print(f"   Package source: {source_mode}")
+    lock_mode = "PyPI resolution" if args.no_sources else "locked"
+    print(f"   Install mode:   uv sync ({lock_mode})")
 
 
 if __name__ == "__main__":

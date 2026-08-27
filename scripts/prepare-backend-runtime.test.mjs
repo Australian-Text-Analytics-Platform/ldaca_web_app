@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
     BACKEND_RUNTIME_PYTHON,
+    parseRuntimePreparationArgs,
     runtimePreparationSteps,
 } from './prepare-backend-runtime.mjs';
 
@@ -21,4 +22,18 @@ test('one runtime command owns packaging, version selection, and staging', () =>
         '3.14',
     ]);
     assert.deepEqual(steps[1].args, ['frontend/scripts/stage-backend-runtime.mjs']);
+});
+
+test('published-package mode is explicit and forwards uv no-sources', () => {
+    assert.deepEqual(parseRuntimePreparationArgs([]), { noSources: false });
+    assert.deepEqual(parseRuntimePreparationArgs(['--no-sources']), {
+        noSources: true,
+    });
+    assert.throws(
+        () => parseRuntimePreparationArgs(['--unknown']),
+        /Unknown backend runtime argument: --unknown/,
+    );
+
+    const steps = runtimePreparationSteps('/repo', { noSources: true });
+    assert.equal(steps[0].args.at(-1), '--no-sources');
 });

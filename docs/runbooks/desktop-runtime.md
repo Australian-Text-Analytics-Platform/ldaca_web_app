@@ -16,13 +16,19 @@ addition to the relocatable Python layout. The locked sync honors
 `backend/pyproject.toml` source overrides, so checked-out sibling packages are
 built when configured and packages without an override come from their locked
 registry source. Packaging fails when `pyproject.toml` and `uv.lock` disagree;
-it does not use `--no-sources`. The packager removes Finder `._*` and
-`.DS_Store` metadata before signing because HFS disk-image installation does
-not preserve those pseudo-files as ordinary sealed resources. The frontend
-staging script validates the target, backend version, lock digest, Python ABI,
-and layout, copies into a temporary sibling directory, then replaces
-`frontend/src-tauri/backend-runtime` as a whole. A previous runtime can never be
-merged into the replacement.
+the default path does not use `--no-sources`. The manual desktop workflows
+expose an opt-in `no_sources` input, defaulting to `false`. When enabled, CI
+passes `--no-sources`, resolves dependencies from PyPI without `--locked`, and
+refuses source distribution builds for `polars-text` and
+`polars-source-utils`. This installs their Python 3.14 wheels without compiling
+either Rust extension.
+
+The packager removes Finder `._*` and `.DS_Store` metadata before signing
+because HFS disk-image installation does not preserve those pseudo-files as
+ordinary sealed resources. The frontend staging script validates the target,
+backend version, lock digest, Python ABI, and layout, copies into a temporary
+sibling directory, then replaces `frontend/src-tauri/backend-runtime` as a
+whole. A previous runtime can never be merged into the replacement.
 
 Do not set `PYTHONPATH` manually or create another desktop development runtime.
 `pnpm dev:desktop` and release builds consume the same staged directory through
@@ -94,8 +100,12 @@ once per platform after version validation. Backend Ruff, Ty, and Pytest gates
 belong to the root CI workflow; desktop CI retains only supervisor, bundle, and
 packaged-runtime checks.
 
+Leave `no_sources` disabled when a desktop artifact must include unpublished
+local extension changes. Enable it only after the matching `polars-text` and
+`polars-source-utils` versions and Python 3.14 wheels are published to PyPI.
+
 The reusable build workflow owns all compilation and packaging. It prepares the
-source-aware backend runtime and invokes only the packaging configuration, then:
+selected backend runtime and invokes only the packaging configuration, then:
 
 - creates a signed MSI and updater signature on Windows;
 - builds explicitly for `aarch64-apple-darwin` on Apple Silicon;

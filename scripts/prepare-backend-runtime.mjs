@@ -7,21 +7,32 @@ import { fileURLToPath } from 'node:url';
 
 export const BACKEND_RUNTIME_PYTHON = '3.14';
 
-export function runtimePreparationSteps(repoRoot) {
+export function parseRuntimePreparationArgs(args) {
+    const unknownArgs = args.filter((arg) => arg !== '--no-sources');
+    if (unknownArgs.length > 0) {
+        throw new Error(`Unknown backend runtime argument: ${unknownArgs[0]}`);
+    }
+    return { noSources: args.includes('--no-sources') };
+}
+
+export function runtimePreparationSteps(repoRoot, { noSources = false } = {}) {
+    const packageArgs = [
+        'run',
+        '--no-project',
+        '--python',
+        BACKEND_RUNTIME_PYTHON,
+        'python',
+        'scripts/package_backend_runtime.py',
+        '--clean',
+        '--python-version',
+        BACKEND_RUNTIME_PYTHON,
+    ];
+    if (noSources) packageArgs.push('--no-sources');
+
     return [
         {
             command: 'uv',
-            args: [
-                'run',
-                '--no-project',
-                '--python',
-                BACKEND_RUNTIME_PYTHON,
-                'python',
-                'scripts/package_backend_runtime.py',
-                '--clean',
-                '--python-version',
-                BACKEND_RUNTIME_PYTHON,
-            ],
+            args: packageArgs,
             cwd: repoRoot,
         },
         {
@@ -32,8 +43,8 @@ export function runtimePreparationSteps(repoRoot) {
     ];
 }
 
-export function prepareBackendRuntime(repoRoot) {
-    for (const step of runtimePreparationSteps(repoRoot)) {
+export function prepareBackendRuntime(repoRoot, options) {
+    for (const step of runtimePreparationSteps(repoRoot, options)) {
         const result = spawnSync(step.command, step.args, {
             cwd: step.cwd,
             stdio: 'inherit',
@@ -46,5 +57,6 @@ export function prepareBackendRuntime(repoRoot) {
 
 const scriptPath = fileURLToPath(import.meta.url);
 if (process.argv[1] && resolve(process.argv[1]) === scriptPath) {
-    prepareBackendRuntime(resolve(dirname(scriptPath), '..'));
+    const options = parseRuntimePreparationArgs(process.argv.slice(2));
+    prepareBackendRuntime(resolve(dirname(scriptPath), '..'), options);
 }

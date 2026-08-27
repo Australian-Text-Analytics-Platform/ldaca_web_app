@@ -267,9 +267,9 @@ def test_liveness_and_readiness_are_distinct_and_legacy_health_is_absent(
         ready = client.get("/health/ready")
 
         assert live.status_code == 200
-        assert live.json() == {"status": "live", "version": "0.7.3"}
+        assert live.json() == {"status": "live", "version": "0.7.5"}
         assert ready.status_code == 200
-        assert ready.json() == {"status": "ready", "version": "0.7.3"}
+        assert ready.json() == {"status": "ready", "version": "0.7.5"}
         assert client.get("/health").status_code == 404
         assert client.get("/status").status_code == 404
         assert client.get("/api").status_code == 404

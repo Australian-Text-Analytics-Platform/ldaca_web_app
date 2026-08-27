@@ -17,6 +17,11 @@ on:
         required: false
         type: boolean
         default: false
+      no_sources:
+        description: "Use PyPI wheels instead of checked-out polars packages"
+        required: false
+        type: boolean
+        default: false
   workflow_dispatch:
     inputs:
       platform:
@@ -32,6 +37,11 @@ on:
         type: string
       debug:
         description: "Build Windows with debug diagnostics enabled"
+        required: false
+        type: boolean
+        default: false
+      no_sources:
+        description: "Use PyPI wheels instead of checked-out polars packages"
         required: false
         type: boolean
         default: false
@@ -118,9 +128,18 @@ jobs:
           cargo test --manifest-path src-tauri/Cargo.toml --lib
           cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --all-features --locked -- -D warnings
 
-      - name: Prepare backend runtime from checked-out sources
+      - name: Prepare backend runtime
+        shell: bash
         working-directory: frontend
-        run: pnpm prepare:backend-runtime
+        env:
+          NO_SOURCES: ${{ inputs.no_sources }}
+        run: |
+          set -Eeuo pipefail
+          args=()
+          if [ "$NO_SOURCES" = "true" ]; then
+            args+=(--no-sources)
+          fi
+          pnpm prepare:backend-runtime "${args[@]}"
 
       - name: Require updater signing key
         shell: bash

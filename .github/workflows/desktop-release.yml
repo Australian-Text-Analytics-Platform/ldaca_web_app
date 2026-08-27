@@ -13,6 +13,11 @@ on:
         required: false
         type: boolean
         default: false
+      no_sources:
+        description: "Use PyPI wheels instead of checked-out polars packages"
+        required: false
+        type: boolean
+        default: false
       release_tag:
         description: "Release tag to publish when publish_release is enabled"
         required: false
@@ -73,6 +78,7 @@ jobs:
     with:
       platform: ${{ matrix.platform }}
       debug: false
+      no_sources: ${{ inputs.no_sources }}
       ref: ${{ inputs.ref != '' && inputs.ref || github.ref }}
 
   publish-release:
