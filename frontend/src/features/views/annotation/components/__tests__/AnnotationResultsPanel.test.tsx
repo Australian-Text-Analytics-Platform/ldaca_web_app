@@ -191,13 +191,11 @@ describe('AnnotationResultsPanel', () => {
 
     renderPanel();
 
-    expect(screen.getByRole('row', { name: /^Example/ })).toHaveClass(
-      'bg-surface',
-      'hover:bg-surface',
+    expect(screen.getByRole('row', { name: /^Example/ }).style.backgroundColor).toBe(
+      'var(--vscode-surface-background)',
     );
-    expect(screen.getByRole('row', { name: /^Second example/ })).toHaveClass(
-      'bg-panel',
-      'hover:bg-panel',
+    expect(screen.getByRole('row', { name: /^Second example/ }).style.backgroundColor).toBe(
+      'var(--vscode-list-hoverBackground)',
     );
   });
 

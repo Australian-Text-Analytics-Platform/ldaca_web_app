@@ -453,7 +453,13 @@ export function AnnotationResultsPanel({
                 return (
                   <TableRow
                     key={rowPosition}
-                    className={`align-top ${index % 2 === 0 ? 'bg-surface hover:bg-surface' : 'bg-panel hover:bg-panel'}`}
+                    className="align-top"
+                    style={{
+                      backgroundColor:
+                        index % 2 === 0
+                          ? 'var(--vscode-surface-background)'
+                          : 'var(--vscode-list-hoverBackground)',
+                    }}
                   >
                     <TableCell className="break-words whitespace-pre-wrap">
                       {cellText(row[textColumn])}

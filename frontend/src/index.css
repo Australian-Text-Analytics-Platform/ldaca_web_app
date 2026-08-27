@@ -128,6 +128,14 @@
 }
 
 @layer components {
+  section[aria-label="Annotation Review"] tbody > tr:nth-child(odd) {
+    background-color: var(--vscode-surface-background) !important;
+  }
+
+  section[aria-label="Annotation Review"] tbody > tr:nth-child(even) {
+    background-color: var(--vscode-list-hoverBackground) !important;
+  }
+
   .react-flow {
     --xy-background-color: transparent;
     --xy-background-pattern-dots-color: var(--vscode-charts-lines);
