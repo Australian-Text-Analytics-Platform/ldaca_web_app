@@ -11,6 +11,19 @@ import { AnnotationResultsPanel } from '../AnnotationResultsPanel';
 const queryWorkspaceSqlTable = vi.hoisted(() => vi.fn());
 const setCell = vi.hoisted(() => vi.fn());
 const setPagination = vi.hoisted(() => vi.fn());
+const nodePageRows = vi.hoisted(() => ({
+  value: [
+    {
+      __wordflow_annotation_source_row_index: 0,
+      text: 'Example',
+      annotation: 'covid',
+      correction: null,
+      reviewer: 'covid',
+      username: 'alice',
+      record_id: 1,
+    },
+  ] as Record<string, unknown>[],
+}));
 
 vi.mock('@/api', async (importOriginal) => ({
   ...(await importOriginal()),
@@ -51,18 +64,8 @@ vi.mock('../../hooks/useAnnotationNodePage', () => ({
       isError: false,
       isFetching: false,
     },
-    rows: [
-      {
-        __wordflow_annotation_source_row_index: 0,
-        text: 'Example',
-        annotation: 'covid',
-        correction: null,
-        reviewer: 'covid',
-        username: 'alice',
-        record_id: 1,
-      },
-    ],
-    rowCount: 2380,
+    rows: nodePageRows.value,
+    rowCount: nodePageRows.value.length === 0 ? 0 : 2380,
     countQuery: { isLoading: false, isError: false, isFetching: false },
     sourceRowIndexColumn: '__wordflow_annotation_source_row_index',
     refreshFilteredRows: vi.fn(),
@@ -144,6 +147,45 @@ describe('AnnotationResultsPanel', () => {
     setCell.mockReset();
     setCell.mockResolvedValue(undefined);
     setPagination.mockReset();
+    nodePageRows.value = [
+      {
+        __wordflow_annotation_source_row_index: 0,
+        text: 'Example',
+        annotation: 'covid',
+        correction: null,
+        reviewer: 'covid',
+        username: 'alice',
+        record_id: 1,
+      },
+    ];
+  });
+
+  it('keeps the headers and filter controls mounted when a filter matches no rows', async () => {
+    const user = userEvent.setup();
+    queryWorkspaceSqlTable.mockResolvedValue({
+      columns: ['__reference', '__comparison', '__count'],
+      rows: [],
+      hasNext: false,
+      etag: 'revision-1',
+    });
+    nodePageRows.value = [];
+
+    renderPanel();
+
+    expect(screen.getByRole('columnheader', { name: 'text' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Filter rows by annotation' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Filter rows by reviewer' })).toBeEnabled();
+    expect(screen.getByRole('cell', { name: 'No rows to annotate.' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Filter rows by reviewer' }));
+    await user.click(screen.getByRole('menuitemradio', { name: 'Empty' }));
+    await user.keyboard('{Escape}');
+
+    expect(screen.getByRole('cell', { name: 'No rows match the filter.' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Filter rows by reviewer' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
   });
 
   it('edits the selected correction column without exposing an example shortcut', async () => {

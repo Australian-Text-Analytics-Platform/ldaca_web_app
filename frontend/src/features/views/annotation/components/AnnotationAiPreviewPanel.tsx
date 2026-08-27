@@ -324,7 +324,7 @@ export function AnnotationAiPreviewPanel({
       >
         <Table className="w-full table-auto" disableContainer>
           <TableHeader className="sticky top-0 z-10 bg-surface">
-            <TableRow>
+            <TableRow className="[&>th]:align-bottom">
               <TableHead>{columns.text}</TableHead>
               <TableHead className="w-px whitespace-nowrap">
                 {columns.annotation} (preview)

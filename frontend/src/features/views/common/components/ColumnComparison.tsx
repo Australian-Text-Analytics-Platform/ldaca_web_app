@@ -44,9 +44,9 @@ interface ColumnComparisonHeaderProps {
 
 /**
  * Presents one comparison column without exposing its coding until the user reveals it.
- * Rendered by: Annotation Manual, Preview, and Review headers. Flow: always show the column name,
- * the disclosure control, the aggregate reliability score with its matrix, and (when the table
- * supports it) the row-filter menu. Only per-row values and difference tint wait for reveal, so a
+ * Rendered by: Annotation Manual, Preview, and Review headers. Flow: stack the aggregate
+ * reliability score (with its matrix tooltip) above the column name, the disclosure control, and
+ * (when the table supports it) the row-filter menu, so the header stays narrow. Only per-row values and difference tint wait for reveal, so a
  * coder can track agreement and filter rows without seeing how any individual row was coded.
  */
 export function ColumnComparisonHeader({
@@ -88,31 +88,8 @@ export function ColumnComparisonHeader({
       : `${metricDefinition?.label ?? ''} ${accessibleScore ?? ''} for ${referenceColumn} versus ${comparisonColumn}`;
 
   return (
-    <span className="inline-flex items-center gap-1.5">
-      <span>{label ?? comparisonColumn}</span>
+    <span className="inline-flex flex-col items-start gap-1">
       <TooltipProvider delayDuration={120} skipDelayDuration={0}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="size-7 p-0"
-              aria-label={`${revealed ? 'Hide' : 'Show'} comparison values for ${comparisonColumn}`}
-              aria-pressed={revealed}
-              onClick={() => {
-                onRevealedChange(!revealed);
-              }}
-            >
-              {revealed ? (
-                <EyeOff aria-hidden="true" className="size-3.5" />
-              ) : (
-                <Eye aria-hidden="true" className="size-3.5" />
-              )}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>{revealed ? 'Hide comparison' : 'Show comparison'}</TooltipContent>
-        </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>
             <Badge
@@ -194,14 +171,39 @@ export function ColumnComparisonHeader({
             )}
           </TooltipContent>
         </Tooltip>
-        {filter && onFilterChange ? (
-          <AnnotationColumnFilterMenu
-            column={comparisonColumn}
-            value={filter}
-            onChange={onFilterChange}
-            differsLabel={`Differs from ${referenceColumn}`}
-          />
-        ) : null}
+        <span className="inline-flex items-center gap-1.5">
+          <span>{label ?? comparisonColumn}</span>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="size-7 p-0"
+                aria-label={`${revealed ? 'Hide' : 'Show'} comparison values for ${comparisonColumn}`}
+                aria-pressed={revealed}
+                onClick={() => {
+                  onRevealedChange(!revealed);
+                }}
+              >
+                {revealed ? (
+                  <EyeOff aria-hidden="true" className="size-3.5" />
+                ) : (
+                  <Eye aria-hidden="true" className="size-3.5" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{revealed ? 'Hide comparison' : 'Show comparison'}</TooltipContent>
+          </Tooltip>
+          {filter && onFilterChange ? (
+            <AnnotationColumnFilterMenu
+              column={comparisonColumn}
+              value={filter}
+              onChange={onFilterChange}
+              differsLabel={`Differs from ${referenceColumn}`}
+            />
+          ) : null}
+        </span>
       </TooltipProvider>
     </span>
   );

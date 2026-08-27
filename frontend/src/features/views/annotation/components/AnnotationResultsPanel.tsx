@@ -357,10 +357,6 @@ export function AnnotationResultsPanel({
         <div className="rounded-md border border-error/30 bg-error/5 px-4 py-3 text-body text-error">
           Could not load annotations.
         </div>
-      ) : rows.length === 0 ? (
-        <div className="rounded-md border border-dashed border-surface-border px-4 py-3 text-body text-description">
-          {activeFilter ? 'No rows match the filter.' : 'No rows to annotate.'}
-        </div>
       ) : (
         <AnnotationTableFrame
           height={tableHeight}
@@ -378,7 +374,7 @@ export function AnnotationResultsPanel({
         >
           <Table className="w-full table-auto" disableContainer>
             <TableHeader className="sticky top-0 z-10 bg-surface">
-              <TableRow>
+              <TableRow className="[&>th]:align-bottom">
                 <TableHead>{textColumn}</TableHead>
                 <TableHead className="w-px whitespace-nowrap">
                   <span className="inline-flex items-center gap-1.5">
@@ -437,6 +433,16 @@ export function AnnotationResultsPanel({
               </TableRow>
             </TableHeader>
             <TableBody>
+              {rows.length === 0 ? (
+                <TableRow className="hover:bg-transparent">
+                  <TableCell
+                    className="h-24 text-center text-description"
+                    colSpan={tableColumns.length}
+                  >
+                    {activeFilter ? 'No rows match the filter.' : 'No rows to annotate.'}
+                  </TableCell>
+                </TableRow>
+              ) : null}
               {rows.map((row) => {
                 const rowPosition = Number(row[sourceRowIndexColumn]);
                 const seeded =

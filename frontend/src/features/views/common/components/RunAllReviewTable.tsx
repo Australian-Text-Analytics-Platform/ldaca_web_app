@@ -326,7 +326,7 @@ export function RunAllReviewTable({
         >
           <Table className="w-full table-auto" disableContainer>
             <TableHeader className="sticky top-0 z-10 bg-surface">
-              <TableRow>
+              <TableRow className="[&>th]:align-bottom">
                 {visibleRequiredColumns.map((column) => (
                   <TableHead
                     key={column}
@@ -415,6 +415,16 @@ export function RunAllReviewTable({
               </TableRow>
             </TableHeader>
             <TableBody>
+              {page.rows.length === 0 ? (
+                <TableRow className="hover:bg-transparent">
+                  <TableCell
+                    className="h-24 text-center text-description"
+                    colSpan={tableColumns.length}
+                  >
+                    {activeFilter ? 'No rows match the filter.' : 'No rows to review.'}
+                  </TableCell>
+                </TableRow>
+              ) : null}
               {page.rows.map((row) => {
                 const rowPosition = Number(row[sourceRowIndexColumn]);
                 const referenceValue = row[comparisonColumn];

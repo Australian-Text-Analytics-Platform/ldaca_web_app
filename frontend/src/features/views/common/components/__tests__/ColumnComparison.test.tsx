@@ -62,7 +62,7 @@ describe('ColumnComparison', () => {
     ).toBe(rows);
   });
 
-  it('shows Cohen’s Kappa beside the column and plain matrix counts on hover', async () => {
+  it('stacks Cohen’s Kappa above the column name and shows plain matrix counts on hover', async () => {
     const user = userEvent.setup();
     render(
       <ColumnComparisonHeader
@@ -84,6 +84,9 @@ describe('ColumnComparison', () => {
     expect(screen.getByText('review')).toBeVisible();
     expect(score).toBeVisible();
     expect(score).toHaveClass('h-7', 'px-2.5', 'text-body');
+    expect(score.compareDocumentPosition(screen.getByText('review'))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
 
     await user.hover(score);
