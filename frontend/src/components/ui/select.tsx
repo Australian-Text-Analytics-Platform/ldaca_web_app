@@ -112,12 +112,16 @@ const SelectLabel = ({
 
 type SelectItemProps = React.ComponentProps<typeof SelectPrimitive.Item>;
 
-/** Select option row with checkmark indicator for chosen values. */
+/**
+ * Select option row with checkmark indicator for chosen values. The compact control height is a
+ * minimum, not a fixed height, so two-line options (label plus identifier) grow instead of
+ * overlapping the next row.
+ */
 const SelectItem = ({ className, children, ref, ...props }: SelectItemProps) => (
   <SelectPrimitive.Item
     ref={ref}
     className={cn(
-      'relative flex h-control-sm w-full cursor-default select-none items-center rounded-sm py-0.5 pl-2 pr-8 text-body outline-hidden focus:bg-list-hover focus:text-foreground data-[highlighted]:bg-list-hover data-[highlighted]:text-foreground data-disabled:pointer-events-none data-disabled:text-disabled',
+      'relative flex min-h-control-sm w-full cursor-default select-none items-center rounded-sm py-0.5 pl-2 pr-8 text-body outline-hidden focus:bg-list-hover focus:text-foreground data-[highlighted]:bg-list-hover data-[highlighted]:text-foreground data-disabled:pointer-events-none data-disabled:text-disabled',
       className,
     )}
     {...props}
