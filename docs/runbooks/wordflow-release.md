@@ -83,5 +83,5 @@ already reached PyPI.
   standard system confirmation, and confirm the app installs the release and
   relaunches into the new version.
 - Deploy the tagged root commit and current supporting-package pointers.
-- Verify `/health`, hosted login, one Workspace read, and `/api/events`
+- Verify `/health/live`, `/health/ready`, hosted login, one Workspace read, and `/api/events`
   delivery.

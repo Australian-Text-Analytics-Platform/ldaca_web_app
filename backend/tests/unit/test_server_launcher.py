@@ -121,7 +121,7 @@ async def test_dynamic_port_is_bound_before_final_settings_and_readiness(
     assert isinstance(handle, ServerHandle)
 
     record = json.loads(startup_file.read_text(encoding="utf-8"))
-    assert record["status"] == "ready"
+    assert record["status"] == "live"
     assert record["port"] == handle.server.config.port
     assert record["port"] > 0
     if os.name != "nt":

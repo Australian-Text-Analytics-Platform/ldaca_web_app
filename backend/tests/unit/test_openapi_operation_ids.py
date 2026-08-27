@@ -53,6 +53,7 @@ def test_resource_routes_have_no_action_aliases_or_hidden_workspace_selection() 
     assert "/status" not in paths
 
 
-def test_public_health_does_not_advertise_irrelevant_global_errors() -> None:
-    operation = app.openapi()["paths"]["/health"]["get"]
-    assert set(operation["responses"]) == {"200", "503"}
+def test_public_health_contracts_are_minimal() -> None:
+    paths = app.openapi()["paths"]
+    assert set(paths["/health/live"]["get"]["responses"]) == {"200"}
+    assert set(paths["/health/ready"]["get"]["responses"]) == {"200", "503"}

@@ -108,16 +108,16 @@ async def _serve_bound(
     *,
     settings: Settings,
     startup_file: Path | None,
-    readiness: asyncio.Future[None],
+    liveness: asyncio.Future[None],
 ) -> None:
-    """Run Uvicorn and publish readiness only after lifespan succeeds."""
+    """Run Uvicorn and publish liveness only after lifespan succeeds."""
 
     serve_task = asyncio.create_task(server.serve(sockets=[listener]))
     try:
         while not server.started:
             if serve_task.done():
                 await serve_task
-                raise RuntimeError("Uvicorn stopped before reporting readiness")
+                raise RuntimeError("Uvicorn stopped before reporting liveness")
             await asyncio.sleep(0.01)
 
         if startup_file is not None:
@@ -125,21 +125,21 @@ async def _serve_bound(
                 startup_file,
                 {
                     "schema_version": 1,
-                    "status": "ready",
+                    "status": "live",
                     "pid": os.getpid(),
                     "host": settings.server_host,
                     "port": settings.backend_port,
                     "version": __version__,
                 },
             )
-        if not readiness.done():
-            readiness.set_result(None)
+        if not liveness.done():
+            liveness.set_result(None)
         await serve_task
     except BaseException as exc:
         if startup_file is not None and not server.started:
             _publish_startup_failure(startup_file)
-        if not readiness.done():
-            readiness.set_exception(exc)
+        if not liveness.done():
+            liveness.set_exception(exc)
         if not serve_task.done():
             serve_task.cancel()
         await asyncio.gather(serve_task, return_exceptions=True)
@@ -216,7 +216,7 @@ async def start_async_server(
     settings: Settings | None = None,
     startup_file: str | Path | None = None,
 ) -> ServerHandle:
-    """Start one server and return only after ASGI lifespan reports ready."""
+    """Start one server and return after its live HTTP control plane starts."""
 
     server, listener, current, startup_path = _prepare_server(
         serve_frontend=serve_frontend,
@@ -226,18 +226,18 @@ async def start_async_server(
         settings=settings,
         startup_file=startup_file,
     )
-    readiness = asyncio.get_running_loop().create_future()
+    liveness = asyncio.get_running_loop().create_future()
     task = asyncio.create_task(
         _serve_bound(
             server,
             listener,
             settings=current,
             startup_file=startup_path,
-            readiness=readiness,
+            liveness=liveness,
         )
     )
     try:
-        await asyncio.shield(readiness)
+        await asyncio.shield(liveness)
     except BaseException:
         await asyncio.gather(task, return_exceptions=True)
         raise

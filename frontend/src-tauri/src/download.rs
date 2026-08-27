@@ -1,6 +1,6 @@
 //! Native streaming downloads restricted to the supervised local backend.
 
-use crate::{ready_backend_url, BackendState};
+use crate::{live_backend_url, BackendState};
 use futures_util::StreamExt;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -141,7 +141,7 @@ pub(crate) async fn download_to_downloads(
     api_path: String,
     filename: String,
 ) -> Result<String, String> {
-    let backend_url = ready_backend_url(&state)?;
+    let backend_url = live_backend_url(&state)?;
     let directory = app
         .path()
         .download_dir()

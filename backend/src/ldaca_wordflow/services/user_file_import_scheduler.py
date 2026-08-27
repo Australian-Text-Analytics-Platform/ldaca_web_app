@@ -122,6 +122,12 @@ class UserFileImportScheduler:
                     active.scope.cancel()
             return keys
 
+    async def has_work(self) -> bool:
+        """Return whether queued or running import execution still exists."""
+
+        async with self._lock:
+            return bool(self._pending or self._active)
+
     async def wait_idle(self) -> None:
         while True:
             async with self._lock:

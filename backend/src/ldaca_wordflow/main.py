@@ -38,6 +38,7 @@ from ._middleware import (
 from .api.auth import router as auth_router
 from .api.annotations import router as annotations_router
 from .api.data_portal import router as data_portal_router
+from .api.data_root import router as data_root_router
 from .api.provider_credentials import router as provider_credentials_router
 from .api.preferences import router as preferences_router
 from .api.error_response import api_error_response
@@ -51,8 +52,18 @@ from .api.user_file_imports import router as user_file_imports_router
 from .api.workspaces import router as workspaces_router
 from .shared.errors import AppError
 from .shared.json_data import JsonData
-from .runtime import LifespanState, Runtime, get_runtime, runtime_context
+from .runtime import (
+    LifespanState,
+    Runtime,
+    RuntimeManager,
+    RuntimeManagerState,
+    get_runtime_manager,
+    runtime_context,
+    runtime_manager_context,
+)
 from .settings import Settings
+from .data_root_config import DataRootConfigStore
+from .shared.errors import RuntimeUnavailableError
 
 logger = logging.getLogger(__name__)
 
@@ -62,12 +73,21 @@ __version__ = version("ldaca-wordflow")
 RuntimeContextFactory = Callable[[Settings], AbstractAsyncContextManager[Runtime]]
 
 
-class HealthResponse(BaseModel):
-    """Minimal public readiness payload for probes and uptime monitors."""
+class LivenessResponse(BaseModel):
+    """Minimal public process-liveness payload."""
 
     model_config = ConfigDict(extra="forbid")
 
-    status: Literal["ready", "stopping"]
+    status: Literal["live"]
+    version: str
+
+
+class ReadinessResponse(BaseModel):
+    """Public Runtime readiness without component or filesystem details."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    status: RuntimeManagerState
     version: str
 
 
@@ -183,6 +203,58 @@ class _UnexpectedErrorMiddleware:
             await response(scope, receive, send)
 
 
+class _RuntimeLeaseMiddleware:
+    """Pin finite API requests to one Runtime while a root switch drains."""
+
+    _control_paths = {"/api/data-root", "/api/openapi.json"}
+    _control_prefixes = ("/api/docs", "/api/redoc")
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        path = self._route_path(scope)
+        if (
+            not path.startswith("/api")
+            or path in self._control_paths
+            or path.startswith(self._control_prefixes)
+        ):
+            await self.app(scope, receive, send)
+            return
+        state = cast(dict[str, object], scope.setdefault("state", {}))
+        manager = state.get("runtime_manager")
+        if not isinstance(manager, RuntimeManager):
+            await self.app(scope, receive, send)
+            return
+        try:
+            if path == "/api/events":
+                state["runtime"] = manager.current_runtime()
+                await self.app(scope, receive, send)
+                return
+            async with manager.lease() as runtime:
+                state["runtime"] = runtime
+                await self.app(scope, receive, send)
+        except RuntimeUnavailableError:
+            request_id = str(state.get("request_id", "missing-request-id"))
+            await api_error_response(
+                request_id=request_id,
+                status_code=503,
+                code="runtime_unavailable",
+                message="The Data Root runtime is not ready",
+            )(scope, receive, send)
+
+    @staticmethod
+    def _route_path(scope: Scope) -> str:
+        path = str(scope.get("path") or "/")
+        root_path = str(scope.get("root_path") or "").rstrip("/")
+        if root_path and (path == root_path or path.startswith(f"{root_path}/")):
+            return path[len(root_path) :] or "/"
+        return path
+
+
 async def _http_error_handler(
     request: Request,
     exc: StarletteHTTPException,
@@ -214,6 +286,7 @@ def _register_routers(app: FastAPI) -> None:
         auth_router,
         annotations_router,
         data_portal_router,
+        data_root_router,
         preferences_router,
         provider_credentials_router,
         events_router,
@@ -232,6 +305,7 @@ def create_app(
     runtime_context_factory: RuntimeContextFactory = runtime_context,
     *,
     serve_frontend: bool = True,
+    data_root_config_store: DataRootConfigStore | None = None,
 ) -> FastAPI:
     """Construct a side-effect-free FastAPI application.
 
@@ -245,8 +319,12 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[LifespanState]:
-        async with runtime_context_factory(settings) as runtime:
-            yield LifespanState(runtime=runtime)
+        async with runtime_manager_context(
+            settings,
+            runtime_context_factory,
+            config_store=data_root_config_store,
+        ) as manager:
+            yield LifespanState(runtime_manager=manager)
 
     app = FastAPI(
         title="LDaCA Wordflow API",
@@ -274,6 +352,7 @@ def create_app(
         cast(Any, ExactHostMiddleware),
         trusted_hosts=settings.get_trusted_hosts(),
     )
+    app.add_middleware(cast(Any, _RuntimeLeaseMiddleware))
     app.add_middleware(
         cast(Any, RequestBodyLimitMiddleware),
         default_limit=settings.max_default_request_body_bytes,
@@ -294,6 +373,7 @@ def create_app(
             "Accept",
             "Content-Type",
             "X-CSRF-Token",
+            "X-Data-Root-Token",
             "X-Request-ID",
         ],
         expose_headers=[
@@ -311,19 +391,33 @@ def create_app(
     _register_routers(app)
 
     @app.get(
-        "/health",
-        response_model=HealthResponse,
-        response_model_exclude_none=True,
-        responses={503: {"model": HealthResponse, "description": "Stopping"}},
+        "/health/live",
+        response_model=LivenessResponse,
         tags=["health"],
+        name="liveness_check",
     )
-    async def health_check(request: Request, response: Response) -> HealthResponse:
-        """Report only process readiness and the installed package version."""
+    async def liveness_check() -> LivenessResponse:
+        """Report that the HTTP control plane is responsive."""
 
-        status = get_runtime(request).readiness.status
-        if status == "stopping":
+        return LivenessResponse(status="live", version=__version__)
+
+    @app.get(
+        "/health/ready",
+        response_model=ReadinessResponse,
+        responses={503: {"model": ReadinessResponse, "description": "Not ready"}},
+        tags=["health"],
+        name="readiness_check",
+    )
+    async def readiness_check(
+        request: Request,
+        response: Response,
+    ) -> ReadinessResponse:
+        """Report whether the complete Data Root Runtime accepts requests."""
+
+        status = get_runtime_manager(request).state
+        if status != "ready":
             response.status_code = 503
-        return HealthResponse(status=status, version=__version__)
+        return ReadinessResponse(status=status, version=__version__)
 
     if serve_frontend:
         from .spa import _mount_frontend

@@ -339,10 +339,20 @@ punctuation/symbol-only tokens from context counts and L1/R1 while preserving
 their original source text in context and extraction strings. Tokens mode
 ignores this field because tokenization already removes punctuation.
 
-## Readiness And Common Semantics
+## Bootstrap, Readiness, And Common Semantics
 
-`GET /health` (`health_check`) is public. It returns `200` with `status: ready`
-or `503` with `status: stopping`, plus the installed package version.
+`GET /health/live` (`liveness_check`) is public and returns `200` with
+`status: live` while the HTTP control plane functions. `GET /health/ready`
+(`readiness_check`) returns `200` only for `status: ready` and `503` for every
+other Runtime-manager state.
+
+`GET /api/data-root` returns `state`, `source`, `data_root`,
+`suggested_data_root`, `mutable`, `runtime_generation`, optional typed `error`,
+and a same-origin `change_token` when mutation is allowed. Multi-user responses
+redact paths and the token. `PUT /api/data-root` accepts one absolute server
+path and requires `X-Data-Root-Token`. It returns `403` for operator-managed
+roots, `409` for active work or another transition, and `422` for invalid or
+inaccessible paths. There is no legacy `/health` route or Data Root alias.
 
 - Addressable creation returns `201` and relative `Location`; accepted import
   submission or running cancellation returns `202`; empty deletion returns

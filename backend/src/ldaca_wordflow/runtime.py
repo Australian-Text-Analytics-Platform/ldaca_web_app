@@ -19,24 +19,31 @@ from __future__ import annotations
 
 import logging
 import os
+import secrets
 import sys
 import tempfile
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal, TypedDict, cast
+from typing import AsyncContextManager, Literal, TypedDict, cast
 
 import anyio
 from anyio.abc import TaskGroup
 from anyio.to_thread import run_sync as run_sync_in_worker_thread
 from fastapi import Request
 
+from ._logging import setup_logging
 from .services.user_files import UserFileStore
 from .services.workspace_archives import WorkspaceArchiveLimits, WorkspaceArchiveService
 from .infrastructure.database import Database
 from .infrastructure.providers.quotation_client import QuotationProviderClient
 from .settings import Settings
+from .data_root_config import (
+    DataRootConfigError,
+    DataRootConfigStore,
+    probe_data_root,
+)
 from .services.sessions import SessionService
 from .services.oauth import OAuthService
 from .services.file_preview import FileReadService
@@ -76,10 +83,28 @@ from .services.workspace_sql import WorkspaceSqlService
 from .services.workspace import WorkspaceService
 from .infrastructure.storage.workspace_store import WorkspaceStore
 from .services.workspace_lifecycle import WorkspaceLifecycleService
+from .shared.errors import (
+    DataRootBusyError,
+    DataRootInvalidError,
+    DataRootManagedByOperatorError,
+    DataRootTransitionError,
+    InternalServiceError,
+    RuntimeUnavailableError,
+)
 
 logger = logging.getLogger(__name__)
 ReadinessStatus = Literal["ready", "stopping"]
+RuntimeManagerState = Literal[
+    "unconfigured",
+    "initializing",
+    "ready",
+    "reconfiguring",
+    "configuration_error",
+    "stopping",
+]
+DataRootSource = Literal["environment", "config", "none"]
 ExecutionShutdown = Callable[[float], Awaitable[None]]
+ManagedRuntimeFactory = Callable[[Settings], AsyncContextManager["Runtime"]]
 
 
 @dataclass(slots=True)
@@ -237,10 +262,341 @@ class _RuntimeTaskGroupOwner:
             await self.task_group.__aexit__(None, None, None)
 
 
+@dataclass(frozen=True, slots=True)
+class RuntimeManagerError:
+    """Safe bootstrap failure returned by the public control plane."""
+
+    code: str
+    message: str
+
+
+@dataclass(frozen=True, slots=True)
+class RuntimeManagerSnapshot:
+    """Immutable public projection of one process's Data Root state."""
+
+    state: RuntimeManagerState
+    source: DataRootSource
+    data_root: Path | None
+    suggested_data_root: Path | None
+    mutable: bool
+    runtime_generation: int
+    error: RuntimeManagerError | None
+    change_token: str | None
+
+
+class RuntimeManager:
+    """Own an optional complete Runtime behind a live HTTP control plane."""
+
+    def __init__(
+        self,
+        settings: Settings,
+        runtime_factory: ManagedRuntimeFactory,
+        *,
+        config_store: DataRootConfigStore | None = None,
+    ) -> None:
+        self._base_settings = settings
+        self._runtime_factory = runtime_factory
+        self._config_store = config_store or DataRootConfigStore()
+        self._runtime: Runtime | None = None
+        self._runtime_stack: AsyncExitStack | None = None
+        self._state: RuntimeManagerState = "unconfigured"
+        self._source: DataRootSource = "none"
+        self._data_root: Path | None = None
+        self._generation = 0
+        self._error: RuntimeManagerError | None = None
+        self._change_token = secrets.token_urlsafe(32)
+        self._transition_lock = anyio.Lock()
+        self._lease_condition = anyio.Condition()
+        self._active_leases = 0
+
+    @property
+    def state(self) -> RuntimeManagerState:
+        return self._state
+
+    def snapshot(self) -> RuntimeManagerSnapshot:
+        """Return a redacted, mode-aware public state snapshot."""
+
+        mutable = not self._base_settings.multi_user and self._source != "environment"
+        reveal_paths = not self._base_settings.multi_user
+        return RuntimeManagerSnapshot(
+            state=self._state,
+            source=self._source,
+            data_root=self._data_root if reveal_paths else None,
+            suggested_data_root=(
+                self._config_store.paths.suggested_data_root
+                if mutable and reveal_paths
+                else None
+            ),
+            mutable=mutable,
+            runtime_generation=self._generation,
+            error=self._error,
+            change_token=self._change_token if mutable else None,
+        )
+
+    def validate_change_token(self, candidate: str | None) -> bool:
+        """Compare the single-user control token without timing disclosure."""
+
+        snapshot = self.snapshot()
+        return bool(
+            snapshot.mutable
+            and candidate
+            and secrets.compare_digest(candidate, self._change_token)
+        )
+
+    def current_runtime(self) -> Runtime:
+        """Return the ready Runtime or a typed temporary-unavailability error."""
+
+        if self._state != "ready" or self._runtime is None:
+            raise RuntimeUnavailableError()
+        return self._runtime
+
+    @asynccontextmanager
+    async def lease(self) -> AsyncIterator[Runtime]:
+        """Hold one finite request against Runtime teardown."""
+
+        async with self._lease_condition:
+            runtime = self.current_runtime()
+            self._active_leases += 1
+        try:
+            yield runtime
+        finally:
+            async with self._lease_condition:
+                self._active_leases -= 1
+                self._lease_condition.notify_all()
+
+    async def start(self) -> None:
+        """Resolve environment/config precedence and initialize when configured."""
+
+        if self._base_settings.data_root is not None:
+            self._source = "environment"
+            selected = self._base_settings.data_root
+        else:
+            try:
+                selected = await run_sync_in_worker_thread(
+                    self._config_store.read,
+                    abandon_on_cancel=False,
+                )
+            except DataRootConfigError:
+                self._source = "config"
+                self._state = "configuration_error"
+                self._error = RuntimeManagerError(
+                    "data_root_config_invalid",
+                    "The saved Data Root configuration is invalid",
+                )
+                return
+            self._source = "config" if selected is not None else "none"
+        if selected is None:
+            self._state = "unconfigured"
+            return
+        self._data_root = selected
+        self._state = "initializing"
+        try:
+            stack, runtime, canonical = await self._open_runtime(selected)
+        except Exception:
+            logger.exception("Configured Data Root could not initialize")
+            self._state = "configuration_error"
+            self._error = RuntimeManagerError(
+                "data_root_unavailable",
+                "The configured Data Root could not be opened",
+            )
+            return
+        self._runtime_stack = stack
+        self._runtime = runtime
+        self._data_root = canonical
+        self._generation = 1
+        self._state = "ready"
+
+    async def close(self) -> None:
+        """Stop admission, drain finite requests, and close the active Runtime."""
+
+        self._state = "stopping"
+        await self._wait_for_leases()
+        await self._close_active_runtime()
+        self._use_bootstrap_logging()
+
+    async def configure(self, candidate: Path) -> RuntimeManagerSnapshot:
+        """Validate and transactionally select one single-user Data Root."""
+
+        if self._base_settings.multi_user or self._source == "environment":
+            raise DataRootManagedByOperatorError()
+        try:
+            self._transition_lock.acquire_nowait()
+        except (anyio.WouldBlock, RuntimeError):
+            raise DataRootTransitionError()
+        try:
+            return await self._configure_locked(candidate)
+        finally:
+            self._transition_lock.release()
+
+    async def _configure_locked(self, candidate: Path) -> RuntimeManagerSnapshot:
+        """Run one transition after non-blocking ownership is established."""
+
+        try:
+            canonical = await run_sync_in_worker_thread(
+                probe_data_root,
+                candidate,
+                abandon_on_cancel=False,
+            )
+        except (OSError, ValueError):
+            raise DataRootInvalidError() from None
+        if self._state == "ready" and canonical == self._data_root:
+            return self.snapshot()
+
+        old_root = self._data_root if self._runtime is not None else None
+        old_source = self._source
+        self._state = "reconfiguring"
+        self._error = None
+        await self._wait_for_leases()
+        if await self._has_background_work():
+            self._state = "ready"
+            raise DataRootBusyError()
+
+        await self._close_active_runtime()
+        try:
+            stack, runtime, canonical = await self._open_runtime(canonical)
+        except Exception as exc:
+            logger.exception("Candidate Data Root could not initialize")
+            await self._restore_or_fail(old_root, old_source)
+            raise InternalServiceError("Data Root initialization failed") from exc
+
+        try:
+            await run_sync_in_worker_thread(
+                self._config_store.write,
+                canonical,
+                abandon_on_cancel=False,
+            )
+        except Exception as exc:
+            logger.exception("Data Root configuration could not be persisted")
+            await stack.aclose()
+            self._use_bootstrap_logging()
+            await self._restore_or_fail(old_root, old_source)
+            raise InternalServiceError("Data Root persistence failed") from exc
+
+        self._runtime_stack = stack
+        self._runtime = runtime
+        self._data_root = canonical
+        self._source = "config"
+        self._generation += 1
+        self._state = "ready"
+        self._error = None
+        self._change_token = secrets.token_urlsafe(32)
+        return self.snapshot()
+
+    async def _open_runtime(
+        self,
+        data_root: Path,
+    ) -> tuple[AsyncExitStack, Runtime, Path]:
+        canonical = await run_sync_in_worker_thread(
+            probe_data_root,
+            data_root,
+            abandon_on_cancel=False,
+        )
+        effective_settings = Settings.model_validate(
+            {**self._base_settings.model_dump(), "data_root": canonical}
+        )
+        stack = AsyncExitStack()
+        await stack.__aenter__()
+        try:
+            runtime = await stack.enter_async_context(
+                self._runtime_factory(effective_settings)
+            )
+            setup_logging(
+                level=effective_settings.log_level,
+                log_file=effective_settings.log_file,
+                data_root=canonical,
+            )
+        except BaseException:
+            await stack.aclose()
+            raise
+        return stack, runtime, canonical
+
+    async def _restore_or_fail(
+        self,
+        old_root: Path | None,
+        old_source: DataRootSource,
+    ) -> None:
+        if old_root is None:
+            self._runtime = None
+            self._runtime_stack = None
+            self._data_root = None
+            self._source = "none"
+            self._state = "configuration_error"
+            self._error = RuntimeManagerError(
+                "data_root_initialization_failed",
+                "The selected Data Root could not be initialized",
+            )
+            return
+        try:
+            stack, runtime, canonical = await self._open_runtime(old_root)
+        except Exception:
+            logger.exception("Previous Data Root could not be restored")
+            self._runtime = None
+            self._runtime_stack = None
+            self._data_root = old_root
+            self._source = old_source
+            self._state = "configuration_error"
+            self._error = RuntimeManagerError(
+                "data_root_rollback_failed",
+                "Neither the selected nor previous Data Root could be initialized",
+            )
+            return
+        self._runtime_stack = stack
+        self._runtime = runtime
+        self._data_root = canonical
+        self._source = old_source
+        self._state = "ready"
+
+    async def _has_background_work(self) -> bool:
+        runtime = self._runtime
+        if runtime is None:
+            return False
+        analysis_execution = getattr(runtime, "analysis_execution", None)
+        imports = getattr(runtime, "user_file_import_service", None)
+        analysis_busy = bool(
+            analysis_execution is not None
+            and await analysis_execution.has_work()
+        )
+        import_busy = bool(imports is not None and await imports.has_work())
+        return analysis_busy or import_busy
+
+    async def _wait_for_leases(self) -> None:
+        async with self._lease_condition:
+            while self._active_leases:
+                await self._lease_condition.wait()
+
+    async def _close_active_runtime(self) -> None:
+        stack = self._runtime_stack
+        self._runtime = None
+        self._runtime_stack = None
+        if stack is not None:
+            await stack.aclose()
+            self._use_bootstrap_logging()
+
+    def _use_bootstrap_logging(self) -> None:
+        setup_logging(level=self._base_settings.log_level)
+
+
+@asynccontextmanager
+async def runtime_manager_context(
+    settings: Settings,
+    runtime_factory: ManagedRuntimeFactory,
+    *,
+    config_store: DataRootConfigStore | None = None,
+) -> AsyncIterator[RuntimeManager]:
+    """Own one optional Runtime manager for the complete ASGI lifespan."""
+
+    manager = RuntimeManager(settings, runtime_factory, config_store=config_store)
+    await manager.start()
+    try:
+        yield manager
+    finally:
+        await manager.close()
+
+
 class LifespanState(TypedDict):
     """Typed state copied by Starlette onto every request in a lifespan."""
 
-    runtime: Runtime
+    runtime_manager: RuntimeManager
 
 
 def get_runtime(request: Request) -> Runtime:
@@ -252,9 +608,21 @@ def get_runtime(request: Request) -> Runtime:
     """
 
     runtime = getattr(request.state, "runtime", None)
-    if runtime is None:
+    if runtime is not None:
+        return cast(Runtime, runtime)
+    manager = getattr(request.state, "runtime_manager", None)
+    if not isinstance(manager, RuntimeManager):
         raise RuntimeError("Application lifespan is not active")
-    return cast(Runtime, runtime)
+    return manager.current_runtime()
+
+
+def get_runtime_manager(request: Request) -> RuntimeManager:
+    """Return the lifespan-owned Data Root control-plane authority."""
+
+    manager = getattr(request.state, "runtime_manager", None)
+    if not isinstance(manager, RuntimeManager):
+        raise RuntimeError("Application lifespan is not active")
+    return manager
 
 
 def get_workspace_service(request: Request) -> WorkspaceService:

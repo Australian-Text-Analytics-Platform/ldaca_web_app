@@ -99,6 +99,11 @@ class AnalysisExecutionRuntime(AnalysisExecutionControl):
     async def active_keys(self) -> set[AnalysisExecutionKey]:
         return await self._scheduler.active_keys()
 
+    async def has_work(self) -> bool:
+        """Return whether switching roots would interrupt Analysis work."""
+
+        return await self._scheduler.has_work()
+
     async def close(self, deadline: float) -> None:
         """Stop dispatch, terminate runners, and commit truthful terminal state."""
 

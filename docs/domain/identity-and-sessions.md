@@ -36,7 +36,8 @@ loopback. Startup provisions exactly `root` / `Root User` / `root@localhost`;
 there is no alternate local identity setting or selector. This mode uses the
 process identity and process-scoped CSRF rather than a browser Session or
 bearer-token exception. The Tauri supervisor additionally supplies the one
-verified desktop Origin and owns backend restart and Data Root selection.
+verified desktop Origin and native directory picker; the backend owns Data
+Root selection and Runtime transitions.
 
 Root's Provider Credentials are independent write-only user resources. Hosted
 multi-user identities instead own personal credentials in each browser and

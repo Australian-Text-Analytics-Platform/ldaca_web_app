@@ -340,6 +340,11 @@ class UserFileImportService:
 
         self._accepting = False
 
+    async def has_work(self) -> bool:
+        """Return whether switching roots would interrupt retained import work."""
+
+        return await self._scheduler.has_work()
+
     async def close(self, deadline: float) -> None:
         """Stop dispatch, clean queued work, and terminate active execution."""
 

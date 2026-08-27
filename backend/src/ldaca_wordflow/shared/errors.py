@@ -172,6 +172,28 @@ class BackendStoppingError(AppError):
         super().__init__("Backend is stopping")
 
 
+class RuntimeUnavailableError(AppError):
+    """A data-dependent request arrived while no Runtime was ready."""
+
+    status_code = 503
+    code = "runtime_unavailable"
+    expose_message = True
+
+    def __init__(self) -> None:
+        super().__init__("The Data Root runtime is not ready")
+
+
+class DataRootInvalidError(AppError):
+    """A proposed Data Root could not pass backend filesystem validation."""
+
+    status_code = 422
+    code = "data_root_invalid"
+    expose_message = True
+
+    def __init__(self) -> None:
+        super().__init__("Data Root must be an accessible absolute directory")
+
+
 class InvalidWorkspaceArchiveError(InvalidInputError):
     """A workspace ZIP failed structural or bounded-extraction validation."""
 
@@ -192,6 +214,16 @@ class UnauthenticatedError(AppError):
 class AccessDeniedError(AppError):
     status_code = 403
     code = "access_denied"
+
+
+class DataRootManagedByOperatorError(AccessDeniedError):
+    """The current deployment profile does not permit browser mutation."""
+
+    code = "data_root_managed_by_operator"
+    expose_message = True
+
+    def __init__(self) -> None:
+        super().__init__("Data Root is managed by the deployment operator")
 
 
 # ── 404 Not Found ────────────────────────────────────────────────────────────
@@ -238,6 +270,26 @@ class FileNotFoundError(AppError):  # noqa: A001 (shadows builtin on purpose)
 class ResourceConflictError(AppError):
     status_code = 409
     code = "resource_conflict"
+
+
+class DataRootBusyError(ResourceConflictError):
+    """A root switch would interrupt retained background work."""
+
+    code = "data_root_busy"
+    expose_message = True
+
+    def __init__(self) -> None:
+        super().__init__("Wait for analyses and imports to finish before switching")
+
+
+class DataRootTransitionError(ResourceConflictError):
+    """Another root transition already owns the process-wide boundary."""
+
+    code = "data_root_transition_in_progress"
+    expose_message = True
+
+    def __init__(self) -> None:
+        super().__init__("A Data Root change is already in progress")
 
 
 class WorkspaceConflictError(ResourceConflictError):

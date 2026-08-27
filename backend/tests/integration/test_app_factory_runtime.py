@@ -131,7 +131,7 @@ def test_settings_are_loaded_explicitly_and_are_immutable(tmp_path: Path) -> Non
         settings.data_root = tmp_path / "other"
 
 
-def test_runtime_factory_is_deferred_until_lifespan_and_unwinds() -> None:
+def test_runtime_factory_is_deferred_until_lifespan_and_unwinds(tmp_path: Path) -> None:
     """OpenAPI/app construction is side-effect free; lifespan owns resources."""
 
     from ldaca_wordflow.main import RuntimeContextFactory, create_app
@@ -154,7 +154,7 @@ def test_runtime_factory_is_deferred_until_lifespan_and_unwinds() -> None:
         return context()
 
     app = create_app(
-        load_settings(multi_user=False),
+        load_settings(data_root=tmp_path, multi_user=False),
         cast(RuntimeContextFactory, runtime_context_factory),
         serve_frontend=False,
     )
@@ -191,8 +191,8 @@ def test_two_app_instances_can_share_one_data_root(tmp_path: Path) -> None:
         TestClient(app_a, base_url="http://localhost") as client_a,
         TestClient(app_b, base_url="http://localhost") as client_b,
     ):
-        assert client_a.get("/health").status_code == 200
-        assert client_b.get("/health").status_code == 200
+        assert client_a.get("/health/ready").status_code == 200
+        assert client_b.get("/health/ready").status_code == 200
 
 
 def test_two_app_instances_keep_settings_runtime_and_overrides_isolated(
@@ -242,8 +242,10 @@ def test_two_app_instances_keep_settings_runtime_and_overrides_isolated(
         assert client_b.get("/__runtime-name").json() == {"name": "b"}
 
 
-def test_health_is_minimal_and_removed_diagnostics_are_absent(tmp_path: Path) -> None:
-    """The public readiness route is honest and does not expose internals."""
+def test_liveness_and_readiness_are_distinct_and_legacy_health_is_absent(
+    tmp_path: Path,
+) -> None:
+    """The control plane stays live independently of the complete Runtime."""
 
     from ldaca_wordflow.main import RuntimeContextFactory, create_app
     from ldaca_wordflow.settings import load_settings
@@ -261,14 +263,14 @@ def test_health_is_minimal_and_removed_diagnostics_are_absent(tmp_path: Path) ->
     )
 
     with TestClient(app, base_url="http://localhost") as client:
-        response = client.get("/health")
+        live = client.get("/health/live")
+        ready = client.get("/health/ready")
 
-        assert response.status_code == 200
-        assert response.json() == {"status": "ready", "version": "0.7.2"}
-        runtime.readiness.mark_stopping()
-        stopping = client.get("/health")
-        assert stopping.status_code == 503
-        assert stopping.json() == {"status": "stopping", "version": "0.7.2"}
+        assert live.status_code == 200
+        assert live.json() == {"status": "live", "version": "0.7.2"}
+        assert ready.status_code == 200
+        assert ready.json() == {"status": "ready", "version": "0.7.2"}
+        assert client.get("/health").status_code == 404
         assert client.get("/status").status_code == 404
         assert client.get("/api").status_code == 404
 

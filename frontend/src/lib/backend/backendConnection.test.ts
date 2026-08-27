@@ -36,7 +36,9 @@ describe('resolveBackendConnection', () => {
     expect(connection).toEqual({
       apiBaseUrl: `${window.location.origin}/user/example/proxy/3000/api`,
       clientBaseUrl: `${window.location.origin}/user/example/proxy/3000`,
-      healthUrl: `${window.location.origin}/user/example/proxy/3000/health`,
+      liveUrl: `${window.location.origin}/user/example/proxy/3000/health/live`,
+      readyUrl: `${window.location.origin}/user/example/proxy/3000/health/ready`,
+      dataRootUrl: `${window.location.origin}/user/example/proxy/3000/api/data-root`,
     });
     expect(client.getConfig().baseUrl).toBe(`${window.location.origin}/user/example/proxy/3000`);
     expect(mocks.invoke).not.toHaveBeenCalled();
@@ -55,7 +57,9 @@ describe('resolveBackendConnection', () => {
     expect(connection).toEqual({
       apiBaseUrl: 'http://127.0.0.1:49123/api',
       clientBaseUrl: 'http://127.0.0.1:49123',
-      healthUrl: 'http://127.0.0.1:49123/health',
+      liveUrl: 'http://127.0.0.1:49123/health/live',
+      readyUrl: 'http://127.0.0.1:49123/health/ready',
+      dataRootUrl: 'http://127.0.0.1:49123/api/data-root',
     });
     expect(window.__BACKEND_URL__).toBe('http://127.0.0.1:49123');
     expect(client.getConfig().baseUrl).toBe('http://127.0.0.1:49123');
@@ -67,7 +71,7 @@ describe('resolveBackendConnection', () => {
 
     const connection = await resolveBackendConnection(new URL('tauri://localhost'));
 
-    expect(connection.healthUrl).toBe('http://127.0.0.1:49124/health');
+    expect(connection.liveUrl).toBe('http://127.0.0.1:49124/health/live');
     expect(mocks.invoke).toHaveBeenCalledWith('get_backend_url');
   });
 });
