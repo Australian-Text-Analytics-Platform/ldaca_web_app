@@ -55,10 +55,15 @@ once per platform after version validation. Backend Ruff, Ty, and Pytest gates
 belong to the root CI workflow; desktop CI retains only supervisor, bundle, and
 packaged-runtime checks.
 
-The reusable build workflow owns all compilation and packaging. It preserves
-the source-aware backend-runtime build, then:
+The reusable build workflow owns all compilation and packaging. Windows builds
+take an `arch` input (`x86_64` on `windows-latest`, `aarch64` on
+`windows-11-arm`), always pass the matching explicit Rust target so bundle
+paths are uniform (`target/<triple>/<profile>/...`), and verify the runner's
+`PROCESSOR_ARCHITECTURE` before building. It preserves the source-aware
+backend-runtime build, then:
 
-- creates a signed MSI and updater signature on Windows;
+- creates a signed MSI and updater signature on Windows, named
+  `ldaca-wordflow_<version>_windows-<arch>.msi`;
 - builds explicitly for `aarch64-apple-darwin` on Apple Silicon;
 - deep-signs the embedded Python runtime and outer application with the
   Developer ID certificate;
@@ -66,9 +71,11 @@ the source-aware backend-runtime build, then:
 - creates and signs the updater `.app.tar.gz` from that final application;
 - creates, signs, notarizes, and staples the direct-download DMG.
 
-The desktop release workflow does not rebuild. It downloads both build artifacts,
-creates `latest.json`, and publishes the MSI, DMG, updater archives, signatures,
-and manifest to the matching GitHub Release. Publication requires the release
+The desktop release workflow does not rebuild. It downloads all three build
+artifacts (Windows x86_64 MSI, Windows ARM64 MSI, macOS), creates `latest.json`
+with `windows-x86_64`, `windows-aarch64`, and `darwin-aarch64` entries, and
+publishes the MSIs, DMG, updater archives, signatures, and manifest to the
+matching GitHub Release. Publication requires the release
 tag and checked-out ref to peel to the same commit.
 
 Repository Actions secrets required by this workflow are:

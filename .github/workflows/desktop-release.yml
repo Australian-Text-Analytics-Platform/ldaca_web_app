@@ -66,12 +66,18 @@ jobs:
         include:
           - name: Windows MSI
             platform: windows
+            arch: x86_64
+          - name: Windows MSI (ARM64)
+            platform: windows
+            arch: aarch64
           - name: macOS DMG and updater
             platform: macos
+            arch: x86_64
     uses: ./.github/workflows/desktop-build.yml
     secrets: inherit
     with:
       platform: ${{ matrix.platform }}
+      arch: ${{ matrix.arch }}
       debug: false
       ref: ${{ inputs.ref != '' && inputs.ref || github.ref }}
 
@@ -89,6 +95,12 @@ jobs:
           name: ldaca-desktop-windows-msi
           path: release-assets/windows
 
+      - name: Download Windows ARM64 artifacts
+        uses: actions/download-artifact@v8.0.1
+        with:
+          name: ldaca-desktop-windows-msi-arm64
+          path: release-assets/windows-arm64
+
       - name: Download macOS artifacts
         uses: actions/download-artifact@v8.0.1
         with:
@@ -104,9 +116,12 @@ jobs:
           test -n "$RELEASE_TAG" || { echo "release_tag is required when publishing" >&2; exit 1; }
 
           windows_asset="$(find release-assets/windows -type f -name '*.msi' -print -quit)"
+          windows_arm64_asset="$(find release-assets/windows-arm64 -type f -name '*.msi' -print -quit)"
           macos_asset="$(find release-assets/macos -type f -name '*.app.tar.gz' -print -quit)"
           test -s "$windows_asset"
           test -s "$windows_asset.sig"
+          test -s "$windows_arm64_asset"
+          test -s "$windows_arm64_asset.sig"
           test -s "$macos_asset"
           test -s "$macos_asset.sig"
 
@@ -122,6 +137,7 @@ jobs:
           release_base="https://github.com/$GITHUB_REPOSITORY/releases/download/$RELEASE_TAG"
           version="${RELEASE_TAG#v}"
           windows_signature="$(tr -d '\r\n' < "$windows_asset.sig")"
+          windows_arm64_signature="$(tr -d '\r\n' < "$windows_arm64_asset.sig")"
           macos_signature="$(tr -d '\r\n' < "$macos_asset.sig")"
 
           jq -n \
@@ -130,6 +146,8 @@ jobs:
             --arg pub_date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --arg windows_signature "$windows_signature" \
             --arg windows_url "$release_base/$(basename "$windows_asset")" \
+            --arg windows_arm64_signature "$windows_arm64_signature" \
+            --arg windows_arm64_url "$release_base/$(basename "$windows_arm64_asset")" \
             --arg macos_signature "$macos_signature" \
             --arg macos_url "$release_base/$(basename "$macos_asset")" \
             '{
@@ -141,6 +159,10 @@ jobs:
                   signature: $windows_signature,
                   url: $windows_url
                 },
+                "windows-aarch64": {
+                  signature: $windows_arm64_signature,
+                  url: $windows_arm64_url
+                },
                 "darwin-aarch64": {
                   signature: $macos_signature,
                   url: $macos_url
@@ -149,7 +171,7 @@ jobs:
             }' > release-assets/latest.json
 
           jq -e \
-            '.version != "" and (.platforms | keys | sort) == ["darwin-aarch64", "windows-x86_64"] and all(.platforms[]; .signature != "" and .url != "")' \
+            '.version != "" and (.platforms | keys | sort) == ["darwin-aarch64", "windows-aarch64", "windows-x86_64"] and all(.platforms[]; .signature != "" and .url != "")' \
             release-assets/latest.json >/dev/null
 
       - name: Replace GitHub release assets
@@ -165,6 +187,8 @@ jobs:
           gh release upload "$RELEASE_TAG" \
             release-assets/windows/*.msi \
             release-assets/windows/*.msi.sig \
+            release-assets/windows-arm64/*.msi \
+            release-assets/windows-arm64/*.msi.sig \
             release-assets/macos/dmg/*.dmg \
             release-assets/macos/updater/*.app.tar.gz \
             release-assets/macos/updater/*.app.tar.gz.sig \
