@@ -26,7 +26,8 @@ interface AnnotationTableFrameProps {
  * Resizable, always-scrollable shell shared by the Annotation Manual, Preview, and Review tables.
  * Flow: the table scrolls inside a viewport whose max height is the lesser of the persisted
  * height and 75% of the window (CSS `min()` re-clamps on window resize); the bottom handle
- * drags, nudges by keyboard, or double-clicks back to the default. Live drag height stays local
+ * drags, nudges by keyboard, or double-clicks back to the default. The handle shows a persistent
+ * pill so the affordance is discoverable without hovering. Live drag height stays local
  * and is committed through onHeightChange on release so the Tab persists one shared value.
  */
 export function AnnotationTableFrame({
@@ -62,14 +63,14 @@ export function AnnotationTableFrame({
       </ScrollArea>
       <ResizeHandle
         orientation="horizontal"
-        variant="grip"
+        variant="line"
         isDragging={drag !== null}
         aria-label="Resize annotation table"
         aria-valuenow={liveHeight}
         aria-valuemin={ANNOTATION_TABLE_DEFAULT_HEIGHT}
         tabIndex={0}
         title="Drag to resize. Double-click to reset."
-        className="border-t border-surface-border"
+        className="h-3 border-t border-surface-border bg-editor/60 hover:bg-list-hover"
         data-testid="annotation-table-resize-handle"
         onPointerDown={(event) => {
           if (event.button !== 0) return;
@@ -110,7 +111,13 @@ export function AnnotationTableFrame({
         onDoubleClick={() => {
           onHeightChange(null);
         }}
-      />
+      >
+        <span
+          aria-hidden="true"
+          data-testid="annotation-table-resize-grip"
+          className="pointer-events-none relative z-10 h-1 w-14 rounded-full bg-description/60"
+        />
+      </ResizeHandle>
       {belowTable}
     </div>
   );

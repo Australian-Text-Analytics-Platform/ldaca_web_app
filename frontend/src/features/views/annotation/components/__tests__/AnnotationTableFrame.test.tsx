@@ -37,6 +37,7 @@ describe('AnnotationTableFrame', () => {
       '520',
     );
     expect(screen.getByText('footer')).toBeInTheDocument();
+    expect(screen.getByTestId('annotation-table-resize-grip')).toBeInTheDocument();
   });
 
   it('commits a dragged height on release and resets on double-click', () => {
