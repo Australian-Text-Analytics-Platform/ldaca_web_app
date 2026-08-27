@@ -176,6 +176,31 @@ describe('AnnotationResultsPanel', () => {
     expect(await screen.findByRole('columnheader', { name: /reviewer/ })).toHaveClass('w-px');
   });
 
+  it('alternates themed row surfaces to separate adjacent annotations', () => {
+    nodePageRows.value = [
+      nodePageRows.value[0]!,
+      {
+        ...nodePageRows.value[0],
+        __wordflow_annotation_source_row_index: 1,
+        text: 'Second example',
+        annotation: 'job',
+        reviewer: 'job',
+        record_id: 2,
+      },
+    ];
+
+    renderPanel();
+
+    expect(screen.getByRole('row', { name: /^Example/ })).toHaveClass(
+      'bg-surface',
+      'hover:bg-surface',
+    );
+    expect(screen.getByRole('row', { name: /^Second example/ })).toHaveClass(
+      'bg-panel',
+      'hover:bg-panel',
+    );
+  });
+
   it('keeps an existing non-Codebook annotation visible in its dropdown', async () => {
     const user = userEvent.setup();
     queryWorkspaceSqlTable.mockResolvedValue({
