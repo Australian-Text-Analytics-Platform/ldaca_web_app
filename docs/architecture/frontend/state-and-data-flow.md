@@ -113,14 +113,19 @@ active correction column is removed from both roles. Comparison choices are
 restricted to string and categorical schema columns. Cohen's Kappa is the
 default metric; Percent Agreement and nominal Krippendorff's Alpha use the same
 grouped counts. Reveal state is mount-local, so each selected comparison starts
-masked after remount. Only revealed comparisons participate in reliability
-queries, difference tinting, or filters.
+masked after remount. Every selected comparison participates in reliability
+queries and filters; only revealed comparisons show values and difference tint.
+The shared result-table height is also persisted in the same settings record.
 
-Manual and Review retain at most one mount-local named-column difference
-filter. Its funnel stays visible but disabled while the comparison is hidden;
-hiding or deselecting the column clears it. Each filtered page and its exact row
-count are separate Workspace SQL Query resources keyed by the generated
-single-column predicate and pagination. Workspace SQL applies that predicate
+Manual and Review retain at most one mount-local row filter, owned by either the
+annotation column or one comparison column, holding a difference toggle and an
+existence choice. Its funnel menu stays usable while the comparison is hidden;
+deselecting the column clears it. Each filtered page and its exact row count are
+separate Workspace SQL Query resources keyed by the generated predicate and
+pagination. The predicate and the grouped-count comparison query both normalize
+cells through `annotationLabelSql`, which trims text and maps blank or
+non-Codebook values to NULL, so all comparison surfaces share one definition of
+a valid label. Workspace SQL applies that predicate
 before server pagination. Manual pages carry a transient absolute source-row
 number created before filtering so an edit still targets the original Data
 Block row; that transport column is never shown or persisted. Changing the
@@ -134,7 +139,8 @@ uses the transient absolute source-row number, disables only the affected cell,
 and rolls back its local value on failure. Preview compares only its current
 page. Revealed Manual and Review comparisons use a dedicated full-table
 grouped-count Query resource keyed by Workspace, Data Block dependencies,
-source SQL, reference column, and target column. A revealed column projects
+source SQL, reference column, target column, and Codebook classes. A selected
+column projects
 that resource as the selected reliability value beside the table header and a
 plain count matrix on hover or focus; no separate comparison card owns state. A
 successful Manual label edit applies its old and new count pairs to that
@@ -148,8 +154,9 @@ Review all use the selected Data Block's previewed color as a light difference
 tint: the annotation or prediction cell is tinted when any revealed comparison
 differs, and a revealed comparison cell is tinted only when that value differs.
 Hidden cells render the uniform `•••` mask without exposing the underlying
-value, emptiness, score, matrix, or tint. Null pairs follow ordinary SQL
-inequality semantics and are neither filtered nor highlighted. The shared
+value, emptiness, or tint; the score, matrix, and filter remain available.
+Blank and non-Codebook labels normalize to null and are neither different nor
+included in reliability counts. The shared
 color control commits `Node.color` before
 Preview, Run All, or Manual Start; a failed commit aborts that action.
 

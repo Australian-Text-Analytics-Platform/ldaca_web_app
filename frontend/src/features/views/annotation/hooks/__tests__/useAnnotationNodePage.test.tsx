@@ -3,6 +3,8 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { annotationLabelSql } from '../../annotationLabelModel';
+import type { AnnotationRowFilter } from '../../annotationRowFilter';
 import { useAnnotationNodePage } from '../useAnnotationNodePage';
 
 const queryWorkspaceSqlTable = vi.hoisted(() => vi.fn());
@@ -44,7 +46,9 @@ describe('useAnnotationNodePage', () => {
           sourceSql: 'SELECT * FROM "node-1"',
           sourceColumns: ['text', 'annotation', 'reviewer'],
           annotationColumn: 'annotation',
-          differenceColumn: null,
+          comparisonColumns: ['reviewer'],
+          classOptions: [],
+          filter: null,
           rowCount: 2380,
           pageSize: 10,
         }),
@@ -84,7 +88,9 @@ describe('useAnnotationNodePage', () => {
           sourceSql: 'SELECT * FROM "node-1"',
           sourceColumns: ['text', 'annotation', 'reviewer_one', 'reviewer_two'],
           annotationColumn: 'annotation',
-          differenceColumn: 'reviewer_two',
+          comparisonColumns: ['reviewer_one', 'reviewer_two'],
+          classOptions: ['covid', 'job'],
+          filter: { column: 'reviewer_two', differs: true, existence: 'off' },
           rowCount: 2380,
           pageSize: 10,
         }),
@@ -95,27 +101,31 @@ describe('useAnnotationNodePage', () => {
     const sqlRequests = queryWorkspaceSqlTable.mock.calls.map(([request]) => request.body.sql);
     expect(sqlRequests).toEqual(
       expect.arrayContaining([
-        expect.stringContaining('"annotation" != "reviewer_two"'),
+        expect.stringContaining(
+          `${annotationLabelSql('annotation', ['covid', 'job'])} != ${annotationLabelSql('reviewer_two', ['covid', 'job'])}`,
+        ),
         expect.stringContaining('COUNT(*)'),
       ]),
     );
     expect(result.current.rows[0]?.__wordflow_annotation_source_row_index).toBe(12);
   });
 
-  it('resets server pagination when the active difference column changes', async () => {
+  it('resets server pagination when the active row filter changes', async () => {
     const { result, rerender } = renderHook(
-      ({ differenceColumn }: { differenceColumn: string | null }) =>
+      ({ filter }: { filter: AnnotationRowFilter | null }) =>
         useAnnotationNodePage({
           workspaceId: 'workspace-1',
           nodeId: 'node-1',
           sourceSql: 'SELECT * FROM "node-1"',
           sourceColumns: ['text', 'annotation', 'reviewer'],
           annotationColumn: 'annotation',
-          differenceColumn,
+          comparisonColumns: ['reviewer'],
+          classOptions: [],
+          filter,
           rowCount: 100,
           pageSize: 10,
         }),
-      { initialProps: { differenceColumn: null }, wrapper },
+      { initialProps: { filter: null as AnnotationRowFilter | null }, wrapper },
     );
 
     await waitFor(() => expect(queryWorkspaceSqlTable).toHaveBeenCalled());
@@ -128,11 +138,13 @@ describe('useAnnotationNodePage', () => {
       ),
     );
 
-    rerender({ differenceColumn: 'reviewer' });
+    rerender({ filter: { column: 'reviewer', differs: true, existence: 'off' } });
     await waitFor(() => {
       const lastRequest = queryWorkspaceSqlTable.mock.calls.at(-1)?.[0];
       expect(lastRequest?.body.page).toBe(1);
-      expect(lastRequest?.body.sql).toContain('"annotation" != "reviewer"');
+      expect(lastRequest?.body.sql).toContain(
+        `${annotationLabelSql('annotation', [])} != ${annotationLabelSql('reviewer', [])}`,
+      );
     });
   });
 
@@ -154,7 +166,9 @@ describe('useAnnotationNodePage', () => {
           sourceSql: 'SELECT * FROM "node-1"',
           sourceColumns: ['text', 'annotation'],
           annotationColumn: 'annotation',
-          differenceColumn: null,
+          comparisonColumns: [],
+          classOptions: [],
+          filter: null,
           rowCount: 20,
           pageSize: 10,
         }),

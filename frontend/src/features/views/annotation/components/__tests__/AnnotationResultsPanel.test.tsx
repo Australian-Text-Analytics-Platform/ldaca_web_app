@@ -11,6 +11,19 @@ import { AnnotationResultsPanel } from '../AnnotationResultsPanel';
 const queryWorkspaceSqlTable = vi.hoisted(() => vi.fn());
 const setCell = vi.hoisted(() => vi.fn());
 const setPagination = vi.hoisted(() => vi.fn());
+const nodePageRows = vi.hoisted(() => ({
+  value: [
+    {
+      __wordflow_annotation_source_row_index: 0,
+      text: 'Example',
+      annotation: 'covid',
+      correction: null,
+      reviewer: 'covid',
+      username: 'alice',
+      record_id: 1,
+    },
+  ] as Record<string, unknown>[],
+}));
 
 vi.mock('@/api', async (importOriginal) => ({
   ...(await importOriginal()),
@@ -51,18 +64,8 @@ vi.mock('../../hooks/useAnnotationNodePage', () => ({
       isError: false,
       isFetching: false,
     },
-    rows: [
-      {
-        __wordflow_annotation_source_row_index: 0,
-        text: 'Example',
-        annotation: 'covid',
-        correction: null,
-        reviewer: 'covid',
-        username: 'alice',
-        record_id: 1,
-      },
-    ],
-    rowCount: 2380,
+    rows: nodePageRows.value,
+    rowCount: nodePageRows.value.length === 0 ? 0 : 2380,
     countQuery: { isLoading: false, isError: false, isFetching: false },
     sourceRowIndexColumn: '__wordflow_annotation_source_row_index',
     refreshFilteredRows: vi.fn(),
@@ -84,6 +87,8 @@ function ManualResults(
     | 'onMetadataColumnsChange'
     | 'reliabilityMetric'
     | 'onReliabilityMetricChange'
+    | 'tableHeight'
+    | 'onTableHeightChange'
   >,
 ) {
   const [comparisonColumns, setComparisonColumns] = useState(['reviewer']);
@@ -99,6 +104,8 @@ function ManualResults(
       onMetadataColumnsChange={setMetadataColumns}
       reliabilityMetric={reliabilityMetric}
       onReliabilityMetricChange={setReliabilityMetric}
+      tableHeight={null}
+      onTableHeightChange={vi.fn()}
     />
   );
 }
@@ -140,6 +147,137 @@ describe('AnnotationResultsPanel', () => {
     setCell.mockReset();
     setCell.mockResolvedValue(undefined);
     setPagination.mockReset();
+    nodePageRows.value = [
+      {
+        __wordflow_annotation_source_row_index: 0,
+        text: 'Example',
+        annotation: 'covid',
+        correction: null,
+        reviewer: 'covid',
+        username: 'alice',
+        record_id: 1,
+      },
+    ];
+  });
+
+  it('uses a flexible text column and content-width label columns', async () => {
+    queryWorkspaceSqlTable.mockResolvedValue({
+      columns: ['__reference', '__comparison', '__count'],
+      rows: [],
+      hasNext: false,
+      etag: 'revision-1',
+    });
+
+    renderPanel();
+
+    expect(screen.getByRole('table')).toHaveClass('table-auto');
+    expect(screen.getByRole('columnheader', { name: 'text' })).not.toHaveClass('w-px');
+    expect(screen.getByRole('columnheader', { name: /annotation/ })).toHaveClass('w-px');
+    expect(await screen.findByRole('columnheader', { name: /reviewer/ })).toHaveClass('w-px');
+  });
+
+  it('keeps an existing non-Codebook annotation visible in its dropdown', async () => {
+    const user = userEvent.setup();
+    queryWorkspaceSqlTable.mockResolvedValue({
+      columns: ['__reference', '__comparison', '__count'],
+      rows: [],
+      hasNext: false,
+      etag: 'revision-1',
+    });
+    nodePageRows.value = [{ ...nodePageRows.value[0], annotation: 'P', correction: '2026-08-28' }];
+
+    renderPanel('correction');
+
+    const classSelect = screen.getByRole('combobox', { name: 'Class for row 1' });
+    expect(classSelect).toHaveTextContent('P');
+    expect(screen.getByRole('combobox', { name: 'Correction for row 1' })).toHaveTextContent(
+      '2026-08-28',
+    );
+    await user.click(classSelect);
+    const invalidOption = screen.getByRole('option', { name: 'P' });
+    expect(invalidOption).toHaveClass('italic', 'text-description');
+    expect(screen.getByRole('option', { name: 'job' })).toBeInTheDocument();
+  });
+
+  it('preserves whitespace-padded raw values without marking valid trimmed labels invalid', async () => {
+    const user = userEvent.setup();
+    queryWorkspaceSqlTable.mockResolvedValue({
+      columns: ['__reference', '__comparison', '__count'],
+      rows: [],
+      hasNext: false,
+      etag: 'revision-1',
+    });
+    nodePageRows.value = [{ ...nodePageRows.value[0], annotation: ' covid ', correction: ' job ' }];
+
+    renderPanel('correction');
+
+    const annotation = screen.getByRole('combobox', { name: 'Class for row 1' });
+    const correction = screen.getByRole('combobox', { name: 'Correction for row 1' });
+    expect(annotation).toHaveTextContent('covid');
+    expect(correction).toHaveTextContent('job');
+    expect(annotation).not.toHaveClass('italic');
+    expect(correction).not.toHaveClass('italic');
+    await user.click(annotation);
+    const options = screen.getAllByRole('option', { name: 'covid' });
+    expect(options).toHaveLength(2);
+    expect(options.some((option) => option.textContent === ' covid ')).toBe(true);
+  });
+
+  it('downgrades an annotation-column difference filter when its last comparator goes away', async () => {
+    const user = userEvent.setup();
+    queryWorkspaceSqlTable.mockResolvedValue({
+      columns: ['__reference', '__comparison', '__count'],
+      rows: [],
+      hasNext: false,
+      etag: 'revision-1',
+    });
+
+    renderPanel();
+
+    const annotationFilter = screen.getByRole('button', { name: 'Filter rows by annotation' });
+    await user.click(annotationFilter);
+    await user.click(
+      screen.getByRole('menuitemcheckbox', { name: 'Differs from any comparison column' }),
+    );
+    await user.keyboard('{Escape}');
+    expect(annotationFilter).toHaveAttribute('aria-pressed', 'true');
+
+    await user.click(screen.getByRole('button', { name: 'Compare To' }));
+    await user.click(screen.getByRole('menuitemcheckbox', { name: 'reviewer' }));
+    await user.keyboard('{Escape}');
+
+    expect(screen.getByRole('button', { name: 'Filter rows by annotation' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+  });
+
+  it('keeps the headers and filter controls mounted when a filter matches no rows', async () => {
+    const user = userEvent.setup();
+    queryWorkspaceSqlTable.mockResolvedValue({
+      columns: ['__reference', '__comparison', '__count'],
+      rows: [],
+      hasNext: false,
+      etag: 'revision-1',
+    });
+    nodePageRows.value = [];
+
+    renderPanel();
+
+    expect(screen.getByRole('columnheader', { name: 'text' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Filter rows by annotation' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Filter rows by reviewer' })).toBeEnabled();
+    expect(screen.getByRole('cell', { name: 'No rows to annotate.' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Filter rows by reviewer' }));
+    await user.click(screen.getByRole('menuitemradio', { name: 'Empty' }));
+    await user.keyboard('{Escape}');
+
+    expect(screen.getByRole('cell', { name: 'No rows match the filter.' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Filter rows by reviewer' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
   });
 
   it('edits the selected correction column without exposing an example shortcut', async () => {
@@ -185,14 +323,21 @@ describe('AnnotationResultsPanel', () => {
     expect(headers[0]).toHaveTextContent('text');
     expect(headers[1]).toHaveTextContent('annotation');
     expect(within(headers[2]).getByText('reviewer')).toBeInTheDocument();
-    expect(within(headers[2]).queryByRole('button', { name: /Cohen’s Kappa/ })).toBeNull();
+    expect(
+      await within(headers[2]).findByRole('button', {
+        name: 'Cohen’s Kappa unavailable for annotation versus reviewer',
+      }),
+    ).toBeVisible();
     expect(
       within(headers[2]).getByRole('button', { name: 'Show comparison values for reviewer' }),
     ).toBeInTheDocument();
+    expect(
+      within(headers[1]).getByRole('button', { name: 'Filter rows by annotation' }),
+    ).toBeEnabled();
     const filterToggle = within(headers[2]).getByRole('button', {
-      name: 'Filter difference for reviewer',
+      name: 'Filter rows by reviewer',
     });
-    expect(filterToggle).toBeDisabled();
+    expect(filterToggle).toBeEnabled();
     expect(filterToggle).toHaveAttribute('aria-pressed', 'false');
     const resultRow = screen.getByRole('row', { name: 'Example Comparison value hidden' });
     expect(within(resultRow).getAllByRole('cell').at(-1)).toHaveTextContent('•••');
@@ -216,7 +361,7 @@ describe('AnnotationResultsPanel', () => {
     expect(setPagination).toHaveBeenCalledWith({ pageIndex: 99, pageSize: 10 });
   });
 
-  it('enables the per-column filter only while its comparison is revealed', async () => {
+  it('keeps one row filter at a time and allows it while the comparison is masked', async () => {
     const user = userEvent.setup();
     queryWorkspaceSqlTable.mockResolvedValue({
       columns: ['__reference', '__comparison', '__count'],
@@ -227,18 +372,32 @@ describe('AnnotationResultsPanel', () => {
 
     renderPanel();
 
-    const reviewerFilter = screen.getByRole('button', {
-      name: 'Filter difference for reviewer',
-    });
-    expect(reviewerFilter).toBeDisabled();
-    await user.click(screen.getByRole('button', { name: 'Show comparison values for reviewer' }));
+    const reviewerFilter = screen.getByRole('button', { name: 'Filter rows by reviewer' });
+    const annotationFilter = screen.getByRole('button', { name: 'Filter rows by annotation' });
     expect(reviewerFilter).toBeEnabled();
-
     await user.click(reviewerFilter);
+    await user.click(screen.getByRole('menuitemcheckbox', { name: 'Differs from annotation' }));
+    await user.keyboard('{Escape}');
     expect(reviewerFilter).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getAllByLabelText('Comparison value hidden')).toHaveLength(1);
+
+    await user.click(screen.getByRole('button', { name: 'Show comparison values for reviewer' }));
     await user.click(screen.getByRole('button', { name: 'Hide comparison values for reviewer' }));
-    expect(reviewerFilter).toBeDisabled();
+    expect(reviewerFilter).toHaveAttribute('aria-pressed', 'true');
+
+    await user.click(annotationFilter);
+    await user.click(screen.getByRole('menuitemradio', { name: 'Empty' }));
+    await user.keyboard('{Escape}');
+    expect(annotationFilter).toHaveAttribute('aria-pressed', 'true');
     expect(reviewerFilter).toHaveAttribute('aria-pressed', 'false');
+
+    await user.click(screen.getByRole('button', { name: 'Compare To' }));
+    await user.click(screen.getByRole('menuitemcheckbox', { name: 'reviewer' }));
+    await user.keyboard('{Escape}');
+    expect(screen.getByRole('button', { name: 'Filter rows by annotation' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
   });
 
   it('shows selected metadata alongside manual annotations', async () => {

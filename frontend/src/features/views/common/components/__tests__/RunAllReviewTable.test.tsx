@@ -35,6 +35,8 @@ function ReviewTable({
   | 'onMetadataColumnsChange'
   | 'reliabilityMetric'
   | 'onReliabilityMetricChange'
+  | 'tableHeight'
+  | 'onTableHeightChange'
   | 'correction'
 > & { correctionColumn?: string }) {
   const [comparisonColumns, setComparisonColumns] = useState<string[]>([]);
@@ -53,9 +55,11 @@ function ReviewTable({
       onMetadataColumnsChange={setMetadataColumns}
       reliabilityMetric={reliabilityMetric}
       onReliabilityMetricChange={setReliabilityMetric}
+      tableHeight={null}
+      onTableHeightChange={vi.fn()}
       correction={{
         column: selectedCorrectionColumn,
-        classOptions: ['label', 'corrected'],
+        classOptions: ['label', 'corrected', 'covid', 'job', 'other'],
         onColumnChange: setSelectedCorrectionColumn,
         onCreate: vi.fn(),
         onUseAsExample: vi.fn(),
@@ -101,7 +105,11 @@ describe('RunAllReviewTable', () => {
 
     expect(await screen.findByText('Example')).toBeInTheDocument();
     expect(screen.getByTestId('analysis-table-scroll-area')).toBeInTheDocument();
-    expect(within(screen.getByRole('table')).getAllByRole('rowgroup')[0]).toHaveClass(
+    const table = screen.getByRole('table');
+    expect(table).toHaveClass('table-auto');
+    expect(screen.getByRole('columnheader', { name: 'text' })).not.toHaveClass('w-px');
+    expect(screen.getByRole('columnheader', { name: /annotation/ })).toHaveClass('w-px');
+    expect(within(table).getAllByRole('rowgroup')[0]).toHaveClass(
       'sticky',
       'top-0',
       'z-10',
@@ -262,6 +270,60 @@ describe('RunAllReviewTable', () => {
     await user.keyboard('{Escape}');
   });
 
+  it('keeps an invalid correction visible and replaceable during Review', async () => {
+    const user = userEvent.setup();
+    queryWorkspaceSqlTable.mockResolvedValue({
+      columns: ['__wordflow_annotation_source_row_index', 'text', 'annotation', 'correction'],
+      schema: [
+        integerColumn('__wordflow_annotation_source_row_index'),
+        stringColumn('text'),
+        stringColumn('annotation'),
+        stringColumn('correction'),
+      ],
+      rows: [
+        {
+          __wordflow_annotation_source_row_index: 0,
+          text: 'Example',
+          annotation: 'label',
+          correction: 'legacy',
+        },
+      ],
+      hasNext: false,
+    });
+
+    render(
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <ReviewTable
+          workspaceId="workspace-1"
+          nodeId="node-1"
+          sourceColumns={['text', 'annotation', 'correction']}
+          sourceColor="#2563eb"
+          sql={'SELECT * FROM "node-1"'}
+          title="Annotation"
+          requiredColumns={['text', 'annotation', 'correction']}
+          correctionColumn="correction"
+          comparisonColumn="annotation"
+          rowCount={1}
+        />
+      </QueryClientProvider>,
+    );
+
+    const trigger = await screen.findByRole('combobox', { name: 'Correction for row 1' });
+    expect(trigger).toHaveTextContent('legacy');
+    expect(trigger).toHaveClass('italic', 'text-description');
+    await user.click(trigger);
+    expect(screen.getByRole('option', { name: 'legacy' })).toHaveClass(
+      'italic',
+      'text-description',
+    );
+    await user.click(screen.getByRole('option', { name: 'corrected' }));
+    await waitFor(() => {
+      expect(setCell).toHaveBeenCalledWith('node-1', 'correction', 0, 'corrected');
+    });
+  });
+
   it('compares the full annotation column with multiple selected columns', async () => {
     const user = userEvent.setup();
     queryWorkspaceSqlTable.mockImplementation(({ body }) => {
@@ -346,21 +408,25 @@ describe('RunAllReviewTable', () => {
     await user.keyboard('{Escape}');
 
     expect(screen.getAllByLabelText('Comparison value hidden')).toHaveLength(2);
-    expect(screen.queryByRole('button', { name: /Cohen’s Kappa/ })).not.toBeInTheDocument();
-    await user.click(
-      screen.getByRole('button', { name: 'Show comparison values for reviewer_one' }),
-    );
-
     expect(
       await screen.findByRole('button', {
         name: 'Cohen’s Kappa 0.727 for annotation versus reviewer_one',
       }),
     ).toBeVisible();
     expect(
-      screen.queryByRole('button', {
+      await screen.findByRole('button', {
         name: 'Cohen’s Kappa 0.000 for annotation versus reviewer_two',
       }),
-    ).not.toBeInTheDocument();
+    ).toBeVisible();
+    await user.click(
+      screen.getByRole('button', { name: 'Show comparison values for reviewer_one' }),
+    );
+
+    expect(
+      screen.getByRole('button', {
+        name: 'Cohen’s Kappa 0.727 for annotation versus reviewer_one',
+      }),
+    ).toBeVisible();
     expect(
       screen.queryByRole('heading', { name: /annotation vs reviewer/ }),
     ).not.toBeInTheDocument();
@@ -372,16 +438,22 @@ describe('RunAllReviewTable', () => {
     expect(within(headers[3]).getByText('reviewer_one')).toBeInTheDocument();
     expect(within(headers[4]).getByText('reviewer_two')).toBeInTheDocument();
     expect(
-      within(headers[3]).getByRole('button', { name: 'Filter difference for reviewer_one' }),
+      within(headers[1]).getByRole('button', { name: 'Filter rows by annotation' }),
+    ).toBeEnabled();
+    expect(
+      within(headers[3]).getByRole('button', { name: 'Filter rows by reviewer_one' }),
     ).toHaveAttribute('aria-pressed', 'false');
     expect(
-      within(headers[4]).getByRole('button', { name: 'Filter difference for reviewer_two' }),
-    ).toBeDisabled();
-    await user.click(screen.getByRole('button', { name: 'Filter difference for reviewer_one' }));
+      within(headers[4]).getByRole('button', { name: 'Filter rows by reviewer_two' }),
+    ).toBeEnabled();
+    await user.click(screen.getByRole('button', { name: 'Filter rows by reviewer_one' }));
+    await user.click(screen.getByRole('menuitemcheckbox', { name: 'Differs from annotation' }));
+    await user.keyboard('{Escape}');
     await waitFor(() => {
-      expect(
-        screen.getByRole('button', { name: 'Filter difference for reviewer_one' }),
-      ).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByRole('button', { name: 'Filter rows by reviewer_one' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
     });
     const filteredReviewTable = screen.getAllByRole('table')[0];
     expect(

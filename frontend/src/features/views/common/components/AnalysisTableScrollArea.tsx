@@ -13,7 +13,8 @@ interface AnalysisTableScrollAreaProps {
 /**
  * Wraps wide analysis result tables in the project's standard two-axis scroll
  * area so feature tables do not each implement overflow chrome.
- * Used by: Annotation preview/Review and Concordance/Quotation result table blocks.
+ * Used by: Concordance/Quotation result table blocks. Annotation tables use the
+ * resizable AnnotationTableFrame instead.
  */
 const AnalysisTableScrollArea = ({
   maxHeightClass,
@@ -40,9 +41,9 @@ interface AnalysisTableFrameProps extends AnalysisTableScrollAreaProps {
 /**
  * Adds the standard rounded-sm/bordered analysis table shell around
  * AnalysisTableScrollArea.
- * Used by: Annotation preview/Review and Concordance/Quotation result blocks
- * because those views need the same clipped border boundary around scrollable
- * tables without re-creating the wrapper classes in every table component.
+ * Used by: Concordance/Quotation result blocks because those views need the
+ * same clipped border boundary around scrollable tables without re-creating the
+ * wrapper classes in every table component.
  */
 export const AnalysisTableFrame = ({
   maxHeightClass,
