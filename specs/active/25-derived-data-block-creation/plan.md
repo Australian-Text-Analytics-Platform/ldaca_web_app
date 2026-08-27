@@ -9,6 +9,7 @@
 4. Align the glossary, accepted ADRs, current architecture/reference pages, and
    user documentation while retaining historical records.
 5. Extend the same contract to Trends using immutable original-row publication
-   artifacts and period/group filters.
+   artifacts and exact period/group filters, with frontend-only Uncased display
+   groups expanding back to their member indices.
 6. Regenerate OpenAPI, run full package and documentation checks, and complete
    browser acceptance before coordinating Issues #25 and #24.

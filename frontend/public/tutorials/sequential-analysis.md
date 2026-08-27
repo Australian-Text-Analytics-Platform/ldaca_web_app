@@ -65,15 +65,17 @@ Click **Add Group** to add a column selector row. A badge next to each selector 
 
 When multiple grouping columns are added, categories are combined across all columns. Be aware this multiplies the number of series: three platforms × four genres = twelve combined series. Too many series can make the chart unreadable.
 
-**Case sensitive** — a checkbox that appears once at least one group column is added. When checked, values that differ only in capitalisation are treated as separate groups. When unchecked, they are merged.
+Trends retains exact group values in its result. After the analysis finishes,
+use **Uncased** beside the result legend when values that differ only in
+capitalisation should be displayed and filtered as one group.
 
 <h2 id="help-sequential-run">Step 5 — Run the analysis</h2>
 
 Click **Run** to start the analysis. The label always remains **Run**. Parameters
 lock only while the Analysis is submitting, queued, or running. After success,
 change an execution input to enable Run again; reverting to the submitted values
-disables it. Chart type, axis, selection, and visibility controls do not enable
-Run because they only change presentation.
+disables it. Chart type, axis, selection, visibility, and Uncased controls do not
+enable Run because they only change result presentation or filtering.
 
 <h2 id="help-sequential-results">Result panel</h2>
 
@@ -112,7 +114,15 @@ Click the download button (↓ icon) in the results header to export the chart. 
 
 The legend below the chart lists all groups with their colours, full-result count, and share of the counts among currently visible groups. Percentages use one decimal place and do not change when periods are selected. When periods are selected, each visible label shows *selected / total* before the percentage. Click any legend item to hide or show that group. Hidden groups retain their count detail, show **Hidden**, and use a strikethrough label with reduced opacity.
 
-Use this to focus on a subset of groups. Hidden groups are not plotted and are marked hidden in chart exports, but are still counted in the **Total** tile; the **Shown** tile reflects the visible groups.
+Use this to focus on a subset of groups. Hidden groups are not plotted and are
+marked hidden in chart exports, while their legend entry retains its
+full-result count.
+
+Select **Uncased** beside the legend to merge case variants without rerunning
+the analysis. For example, `jobs` and `Jobs` become `jobs/Jobs`, with their
+per-period values, totals, percentages, tooltip values, and export entry
+summed. Changing this checkbox restores all hidden groups while preserving
+selected periods, zoom, chart type, and axis mode.
 
 <h3 id="help-sequential-zoom">Zoom and navigation</h3>
 
@@ -120,7 +130,7 @@ Use the chart slider, mouse wheel, or trackpad pinch to zoom along the horizonta
 
 <h3 id="help-sequential-period-selection">Period selection</h3>
 
-Click any bar, line point, or area segment in the chart to select that time period. Selected periods are highlighted; unselected periods are dimmed to 25 % opacity.
+Click anywhere inside the plot to select the time period nearest the vertical axis pointer. You do not need to target a line point, bar, or area segment. Selected periods are highlighted; unselected periods are dimmed to 25 % opacity.
 
 To select a range, click one period then **Shift-click** another — all periods between them are selected.
 
@@ -137,6 +147,9 @@ rows represented by the current Trends result. If periods are selected, only
 those periods are included; with no selection, all periods are included. Hidden
 legend groups are always excluded. Zoom changes only the viewport and never the
 rows added to the Workspace.
+
+When Uncased is enabled, hiding a merged legend entry excludes every exact
+spelling represented by that entry.
 
 The time or numeric axis column is required. The source Document Column and
 Group By columns start selected but remain optional, while other source columns

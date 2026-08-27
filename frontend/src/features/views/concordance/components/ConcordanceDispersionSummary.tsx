@@ -24,6 +24,7 @@ import {
   type ChartImageFormat,
 } from '@/lib/chartExport';
 import { EChartsView } from '../../common/components/EChartsView';
+import { FilterableSeriesControls } from '../../common/components/FilterableSeriesControls';
 import { VIZ_PALETTE } from '../../common/vizPalette';
 import {
   CONCORDANCE_DISPERSION_CHART_MODES,
@@ -35,10 +36,6 @@ import {
   type DispersionDisplayBinCount,
   type ConcordanceDensitySeriesInput,
 } from '../concordanceDispersionDomain';
-import {
-  ConcordanceDispersionMatchControls,
-  type ConcordanceDispersionLegendItem,
-} from './ConcordanceDispersionMatchControls';
 
 interface Props {
   rows: ConcordanceDispersionRow[];
@@ -71,7 +68,12 @@ interface Props {
   showChart?: boolean;
 }
 
-interface DispersionChartSeries extends ConcordanceDispersionLegendItem {
+interface DispersionChartSeries {
+  key: string;
+  color: string;
+  matchedTexts: string[];
+  hidden: boolean;
+  countLabel: string;
   /** Human-readable label for tooltip/export display. */
   label?: string;
 }
@@ -406,22 +408,34 @@ export function ConcordanceDispersionSummary({
 
   return (
     <>
-      <ConcordanceDispersionMatchControls
-        items={allSeries}
-        uncasedMatchedTexts={uncasedMatchedTexts}
-        onUncasedMatchedTextsChange={onUncasedMatchedTextsChange}
-        onToggleMatchedTexts={onToggleMatchedTexts}
+      <FilterableSeriesControls
+        items={allSeries.map((item) => ({
+          key: item.key,
+          color: item.color,
+          text: item.countLabel,
+          label: item.countLabel,
+          hidden: item.hidden,
+        }))}
+        ariaLabel="Matched terms"
+        pressedWhenHidden
+        uncased={uncasedMatchedTexts}
+        onUncasedChange={onUncasedMatchedTextsChange}
+        onClearSelection={selection?.onClear}
+        clearSelectionDisabled={!selection || selection.selectedIndices.size === 0}
+        onToggle={
+          onToggleMatchedTexts
+            ? (key) => {
+                const item = allSeries.find((candidate) => candidate.key === key);
+                if (item) onToggleMatchedTexts(item.matchedTexts);
+              }
+            : undefined
+        }
       />
       {showChart ? (
         <Card data-testid="concordance-dispersion-chart">
           <CardHeader className="gap-3 pb-2 md:flex-row md:items-start md:justify-between">
             <CardTitle className="text-body">{chartTitle}</CardTitle>
             <div className="flex flex-wrap items-center justify-end gap-3">
-              {selection && selection.selectedIndices.size > 0 && (
-                <Button type="button" variant="outline" size="sm" onClick={selection.onClear}>
-                  Clear Selection ({selection.selectedIndices.size})
-                </Button>
-              )}
               {onBinCountChange && (
                 <div className="flex items-center gap-2 text-body text-foreground">
                   <span id={`${controlId}-bin-count`}>Bin No.</span>

@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => {
     off: vi.fn(),
     setOption: vi.fn(),
     dispatchAction: vi.fn(),
+    containPixel: vi.fn(() => true),
     resize: vi.fn(),
     dispose: vi.fn(),
     getZr: vi.fn(() => ({
@@ -130,7 +131,7 @@ describe('EChartsView', () => {
     expect(mocks.chart.dispose).toHaveBeenCalledOnce();
   });
 
-  it('maps chart clicks and brush selections to complete dataset indices', () => {
+  it('maps plot clicks and brush selections to complete dataset indices', () => {
     const onSelect = vi.fn();
     const onSelectRange = vi.fn();
     render(
@@ -147,14 +148,17 @@ describe('EChartsView', () => {
     );
 
     act(() => {
-      mocks.handlers.get('click')?.({
-        componentType: 'series',
-        dataIndex: 3,
-        event: { event: { shiftKey: true } },
-      });
+      mocks.handlers.get('showtip')?.({ dataIndex: 3 });
+      mocks.zrHandlers.get('click')?.({ offsetX: 120, offsetY: 80, event: { shiftKey: true } });
     });
     expect(onSelect).toHaveBeenCalledWith(3, true);
     expect(screen.getByText('Point summary 3')).toBeInTheDocument();
+    expect(mocks.chart.containPixel).toHaveBeenCalledWith({ gridIndex: 0 }, [120, 80]);
+    expect(mocks.chart.dispatchAction).toHaveBeenCalledWith({
+      type: 'updateAxisPointer',
+      x: 120,
+      y: 80,
+    });
 
     fireEvent.click(screen.getByRole('button', { name: 'Select range' }));
     act(() => {

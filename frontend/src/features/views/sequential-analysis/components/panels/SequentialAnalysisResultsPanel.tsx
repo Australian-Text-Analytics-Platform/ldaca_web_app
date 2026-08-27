@@ -29,7 +29,8 @@ export interface SequentialAnalysisResultsPanelProps {
   addToWorkspaceDisabled: boolean;
   dataResetKey: string;
 
-  onToggleKey: (key: string) => void;
+  onToggleGroupIndices: (groupIndices: readonly number[]) => void;
+  onUncasedChange: (value: boolean) => void;
   onPeriodClick: (index: number, shiftHeld: boolean) => void;
   onPeriodRangeSelect: (startIndex: number, endIndex: number, shiftHeld: boolean) => void;
   onClearSelection: () => void;
@@ -51,7 +52,8 @@ export function SequentialAnalysisResultsPanel({
   onAddToWorkspace,
   addToWorkspaceDisabled,
   dataResetKey,
-  onToggleKey,
+  onToggleGroupIndices,
+  onUncasedChange,
   onPeriodClick,
   onPeriodRangeSelect,
   onClearSelection,
@@ -79,7 +81,8 @@ export function SequentialAnalysisResultsPanel({
       <CardContent className="space-y-4">
         <SequentialChart
           model={model}
-          onToggleKey={onToggleKey}
+          onToggleGroupIndices={onToggleGroupIndices}
+          onUncasedChange={onUncasedChange}
           onPeriodClick={onPeriodClick}
           onPeriodRangeSelect={onPeriodRangeSelect}
           onClearSelection={onClearSelection}

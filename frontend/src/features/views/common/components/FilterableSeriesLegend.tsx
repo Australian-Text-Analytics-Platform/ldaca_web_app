@@ -1,4 +1,4 @@
-interface FilterableSeriesLegendItem {
+export interface FilterableSeriesLegendItem {
   key: string;
   color: string;
   text: string;

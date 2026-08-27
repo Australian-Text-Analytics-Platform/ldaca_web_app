@@ -159,7 +159,7 @@ tracked in the
 Export omits `access.json`; import rejects an archive-supplied sidecar. Lock
 files are outside Workspace directories and are never portable archive content.
 
-Portable archive format 19 materializes Data Blocks and retained Analysis query
+Portable archive format 20 materializes Data Blocks and retained Analysis query
 inputs as Parquet, includes terminal Analysis forests and declared Artifacts,
 and contains no serialized executable plans. Import reconstructs private lazy
 plans from those safe files, rebases their sources and Workspace identity after

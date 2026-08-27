@@ -1,5 +1,9 @@
 import { useRef, useState } from 'react';
 
+import {
+  createCaseFoldedSeriesVisibility,
+  reduceCaseFoldedSeriesVisibility,
+} from '../../common/caseFoldedSeriesVisibility';
 import type { SequentialXAxisType } from './sequentialChartModel';
 
 /**
@@ -13,10 +17,10 @@ import type { SequentialXAxisType } from './sequentialChartModel';
  */
 export function useSequentialChartControls(resultKey?: string | null) {
   const [xAxisType, setXAxisType] = useState<SequentialXAxisType>('category');
-  const [hiddenState, setHiddenState] = useState<{
+  const [seriesVisibilityState, setSeriesVisibilityState] = useState<{
     resultKey: string | null | undefined;
-    values: Set<string>;
-  }>({ resultKey, values: new Set() });
+    value: ReturnType<typeof createCaseFoldedSeriesVisibility<number>>;
+  }>({ resultKey, value: createCaseFoldedSeriesVisibility<number>() });
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
   const [selectionState, setSelectionState] = useState<{
     resultKey: string | null | undefined;
@@ -26,7 +30,10 @@ export function useSequentialChartControls(resultKey?: string | null) {
     resultKey: string | null | undefined;
     value: number | null;
   }>({ resultKey, value: null });
-  const hiddenKeys = hiddenState.resultKey === resultKey ? hiddenState.values : new Set<string>();
+  const seriesVisibility =
+    seriesVisibilityState.resultKey === resultKey
+      ? seriesVisibilityState.value
+      : createCaseFoldedSeriesVisibility<number>();
   const selectedPeriodIndices =
     selectionState.resultKey === resultKey ? selectionState.values : new Set<number>();
   const lastClickedIndex = () =>
@@ -39,16 +46,33 @@ export function useSequentialChartControls(resultKey?: string | null) {
    * Toggles chart series visibility without losing the underlying result rows.
    * Called by: SequentialAnalysisResultsPanel legend controls.
    */
-  const toggleKey = (key: string) => {
-    setHiddenState((previous) => {
-      const current = previous.resultKey === resultKey ? previous.values : new Set<string>();
-      const next = new Set(current);
-      if (next.has(key)) {
-        next.delete(key);
-      } else {
-        next.add(key);
-      }
-      return { resultKey, values: next };
+  const toggleGroupIndices = (groupIndices: readonly number[]) => {
+    setSeriesVisibilityState((previous) => {
+      const current =
+        previous.resultKey === resultKey
+          ? previous.value
+          : createCaseFoldedSeriesVisibility<number>();
+      return {
+        resultKey,
+        value: reduceCaseFoldedSeriesVisibility(current, {
+          type: 'toggle-members',
+          keys: groupIndices,
+        }),
+      };
+    });
+  };
+
+  /** Changes case folding and restores all exact groups, matching Concordance. */
+  const setUncasedGroups = (value: boolean) => {
+    setSeriesVisibilityState((previous) => {
+      const current =
+        previous.resultKey === resultKey
+          ? previous.value
+          : createCaseFoldedSeriesVisibility<number>();
+      return {
+        resultKey,
+        value: reduceCaseFoldedSeriesVisibility(current, { type: 'set-uncased', value }),
+      };
     });
   };
 
@@ -130,18 +154,23 @@ export function useSequentialChartControls(resultKey?: string | null) {
    * clears the active task result.
    */
   const resetAfterClear = () => {
-    setHiddenState({ resultKey, values: new Set() });
+    setSeriesVisibilityState({
+      resultKey,
+      value: createCaseFoldedSeriesVisibility<number>(),
+    });
     resetResultSelection();
   };
 
   return {
     xAxisType,
     setXAxisType,
-    hiddenKeys,
+    uncasedGroups: seriesVisibility.uncased,
+    excludedGroupIndices: seriesVisibility.excludedKeys,
     downloadDialogOpen,
     setDownloadDialogOpen,
     selectedPeriodIndices,
-    toggleKey,
+    toggleGroupIndices,
+    setUncasedGroups,
     selectPeriod,
     selectPeriodRange,
     clearPeriodSelection,

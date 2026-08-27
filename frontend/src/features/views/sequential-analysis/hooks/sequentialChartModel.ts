@@ -129,6 +129,7 @@ interface SequentialChartGroup {
   color: string;
   hidden: boolean;
   values: Record<string, SequentialGroupValue>;
+  memberGroupIndices: number[];
   totalCount: number;
   selectedCount: number;
   legendText: string;
@@ -149,13 +150,15 @@ export interface BuildSequentialChartModelInput {
   fallbacks: SequentialResultSummaryFallbacks;
   chartType: ChartTypeOption;
   xAxisType: SequentialXAxisType;
-  hiddenKeys: Set<string>;
+  uncased: boolean;
+  excludedGroupIndices: Set<number>;
   selectedPeriodIndices: Set<number>;
 }
 
 export interface SequentialChartModel {
   chartType: ChartTypeOption;
   xAxisType: SequentialXAxisType;
+  uncased: boolean;
   status: 'ready' | 'empty' | 'malformed';
   diagnostics: SequentialChartDiagnostic[];
   summary: SequentialResultSummary;
@@ -167,6 +170,7 @@ export interface SequentialChartModel {
     labelFormatter: (value: string | number) => string;
   };
   groups: SequentialChartGroup[];
+  supportsUncased: boolean;
   series: MultiSeriesChartSeries[];
   legend: ChartExportLegendItem[];
   selection: {
@@ -309,6 +313,31 @@ function buildGroupIdentity(
   };
 }
 
+function caseFoldedGroupId(
+  values: Record<string, SequentialGroupValue>,
+  groupBy: string[],
+): string {
+  const tuple = groupBy.map((column) => {
+    const value = values[column] ?? null;
+    if (typeof value === 'string') return ['string', value.toLowerCase()];
+    if (value === null) return ['null'];
+    return [typeof value, value];
+  });
+  return `uncased:${encodeURIComponent(JSON.stringify(tuple))}`;
+}
+
+/** Joins exact display labels with the fully lowercase spelling first when present. */
+function joinCaseVariantLabels(labels: readonly string[]): string {
+  return Array.from(new Set(labels))
+    .sort((left, right) => {
+      const leftLowercase = left === left.toLowerCase();
+      const rightLowercase = right === right.toLowerCase();
+      if (leftLowercase !== rightLowercase) return leftLowercase ? -1 : 1;
+      return left.localeCompare(right);
+    })
+    .join('/');
+}
+
 function normalizeRows(
   results: SequentialAnalysisResponse | null | undefined,
   summary: SequentialResultSummary,
@@ -423,7 +452,8 @@ export function buildSequentialChartModel({
   fallbacks,
   chartType,
   xAxisType,
-  hiddenKeys,
+  uncased,
+  excludedGroupIndices,
   selectedPeriodIndices,
 }: BuildSequentialChartModelInput): SequentialChartModel {
   const diagnostics: SequentialChartDiagnostic[] = [];
@@ -442,9 +472,44 @@ export function buildSequentialChartModel({
       values: row.groupValues,
     });
   });
-  const groupBases = Array.from(groupsById.values()).sort(
+  const exactGroupBases = Array.from(groupsById.values()).sort(
     (left, right) => left.index - right.index,
   );
+
+  const supportsUncased = exactGroupBases.some((group) =>
+    Object.values(group.values).some((value) => typeof value === 'string'),
+  );
+  const displayGroupsById = new Map<
+    string,
+    Pick<SequentialChartGroup, 'id' | 'index' | 'label' | 'values' | 'memberGroupIndices'> & {
+      labels: string[];
+    }
+  >();
+  const displayIdByExactId = new Map<string, string>();
+  exactGroupBases.forEach((group) => {
+    const hasStringValue = Object.values(group.values).some((value) => typeof value === 'string');
+    const id =
+      uncased && hasStringValue ? caseFoldedGroupId(group.values, summary.groupBy) : group.id;
+    displayIdByExactId.set(group.id, id);
+    const existing = displayGroupsById.get(id);
+    if (existing) {
+      existing.memberGroupIndices.push(group.index);
+      existing.labels.push(group.label);
+      existing.label = joinCaseVariantLabels(existing.labels);
+      return;
+    }
+    displayGroupsById.set(id, {
+      id,
+      index: group.index,
+      label: group.label,
+      labels: [group.label],
+      values: group.values,
+      memberGroupIndices: [group.index],
+    });
+  });
+  const groupBases = Array.from(displayGroupsById.values())
+    .sort((left, right) => left.index - right.index)
+    .map(({ labels: _labels, ...group }) => group);
 
   const buckets = new Map<string, SequentialAnalysisDatum>();
   canonicalRows.forEach((row) => {
@@ -457,7 +522,10 @@ export function buildSequentialChartModel({
       period_start: row.periodStart,
       period_end: row.periodEnd,
     };
-    entry[row.groupId] = Number(entry[row.groupId] ?? 0) + row.count;
+    const displayId = displayIdByExactId.get(row.groupId) ?? row.groupId;
+    if (!excludedGroupIndices.has(row.groupIndex)) {
+      entry[displayId] = Number(entry[displayId] ?? 0) + row.count;
+    }
     if (existing) {
       if (
         periodCoordinate(row.periodStart, summary.columnType) <
@@ -510,27 +578,29 @@ export function buildSequentialChartModel({
   const selectedPeriodIdSet = new Set(selectedPeriodIds);
   const sumCounts = (rows: SequentialCanonicalRow[]) =>
     rows.reduce((total, row) => total + row.count, 0);
-  const groupTotals = new Map<number, number>();
-  const selectedGroupTotals = new Map<number, number>();
+  const groupTotals = new Map<string, number>();
+  const selectedGroupTotals = new Map<string, number>();
   canonicalRows.forEach((row) => {
-    groupTotals.set(row.groupIndex, (groupTotals.get(row.groupIndex) ?? 0) + row.count);
+    const displayId = displayIdByExactId.get(row.groupId) ?? row.groupId;
+    groupTotals.set(displayId, (groupTotals.get(displayId) ?? 0) + row.count);
     if (selectedPeriodIdSet.has(row.periodIndex)) {
-      selectedGroupTotals.set(
-        row.groupIndex,
-        (selectedGroupTotals.get(row.groupIndex) ?? 0) + row.count,
-      );
+      selectedGroupTotals.set(displayId, (selectedGroupTotals.get(displayId) ?? 0) + row.count);
     }
   });
   const visibleTotal = groupBases.reduce(
     (total, group) =>
-      hiddenKeys.has(group.id) ? total : total + (groupTotals.get(group.index) ?? 0),
+      group.memberGroupIndices.every((index) => excludedGroupIndices.has(index))
+        ? total
+        : total + (groupTotals.get(group.id) ?? 0),
     0,
   );
   const groups: SequentialChartGroup[] = groupBases.map((group, index) => {
     const color = getSequentialPaletteColor(index);
-    const hidden = hiddenKeys.has(group.id);
-    const totalCount = groupTotals.get(group.index) ?? 0;
-    const selectedCount = selectedGroupTotals.get(group.index) ?? 0;
+    const hidden = group.memberGroupIndices.every((memberIndex) =>
+      excludedGroupIndices.has(memberIndex),
+    );
+    const totalCount = groupTotals.get(group.id) ?? 0;
+    const selectedCount = selectedGroupTotals.get(group.id) ?? 0;
     const countText =
       validSelectedIndices.size > 0
         ? `${String(selectedCount)}/${String(totalCount)}`
@@ -590,7 +660,7 @@ export function buildSequentialChartModel({
     hidden: group.hidden,
   }));
 
-  const shownRows = canonicalRows.filter((row) => !hiddenKeys.has(row.groupId));
+  const shownRows = canonicalRows.filter((row) => !excludedGroupIndices.has(row.groupIndex));
   const chosenRows = shownRows.filter((row) => selectedPeriodIdSet.has(row.periodIndex));
   const counts: SequentialVisibilityCounts = {
     totalPointCount: canonicalRows.length,
@@ -603,6 +673,7 @@ export function buildSequentialChartModel({
   return {
     chartType,
     xAxisType,
+    uncased,
     status: diagnostics.length > 0 ? 'malformed' : canonicalRows.length > 0 ? 'ready' : 'empty',
     diagnostics,
     summary,
@@ -622,6 +693,7 @@ export function buildSequentialChartModel({
             },
     },
     groups,
+    supportsUncased,
     series,
     legend,
     selection: {
@@ -630,7 +702,9 @@ export function buildSequentialChartModel({
       hasInvalidSelection,
       selectedPeriodIds,
     },
-    excludedGroupIndices: groups.filter((group) => group.hidden).map((group) => group.index),
+    excludedGroupIndices: Array.from(excludedGroupIndices)
+      .filter((index) => exactGroupBases.some((group) => group.index === index))
+      .sort((left, right) => left - right),
     eligibleDocumentCount:
       validSelectedIndices.size > 0 ? sumCounts(chosenRows) : sumCounts(shownRows),
     counts,

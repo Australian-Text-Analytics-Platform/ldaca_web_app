@@ -17,7 +17,6 @@ describe('sequential analysis parameter helpers', () => {
         numericIntervalInput: '10',
         customIntervalValueInput: '30',
         customIntervalUnit: 'minutes',
-        caseSensitive: false,
       },
       'numeric',
     );
@@ -32,7 +31,6 @@ describe('sequential analysis parameter helpers', () => {
       numeric_interval: 10,
       custom_interval_value: null,
       custom_interval_unit: null,
-      case_sensitive: false,
     });
   });
 
@@ -45,7 +43,6 @@ describe('sequential analysis parameter helpers', () => {
         numericIntervalInput: '1',
         customIntervalValueInput: '15',
         customIntervalUnit: 'minutes',
-        caseSensitive: true,
       },
       'datetime',
     );
@@ -64,7 +61,6 @@ describe('sequential analysis parameter helpers', () => {
         column_type: 'datetime',
         custom_interval_value: 2,
         custom_interval_unit: 'hours',
-        case_sensitive: false,
       }),
     ).toEqual({
       frequency: 'custom',
@@ -74,7 +70,6 @@ describe('sequential analysis parameter helpers', () => {
       numeric_interval: null,
       custom_interval_value: 2,
       custom_interval_unit: 'hours',
-      case_sensitive: false,
     });
   });
 });
@@ -113,7 +108,6 @@ describe('useSequentialAnalysisParameters', () => {
         numeric_interval: 25,
         group_by_columns: ['region'],
         frequency: 'monthly',
-        case_sensitive: false,
       });
     });
 
@@ -121,7 +115,6 @@ describe('useSequentialAnalysisParameters', () => {
     expect(result.current.groupByColumns).toEqual(['region']);
     expect(result.current.numericOriginInput).toBe('1800');
     expect(result.current.numericIntervalInput).toBe('25');
-    expect(result.current.caseSensitive).toBe(false);
     expect(hydrated?.nodeId).toBe('node-1');
     expect(hydrated?.hydratedParams).toMatchObject({
       timeColumn: 'year',

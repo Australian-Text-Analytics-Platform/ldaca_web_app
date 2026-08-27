@@ -47,11 +47,11 @@ describe('buildSequentialChartExportMetadata', () => {
       fallbacks,
       chartType: 'area',
       xAxisType: 'category',
-      hiddenKeys: new Set(),
+      uncased: false,
+      excludedGroupIndices: new Set(),
       selectedPeriodIndices: new Set(),
-      sourceDocumentCount: 30,
     });
-    const graceId = base.groups.find((group) => group.label === 'Grace')?.id ?? '';
+    const graceIndex = base.groups.find((group) => group.label === 'Grace')?.memberGroupIndices[0];
     const model = buildSequentialChartModel({
       results: {
         data: [
@@ -84,9 +84,9 @@ describe('buildSequentialChartExportMetadata', () => {
       fallbacks,
       chartType: 'area',
       xAxisType: 'category',
-      hiddenKeys: new Set([graceId]),
+      uncased: false,
+      excludedGroupIndices: new Set(graceIndex === undefined ? [] : [graceIndex]),
       selectedPeriodIndices: new Set(),
-      sourceDocumentCount: 30,
     });
 
     const metadata = buildSequentialChartExportMetadata({ nodeName: 'Interviews', model });

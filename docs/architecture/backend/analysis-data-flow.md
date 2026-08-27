@@ -259,10 +259,11 @@ the immutable request. A successful Trends Run All also retains a private
 Parquet publication artifact from the same input snapshot as its public Arrow
 aggregate. Original source rows in that artifact carry reserved period and
 group indices; the public aggregate exposes the corresponding `period_index`
-and `group_index` values. Trends Data Block Creation filters only this immutable
+and `group_index` values. Group indices always identify exact source-value
+tuples; optional case folding belongs to the result frontend. Trends Data Block Creation filters only this immutable
 artifact and never re-reads the live source Data Block.
 
-Native schema 20 and portable archive format 19 validate
+Native schema 21 and portable archive format 20 validate
 parent ownership, ordered Tab membership, terminal archive state, output
 identities, and retained query inputs. Older layouts are rejected without
 runtime migration.

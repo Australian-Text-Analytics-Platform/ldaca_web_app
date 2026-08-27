@@ -68,9 +68,9 @@ const build = (
     fallbacks: overrides.fallbacks ?? fallbacks,
     chartType: overrides.chartType ?? 'line',
     xAxisType: overrides.xAxisType ?? 'category',
-    hiddenKeys: overrides.hiddenKeys ?? new Set(),
+    uncased: overrides.uncased ?? false,
+    excludedGroupIndices: overrides.excludedGroupIndices ?? new Set(),
     selectedPeriodIndices: overrides.selectedPeriodIndices ?? new Set(),
-    sourceDocumentCount: overrides.sourceDocumentCount,
   });
 };
 
@@ -361,7 +361,7 @@ describe('buildSequentialChartModel', () => {
       ],
       analysis_params: { column_type: 'datetime', group_by_columns: ['group'] },
     });
-    const hiddenId = initial.groups.find((group) => group.label === 'B')?.id ?? '';
+    const hiddenIndex = initial.groups.find((group) => group.label === 'B')?.memberGroupIndices[0];
     const model = build(
       {
         data: [
@@ -390,9 +390,8 @@ describe('buildSequentialChartModel', () => {
         analysis_params: { column_type: 'datetime', group_by_columns: ['group'] },
       },
       {
-        hiddenKeys: new Set([hiddenId]),
+        excludedGroupIndices: new Set(hiddenIndex === undefined ? [] : [hiddenIndex]),
         selectedPeriodIndices: new Set([1]),
-        sourceDocumentCount: 20,
       },
     );
 
@@ -413,6 +412,100 @@ describe('buildSequentialChartModel', () => {
       'A (4/6 · 100.0%)',
       'B (0/3 · Hidden)',
     ]);
+  });
+
+  it('folds string tuple variants into one frontend series with exact member indices', () => {
+    const result = {
+      data: [
+        {
+          time_period: '2024-01',
+          period_start: '2024-01-01',
+          period_end: '2024-02-01',
+          region: 'au',
+          party: 'jobs',
+          sequential_count: 3,
+        },
+        {
+          time_period: '2024-01',
+          period_start: '2024-01-01',
+          period_end: '2024-02-01',
+          region: 'AU',
+          party: 'Jobs',
+          sequential_count: 2,
+        },
+        {
+          time_period: '2024-02',
+          period_start: '2024-02-01',
+          period_end: '2024-03-01',
+          region: 'au',
+          party: 'jobs',
+          sequential_count: 4,
+        },
+      ],
+      analysis_params: {
+        column_type: 'datetime' as const,
+        group_by_columns: ['region', 'party'],
+      },
+    };
+    const exact = build(result);
+    const uncased = build(result, { uncased: true, selectedPeriodIndices: new Set([0]) });
+
+    expect(exact.groups).toHaveLength(2);
+    expect(uncased.supportsUncased).toBe(true);
+    expect(uncased.groups).toHaveLength(1);
+    expect(uncased.groups[0]).toEqual(
+      expect.objectContaining({
+        label: 'au - jobs/AU - Jobs',
+        totalCount: 9,
+        selectedCount: 5,
+        legendText: 'au - jobs/AU - Jobs (5/9 · 100.0%)',
+      }),
+    );
+    expect(new Set(uncased.groups[0]?.memberGroupIndices)).toEqual(new Set([0, 1]));
+    expect(uncased.chartData[0]?.[uncased.groups[0]!.id]).toBe(5);
+
+    const hidden = build(result, {
+      uncased: true,
+      excludedGroupIndices: new Set(uncased.groups[0]?.memberGroupIndices),
+    });
+    expect(hidden.series).toEqual([]);
+    expect(hidden.eligibleDocumentCount).toBe(0);
+    expect(hidden.excludedGroupIndices).toEqual([0, 1]);
+  });
+
+  it('does not case-fold non-string group values', () => {
+    const model = build(
+      {
+        data: [
+          {
+            time_period: 1,
+            period_start: 0,
+            period_end: 2,
+            group: 1,
+            sequential_count: 2,
+          },
+          {
+            time_period: 1,
+            period_start: 0,
+            period_end: 2,
+            group: true,
+            sequential_count: 3,
+          },
+          {
+            time_period: 1,
+            period_start: 0,
+            period_end: 2,
+            group: null,
+            sequential_count: 4,
+          },
+        ],
+        analysis_params: { column_type: 'numeric', group_by_columns: ['group'] },
+      },
+      { uncased: true },
+    );
+
+    expect(model.supportsUncased).toBe(false);
+    expect(model.groups).toHaveLength(3);
   });
 
   it('rejects stale selection indices', () => {
@@ -590,8 +683,11 @@ describe('buildSequentialChartModel', () => {
         analysis_params: { column_type: 'datetime', group_by_columns: ['group'] },
       };
       const base = build(result, { chartType });
-      const hiddenId = base.groups[0]?.id ?? '';
-      const hidden = build(result, { chartType, hiddenKeys: new Set([hiddenId]) });
+      const hiddenIndex = base.groups[0]?.memberGroupIndices[0];
+      const hidden = build(result, {
+        chartType,
+        excludedGroupIndices: new Set(hiddenIndex === undefined ? [] : [hiddenIndex]),
+      });
 
       expect(hidden.groups[0]).toEqual(expect.objectContaining({ color: '#2563eb', hidden: true }));
       expect(hidden.groups[1]).toEqual(
@@ -659,20 +755,17 @@ describe('buildSequentialChartModel', () => {
   });
 
   it('uses canonical result rows for document counts', () => {
-    const model = build(
-      {
-        data: [
-          {
-            time_period: '2024-01',
-            period_start: '2024-01-01',
-            period_end: '2024-02-01',
-            sequential_count: 3,
-          },
-        ],
-        analysis_params: { column_type: 'datetime' },
-      },
-      { sourceDocumentCount: 1.5 },
-    );
+    const model = build({
+      data: [
+        {
+          time_period: '2024-01',
+          period_start: '2024-01-01',
+          period_end: '2024-02-01',
+          sequential_count: 3,
+        },
+      ],
+      analysis_params: { column_type: 'datetime' },
+    });
 
     expect(model.counts.totalPointCount).toBe(1);
     expect(model.counts.totalDocumentCount).toBe(3);

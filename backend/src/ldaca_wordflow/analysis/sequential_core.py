@@ -33,7 +33,6 @@ def _build_sequential_result_frames(
     numeric_interval: float | None = None,
     custom_interval_value: int | None = None,
     custom_interval_unit: str | None = None,
-    case_sensitive: bool = True,
 ) -> tuple[pl.DataFrame, pl.DataFrame]:
     """Pure-Polars implementation of sequential analysis.
 
@@ -161,15 +160,6 @@ def _build_sequential_result_frames(
 
     # Determine grouping columns
     group_cols = ["time_period"] + (group_by_columns or [])
-
-    # Lowercase group-by column values for case-insensitive grouping
-    if not case_sensitive and group_by_columns:
-        for col_name in group_by_columns:
-            if (
-                df.schema.get(col_name) == pl.String
-                or df.schema.get(col_name) == pl.Utf8
-            ):
-                df = df.with_columns(pl.col(col_name).str.to_lowercase())
 
     period_indices = (
         df.select("time_period")
@@ -323,7 +313,6 @@ def _run_sequential_analysis(
     numeric_interval: float | None = None,
     custom_interval_value: int | None = None,
     custom_interval_unit: str | None = None,
-    case_sensitive: bool = True,
 ) -> pl.DataFrame:
     """Return the public aggregate while preserving the established core API."""
 
@@ -338,7 +327,6 @@ def _run_sequential_analysis(
         numeric_interval=numeric_interval,
         custom_interval_value=custom_interval_value,
         custom_interval_unit=custom_interval_unit,
-        case_sensitive=case_sensitive,
     )
     return result
 

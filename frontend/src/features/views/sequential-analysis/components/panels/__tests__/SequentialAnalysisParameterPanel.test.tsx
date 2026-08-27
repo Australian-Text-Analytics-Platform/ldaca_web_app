@@ -48,8 +48,6 @@ describe('SequentialAnalysisParameterPanel', () => {
         onAddGroupByColumn={vi.fn()}
         onRemoveGroupByColumn={vi.fn()}
         onGroupByColumnChange={vi.fn()}
-        caseSensitive={false}
-        onCaseSensitiveChange={vi.fn()}
       />,
     );
 

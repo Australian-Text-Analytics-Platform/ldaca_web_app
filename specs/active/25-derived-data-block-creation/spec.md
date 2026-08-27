@@ -18,15 +18,18 @@ Issue: [#25](https://github.com/Australian-Text-Analytics-Platform/ldaca-wordflo
 - Trends requires its axis column, defaults the source Document Column and
   Group By columns on, retains source-column order, and derives original rows
   from the successful Run All snapshot. Selected periods restrict rows; no
-  selected period means all periods; hidden legend groups are excluded.
+  selected period means all periods; hidden legend groups are excluded. Trends
+  Run All retains exact group indices. Its shared result-level Uncased control
+  may merge string case variants for display, and a hidden merged entry expands
+  back to all exact member indices in the creation request.
 
 ## Compatibility boundary
 
 The persisted kinds are `concordance_match_data_block_creation`,
 `concordance_document_data_block_creation`,
 `quotation_result_data_block_creation`, `topic_modeling_data_block_creation`,
-and `sequential_data_block_creation`. Native Workspace schema 20 and portable
-archive format 19 are the current strict cutover with no alias or data
+and `sequential_data_block_creation`. Native Workspace schema 21 and portable
+archive format 20 are the current strict cutover with no alias or data
 migration.
 
 Device-local guidance acknowledgments migrate the three former contextual-hint

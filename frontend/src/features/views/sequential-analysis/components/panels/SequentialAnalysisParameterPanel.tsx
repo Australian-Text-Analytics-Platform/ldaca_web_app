@@ -4,7 +4,6 @@ import HelpIcon from '@/components/help/HelpIcon';
 import { NodeInputsPanel } from '@/features/views/common/components/NodeInputsPanel';
 import type { UseTabNodeInputsResult } from '@/features/views/common/nodeInputs';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -95,8 +94,6 @@ export interface SequentialAnalysisParameterPanelProps {
   onAddGroupByColumn: () => void;
   onRemoveGroupByColumn: (index: number) => void;
   onGroupByColumnChange: (index: number, value: string) => void;
-  caseSensitive: boolean;
-  onCaseSensitiveChange: (value: boolean) => void;
 }
 
 /**
@@ -129,8 +126,6 @@ export function SequentialAnalysisParameterPanel({
   onAddGroupByColumn,
   onRemoveGroupByColumn,
   onGroupByColumnChange,
-  caseSensitive,
-  onCaseSensitiveChange,
 }: SequentialAnalysisParameterPanelProps) {
   return (
     <>
@@ -320,25 +315,6 @@ export function SequentialAnalysisParameterPanel({
               </Button>
             </div>
           ))}
-
-          {groupByColumns.length > 0 && (
-            <div className="flex items-center space-x-2 mt-2">
-              <Checkbox
-                id="case-sensitive"
-                checked={caseSensitive}
-                onCheckedChange={(checked) => {
-                  onCaseSensitiveChange(checked === true);
-                }}
-                disabled={inputsDisabled}
-              />
-              <label
-                htmlFor="case-sensitive"
-                className="text-body font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-              >
-                Case sensitive
-              </label>
-            </div>
-          )}
         </div>
       </div>
     </>

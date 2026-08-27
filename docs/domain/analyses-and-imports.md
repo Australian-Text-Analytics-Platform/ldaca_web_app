@@ -221,7 +221,9 @@ Review term/bin filter. Trends Data Block Creation emits selected original
 source columns after applying selected period indices, or all periods when no
 period is selected, and excluding hidden group indices. It reads the successful
 parent's private publication artifact, so later source edits cannot change the
-derived result. Checked sources, including empty ones, are committed atomically.
+derived result. A frontend Uncased legend may combine exact groups for display,
+but hiding that entry expands back to every member `group_index` in the
+Supporting Analysis request. Checked sources, including empty ones, are committed atomically.
 Every created Data Block starts without a persisted color and therefore renders
 with the default grey instead of inheriting its source Data Block's analysis
 color. Run All itself never changes the Workspace graph.
@@ -276,7 +278,7 @@ selection.
 
 Closing and reopening a Workspace restores Tabs, terminal Analysis forests,
 immutable requests, stored Results, Artifacts, and retained query inputs.
-Native Workspace schema 20 and portable archive format 19 accept only this
+Native Workspace schema 21 and portable archive format 20 accept only this
 forest representation. Older layouts are rejected without runtime migration.
 Browser-local active Tab selection and Active Analysis Drafts are outside both
 storage forms.

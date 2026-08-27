@@ -17,7 +17,6 @@ export interface SequentialHydratedParams {
   numericInterval: number | null;
   customIntervalValue: number | null;
   customIntervalUnit: SequentialCustomIntervalUnit | null;
-  caseSensitive: boolean;
 }
 
 export interface SequentialParameterValues {
@@ -34,7 +33,6 @@ export interface SequentialParameterValues {
     numeric_interval: number | null;
     custom_interval_value: number | null;
     custom_interval_unit: SequentialCustomIntervalUnit | null;
-    case_sensitive: boolean;
   };
 }
 
@@ -45,7 +43,6 @@ export interface SequentialParameterDraftState {
   numericIntervalInput: string;
   customIntervalValueInput: string;
   customIntervalUnit: SequentialCustomIntervalUnit;
-  caseSensitive: boolean;
 }
 
 interface SequentialParameterState extends SequentialParameterDraftState {
@@ -115,7 +112,6 @@ export function deriveSequentialParameterValues(
       numeric_interval: derivedColumnType === 'numeric' ? numericIntervalValue : null,
       custom_interval_value: isCustomDatetime ? customIntervalValue : null,
       custom_interval_unit: isCustomDatetime ? customIntervalUnitValue : null,
-      case_sensitive: state.caseSensitive,
     },
   };
 }
@@ -124,7 +120,6 @@ const INITIAL_SEQUENTIAL_PARAMETER_STATE: SequentialParameterState = {
   timeColumn: '',
   groupByColumns: [],
   frequency: 'daily',
-  caseSensitive: true,
   numericOriginInput: '',
   numericIntervalInput: '1',
   customIntervalValueInput: '1',
@@ -135,7 +130,6 @@ type SequentialParameterAction =
   | { type: 'set-time-column'; value: string }
   | { type: 'set-group-by-columns'; value: string[] }
   | { type: 'set-frequency'; value: SequentialFrequency }
-  | { type: 'set-case-sensitive'; value: boolean }
   | { type: 'set-numeric-origin-input'; value: string }
   | { type: 'set-numeric-interval-input'; value: string }
   | { type: 'set-custom-interval-value-input'; value: string }
@@ -162,8 +156,6 @@ const sequentialParameterReducer = (
       return { ...state, groupByColumns: action.value };
     case 'set-frequency':
       return { ...state, frequency: action.value };
-    case 'set-case-sensitive':
-      return { ...state, caseSensitive: action.value };
     case 'set-numeric-origin-input':
       return { ...state, numericOriginInput: action.value };
     case 'set-numeric-interval-input':
@@ -208,7 +200,6 @@ export function readSequentialServerParams(request: SequentialAnalysisRequest) {
     numeric_interval: serverColumnType === 'numeric' ? (request.numeric_interval ?? null) : null,
     custom_interval_value: serverIsCustomDatetime ? (request.custom_interval_value ?? null) : null,
     custom_interval_unit: serverIsCustomDatetime ? (request.custom_interval_unit ?? null) : null,
-    case_sensitive: request.case_sensitive ?? true,
   };
 }
 
@@ -242,8 +233,6 @@ function resolveHydratedSequentialParameters(req: SequentialAnalysisRequest): {
     columnType === 'datetime' && frequency === 'custom' && req.custom_interval_unit != null
       ? req.custom_interval_unit
       : null;
-  const caseSensitive = req.case_sensitive ?? true;
-
   return {
     nodeId,
     columnType,
@@ -263,7 +252,6 @@ function resolveHydratedSequentialParameters(req: SequentialAnalysisRequest): {
         frequency === 'custom' && columnType === 'datetime'
           ? (customIntervalUnit ?? 'minutes')
           : 'minutes',
-      caseSensitive,
     },
     hydratedParams: {
       timeColumn,
@@ -274,7 +262,6 @@ function resolveHydratedSequentialParameters(req: SequentialAnalysisRequest): {
       numericInterval,
       customIntervalValue,
       customIntervalUnit,
-      caseSensitive,
     },
   };
 }
@@ -299,9 +286,6 @@ export function useSequentialAnalysisParameters() {
   }, []);
   const setFrequency = useCallback((value: SequentialFrequency) => {
     dispatch({ type: 'set-frequency', value });
-  }, []);
-  const setCaseSensitive = useCallback((value: boolean) => {
-    dispatch({ type: 'set-case-sensitive', value });
   }, []);
   const setNumericOriginInput = useCallback((value: string) => {
     dispatch({ type: 'set-numeric-origin-input', value });
@@ -360,8 +344,6 @@ export function useSequentialAnalysisParameters() {
     setGroupByColumns,
     frequency: state.frequency,
     setFrequency,
-    caseSensitive: state.caseSensitive,
-    setCaseSensitive,
     numericOriginInput: state.numericOriginInput,
     setNumericOriginInput,
     numericIntervalInput: state.numericIntervalInput,

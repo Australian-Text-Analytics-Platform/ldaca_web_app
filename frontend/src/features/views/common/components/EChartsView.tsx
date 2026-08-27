@@ -40,10 +40,14 @@ interface EChartsZoomRange {
   end: number;
 }
 
-interface EChartsClickEvent {
-  componentType?: string;
+interface EChartsShowTipEvent {
   dataIndex?: number;
-  event?: { event?: { shiftKey?: boolean } };
+}
+
+interface EChartsPointerEvent {
+  offsetX?: number;
+  offsetY?: number;
+  event?: { shiftKey?: boolean };
 }
 
 interface EChartsBrushSelectedEvent {
@@ -131,6 +135,7 @@ function EChartsInstance({
   const summaryRef = useRef(getPointSummary);
   const selectionModeRef = useRef<'point' | 'range'>('point');
   const shiftHeldRef = useRef(false);
+  const nearestPointIndexRef = useRef<number | null>(null);
   const suppressBrushEventRef = useRef(false);
   const zoomRangeRef = useRef<EChartsZoomRange>(FULL_ZOOM);
   const [selectionMode, setSelectionMode] = useState<'point' | 'range'>('point');
@@ -153,12 +158,24 @@ function EChartsInstance({
     const chart = init(element, undefined, { renderer: 'svg' });
     chartRef.current = chart;
 
-    const handleClick = (event: EChartsClickEvent) => {
-      if (selectionModeRef.current !== 'point' || event.componentType !== 'series') return;
-      if (typeof event.dataIndex !== 'number') return;
-      setActiveIndex(event.dataIndex);
-      setLiveText(summaryRef.current?.(event.dataIndex) ?? `Point ${String(event.dataIndex + 1)}`);
-      selectRef.current?.(event.dataIndex, !!event.event?.event?.shiftKey);
+    const handleShowTip = (event: EChartsShowTipEvent) => {
+      if (typeof event.dataIndex === 'number') nearestPointIndexRef.current = event.dataIndex;
+    };
+    const handlePlotClick = (event: EChartsPointerEvent) => {
+      if (selectionModeRef.current !== 'point' || !selectRef.current) return;
+      if (typeof event.offsetX !== 'number' || typeof event.offsetY !== 'number') return;
+      const pixel: [number, number] = [event.offsetX, event.offsetY];
+      if (!chart.containPixel({ gridIndex: 0 }, pixel)) return;
+
+      // Let ECharts snap the axis pointer to the nearest complete-dataset row.
+      // Its synchronous showTip event supplies the correct dataIndex for both
+      // categorical and continuous axes, including while dataZoom is active.
+      chart.dispatchAction({ type: 'updateAxisPointer', x: pixel[0], y: pixel[1] });
+      const index = nearestPointIndexRef.current;
+      if (index == null) return;
+      setActiveIndex(index);
+      setLiveText(summaryRef.current?.(index) ?? `Point ${String(index + 1)}`);
+      selectRef.current(index, !!event.event?.shiftKey);
     };
     const handleBrushSelected = (event: EChartsBrushSelectedEvent) => {
       if (suppressBrushEventRef.current || selectionModeRef.current !== 'range') return;
@@ -191,10 +208,11 @@ function EChartsInstance({
       shiftHeldRef.current = !!event.event?.shiftKey;
     };
 
-    chart.on('click', handleClick as never);
+    chart.on('showtip', handleShowTip as never);
     chart.on('brushselected', handleBrushSelected as never);
     chart.on('datazoom', handleDataZoom as never);
     chart.getZr().on('mousedown', handlePointerDown);
+    chart.getZr().on('click', handlePlotClick);
 
     const resizeObserver = new ResizeObserver(() => {
       chart.resize();
@@ -203,10 +221,11 @@ function EChartsInstance({
 
     return () => {
       resizeObserver.disconnect();
-      chart.off('click', handleClick);
+      chart.off('showtip', handleShowTip);
       chart.off('brushselected', handleBrushSelected);
       chart.off('datazoom', handleDataZoom);
       chart.getZr().off('mousedown', handlePointerDown);
+      chart.getZr().off('click', handlePlotClick);
       chart.dispose();
       chartRef.current = null;
     };
@@ -390,7 +409,7 @@ function EChartsInstance({
         tabIndex={0}
         onKeyDown={handleKeyDown}
         style={{ height: `${String(height)}px` }}
-        className="w-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-border"
+        className="w-full cursor-crosshair focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-border"
       />
       <div className="sr-only" aria-live="polite" aria-atomic="true">
         {liveText}

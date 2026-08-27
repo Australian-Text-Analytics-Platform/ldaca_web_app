@@ -82,7 +82,7 @@ flowchart TB
   `access.json` ownership is checked before portable content is exposed.
 - Archive exports omit deployment ownership, and imports reject embedded
   ownership before generating a new sidecar for the importer.
-- Portable Workspace archive format 19 contains materialized Data Blocks,
+- Portable Workspace archive format 20 contains materialized Data Blocks,
   terminal Analysis forests, declared Artifacts, and materialized immutable
   query inputs. It contains no serialized executable plans. Import assigns a
   fresh Workspace identity, rebuilds and rebases the private lazy plans, and

@@ -3348,10 +3348,6 @@ export type SampleUserFileImportResult = {
  */
 export type SequentialAnalysisRequest = {
     /**
-     * Case Sensitive
-     */
-    case_sensitive?: boolean;
-    /**
      * Column Type
      */
     column_type?: 'datetime' | 'numeric';

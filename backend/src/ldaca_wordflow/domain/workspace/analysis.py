@@ -206,8 +206,6 @@ class SequentialAnalysisRequest(_StrictModel):
     custom_interval_unit: (
         Literal["seconds", "minutes", "hours", "days", "weeks"] | None
     ) = None
-    case_sensitive: bool = True
-
     @model_validator(mode="after")
     def validate_interval(self) -> "SequentialAnalysisRequest":
         if self.column_type == "numeric" and (

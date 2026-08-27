@@ -22,7 +22,6 @@ interface SequentialAnalysisState {
   numericOriginInput: string;
   customIntervalValue: number | null;
   customIntervalUnit: SequentialCustomIntervalUnit | null;
-  caseSensitive: boolean;
 }
 
 interface SequentialAnalysisActions {
@@ -62,7 +61,6 @@ export function useSequentialAnalysisTaskFlow({
     numericOriginInput,
     customIntervalValue,
     customIntervalUnit,
-    caseSensitive,
   },
   actions: {
     runAnalysis,
@@ -138,7 +136,6 @@ export function useSequentialAnalysisTaskFlow({
       numeric_interval: derivedColumnType === 'numeric' ? numericIntervalValue : undefined,
       custom_interval_value: isCustomDatetime ? customIntervalValue : undefined,
       custom_interval_unit: isCustomDatetime ? customIntervalUnit : undefined,
-      case_sensitive: caseSensitive,
     };
 
     await runAnalysis<Analysis>({

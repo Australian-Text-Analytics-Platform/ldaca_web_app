@@ -97,8 +97,6 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
     groupByColumns,
     frequency,
     setFrequency,
-    caseSensitive,
-    setCaseSensitive,
     numericOriginInput,
     setNumericOriginInput,
     numericIntervalInput,
@@ -122,7 +120,8 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
   const {
     xAxisType,
     setXAxisType,
-    hiddenKeys,
+    uncasedGroups,
+    excludedGroupIndices,
     downloadDialogOpen,
     setDownloadDialogOpen,
     selectedPeriodIndices,
@@ -307,7 +306,6 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
         numericOriginInput,
         customIntervalValue,
         customIntervalUnit: customIntervalUnitValue,
-        caseSensitive,
       },
       actions: {
         runAnalysis,
@@ -346,7 +344,8 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
     },
     chartType,
     xAxisType,
-    hiddenKeys,
+    uncased: uncasedGroups,
+    excludedGroupIndices,
     selectedPeriodIndices,
   });
   const { summary } = chartModel;
@@ -495,8 +494,6 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
           onAddGroupByColumn={sequentialParameters.addGroupByColumn}
           onRemoveGroupByColumn={sequentialParameters.removeGroupByColumn}
           onGroupByColumnChange={sequentialParameters.changeGroupByColumn}
-          caseSensitive={caseSensitive}
-          onCaseSensitiveChange={setCaseSensitive}
         />
       </AnalysisCardLayout>
 
@@ -526,7 +523,8 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
           }}
           addToWorkspaceDisabled={chartModel.eligibleDocumentCount === 0}
           dataResetKey={tabTaskId ?? 'trends-result'}
-          onToggleKey={chartControls.toggleKey}
+          onToggleGroupIndices={chartControls.toggleGroupIndices}
+          onUncasedChange={chartControls.setUncasedGroups}
           onPeriodClick={(index, shiftHeld) => {
             chartControls.selectPeriod(index, shiftHeld, chartModel.chartData.length);
           }}

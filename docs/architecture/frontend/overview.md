@@ -167,3 +167,7 @@ legend and Uncased control live in a shared card between the dispersion table
 and optional plot because both surfaces consume that state. The shared controls
 remain available when proportional document-length bars hide the plot; plot-only
 controls remain in the plot header.
+
+Trends consumes the same shared result-level legend and Uncased control. Its
+case folding is frontend presentation and filtering state over exact backend
+group indices, so changing it never submits or reruns Sequential Analysis.

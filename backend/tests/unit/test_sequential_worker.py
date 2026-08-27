@@ -105,7 +105,6 @@ def test_sequential_frames_share_stable_indices_and_preserve_original_groups() -
         group_by_columns=["group"],
         column_type="numeric",
         numeric_interval=10,
-        case_sensitive=False,
     )
 
     assert aggregate.select(
@@ -113,8 +112,8 @@ def test_sequential_frames_share_stable_indices_and_preserve_original_groups() -
         SEQUENTIAL_GROUP_INDEX_COLUMN,
         "group",
     ).rows() == [
-        (0, 1, "a"),
-        (1, 2, "b"),
+        (0, 1, "A"),
+        (1, 2, "B"),
         (2, 0, None),
     ]
     assert publication["text"].to_list() == ["fifteen", "five", "twenty-five"]
@@ -131,6 +130,44 @@ def test_sequential_frames_share_stable_indices_and_preserve_original_groups() -
     ]
 
 
+def test_sequential_frames_keep_case_variants_as_exact_multi_column_groups() -> None:
+    aggregate, publication = _build_sequential_result_frames(
+        pl.DataFrame(
+            {
+                "occurred_at": [
+                    datetime(2026, 1, 1, tzinfo=timezone.utc),
+                    datetime(2026, 1, 2, tzinfo=timezone.utc),
+                    datetime(2026, 1, 3, tzinfo=timezone.utc),
+                ],
+                "region": ["au", "AU", "au"],
+                "party": ["jobs", "Jobs", None],
+                "text": ["one", "two", "three"],
+            }
+        ).lazy(),
+        time_column="occurred_at",
+        group_by_columns=["region", "party"],
+        frequency="monthly",
+    )
+
+    exact_groups = aggregate.select(
+        "region",
+        "party",
+        SEQUENTIAL_GROUP_INDEX_COLUMN,
+    ).rows()
+    assert len(exact_groups) == 3
+    assert {(region, party) for region, party, _index in exact_groups} == {
+        ("au", "jobs"),
+        ("AU", "Jobs"),
+        ("au", None),
+    }
+    assert {index for _region, _party, index in exact_groups} == {0, 1, 2}
+    assert publication.select("region", "party").rows() == [
+        ("au", "jobs"),
+        ("AU", "Jobs"),
+        ("au", None),
+    ]
+
+
 def test_sequential_worker_rejects_noncanonical_request_fields(tmp_path: Path) -> None:
     with pytest.raises(ValidationError):
         run_sequential_analysis(
@@ -142,6 +179,6 @@ def test_sequential_worker_rejects_noncanonical_request_fields(tmp_path: Path) -
             request_payload={
                 "time_column": "occurred_at",
                 "frequency": "monthly",
-                "legacy_frequency": "daily",
+                "case_sensitive": False,
             },
         )

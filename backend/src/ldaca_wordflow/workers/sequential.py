@@ -72,7 +72,6 @@ def run_sequential_analysis(
             numeric_interval=request.numeric_interval,
             custom_interval_value=request.custom_interval_value,
             custom_interval_unit=request.custom_interval_unit,
-            case_sensitive=request.case_sensitive,
         )
 
         result_path = Path(artifact_dir) / "result.arrows"

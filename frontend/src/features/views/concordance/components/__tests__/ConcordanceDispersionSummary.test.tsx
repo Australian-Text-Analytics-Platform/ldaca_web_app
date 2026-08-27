@@ -173,7 +173,7 @@ describe('ConcordanceDispersionSummary', () => {
       />,
     );
 
-    expect(screen.getByTestId('concordance-dispersion-match-controls')).toBeInTheDocument();
+    expect(screen.getByTestId('filterable-series-controls')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'alpha (1)' })).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'Uncased' })).toBeInTheDocument();
     expect(screen.queryByTestId('concordance-dispersion-chart')).not.toBeInTheDocument();
@@ -181,6 +181,7 @@ describe('ConcordanceDispersionSummary', () => {
 
   it('keeps hidden terms in the legend and removes them from the ECharts series', () => {
     const onToggle = vi.fn();
+    const onClear = vi.fn();
     render(
       <ConcordanceDispersionSummary
         rows={[]}
@@ -197,19 +198,21 @@ describe('ConcordanceDispersionSummary', () => {
           selectedIndices: new Set([0]),
           onSelect: vi.fn(),
           onSelectRange: vi.fn(),
-          onClear: vi.fn(),
+          onClear,
         }}
         excludedMatchedTexts={new Set(['alpha'])}
         onToggleMatchedTexts={onToggle}
       />,
     );
 
-    const controls = screen.getByTestId('concordance-dispersion-match-controls');
+    const controls = screen.getByTestId('filterable-series-controls');
     const hidden = within(controls).getByRole('button', { name: 'alpha (5/100)' });
     expect(hidden).toHaveAttribute('aria-pressed', 'true');
     expect(optionSeries()).toHaveLength(1);
     fireEvent.click(hidden);
     expect(onToggle).toHaveBeenCalledWith(['alpha']);
+    fireEvent.click(within(controls).getByRole('button', { name: 'Clear Selection' }));
+    expect(onClear).toHaveBeenCalledOnce();
   });
 
   it('uses exact matched-term colors and merges case variants when uncased', () => {

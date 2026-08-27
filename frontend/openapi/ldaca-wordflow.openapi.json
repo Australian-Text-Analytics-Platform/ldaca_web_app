@@ -6700,11 +6700,6 @@
       "SequentialAnalysisRequest": {
         "additionalProperties": false,
         "properties": {
-          "case_sensitive": {
-            "default": true,
-            "title": "Case Sensitive",
-            "type": "boolean"
-          },
           "column_type": {
             "default": "datetime",
             "enum": [

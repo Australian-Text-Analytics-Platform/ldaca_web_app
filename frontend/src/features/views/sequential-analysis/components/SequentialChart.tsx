@@ -1,13 +1,13 @@
 import React from 'react';
 
-import { Button } from '@/components/ui/button';
 import { MultiSeriesChart } from '@/features/views/common/components/MultiSeriesChart';
-import { FilterableSeriesLegend } from '@/features/views/common/components/FilterableSeriesLegend';
+import { FilterableSeriesControls } from '@/features/views/common/components/FilterableSeriesControls';
 import type { SequentialChartModel } from '../hooks/sequentialChartModel';
 
 interface SequentialChartProps {
   model: SequentialChartModel;
-  onToggleKey: (key: string) => void;
+  onToggleGroupIndices: (groupIndices: readonly number[]) => void;
+  onUncasedChange: (value: boolean) => void;
   onPeriodClick: (index: number, shiftHeld: boolean) => void;
   onPeriodRangeSelect: (startIndex: number, endIndex: number, shiftHeld: boolean) => void;
   onClearSelection: () => void;
@@ -27,7 +27,8 @@ const CHART_HEIGHT_PX = 400;
  */
 export function SequentialChart({
   model,
-  onToggleKey,
+  onToggleGroupIndices,
+  onUncasedChange,
   onPeriodClick,
   onPeriodRangeSelect,
   onClearSelection,
@@ -78,29 +79,26 @@ export function SequentialChart({
           .join('|')}`}
         toolbarStart={toolbarStart}
       />
-      <FilterableSeriesLegend
-        items={model.groups.map((group) => ({
-          key: group.id,
-          color: group.color,
-          text: group.legendText,
-          label: group.label,
-          hidden: group.hidden,
-          marker: model.chartType === 'bar' ? 'bar' : model.chartType,
-        }))}
-        onToggle={onToggleKey}
-        ariaLabel="Trends groups"
-        className="mt-4 flex flex-wrap items-center justify-center gap-4 px-4 text-body font-medium text-description"
-      />
-      <div className="mt-4 flex justify-end px-4 pb-2">
-        <Button
-          type="button"
-          variant="outline"
-          className="w-full sm:w-auto"
-          disabled={!hasSelection}
-          onClick={onClearSelection}
-        >
-          Clear Selection
-        </Button>
+      <div className="mt-4">
+        <FilterableSeriesControls
+          items={model.groups.map((group) => ({
+            key: group.id,
+            color: group.color,
+            text: group.legendText,
+            label: group.label,
+            hidden: group.hidden,
+            marker: model.chartType === 'bar' ? 'bar' : model.chartType,
+          }))}
+          ariaLabel="Trends groups"
+          uncased={model.uncased}
+          onUncasedChange={model.supportsUncased ? onUncasedChange : undefined}
+          onClearSelection={onClearSelection}
+          clearSelectionDisabled={!hasSelection}
+          onToggle={(key) => {
+            const group = model.groups.find((candidate) => candidate.id === key);
+            if (group) onToggleGroupIndices(group.memberGroupIndices);
+          }}
+        />
       </div>
     </div>
   );

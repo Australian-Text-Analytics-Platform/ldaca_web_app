@@ -281,6 +281,13 @@ source to page one, and filter before sorting, counting, and paging. Separated
 mode keeps those filters per source. Combined mode owns one frontend-only filter
 and sends it independently to each source.
 
+Trends uses the same session-only case-folded visibility contract for result
+groups. Run All always returns exact group tuples and stable backend
+`group_index` values. The frontend may fold string tuple elements for display,
+while each merged series retains every exact member index for legend filtering
+and Trends Data Block Creation. Changing Uncased clears exact group exclusions
+but preserves period selection and chart presentation state.
+
 Concordance, Quotation, and Topic Modelling adapt their typed Result contracts
 to one shared **Add to Workspace** dialog. The dialog owns transient source
 inclusion, names, ordered column selections, and exact-name synchronization
