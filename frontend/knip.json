@@ -1,7 +1,8 @@
 {
     "$schema": "https://unpkg.com/knip@6/schema.json",
     "entry": [
-        "openapi.config.ts"
+        "openapi.config.ts",
+        "src/updater/index.tsx"
     ],
     "project": [
         "src/**/*.{ts,tsx}"

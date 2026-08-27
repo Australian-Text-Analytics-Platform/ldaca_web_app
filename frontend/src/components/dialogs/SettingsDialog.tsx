@@ -23,6 +23,8 @@ import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useGuidanceAcknowledgmentsStore } from '@/features/guidance/acknowledgmentsStore';
 import { AiProvidersPreferencesPanel } from '@/features/views/annotation/components/AiProvidersPreferencesPanel';
 import { DataPortalCredentialPanel } from '@/features/settings/DataPortalCredentialPanel';
+import { DesktopUpdateSettings } from '@/features/updater/DesktopUpdateSettings';
+import { isTauri } from '@/lib/isTauri';
 import { toast } from 'sonner';
 import { Bot, Eye, FolderOpen, Hash, KeyRound, Moon, RotateCcw, Sparkles, Sun } from 'lucide-react';
 import {
@@ -214,6 +216,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                     />
                   </div>
                 </section>
+                {isTauri() && <DesktopUpdateSettings />}
               </TabsContent>
 
               <TabsContent value="portal" className="mt-0 space-y-5">

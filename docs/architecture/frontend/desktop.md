@@ -155,37 +155,57 @@ never ship in the packaged policy.
 The official Tauri updater is the only application-update path. Rust owns the
 signed update resource and the complete check, download, install, and restart
 lifecycle. The native application menu exposes **Check for Updates…** as the
-sole control. Checks are manual; application startup performs no update request
-and creates no updater window. Rust applies a 15-second request timeout and
-uses standard operating-system dialogs for the up-to-date result, errors, and
-the install confirmation. The main React application and web deployment have
-no updater UI, state, dependencies, or permissions.
+manual entry point and opens or focuses one `updater` utility window. A separate
+Vite entry renders that window without mounting the backend bootstrap,
+authentication, router, or Workspace. The updater webview receives only
+`core:default`; JavaScript cannot call the Updater, Store, opener, or process
+plugins directly. Typed Rust commands expose only the updater operations and
+validated HTTPS release-note links it needs.
+
+Automatic checks are enabled by default and occur at most once per 24 hours.
+Rust persists `automaticChecks`, `lastCheckAt`, and `skippedVersion` in the
+device-local Tauri Store. Automatic checks remain silent when no update is
+available, fail without interrupting startup, and suppress only the exact
+skipped version. Manual checks bypass both cadence and skip suppression. The
+desktop-only General setting changes automatic checking; browser deployments
+render no setting and make no updater request.
 
 ```mermaid
 sequenceDiagram
     participant Menu as Native application menu
     participant Rust as Rust updater owner
-    participant Dialog as Native system dialog
+    participant Window as Updater utility window
     participant Plugin as Tauri updater plugin
     participant Release as GitHub Release
 
-    Menu->>Rust: request check
+    Menu->>Rust: create or focus singleton window
+    Rust->>Window: render Checking immediately
+    Window->>Rust: request manual check
     Rust->>Plugin: check with timeout
     Plugin->>Release: fetch latest.json
     Release-->>Plugin: version, platform URL, signature
     Plugin-->>Rust: newer signed release metadata or none
     alt No update or check error
-        Rust->>Dialog: show native result
+        Rust-->>Window: Up to date or recoverable Error
     else Newer release
-        Rust->>Dialog: ask to download and restart
-        Dialog-->>Rust: user accepts
-        Rust->>Plugin: download and install
+        Rust-->>Window: version, date, and Markdown notes
+        Window->>Rust: Update with progress channel
+        Rust->>Plugin: download signed artifact
         Plugin->>Release: stream platform updater artifact
         Plugin->>Plugin: verify embedded public key signature
-        Plugin-->>Rust: installed
+        Plugin-->>Rust: verified bytes
+        Rust-->>Window: Ready to install
+        Window->>Rust: Restart and install
+        Rust->>Plugin: install verified bytes
         Rust->>Rust: restart application
     end
 ```
+
+The verified artifact remains in Rust memory between download and installation;
+there is no intermediate file controlled by the webview. Closing the updater
+window is equivalent to **Decide later** and clears the staged update, except
+that close is prevented during download and installation. Only closing the
+`main` window initiates backend shutdown.
 
 The updater public key and endpoint are compiled into Tauri configuration.
 The private updater key exists only as GitHub Actions secrets. GitHub Releases

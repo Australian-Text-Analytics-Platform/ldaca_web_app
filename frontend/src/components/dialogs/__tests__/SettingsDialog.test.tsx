@@ -11,6 +11,8 @@ const mocks = vi.hoisted(() => ({
   useWorkspaceData: vi.fn(),
   multiTabEnabled: false,
   updatePreferences: vi.fn(),
+  getUpdatePreferences: vi.fn(),
+  setAutomaticUpdateChecks: vi.fn(),
   preferencesReady: true,
 }));
 
@@ -20,6 +22,11 @@ vi.mock('@/lib/isTauri', () => ({
 
 vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
   useWorkspaceData: mocks.useWorkspaceData,
+}));
+
+vi.mock('@/features/updater/desktopUpdater', () => ({
+  getUpdatePreferences: mocks.getUpdatePreferences,
+  setAutomaticUpdateChecks: mocks.setAutomaticUpdateChecks,
 }));
 
 vi.mock('@/features/auth/hooks/useAuth', () => ({
@@ -92,6 +99,10 @@ describe('SettingsDialog', () => {
     resetPreferenceState();
     mocks.isTauri.mockReturnValue(false);
     mocks.preferencesReady = true;
+    mocks.getUpdatePreferences.mockResolvedValue({ automaticChecks: true });
+    mocks.setAutomaticUpdateChecks.mockImplementation((enabled: boolean) =>
+      Promise.resolve({ automaticChecks: enabled }),
+    );
     mocks.useWorkspaceData.mockReturnValue({
       currentWorkspaceId: 'workspace-1',
       workspaces: [],
@@ -173,14 +184,30 @@ describe('SettingsDialog', () => {
     expect(screen.getByRole('button', { name: 'Add Provider' })).toBeInTheDocument();
   });
 
-  it('does not duplicate native update controls in Settings', () => {
+  it('renders update preferences only in the desktop runtime', async () => {
     const view = renderSettingsDialog();
-
-    expect(screen.queryByRole('tab', { name: 'Updates' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('switch', { name: 'Automatically check for updates' }),
+    ).not.toBeInTheDocument();
     view.unmount();
 
     mocks.isTauri.mockReturnValue(true);
     renderSettingsDialog();
-    expect(screen.queryByRole('tab', { name: 'Updates' })).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole('switch', { name: 'Automatically check for updates' }),
+    ).toBeChecked();
+  });
+
+  it('persists the desktop automatic-check preference through native IPC', async () => {
+    mocks.isTauri.mockReturnValue(true);
+    const user = userEvent.setup();
+    renderSettingsDialog();
+
+    const automaticChecks = await screen.findByRole('switch', {
+      name: 'Automatically check for updates',
+    });
+    await user.click(automaticChecks);
+
+    expect(mocks.setAutomaticUpdateChecks).toHaveBeenCalledWith(false);
   });
 });

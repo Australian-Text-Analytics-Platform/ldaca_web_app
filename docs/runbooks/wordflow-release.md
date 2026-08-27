@@ -77,11 +77,20 @@ already reached PyPI.
 - Install the exact backend version with `uvx --from ldaca-wordflow==<semver>
   ldaca-wordflow --help`.
 - Confirm the MSI, DMG, both updater signatures, macOS updater archive, and
-  `latest.json` exist in the GitHub Release.
-- Install an older signed build and verify startup performs no updater request.
-  Choose **Check for Updates…** in the native application menu, accept the
-  standard system confirmation, and confirm the app installs the release and
-  relaunches into the new version.
+  `latest.json` exist in the GitHub Release. Confirm `latest.json.notes` exactly
+  matches the GitHub Release body.
+- Install an older signed build on macOS and Windows. Verify a manual no-update
+  result, available-version metadata and rendered notes, singleton window
+  focusing, determinate download progress, and the indeterminate state when a
+  content length is unavailable.
+- Verify **Skip this version** suppresses that exact version only for automatic
+  checks, **Decide later** dismisses without skipping, and manual checks still
+  show a skipped release. Confirm automatic checking occurs at most once in 24
+  hours and the desktop General setting can disable and re-enable it.
+- Download the signed update, choose **Restart and install**, and confirm macOS
+  relaunches into the new version and Windows exits into the passive installer.
+  Confirm closing the updater window never stops the backend and closure is
+  prevented while download or installation is active.
 - Deploy the tagged root commit and current supporting-package pointers.
 - Verify `/health/live`, `/health/ready`, hosted login, one Workspace read, and `/api/events`
   delivery.

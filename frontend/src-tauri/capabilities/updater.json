@@ -1,0 +1,6 @@
+{
+  "identifier": "updater",
+  "description": "Least-privilege access for the dedicated desktop updater window",
+  "windows": ["updater"],
+  "permissions": ["core:default"]
+}

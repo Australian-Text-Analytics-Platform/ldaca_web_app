@@ -46,6 +46,15 @@ export async function findForbiddenLocalApiBases(buildDirectory) {
 }
 
 export async function verifyFrontendBuild(buildDirectory = DEFAULT_BUILD_DIR) {
+  await Promise.all(
+    ['index.html', 'updater.html'].map(async (entry) => {
+      try {
+        await readFile(join(buildDirectory, entry), 'utf8');
+      } catch {
+        throw new Error(`Frontend build is missing required entry point: ${entry}`);
+      }
+    }),
+  );
   const offenders = await findForbiddenLocalApiBases(buildDirectory);
   if (offenders.length > 0) {
     throw new Error(

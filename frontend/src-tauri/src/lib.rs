@@ -62,11 +62,20 @@ pub fn run() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(supervisor::BackendSupervisor::new())
         .manage(desktop_updater::DesktopUpdaterState::default())
         .invoke_handler(tauri::generate_handler![
             get_backend_url,
+            desktop_updater::get_updater_snapshot,
+            desktop_updater::check_for_updates,
+            desktop_updater::download_update,
+            desktop_updater::install_update,
+            desktop_updater::dismiss_update,
+            desktop_updater::open_update_link,
+            desktop_updater::get_update_preferences,
+            desktop_updater::set_automatic_update_checks,
             download::download_backend_to_downloads,
             download::export_data_blocks_to_downloads,
             download::save_bytes_to_downloads
@@ -75,17 +84,24 @@ pub fn run() {
             install_application_menu(app.handle())?;
             app.on_menu_event(|app_handle, event| {
                 if event.id() == CHECK_FOR_UPDATES_MENU_ID {
-                    desktop_updater::check(app_handle.clone());
+                    desktop_updater::show_manual_check(app_handle.clone());
                 }
             });
             app.get_webview_window("main")
                 .ok_or_else(|| boxed_error("Main window not found"))?;
             supervisor::start(app.handle().clone());
+            desktop_updater::schedule_automatic_check(app.handle().clone());
             Ok(())
         })
         .on_window_event(|window, event| {
+            if desktop_updater::handle_window_event(window, event) {
+                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    api.prevent_close();
+                }
+                return;
+            }
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                if supervisor::request_window_close(window.clone()) {
+                if window.label() == "main" && supervisor::request_window_close(window.clone()) {
                     api.prevent_close();
                 }
             }

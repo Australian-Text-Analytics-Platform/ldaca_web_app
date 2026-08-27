@@ -10,6 +10,8 @@ async function withBuildFixture(run) {
   const buildDirectory = await mkdtemp(path.join(os.tmpdir(), 'wordflow-frontend-build-'));
   try {
     await mkdir(path.join(buildDirectory, 'assets'));
+    await writeFile(path.join(buildDirectory, 'index.html'), '<div id="root"></div>');
+    await writeFile(path.join(buildDirectory, 'updater.html'), '<div id="root"></div>');
     await run(buildDirectory);
   } finally {
     await rm(buildDirectory, { force: true, recursive: true });
@@ -24,6 +26,17 @@ test('accepts runtime and dynamically constructed development backend locations'
     );
 
     await verifyFrontendBuild(buildDirectory);
+  });
+});
+
+test('requires both application HTML entry points', async () => {
+  await withBuildFixture(async (buildDirectory) => {
+    await rm(path.join(buildDirectory, 'updater.html'));
+
+    await assert.rejects(
+      verifyFrontendBuild(buildDirectory),
+      /missing required entry point: updater\.html/,
+    );
   });
 });
 

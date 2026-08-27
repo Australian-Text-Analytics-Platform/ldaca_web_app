@@ -73,6 +73,12 @@ export default defineConfig(({ mode }) => ({
   build: {
     target: 'esnext',
     outDir: 'build',
+    rolldownOptions: {
+      input: {
+        main: path.resolve(frontendRootDir, 'index.html'),
+        updater: path.resolve(frontendRootDir, 'updater.html'),
+      },
+    },
   },
   server: {
     port: mode === 'tauri' ? 3001 : Number(process.env.FRONTEND_PORT ?? 3000),

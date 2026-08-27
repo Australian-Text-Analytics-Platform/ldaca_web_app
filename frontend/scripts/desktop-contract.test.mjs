@@ -79,10 +79,12 @@ describe('desktop configuration contracts', () => {
   it('uses the official Tauri updater contract without legacy update checks', () => {
     const tauri = JSON.parse(read('frontend/src-tauri/tauri.conf.json'));
     const capability = JSON.parse(read('frontend/src-tauri/capabilities/default.json'));
+    const updaterCapability = JSON.parse(read('frontend/src-tauri/capabilities/updater.json'));
     const cargo = read('frontend/src-tauri/Cargo.toml');
     const packageJson = JSON.parse(read('frontend/package.json'));
     const desktopShell = read('frontend/src-tauri/src/lib.rs');
     const nativeUpdater = read('frontend/src-tauri/src/desktop_updater.rs');
+    const viteConfig = read('frontend/vite.config.ts');
 
     expect(tauri.bundle.createUpdaterArtifacts).toBe(true);
     expect(tauri.plugins.updater.endpoints).toEqual([
@@ -91,33 +93,32 @@ describe('desktop configuration contracts', () => {
     expect(capability.permissions).not.toContain('updater:default');
     expect(capability.permissions).not.toContain('process:allow-restart');
     expect(cargo).toContain('tauri-plugin-updater = "2"');
+    expect(cargo).toContain('tauri-plugin-store = "2"');
     expect(cargo).not.toContain('tauri-plugin-process = "2"');
     expect(packageJson.dependencies).not.toHaveProperty('@tauri-apps/plugin-updater');
+    expect(packageJson.dependencies).not.toHaveProperty('@tauri-apps/plugin-store');
     expect(packageJson.dependencies).not.toHaveProperty('@tauri-apps/plugin-process');
     expect(capability.windows).toEqual(['main']);
+    expect(updaterCapability.windows).toEqual(['updater']);
+    expect(updaterCapability.permissions).toEqual(['core:default']);
     expect(desktopShell).toContain('Check for Updates…');
-    expect(desktopShell).toContain('desktop_updater::check(app_handle.clone())');
+    expect(desktopShell).toContain('desktop_updater::show_manual_check(app_handle.clone())');
+    expect(desktopShell).toContain('desktop_updater::schedule_automatic_check(app.handle().clone())');
+    expect(desktopShell).toContain('tauri_plugin_store::Builder::default().build()');
+    expect(desktopShell).toContain('window.label() == "main"');
     expect(desktopShell).not.toContain('desktop_update_check_requested');
     expect(desktopShell).not.toContain('desktop-updater=1');
     expect(nativeUpdater).toContain('.timeout(CHECK_TIMEOUT)');
-    expect(nativeUpdater).toContain('.download_and_install(');
+    expect(nativeUpdater).toContain('.download(');
+    expect(nativeUpdater).toContain('Channel<DownloadEvent>');
+    expect(nativeUpdater).toContain('WebviewWindowBuilder::new(');
+    expect(nativeUpdater).toContain('updater-settings.json');
     expect(nativeUpdater).toContain('app.restart()');
-    expect(nativeUpdater).toContain('MessageDialogButtons::OkCancelCustom');
-    expect(
-      existsSync(
-        resolve(repoRoot, 'frontend/src/features/desktop-updater/DesktopUpdaterWindow.tsx'),
-      ),
-    ).toBe(false);
-    expect(
-      existsSync(
-        resolve(repoRoot, 'frontend/src/features/desktop-updater/desktopUpdaterRuntime.ts'),
-      ),
-    ).toBe(false);
-    expect(
-      existsSync(
-        resolve(repoRoot, 'frontend/src/features/desktop-updater/DesktopUpdaterProvider.tsx'),
-      ),
-    ).toBe(false);
+    expect(nativeUpdater).not.toContain('MessageDialogButtons');
+    expect(viteConfig).toContain("main: path.resolve(frontendRootDir, 'index.html')");
+    expect(viteConfig).toContain("updater: path.resolve(frontendRootDir, 'updater.html')");
+    expect(existsSync(resolve(repoRoot, 'frontend/updater.html'))).toBe(true);
+    expect(existsSync(resolve(repoRoot, 'frontend/src/features/updater/UpdaterWindow.tsx'))).toBe(true);
     expect(existsSync(resolve(repoRoot, '.github/workflows/check-context-docs.yml'))).toBe(false);
     expect(existsSync(resolve(repoRoot, '.github/workflows/check-docs-drift.yml'))).toBe(false);
   });
