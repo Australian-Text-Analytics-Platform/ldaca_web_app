@@ -339,6 +339,18 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
   };
 
   /**
+   * Stops clicks from dialogs and other logical children rendered outside the
+   * card DOM before they reach React Flow's node wrapper. Physical card clicks
+   * keep bubbling so React Flow can preserve its normal node interactions.
+   */
+  const stopPortaledGraphEvent = (event: React.MouseEvent<HTMLDivElement>) => {
+    const { target } = event;
+    if (!(target instanceof globalThis.Node) || !event.currentTarget.contains(target)) {
+      event.stopPropagation();
+    }
+  };
+
+  /**
    * Requests this node as an input for the active view without letting the
    * click bubble into React Flow's node drag/select handlers.
    * Called by: the fixed-size NodeToolbar "+" button.
@@ -504,6 +516,8 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
       <div
         className={compactClasses}
         data-testid="custom-node-compact-card"
+        onClick={stopPortaledGraphEvent}
+        onDoubleClick={stopPortaledGraphEvent}
         onMouseEnter={showToolbar}
         onMouseLeave={hideToolbar}
         style={{
@@ -547,6 +561,8 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
     <div
       className={nodeClasses}
       data-testid="custom-node-card"
+      onClick={stopPortaledGraphEvent}
+      onDoubleClick={stopPortaledGraphEvent}
       onMouseEnter={showToolbar}
       onMouseLeave={hideToolbar}
       style={{

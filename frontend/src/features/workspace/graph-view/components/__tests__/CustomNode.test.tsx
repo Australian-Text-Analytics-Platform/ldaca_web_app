@@ -341,26 +341,31 @@ describe('CustomNode', () => {
     mockZoom = 0.59;
     const user = userEvent.setup();
     const onRename = vi.fn();
+    const handleNodeClick = vi.fn((event: React.MouseEvent<HTMLDivElement>) => {
+      event.preventDefault();
+    });
     const name = 'sample_data/ADO/qldelection2020_candidate_tweets';
 
     render(
-      <CustomNode
-        id="node-zoomed-out"
-        type="custom"
-        data={{
-          ...nodeData({ id: 'node-zoomed-out', name }),
-          onRename,
-        }}
-        selected={false}
-        dragging={false}
-        zIndex={0}
-        selectable
-        deletable
-        draggable
-        isConnectable
-        positionAbsoluteX={0}
-        positionAbsoluteY={0}
-      />,
+      <div onClick={handleNodeClick}>
+        <CustomNode
+          id="node-zoomed-out"
+          type="custom"
+          data={{
+            ...nodeData({ id: 'node-zoomed-out', name }),
+            onRename,
+          }}
+          selected={false}
+          dragging={false}
+          zIndex={0}
+          selectable
+          deletable
+          draggable
+          isConnectable
+          positionAbsoluteX={0}
+          positionAbsoluteY={0}
+        />
+      </div>,
     );
 
     await user.hover(screen.getByTitle(name));
@@ -371,10 +376,15 @@ describe('CustomNode', () => {
     await waitFor(() => expect(renameInput).toHaveFocus());
     expect(screen.getByRole('heading', { name: 'Rename Data Block' })).toBeInTheDocument();
     await user.clear(renameInput);
-    await user.type(renameInput, 'Renamed Data Block{Enter}');
+    await user.type(renameInput, 'Renamed Data Block');
+    await user.click(screen.getByRole('button', { name: 'Rename' }));
 
     expect(onRename).toHaveBeenCalledWith('node-zoomed-out', 'Renamed Data Block');
     expect(screen.queryByRole('textbox', { name: 'New Data Block name' })).not.toBeInTheDocument();
+    expect(handleNodeClick).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByTestId('custom-node-compact-card'));
+    expect(handleNodeClick).toHaveBeenCalledOnce();
   });
 
   it('hides the node toolbar immediately when the pointer leaves the node', async () => {
