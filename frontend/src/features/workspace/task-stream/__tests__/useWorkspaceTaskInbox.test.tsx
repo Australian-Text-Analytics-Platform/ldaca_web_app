@@ -1,18 +1,16 @@
-import type { ReactNode } from 'react';
-import { act, renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { act, renderHook, waitFor } from '@testing-library/react';
+import { HttpResponse, http } from 'msw';
+import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { http, HttpResponse } from 'msw';
-
+import type { UserFileImport, WorkspaceCatalogueItem } from '@/api';
+import { useTabAnalysisForest } from '@/features/views/common/hooks/useTabAnalysisForest';
 import { queryKeys } from '@/lib/queryKeys';
+import { useFreshNodesStore } from '@/stores/freshNodesStore';
 import { analysisResponse } from '@/test/msw/fixtures';
 import { server } from '@/test/msw/server';
-import type { UserFileImport } from '@/api';
-import type { WorkspaceCatalogueItem } from '@/api';
-import { useTabAnalysisForest } from '@/features/views/common/hooks/useTabAnalysisForest';
-import { useFreshNodesStore } from '@/stores/freshNodesStore';
-import type { WorkspaceTaskStreamClientOptions } from '../useWorkspaceTaskStreamClient';
 import { useTaskResources, useWorkspaceTaskInbox } from '../useWorkspaceTaskInbox';
+import type { WorkspaceTaskStreamClientOptions } from '../useWorkspaceTaskStreamClient';
 
 let emitEvent: ((payload: unknown) => void) | undefined;
 const mocks = vi.hoisted(() => ({ toastError: vi.fn() }));
@@ -209,6 +207,54 @@ describe('useWorkspaceTaskInbox', () => {
     await waitFor(() =>
       expect(useFreshNodesStore.getState().freshIdsByWorkspace.get('workspace-1')).toEqual(
         new Set(['created-1']),
+      ),
+    );
+  });
+
+  it('marks Trends Data Block Creation outputs as newly created', async () => {
+    const creation = analysisResponse({
+      id: 'trends-creation-1',
+      execution_scope: 'supporting',
+      output_node_ids: ['trends-created-1'],
+      request: {
+        kind: 'sequential_data_block_creation',
+        source: {
+          source_node_id: 'node-1',
+          selected_columns: ['when', 'text'],
+          new_node_name: 'Selected trends',
+          selected_period_indices: [1],
+          excluded_group_indices: [],
+        },
+      },
+    });
+    server.use(
+      http.get('*/api/workspaces/:workspace_id/analyses/:analysis_id', () =>
+        HttpResponse.json(creation),
+      ),
+    );
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+    renderHook(() => useWorkspaceTaskInbox('workspace-1'), { wrapper });
+
+    act(() => {
+      emitEvent?.({
+        type: 'resource_changed',
+        sequence: 2,
+        occurred_at: new Date().toISOString(),
+        resource_type: 'analysis',
+        resource_id: 'trends-creation-1',
+        workspace_id: 'workspace-1',
+        state: 'succeeded',
+        progress: { fraction: 1, message: 'done' },
+        revision: 2,
+      });
+    });
+
+    await waitFor(() =>
+      expect(useFreshNodesStore.getState().freshIdsByWorkspace.get('workspace-1')).toEqual(
+        new Set(['trends-created-1']),
       ),
     );
   });

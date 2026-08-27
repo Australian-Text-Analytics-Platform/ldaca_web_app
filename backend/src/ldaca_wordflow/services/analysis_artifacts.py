@@ -30,6 +30,9 @@ from ..domain.workspace import (
     Node,
     QuotationResultDataBlockCreationAnalysisRequest,
     QuotationResultDataBlockCreationDerivation,
+    SequentialAnalysisRequest,
+    SequentialDataBlockCreationAnalysisRequest,
+    SequentialDataBlockCreationDerivation,
     TopicModelingAnalysisRequest,
     TopicModelingDataBlockCreationAnalysisRequest,
     TopicModelingDataBlockCreationDerivation,
@@ -54,6 +57,7 @@ from ..models.analysis_results import (
     DataBlockCreationOutput,
     DataBlockCreationStoredResult,
     DataBlockCreationWorkerResult,
+    SequentialStoredResult,
     TopicModelingDataBlockCreationOutput,
     TopicModelingDataBlockCreationStoredResult,
     TopicModelingDataBlockCreationWorkerResult,
@@ -573,7 +577,8 @@ def _validate_published_data_block_identity(
             (
                 item
                 for item in request.sources
-                if item.source_node_id in {
+                if item.source_node_id
+                in {
                     uuid.UUID(node_id)
                     for node_id in referenced_node_ids(metadata.provenance)
                 }
@@ -601,7 +606,42 @@ def _validate_published_data_block_identity(
         document = metadata.document
         requested_name = request.source.new_node_name
         selected_columns = request.source.selected_columns
-    elif isinstance(request, TopicModelingDataBlockCreationAnalysisRequest) and isinstance(
+    elif isinstance(request, SequentialDataBlockCreationAnalysisRequest) and isinstance(
+        parent_request,
+        SequentialAnalysisRequest,
+    ):
+        if parent is None or parent.result_payload is None:
+            raise ValueError("Trends Data Block Creation parent Result is unavailable")
+        stored = SequentialStoredResult.model_validate(parent.result_payload)
+        selection = request.source
+        expected_document = (
+            stored.source.document_column
+            if stored.source.document_column in selection.selected_columns
+            else None
+        )
+        expected_provenance = DerivationProvenance(
+            operation=SequentialDataBlockCreationDerivation(),
+            inputs=[
+                DerivationInput(
+                    role="source",
+                    value=node_reference(str(selection.source_node_id)),
+                )
+            ],
+        )
+        if (
+            parent_request.node_id != stored.source.node_id
+            or selection.source_node_id != stored.source.node_id
+            or metadata.name != selection.new_node_name
+            or metadata.provenance != expected_provenance
+            or metadata.document != expected_document
+            or metadata.color is not None
+            or str(metadata.id) in workspace.nodes
+        ):
+            raise ValueError("Trends Data Block metadata is invalid")
+        return
+    elif isinstance(
+        request, TopicModelingDataBlockCreationAnalysisRequest
+    ) and isinstance(
         parent_request,
         TopicModelingAnalysisRequest,
     ):

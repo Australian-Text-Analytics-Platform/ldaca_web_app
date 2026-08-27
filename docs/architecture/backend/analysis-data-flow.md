@@ -133,9 +133,10 @@ flowchart LR
     SELECT --> ATOMIC["Atomically commit Derived Data Blocks"]
 ```
 
-Derived Data Block Creation reads only the parent Result Artifacts. Its document column
-is mandatory, and its selected source identities, columns, and output names
-are immutable request data.
+Derived Data Block Creation reads only the parent Result Artifacts. Concordance and
+Quotation require their document column. Trends preserves its source document identity
+when that column is selected and also supports sources without a document column. Selected
+source identities, columns, and output names are immutable request data.
 
 ## Supersession And Clearing
 

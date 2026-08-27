@@ -1,11 +1,12 @@
-import { useCallback, useEffect } from 'react';
 import {
   type InfiniteData,
   useInfiniteQuery,
   useMutation,
   useQueryClient,
 } from '@tanstack/react-query';
+import { useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
+import type { UserFileImport, UserFileImportPage, WorkspaceCatalogueItem } from '@/api';
 import {
   cancelUserFileImport,
   deleteUserFileImport,
@@ -13,9 +14,8 @@ import {
   getUserFileImport,
   listUserFileImports,
 } from '@/api';
-import type { UserFileImport, UserFileImportPage, WorkspaceCatalogueItem } from '@/api';
-import { invalidateNodeWorkspaceQueries } from '@/features/workspace/common/hooks/workspaceMutationCache';
 import { workspaceAnalysesQueryOptions } from '@/features/workspace/common/hooks/workspaceAnalysesQuery';
+import { invalidateNodeWorkspaceQueries } from '@/features/workspace/common/hooks/workspaceMutationCache';
 import { queryKeys } from '@/lib/queryKeys';
 import { useFreshNodesStore } from '@/stores/freshNodesStore';
 import { analysisToTask, importToTask, sortTasks, type TaskItem } from './taskProjection';
@@ -31,6 +31,7 @@ const createsWorkspaceDataBlocks = (kind: string): boolean =>
   kind === 'concordance_match_data_block_creation' ||
   kind === 'concordance_document_data_block_creation' ||
   kind === 'quotation_result_data_block_creation' ||
+  kind === 'sequential_data_block_creation' ||
   kind === 'topic_modeling_data_block_creation';
 
 const nextPage = (page: { page: number; total_pages: number }): number | undefined =>
