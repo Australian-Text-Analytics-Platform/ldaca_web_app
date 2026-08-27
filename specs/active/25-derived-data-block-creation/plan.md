@@ -1,6 +1,6 @@
 # Implementation Plan
 
-1. Replace the four analysis request, Result, worker, provenance, and persisted
+1. Replace the analysis request, Result, worker, provenance, and persisted
    contracts with Derived Data Block Creation names and bump strict formats.
 2. Add per-source Select all and Select none controls to the two Add to
    Workspace dialogs, preserving required columns and stable submission order.
@@ -8,5 +8,7 @@
    IDs.
 4. Align the glossary, accepted ADRs, current architecture/reference pages, and
    user documentation while retaining historical records.
-5. Regenerate OpenAPI, run full package and documentation checks, and complete
+5. Extend the same contract to Trends using immutable original-row publication
+   artifacts and period/group filters.
+6. Regenerate OpenAPI, run full package and documentation checks, and complete
    browser acceptance before coordinating Issues #25 and #24.

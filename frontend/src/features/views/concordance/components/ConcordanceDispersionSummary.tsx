@@ -74,8 +74,6 @@ interface Props {
 interface DispersionChartSeries extends ConcordanceDispersionLegendItem {
   /** Human-readable label for tooltip/export display. */
   label?: string;
-  /** SVG dash pattern. Undefined = solid. */
-  dash?: string;
 }
 
 const AGGREGATE_DEFAULT_COLOR = '#0284c7';
@@ -134,15 +132,6 @@ const buildCumulativeChartData = (
     }
     return next;
   });
-};
-
-const dashType = (dash: string | undefined): number[] | 'solid' => {
-  if (!dash) return 'solid';
-  const values = dash
-    .split(/\s+/)
-    .map(Number)
-    .filter((value) => Number.isFinite(value) && value > 0);
-  return values.length > 0 ? values : 'solid';
 };
 
 const displayChartValue = (value: unknown): string => {
@@ -252,33 +241,20 @@ export function ConcordanceDispersionSummary({
   const hasSelection = !!selection && selection.selectedIndices.size > 0;
   const usesGroupedBars = chartMode === 'density-bar' && binCount <= GROUPED_BAR_MAX_BIN_COUNT;
   const usesStackedBars = chartMode === 'density-bar' && !usesGroupedBars;
-  const source = chartData.map((row, index) => ({
-    ...row,
-    [SELECTION_DIMENSION]: hasSelection && !selection.selectedIndices.has(index) ? 0 : 1,
-  }));
-  const alternateBinAreas = usesGroupedBars
-    ? chartData.flatMap((_, index) =>
-        index % 2 === 0
-          ? [[{ xAxis: (index * 100) / binCount }, { xAxis: ((index + 1) * 100) / binCount }]]
-          : [],
-      )
-    : [];
-  const seriesOptions = series.map((item, seriesIndex) => {
+  const usesSelectionVisual = hasSelection && chartMode === 'density-bar';
+  const source = usesSelectionVisual
+    ? chartData.map((row, index) => ({
+        ...row,
+        [SELECTION_DIMENSION]: selection.selectedIndices.has(index) ? 1 : 0,
+      }))
+    : chartData;
+  const seriesOptions = series.map((item) => {
     const common = {
       id: item.key,
       name: item.label ?? item.key,
       encode: { x: 'binCenter', y: item.key, tooltip: [item.key] },
       itemStyle: { color: item.color },
       emphasis: { focus: 'series' as const },
-      animation: false,
-      markArea:
-        seriesIndex === 0 && alternateBinAreas.length > 0
-          ? {
-              silent: true,
-              itemStyle: { color: 'var(--muted)', opacity: 0.45 },
-              data: alternateBinAreas,
-            }
-          : undefined,
     };
     if (chartMode === 'density-bar') {
       return {
@@ -296,16 +272,14 @@ export function ConcordanceDispersionSummary({
     return {
       ...common,
       type: 'line' as const,
-      smooth: chartMode === 'cumulative' ? false : 0.35,
-      step: chartMode === 'cumulative' ? ('middle' as const) : undefined,
-      connectNulls: true,
-      stack: chartMode === 'density-area' ? 'density' : undefined,
+      ...(chartMode === 'cumulative' ? { step: 'middle' as const } : { smooth: true }),
+      ...(chartMode === 'density-area' ? { stack: 'density' } : {}),
       showSymbol: chartMode === 'density-line' || hasSelection,
       symbolSize: (_value: unknown, params: { dataIndex?: number }) => {
         if (!hasSelection) return chartMode === 'density-line' ? 6 : 0;
         return selection.selectedIndices.has(params.dataIndex ?? -1) ? 10 : 6;
       },
-      lineStyle: { color: item.color, width: 2, type: dashType(item.dash) },
+      lineStyle: { color: item.color, width: 2 },
       areaStyle:
         chartMode === 'density-area'
           ? { color: item.color, opacity: hasSelection ? 0.2 : 0.35 }
@@ -313,12 +287,15 @@ export function ConcordanceDispersionSummary({
     };
   });
   const chartOption: EChartsCoreOption = {
-    animation: false,
     dataset: {
-      dimensions: ['binCenter', ...series.map((item) => item.key), SELECTION_DIMENSION],
+      dimensions: [
+        'binCenter',
+        ...series.map((item) => item.key),
+        ...(usesSelectionVisual ? [SELECTION_DIMENSION] : []),
+      ],
       source,
     },
-    grid: { containLabel: true, top: 10, right: 12, bottom: 58, left: 12 },
+    grid: { containLabel: true, top: 10, right: 12, bottom: 32, left: 12 },
     tooltip: {
       trigger: 'axis',
       renderMode: 'richText',
@@ -354,10 +331,9 @@ export function ConcordanceDispersionSummary({
       axisLabel: { margin: 8 },
       splitLine: { lineStyle: { color: 'var(--vscode-charts-lines)' } },
     },
-    // Per-row opacity is supported for bars. On line series ECharts attempts
-    // to apply the same visual to the stroke and warns for non-axis dimensions,
-    // so line and area modes use their selection-aware symbols instead.
-    ...(hasSelection && chartMode === 'density-bar'
+    // Per-item opacity is encoded for bars. Line and area modes show selection
+    // through their point symbols instead.
+    ...(usesSelectionVisual
       ? {
           visualMap: {
             type: 'piecewise',

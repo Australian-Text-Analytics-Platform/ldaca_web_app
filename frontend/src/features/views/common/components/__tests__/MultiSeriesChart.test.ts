@@ -8,14 +8,14 @@ const data = [
 ];
 const series = [
   { key: 'alpha', label: 'Alpha', color: '#123456' },
-  { key: 'beta', label: 'Beta', color: '#abcdef', dash: '6 4' },
+  { key: 'beta', label: 'Beta', color: '#abcdef' },
 ];
 
 describe('buildMultiSeriesChartOption', () => {
   it('uses an ECharts dataset and explicit dimension encoding', () => {
     const option = buildMultiSeriesChartOption({ data, xKey: 'period', series });
     expect(option.dataset).toMatchObject({
-      dimensions: ['period', 'alpha', 'beta', '__wordflow_selected__'],
+      dimensions: ['period', 'alpha', 'beta'],
     });
     expect(option.series).toEqual(
       expect.arrayContaining([
@@ -26,6 +26,8 @@ describe('buildMultiSeriesChartOption', () => {
         }),
       ]),
     );
+    expect(option.grid).toMatchObject({ containLabel: true, bottom: 32 });
+    expect((option.series as Record<string, unknown>[])[0]).toMatchObject({ smooth: true });
   });
 
   it('maps bar and stacked area modes without changing the input rows', () => {
@@ -38,6 +40,7 @@ describe('buildMultiSeriesChartOption', () => {
     const area = buildMultiSeriesChartOption({ data, xKey: 'period', series, chartType: 'area' });
     expect((area.series as Record<string, unknown>[])[0]).toMatchObject({
       type: 'line',
+      smooth: true,
       stack: 'wordflow-total',
     });
     expect((area.series as Record<string, unknown>[])[0]?.areaStyle).toBeTruthy();
@@ -72,5 +75,30 @@ describe('buildMultiSeriesChartOption', () => {
       },
     });
     expect(line.visualMap).toBeUndefined();
+  });
+
+  it('accepts native ECharts axis options without compatibility translation', () => {
+    const option = buildMultiSeriesChartOption({
+      data,
+      xKey: 'period',
+      series,
+      xAxis: {
+        type: 'value',
+        min: 'dataMin',
+        max: 'dataMax',
+        splitNumber: 10,
+        axisLabel: { rotate: 45 },
+      },
+      yAxis: { minInterval: 1 },
+    });
+
+    expect(option.xAxis).toMatchObject({
+      type: 'value',
+      min: 'dataMin',
+      max: 'dataMax',
+      splitNumber: 10,
+      axisLabel: { rotate: 45 },
+    });
+    expect(option.yAxis).toMatchObject({ type: 'value', minInterval: 1 });
   });
 });

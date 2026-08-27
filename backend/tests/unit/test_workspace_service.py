@@ -178,7 +178,7 @@ async def test_incompatible_workspace_versions_are_distinct_catalogue_entries(
         (record.stored_schema_version, record.supported_schema_version)
         for record in unavailable
         if isinstance(record, UnavailableWorkspaceRecord)
-    } == {(17, 19), (18, 19)}
+    } == {(17, 20), (18, 20)}
     assert all(
         isinstance(record, UnavailableWorkspaceRecord)
         and record.reason == "incompatible_format"

@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => {
@@ -81,8 +81,15 @@ describe('EChartsView', () => {
         pointCount={2}
         dataResetKey="result-a"
         ariaLabel="Test chart"
+        toolbarStart={<button type="button">Download chart</button>}
       />,
     );
+
+    expect(
+      within(screen.getByRole('generic', { name: 'Chart controls' })).getByRole('button', {
+        name: 'Download chart',
+      }),
+    ).toBeInTheDocument();
 
     expect(mocks.init).toHaveBeenCalledWith(expect.any(HTMLDivElement), undefined, {
       renderer: 'svg',
@@ -91,9 +98,10 @@ describe('EChartsView', () => {
       expect.objectContaining({
         aria: expect.objectContaining({ enabled: true, description: 'Test chart' }),
         dataZoom: expect.arrayContaining([
-          expect.objectContaining({ type: 'inside' }),
+          expect.objectContaining({ type: 'inside', moveOnMouseMove: false }),
           expect.objectContaining({ type: 'slider' }),
         ]),
+        toolbox: { show: false },
       }),
       { notMerge: true, lazyUpdate: false },
     );
@@ -105,6 +113,7 @@ describe('EChartsView', () => {
         pointCount={2}
         dataResetKey="result-a"
         ariaLabel="Updated chart"
+        toolbarStart={<button type="button">Download chart</button>}
       />,
     );
     expect(mocks.init).toHaveBeenCalledTimes(1);
@@ -189,6 +198,9 @@ describe('EChartsView', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Zoom in' }));
     expect(screen.getByRole('button', { name: 'Reset zoom' })).toBeEnabled();
+    expect(mocks.chart.dispatchAction).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'dataZoom', dataZoomId: 'wordflow-inside-zoom' }),
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Reset zoom' }));
     expect(screen.getByText('Chart zoom reset')).toBeInTheDocument();
   });

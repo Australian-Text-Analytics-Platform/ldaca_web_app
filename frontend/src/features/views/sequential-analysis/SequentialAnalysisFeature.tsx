@@ -5,6 +5,7 @@ import { CONTEXTUAL_HINT_IDS } from '@/features/guidance/registry';
 import { useProgressiveContextualHints } from '@/features/guidance/useProgressiveContextualHints';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { useWorkspaceStatus } from '@/features/workspace/common/hooks/useWorkspaceStatus';
+import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { useSchemaManagement } from '@/features/workspace/common/hooks/useSchemaManagement';
 
 import { arrowSchemaToFields } from '@/features/workspace/common/hooks/useSchemaManagement';
@@ -36,6 +37,9 @@ import {
 import { useSequentialChartControls } from './hooks/useSequentialChartControls';
 import { SequentialAnalysisParameterPanel } from './components/panels/SequentialAnalysisParameterPanel';
 import { SequentialAnalysisResultsPanel } from './components/panels/SequentialAnalysisResultsPanel';
+import { SequentialAddToWorkspaceDialog } from './components/SequentialAddToWorkspaceDialog';
+import type { AddToWorkspaceSelection } from '../common/components/AddToWorkspaceDialog';
+import { buildSequentialDataBlockCreationRequest } from './sequentialDataBlockCreation';
 import { ChartImageDownloadDialog } from '@/components/ui/ChartImageDownloadDialog';
 import { downloadChartAs, findSvgInContainer, type ChartImageFormat } from '@/lib/chartExport';
 import { DEFAULT_TAB_INPUT_SET_ID } from '@/features/views/common/tabs/tabStateOps';
@@ -67,6 +71,7 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
   const tabTaskId = latestRunAll?.id ?? null;
   const queryClient = useQueryClient();
   const { currentWorkspaceId } = useWorkspaceData();
+  const { createResultDataBlocks } = useWorkspaceActions();
   const { isLoading } = useWorkspaceStatus();
 
   const nodeInputs = useTabNodeInputs({
@@ -107,11 +112,13 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
   const [chartType, setChartTypeState] = useState<ChartTypeOption>(
     savedChartType === 'bar' || savedChartType === 'area' ? savedChartType : 'line',
   );
+  const [addToWorkspaceDialogOpen, setAddToWorkspaceDialogOpen] = useState(false);
+  const [isAddingToWorkspace, setIsAddingToWorkspace] = useState(false);
   const setChartType = (value: ChartTypeOption) => {
     setChartTypeState(value);
     host.setSetting('sequential.chartType', value);
   };
-  const chartControls = useSequentialChartControls();
+  const chartControls = useSequentialChartControls(tabTaskId);
   const {
     xAxisType,
     setXAxisType,
@@ -234,12 +241,6 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
   const serverColumn = lastRunRequest ? lastRunRequest.time_column : '';
   const resultNodeId = serverNodeId || activeNodeId;
   const resultNodeInfo = resultNodeId ? nodeInputs.nodeInfoById[resultNodeId] : null;
-  const sourceDocumentCount = (() => {
-    const firstShapeValue = resultNodeInfo?.shape?.[0];
-    return typeof firstShapeValue === 'number' && Number.isFinite(firstShapeValue)
-      ? firstShapeValue
-      : undefined;
-  })();
   const currentRequestSignature = {
     ...currentSequentialParams,
     node_id: activeNodeId,
@@ -347,7 +348,6 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
     xAxisType,
     hiddenKeys,
     selectedPeriodIndices,
-    sourceDocumentCount,
   });
   const { summary } = chartModel;
 
@@ -356,6 +356,30 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
       ? `Numeric bin counts for ${summary.timeColumn}`
       : `Frequency of records grouped by ${summary.timeColumn}`
     : 'Aggregated frequency over time';
+
+  const handleAddToWorkspace = async (selection: AddToWorkspaceSelection) => {
+    if (!tabTaskId || !results?.source) return;
+    setIsAddingToWorkspace(true);
+    try {
+      await createResultDataBlocks(
+        host.tabId,
+        tabTaskId,
+        buildSequentialDataBlockCreationRequest(
+          selection,
+          chartModel.selection.selectedPeriodIds,
+          chartModel.excludedGroupIndices,
+        ),
+      );
+      setAddToWorkspaceDialogOpen(false);
+      toast.success('Adding the Trends selection to the Workspace.');
+    } catch (cause) {
+      toast.error('Could not add the Trends selection.', {
+        description: cause instanceof Error ? cause.message : String(cause),
+      });
+    } finally {
+      setIsAddingToWorkspace(false);
+    }
+  };
 
   // Exports the rendered chart SVG with contextual title and legend metadata.
   /**
@@ -497,6 +521,11 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
           onDownloadClick={() => {
             setDownloadDialogOpen(true);
           }}
+          onAddToWorkspace={() => {
+            setAddToWorkspaceDialogOpen(true);
+          }}
+          addToWorkspaceDisabled={chartModel.eligibleDocumentCount === 0}
+          dataResetKey={tabTaskId ?? 'trends-result'}
           onToggleKey={chartControls.toggleKey}
           onPeriodClick={(index, shiftHeld) => {
             chartControls.selectPeriod(index, shiftHeld, chartModel.chartData.length);
@@ -521,6 +550,24 @@ const SequentialAnalysisFeature = ({ host }: AnalysisTabFeatureProps) => {
           void handleDownloadChart(format);
         }}
       />
+      {results?.source ? (
+        <SequentialAddToWorkspaceDialog
+          open={addToWorkspaceDialogOpen}
+          onOpenChange={setAddToWorkspaceDialogOpen}
+          source={results.source}
+          axisColumn={summary.timeColumn}
+          groupByColumns={summary.groupBy}
+          filterSummary={
+            chartModel.selection.selectedCount > 0
+              ? `${String(chartModel.eligibleDocumentCount)} source rows in ${String(chartModel.selection.selectedCount)} selected period${chartModel.selection.selectedCount === 1 ? '' : 's'} and the visible groups`
+              : `${String(chartModel.eligibleDocumentCount)} source rows across all periods and the visible groups`
+          }
+          isSubmitting={isAddingToWorkspace}
+          onSubmit={(selection) => {
+            void handleAddToWorkspace(selection);
+          }}
+        />
+      ) : null}
     </div>
   );
 };

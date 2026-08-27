@@ -56,5 +56,5 @@ remain in force.
   row distributions from the native context.
 - N-only frontend updates retain graph layout and interaction state; K changes
   still reset and refit the graph.
-- Native Workspace schema 19 and portable archive format 18 reject older
+- Native Workspace schema 20 and portable archive format 19 reject older
   layouts without runtime migration.

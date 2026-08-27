@@ -79,22 +79,11 @@ Run because they only change presentation.
 
 ![Trends and Sequence results](tutorials/assets/sequential_analysis/trends_results.png)
 
-The result panel shows a summary row, a chart, a legend, and period-selection controls for inspecting the chart.
-
-<h3 id="help-sequential-stats">Summary stats</h3>
-
-Six tiles at the top of the result panel summarise the current view. The **Total**, **Shown**, and **Chosen** tiles display two numbers separated by a slash — for example *42 / 1,250* — where the first number is the count of time-period buckets and the second is the total document count across those buckets.
-
-| Tile | What it shows |
-|---|---|
-| Time Column | The column used as the time axis |
-| Frequency / Numeric Interval | The bucketing unit in effect — e.g. *Monthly* or *Interval: 10* |
-| Total | All buckets / all documents in the result, before any filtering |
-| Shown | Visible plotted group-points / documents after legend visibility choices |
-| Chosen | Visible group-points / documents in your current period selection; shows *0 / 0* until you select a period |
-| Groups | The group-by columns in effect, listed by name, or *None* |
-
-For example, a **Shown** value of *18 / 934* means 18 time buckets are currently visible, together containing 934 documents. The **Chosen** tile updates live as you click periods in the chart.
+The result panel follows the Concordance dispersion layout: result actions in
+the header, chart presentation controls directly above the plot, then the chart,
+legend, and period-selection controls. Time column, frequency or interval, and
+Group By settings remain visible in the parameter panel instead of being
+repeated in the result.
 
 <h3 id="help-sequential-chart-type">Chart type</h3>
 
@@ -121,9 +110,9 @@ Click the download button (↓ icon) in the results header to export the chart. 
 
 <h3 id="help-sequential-legend">Legend and group visibility</h3>
 
-The legend below the chart lists all groups with their colours. Click any legend item to hide or show that group. Hidden groups are shown with a strikethrough label and reduced opacity.
+The legend below the chart lists all groups with their colours, full-result count, and share of the counts among currently visible groups. Percentages use one decimal place and do not change when periods are selected. When periods are selected, each visible label shows *selected / total* before the percentage. Click any legend item to hide or show that group. Hidden groups retain their count detail, show **Hidden**, and use a strikethrough label with reduced opacity.
 
-Use this to focus on a subset of groups. Hidden groups are excluded from chart exports but are still counted in the **Total** tile; the **Shown** tile reflects the visible groups.
+Use this to focus on a subset of groups. Hidden groups are not plotted and are marked hidden in chart exports, but are still counted in the **Total** tile; the **Shown** tile reflects the visible groups.
 
 <h3 id="help-sequential-zoom">Zoom and navigation</h3>
 
@@ -139,9 +128,20 @@ For drag selection, turn on **Select range** and drag across the periods you wan
 
 With keyboard focus on the chart, use **Left Arrow**, **Right Arrow**, **Home**, and **End** to inspect points. Press **Enter** or **Space** to select the focused point; hold **Shift** to extend the existing selection semantics.
 
-The **Chosen** tile tracks how many points and documents are in the current selection.
-
 Use **Clear Selection** to deselect all periods without losing any other settings.
+
+<h3 id="help-sequential-add-to-workspace">Add to Workspace</h3>
+
+Click **Add to Workspace** to create a Data Block containing original source
+rows represented by the current Trends result. If periods are selected, only
+those periods are included; with no selection, all periods are included. Hidden
+legend groups are always excluded. Zoom changes only the viewport and never the
+rows added to the Workspace.
+
+The time or numeric axis column is required. The source Document Column and
+Group By columns start selected but remain optional, while other source columns
+start unselected. The dialog preserves source-column order and defaults the new
+name to the source name followed by `_trends`.
 
 <h3 id="help-sequential-clear-results">Clear results</h3>
 

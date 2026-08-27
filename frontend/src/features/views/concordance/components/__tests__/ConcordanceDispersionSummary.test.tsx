@@ -101,6 +101,7 @@ describe('ConcordanceDispersionSummary', () => {
       <ConcordanceDispersionSummary {...props} chartMode="density-line" />,
     );
     expect(optionSeries()[0]).toMatchObject({ type: 'line', showSymbol: true });
+    expect(optionSeries()[0]).toMatchObject({ smooth: true });
 
     rerender(<ConcordanceDispersionSummary {...props} chartMode="density-bar" />);
     expect(optionSeries()[0]).toMatchObject({ type: 'bar', stack: 'density' });
@@ -111,7 +112,7 @@ describe('ConcordanceDispersionSummary', () => {
   });
 
   it.each([4, 5, 10] as const)(
-    'groups bars and alternates bin backgrounds at %i bins',
+    'groups bars at %i bins without extra background components',
     (binCount) => {
       render(
         <ConcordanceDispersionSummary
@@ -132,8 +133,7 @@ describe('ConcordanceDispersionSummary', () => {
       expect(optionSeries()).toHaveLength(2);
       expect(optionSeries().every((item) => item.stack === undefined)).toBe(true);
       expect(optionSeries()[0]).toMatchObject({ barGap: '10%', barCategoryGap: '8%' });
-      const markArea = optionSeries()[0]?.markArea as { data?: unknown[] } | undefined;
-      expect(markArea?.data).toHaveLength(Math.ceil(binCount / 2));
+      expect(optionSeries()[0]?.markArea).toBeUndefined();
     },
   );
 
@@ -267,6 +267,7 @@ describe('ConcordanceDispersionSummary', () => {
     );
 
     expect(optionSeries()[0]).toMatchObject({ type: 'line', step: 'middle', showSymbol: false });
+    expect(optionSeries()[0]).not.toHaveProperty('smooth');
     expect(optionSource()[0]).toMatchObject({ binCenter: 2.5, 'term:alpha': 1 });
     expect(optionSource()[5]).toMatchObject({
       binCenter: expect.closeTo(27.5),

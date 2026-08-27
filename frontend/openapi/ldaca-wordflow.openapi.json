@@ -137,6 +137,7 @@
                     "concordance_run_all": "#/components/schemas/ConcordanceRunAllAnalysisRequest",
                     "quotation_result_data_block_creation": "#/components/schemas/QuotationResultDataBlockCreationAnalysisRequest",
                     "quotation_run_all": "#/components/schemas/QuotationRunAllAnalysisRequest",
+                    "sequential_data_block_creation": "#/components/schemas/SequentialDataBlockCreationAnalysisRequest",
                     "topic_modeling_data_block_creation": "#/components/schemas/TopicModelingDataBlockCreationAnalysisRequest"
                   },
                   "propertyName": "kind"
@@ -156,6 +157,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/QuotationResultDataBlockCreationAnalysisRequest"
+                  },
+                  {
+                    "$ref": "#/components/schemas/SequentialDataBlockCreationAnalysisRequest"
                   },
                   {
                     "$ref": "#/components/schemas/AnnotationRunAllAnalysisRequest"
@@ -255,6 +259,7 @@
                 "quotation_result_data_block_creation": "#/components/schemas/QuotationResultDataBlockCreationAnalysisRequest",
                 "quotation_run_all": "#/components/schemas/QuotationRunAllAnalysisRequest",
                 "sequential": "#/components/schemas/SequentialAnalysisRequest",
+                "sequential_data_block_creation": "#/components/schemas/SequentialDataBlockCreationAnalysisRequest",
                 "token_frequency": "#/components/schemas/TokenFrequencyAnalysisRequest",
                 "topic_modeling": "#/components/schemas/TopicModelingAnalysisRequest",
                 "topic_modeling_data_block_creation": "#/components/schemas/TopicModelingDataBlockCreationAnalysisRequest"
@@ -294,6 +299,9 @@
               },
               {
                 "$ref": "#/components/schemas/QuotationResultDataBlockCreationAnalysisRequest"
+              },
+              {
+                "$ref": "#/components/schemas/SequentialDataBlockCreationAnalysisRequest"
               },
               {
                 "$ref": "#/components/schemas/AnnotationRunAllSubmission"
@@ -4162,6 +4170,7 @@
                 "join": "#/components/schemas/JoinDerivation",
                 "quotation_result_data_block_creation": "#/components/schemas/QuotationResultDataBlockCreationDerivation",
                 "replace": "#/components/schemas/ReplaceDerivation",
+                "sequential_data_block_creation": "#/components/schemas/SequentialDataBlockCreationDerivation",
                 "slice": "#/components/schemas/SliceDerivation",
                 "sql": "#/components/schemas/SqlDerivation",
                 "topic_modeling_data_block_creation": "#/components/schemas/TopicModelingDataBlockCreationDerivation"
@@ -4207,6 +4216,9 @@
               },
               {
                 "$ref": "#/components/schemas/QuotationResultDataBlockCreationDerivation"
+              },
+              {
+                "$ref": "#/components/schemas/SequentialDataBlockCreationDerivation"
               },
               {
                 "$ref": "#/components/schemas/TopicModelingDataBlockCreationDerivation"
@@ -6808,6 +6820,129 @@
         "title": "SequentialAnalysisRequest",
         "type": "object"
       },
+      "SequentialDataBlockCreationAnalysisRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "sequential_data_block_creation",
+            "default": "sequential_data_block_creation",
+            "title": "Kind",
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/SequentialDataBlockCreationSource"
+          }
+        },
+        "required": [
+          "source"
+        ],
+        "title": "SequentialDataBlockCreationAnalysisRequest",
+        "type": "object"
+      },
+      "SequentialDataBlockCreationDerivation": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "sequential_data_block_creation",
+            "default": "sequential_data_block_creation",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "title": "SequentialDataBlockCreationDerivation",
+        "type": "object"
+      },
+      "SequentialDataBlockCreationResult": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "sequential_data_block_creation",
+            "default": "sequential_data_block_creation",
+            "title": "Kind",
+            "type": "string"
+          },
+          "output_node_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 2,
+            "minItems": 1,
+            "title": "Output Node Ids",
+            "type": "array"
+          },
+          "outputs": {
+            "items": {
+              "$ref": "#/components/schemas/DataBlockCreationOutput"
+            },
+            "maxItems": 2,
+            "minItems": 1,
+            "title": "Outputs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "output_node_ids",
+          "outputs"
+        ],
+        "title": "SequentialDataBlockCreationResult",
+        "type": "object"
+      },
+      "SequentialDataBlockCreationSource": {
+        "additionalProperties": false,
+        "description": "One immutable Trends filter and source-column selection.",
+        "properties": {
+          "excluded_group_indices": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Excluded Group Indices",
+            "type": "array"
+          },
+          "new_node_name": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "New Node Name",
+            "type": "string"
+          },
+          "selected_columns": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Selected Columns",
+            "type": "array"
+          },
+          "selected_period_indices": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selected Period Indices"
+          },
+          "source_node_id": {
+            "format": "uuid",
+            "title": "Source Node Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_node_id",
+          "selected_columns",
+          "new_node_name"
+        ],
+        "title": "SequentialDataBlockCreationSource",
+        "type": "object"
+      },
       "SequentialResult": {
         "additionalProperties": false,
         "properties": {
@@ -6817,14 +6952,73 @@
             "title": "Kind",
             "type": "string"
           },
+          "source": {
+            "$ref": "#/components/schemas/SequentialSourceDescriptor"
+          },
           "table": {
             "$ref": "#/components/schemas/CompleteTableResource"
           }
         },
         "required": [
-          "table"
+          "table",
+          "source"
         ],
         "title": "SequentialResult",
+        "type": "object"
+      },
+      "SequentialSourceDescriptor": {
+        "additionalProperties": false,
+        "properties": {
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Columns",
+            "type": "array"
+          },
+          "document_column": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Column"
+          },
+          "group_count": {
+            "minimum": 0.0,
+            "title": "Group Count",
+            "type": "integer"
+          },
+          "node_id": {
+            "format": "uuid",
+            "title": "Node Id",
+            "type": "string"
+          },
+          "node_name": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Node Name",
+            "type": "string"
+          },
+          "period_count": {
+            "minimum": 0.0,
+            "title": "Period Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "node_id",
+          "node_name",
+          "columns",
+          "period_count",
+          "group_count"
+        ],
+        "title": "SequentialSourceDescriptor",
         "type": "object"
       },
       "SessionResponse": {
@@ -13793,6 +13987,7 @@
                       "quotation_result_data_block_creation": "#/components/schemas/QuotationResultDataBlockCreationResult",
                       "quotation_run_all": "#/components/schemas/QuotationRunAllResult",
                       "sequential": "#/components/schemas/SequentialResult",
+                      "sequential_data_block_creation": "#/components/schemas/SequentialDataBlockCreationResult",
                       "token_frequency": "#/components/schemas/TokenFrequencyResult",
                       "topic_modeling": "#/components/schemas/TopicModelingResult",
                       "topic_modeling_data_block_creation": "#/components/schemas/TopicModelingDataBlockCreationResult"
@@ -13838,6 +14033,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/QuotationResultDataBlockCreationResult"
+                    },
+                    {
+                      "$ref": "#/components/schemas/SequentialDataBlockCreationResult"
                     }
                   ],
                   "title": "Response Get Analysis Result"
@@ -14020,6 +14218,7 @@
                       "quotation_result_data_block_creation": "#/components/schemas/QuotationResultDataBlockCreationResult",
                       "quotation_run_all": "#/components/schemas/QuotationRunAllResult",
                       "sequential": "#/components/schemas/SequentialResult",
+                      "sequential_data_block_creation": "#/components/schemas/SequentialDataBlockCreationResult",
                       "token_frequency": "#/components/schemas/TokenFrequencyResult",
                       "topic_modeling": "#/components/schemas/TopicModelingResult",
                       "topic_modeling_data_block_creation": "#/components/schemas/TopicModelingDataBlockCreationResult"
@@ -14065,6 +14264,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/QuotationResultDataBlockCreationResult"
+                    },
+                    {
+                      "$ref": "#/components/schemas/SequentialDataBlockCreationResult"
                     }
                   ],
                   "title": "Response Query Analysis Result"

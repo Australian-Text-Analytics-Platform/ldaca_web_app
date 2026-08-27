@@ -11,26 +11,44 @@ import type { SequentialXAxisType } from './sequentialChartModel';
  * result-bound controls when results refresh, and fully reset chart controls
  * when results are cleared.
  */
-export function useSequentialChartControls() {
+export function useSequentialChartControls(resultKey?: string | null) {
   const [xAxisType, setXAxisType] = useState<SequentialXAxisType>('category');
-  const [hiddenKeys, setHiddenKeys] = useState<Set<string>>(new Set());
+  const [hiddenState, setHiddenState] = useState<{
+    resultKey: string | null | undefined;
+    values: Set<string>;
+  }>({ resultKey, values: new Set() });
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
-  const [selectedPeriodIndices, setSelectedPeriodIndices] = useState<Set<number>>(new Set());
-  const lastClickedIndexRef = useRef<number | null>(null);
+  const [selectionState, setSelectionState] = useState<{
+    resultKey: string | null | undefined;
+    values: Set<number>;
+  }>({ resultKey, values: new Set() });
+  const lastClickedIndexRef = useRef<{
+    resultKey: string | null | undefined;
+    value: number | null;
+  }>({ resultKey, value: null });
+  const hiddenKeys = hiddenState.resultKey === resultKey ? hiddenState.values : new Set<string>();
+  const selectedPeriodIndices =
+    selectionState.resultKey === resultKey ? selectionState.values : new Set<number>();
+  const lastClickedIndex = () =>
+    lastClickedIndexRef.current.resultKey === resultKey ? lastClickedIndexRef.current.value : null;
+  const setLastClickedIndex = (value: number | null) => {
+    lastClickedIndexRef.current = { resultKey, value };
+  };
 
   /**
    * Toggles chart series visibility without losing the underlying result rows.
    * Called by: SequentialAnalysisResultsPanel legend controls.
    */
   const toggleKey = (key: string) => {
-    setHiddenKeys((prev) => {
-      const next = new Set(prev);
+    setHiddenState((previous) => {
+      const current = previous.resultKey === resultKey ? previous.values : new Set<string>();
+      const next = new Set(current);
       if (next.has(key)) {
         next.delete(key);
       } else {
         next.add(key);
       }
-      return next;
+      return { resultKey, values: next };
     });
   };
 
@@ -42,12 +60,14 @@ export function useSequentialChartControls() {
   const selectPeriod = (index: number, shiftHeld: boolean, chartDataLength: number) => {
     if (index < 0 || index >= chartDataLength) return;
 
-    setSelectedPeriodIndices((prev) => {
-      const next = new Set(prev);
+    setSelectionState((previous) => {
+      const current = previous.resultKey === resultKey ? previous.values : new Set<number>();
+      const next = new Set(current);
+      const anchor = lastClickedIndex();
 
-      if (shiftHeld && lastClickedIndexRef.current !== null) {
-        const lower = Math.min(lastClickedIndexRef.current, index);
-        const upper = Math.max(lastClickedIndexRef.current, index);
+      if (shiftHeld && anchor !== null) {
+        const lower = Math.min(anchor, index);
+        const upper = Math.max(anchor, index);
         for (let cursor = lower; cursor <= upper; cursor += 1) {
           next.add(cursor);
         }
@@ -57,10 +77,10 @@ export function useSequentialChartControls() {
         } else {
           next.add(index);
         }
-        lastClickedIndexRef.current = index;
+        setLastClickedIndex(index);
       }
 
-      return next;
+      return { resultKey, values: next };
     });
   };
 
@@ -75,12 +95,13 @@ export function useSequentialChartControls() {
     const lower = Math.max(0, Math.min(startIndex, endIndex));
     const upper = Math.min(chartDataLength - 1, Math.max(startIndex, endIndex));
     if (lower > upper) return;
-    setSelectedPeriodIndices((previous) => {
-      const next = shiftHeld ? new Set(previous) : new Set<number>();
+    setSelectionState((previous) => {
+      const current = previous.resultKey === resultKey ? previous.values : new Set<number>();
+      const next = shiftHeld ? new Set(current) : new Set<number>();
       for (let index = lower; index <= upper; index += 1) next.add(index);
-      return next;
+      return { resultKey, values: next };
     });
-    lastClickedIndexRef.current = endIndex;
+    setLastClickedIndex(endIndex);
   };
 
   /**
@@ -89,8 +110,8 @@ export function useSequentialChartControls() {
    * Called by: SequentialAnalysisResultsPanel and result refresh handlers.
    */
   const clearPeriodSelection = () => {
-    setSelectedPeriodIndices(new Set());
-    lastClickedIndexRef.current = null;
+    setSelectionState({ resultKey, values: new Set() });
+    setLastClickedIndex(null);
   };
 
   /**
@@ -109,7 +130,7 @@ export function useSequentialChartControls() {
    * clears the active task result.
    */
   const resetAfterClear = () => {
-    setHiddenKeys(new Set());
+    setHiddenState({ resultKey, values: new Set() });
     resetResultSelection();
   };
 

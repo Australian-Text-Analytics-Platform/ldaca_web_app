@@ -2,6 +2,7 @@ import { useId } from 'react';
 
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { FilterableSeriesLegend } from '../../common/components/FilterableSeriesLegend';
 
 export interface ConcordanceDispersionLegendItem {
   key: string;
@@ -30,33 +31,26 @@ export function ConcordanceDispersionMatchControls({
   return (
     <Card data-testid="concordance-dispersion-match-controls">
       <CardContent className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3 text-body text-description">
-        <div
-          role="group"
-          aria-label="Matched terms"
+        <FilterableSeriesLegend
+          items={items.map((item) => ({
+            key: item.key,
+            color: item.color,
+            text: item.countLabel,
+            label: item.countLabel,
+            hidden: item.hidden,
+          }))}
+          ariaLabel="Matched terms"
+          pressedWhenHidden
           className="flex flex-wrap items-center gap-3 text-label-secondary text-description"
-        >
-          {items.map((item) => (
-            <button
-              key={item.key}
-              type="button"
-              className={`flex items-center gap-2 rounded-sm px-1 py-0.5 ${
-                item.hidden ? 'opacity-50 line-through' : ''
-              }`}
-              disabled={!onToggleMatchedTexts}
-              aria-pressed={item.hidden}
-              onClick={() => {
-                onToggleMatchedTexts?.(item.matchedTexts);
-              }}
-            >
-              <span
-                className="inline-block h-0.5 w-5"
-                style={{ backgroundColor: item.color }}
-                aria-hidden="true"
-              />
-              <span>{item.countLabel}</span>
-            </button>
-          ))}
-        </div>
+          onToggle={
+            onToggleMatchedTexts
+              ? (key) => {
+                  const item = items.find((candidate) => candidate.key === key);
+                  if (item) onToggleMatchedTexts(item.matchedTexts);
+                }
+              : undefined
+          }
+        />
         {onUncasedMatchedTextsChange ? (
           <label
             htmlFor={`${controlId}-uncased`}

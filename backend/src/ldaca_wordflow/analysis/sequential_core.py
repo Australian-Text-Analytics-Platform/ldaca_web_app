@@ -7,6 +7,11 @@ from typing import Optional
 import polars as pl
 
 DEFAULT_CHART_TYPE = "line"
+SEQUENTIAL_PERIOD_INDEX_COLUMN = "period_index"
+SEQUENTIAL_GROUP_INDEX_COLUMN = "group_index"
+SEQUENTIAL_PUBLICATION_PERIOD_INDEX_COLUMN = "__wordflow_trends_period_index"
+SEQUENTIAL_PUBLICATION_GROUP_INDEX_COLUMN = "__wordflow_trends_group_index"
+_SEQUENTIAL_ROW_INDEX_COLUMN = "__wordflow_trends_row_index"
 _CUSTOM_UNIT_SPEC: dict[str, tuple[str, str]] = {
     "seconds": ("s", "%Y-%m-%d %H:%M:%S"),
     "minutes": ("m", "%Y-%m-%d %H:%M"),
@@ -16,7 +21,7 @@ _CUSTOM_UNIT_SPEC: dict[str, tuple[str, str]] = {
 }
 
 
-def _run_sequential_analysis(
+def _build_sequential_result_frames(
     lf: pl.LazyFrame,
     *,
     time_column: str,
@@ -29,7 +34,7 @@ def _run_sequential_analysis(
     custom_interval_value: int | None = None,
     custom_interval_unit: str | None = None,
     case_sensitive: bool = True,
-) -> pl.DataFrame:
+) -> tuple[pl.DataFrame, pl.DataFrame]:
     """Pure-Polars implementation of sequential analysis.
 
     Groups records by time period (datetime truncation or numeric binning),
@@ -43,8 +48,20 @@ def _run_sequential_analysis(
             "Unsupported column_type. Use 'datetime' or 'numeric' for sequential analysis"
         )
 
-    # Collect to DataFrame for aggregation
-    df = lf.collect()
+    # The worker writes both outputs immediately after this computation, so the
+    # shared collect is the explicit artifact boundary for both frames.
+    source_df = lf.collect()
+    reserved_columns = {
+        SEQUENTIAL_PERIOD_INDEX_COLUMN,
+        SEQUENTIAL_GROUP_INDEX_COLUMN,
+        SEQUENTIAL_PUBLICATION_PERIOD_INDEX_COLUMN,
+        SEQUENTIAL_PUBLICATION_GROUP_INDEX_COLUMN,
+        _SEQUENTIAL_ROW_INDEX_COLUMN,
+    }
+    collision = reserved_columns.intersection(source_df.columns)
+    if collision:
+        raise ValueError(f"Source column name is reserved: {sorted(collision)[0]}")
+    df = source_df.with_row_index(_SEQUENTIAL_ROW_INDEX_COLUMN)
 
     time_format = ""
     numeric_interval_value: float | None = None
@@ -100,7 +117,7 @@ def _run_sequential_analysis(
         else:
             raise ValueError("Unsupported datetime frequency")
 
-        df = df.with_columns(time_expr)
+        df = df.filter(pl.col(time_column).is_not_null()).with_columns(time_expr)
     else:
         # Numeric binning
         if numeric_interval is None or numeric_interval <= 0:
@@ -108,21 +125,23 @@ def _run_sequential_analysis(
                 "numeric_interval must be a positive number for numeric sequential analysis"
             )
         numeric_interval_value = float(numeric_interval)
+        df = df.with_columns(
+            pl.col(time_column).cast(pl.Float64()).alias("__numeric_value__"),
+        ).filter(
+            pl.col("__numeric_value__")
+            .is_not_null()
+            .and_(pl.col("__numeric_value__").is_finite())
+        )
         if numeric_origin is not None:
             numeric_origin_value = float(numeric_origin)
         else:
-            origin_series = df.select(
-                pl.col(time_column).cast(pl.Float64()).min()
-            ).to_series()
+            origin_series = df.select(pl.col("__numeric_value__").min()).to_series()
             numeric_origin_value = origin_series[0] if len(origin_series) else None
         if numeric_origin_value is None:
             raise ValueError(
                 "Unable to determine numeric_origin from the provided data"
             )
 
-        df = df.with_columns(
-            pl.col(time_column).cast(pl.Float64()).alias("__numeric_value__"),
-        )
         df = df.with_columns(
             (
                 (pl.col("__numeric_value__") - pl.lit(numeric_origin_value))
@@ -152,8 +171,37 @@ def _run_sequential_analysis(
             ):
                 df = df.with_columns(pl.col(col_name).str.to_lowercase())
 
+    period_indices = (
+        df.select("time_period")
+        .unique()
+        .sort("time_period")
+        .with_row_index(SEQUENTIAL_PERIOD_INDEX_COLUMN)
+    )
+    df = df.join(period_indices, on="time_period", how="left")
+    if group_by_columns:
+        group_indices = (
+            df.select(group_by_columns)
+            .unique()
+            .sort(group_by_columns)
+            .with_row_index(SEQUENTIAL_GROUP_INDEX_COLUMN)
+        )
+        df = df.join(
+            group_indices,
+            on=group_by_columns,
+            how="left",
+            nulls_equal=True,
+        )
+    else:
+        df = df.with_columns(pl.lit(0, dtype=pl.UInt32).alias(SEQUENTIAL_GROUP_INDEX_COLUMN))
+
     # Perform aggregation
-    result_df = df.group_by(group_cols).agg(
+    result_df = df.group_by(
+        [
+            *group_cols,
+            SEQUENTIAL_PERIOD_INDEX_COLUMN,
+            SEQUENTIAL_GROUP_INDEX_COLUMN,
+        ]
+    ).agg(
         [
             pl.len().alias("sequential_count"),
             pl.col(time_column).min().alias("period_start"),
@@ -233,7 +281,73 @@ def _run_sequential_analysis(
 
     # Sort by time if requested
     if sort_by_time:
-        sort_cols = ["time_period"] + (group_by_columns or [])
+        sort_cols = [SEQUENTIAL_PERIOD_INDEX_COLUMN, SEQUENTIAL_GROUP_INDEX_COLUMN]
         result_df = result_df.sort(sort_cols)
 
-    return result_df
+    selection_indices = df.select(
+        _SEQUENTIAL_ROW_INDEX_COLUMN,
+        pl.col(SEQUENTIAL_PERIOD_INDEX_COLUMN).alias(
+            SEQUENTIAL_PUBLICATION_PERIOD_INDEX_COLUMN
+        ),
+        pl.col(SEQUENTIAL_GROUP_INDEX_COLUMN).alias(
+            SEQUENTIAL_PUBLICATION_GROUP_INDEX_COLUMN
+        ),
+    )
+    publication_df = (
+        source_df.with_row_index(_SEQUENTIAL_ROW_INDEX_COLUMN)
+        .join(
+            selection_indices,
+            on=_SEQUENTIAL_ROW_INDEX_COLUMN,
+            how="inner",
+            maintain_order="left",
+        )
+        .drop(_SEQUENTIAL_ROW_INDEX_COLUMN)
+        .select(
+            *source_df.columns,
+            SEQUENTIAL_PUBLICATION_PERIOD_INDEX_COLUMN,
+            SEQUENTIAL_PUBLICATION_GROUP_INDEX_COLUMN,
+        )
+    )
+    return result_df, publication_df
+
+
+def _run_sequential_analysis(
+    lf: pl.LazyFrame,
+    *,
+    time_column: str,
+    group_by_columns: list[str] | None = None,
+    frequency: str = "monthly",
+    sort_by_time: bool = True,
+    column_type: str = "datetime",
+    numeric_origin: float | None = None,
+    numeric_interval: float | None = None,
+    custom_interval_value: int | None = None,
+    custom_interval_unit: str | None = None,
+    case_sensitive: bool = True,
+) -> pl.DataFrame:
+    """Return the public aggregate while preserving the established core API."""
+
+    result, _publication = _build_sequential_result_frames(
+        lf,
+        time_column=time_column,
+        group_by_columns=group_by_columns,
+        frequency=frequency,
+        sort_by_time=sort_by_time,
+        column_type=column_type,
+        numeric_origin=numeric_origin,
+        numeric_interval=numeric_interval,
+        custom_interval_value=custom_interval_value,
+        custom_interval_unit=custom_interval_unit,
+        case_sensitive=case_sensitive,
+    )
+    return result
+
+
+__all__ = [
+    "SEQUENTIAL_GROUP_INDEX_COLUMN",
+    "SEQUENTIAL_PERIOD_INDEX_COLUMN",
+    "SEQUENTIAL_PUBLICATION_GROUP_INDEX_COLUMN",
+    "SEQUENTIAL_PUBLICATION_PERIOD_INDEX_COLUMN",
+    "_build_sequential_result_frames",
+    "_run_sequential_analysis",
+]

@@ -1116,7 +1116,7 @@ def _create_workspace_export(
         manifest = WorkspaceArchiveManifest.model_validate(
             {
                 "format": "wordflow-materialized-workspace",
-                "version": 18,
+                "version": 19,
                 "workspace": {
                     "id": workspace.id,
                     "name": workspace.name,

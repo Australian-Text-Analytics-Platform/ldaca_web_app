@@ -541,11 +541,24 @@ class AnalysisResultService:
                     )
                     payload["kind"] = kind
                     return ResultMaterialization(payload=payload, stored=stored)
+                if isinstance(stored, SequentialStoredResult):
+                    if query is not None:
+                        raise AnalysisKindMismatchError(
+                            "Complete Analysis Results do not accept queries"
+                        )
+                    await self._artifacts.ensure_available(lease, record)
+                    payload = cast(
+                        dict[str, JsonData],
+                        stored.model_dump(
+                            mode="json",
+                            exclude={"publication_artifact"},
+                        ),
+                    )
+                    payload["kind"] = kind
+                    return ResultMaterialization(payload=payload, stored=stored)
                 if isinstance(
                     stored,
-                    TokenFrequencyStoredResult
-                    | SequentialStoredResult
-                    | AnnotationRunAllStoredResult,
+                    TokenFrequencyStoredResult | AnnotationRunAllStoredResult,
                 ):
                     if query is not None:
                         raise AnalysisKindMismatchError(

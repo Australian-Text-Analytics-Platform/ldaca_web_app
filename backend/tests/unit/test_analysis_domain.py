@@ -33,6 +33,8 @@ from ldaca_wordflow.domain.workspace import (
     TopicModelingDataBlockCreationAnalysisRequest,
     QuotationAnalysisRequest,
     QuotationResultDataBlockCreationAnalysisRequest,
+    SequentialDataBlockCreationAnalysisRequest,
+    SequentialDataBlockCreationSource,
     DataBlockCreationSource,
     persisted_submission,
     public_analysis,
@@ -297,6 +299,39 @@ def test_run_all_and_data_block_creation_have_distinct_strict_requests() -> None
     assert TypeAdapter(AnalysisRequest).validate_python(
         quotation_run_all.model_dump(mode="json")
     ) == quotation_run_all
+
+
+def test_sequential_data_block_creation_filter_is_strict_and_ordered() -> None:
+    source_id = uuid.uuid4()
+    request = SequentialDataBlockCreationAnalysisRequest(
+        source=SequentialDataBlockCreationSource(
+            source_node_id=source_id,
+            selected_columns=["when", "text", "group"],
+            new_node_name="Selected trends",
+            selected_period_indices=[3, 1],
+            excluded_group_indices=[2],
+        )
+    )
+
+    restored = TypeAdapter(AnalysisRequest).validate_python(
+        request.model_dump(mode="json")
+    )
+    assert restored == request
+    assert restored.source.selected_columns == ["when", "text", "group"]
+    with pytest.raises(ValidationError, match="unique"):
+        SequentialDataBlockCreationSource(
+            source_node_id=source_id,
+            selected_columns=["when"],
+            new_node_name="Duplicate period",
+            selected_period_indices=[1, 1],
+        )
+    with pytest.raises(ValidationError, match="out of range"):
+        SequentialDataBlockCreationSource(
+            source_node_id=source_id,
+            selected_columns=["when"],
+            new_node_name="Negative group",
+            excluded_group_indices=[-1],
+        )
 
 
 def test_annotation_submission_strips_transient_secret_before_persistence() -> None:

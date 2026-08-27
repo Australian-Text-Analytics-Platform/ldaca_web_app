@@ -217,17 +217,21 @@ Equal values in an explicit Review sort have no secondary ordering contract.
 Run All parent. Concordance Match Data Block Creation emits selected flat match
 columns. Concordance Document Data Block Creation emits the required document
 and newline-joined `CONC_extraction` plus optional metadata after applying the
-Review term/bin filter. Checked sources, including empty ones, are committed
-atomically. Every created Data Block starts without a persisted color and
-therefore renders with the default grey instead of inheriting its source Data
-Block's analysis color. Run All itself never changes the Workspace graph.
+Review term/bin filter. Trends Data Block Creation emits selected original
+source columns after applying selected period indices, or all periods when no
+period is selected, and excluding hidden group indices. It reads the successful
+parent's private publication artifact, so later source edits cannot change the
+derived result. Checked sources, including empty ones, are committed atomically.
+Every created Data Block starts without a persisted color and therefore renders
+with the default grey instead of inheriting its source Data Block's analysis
+color. Run All itself never changes the Workspace graph.
 
 ## Other Analysis Kinds
 
 Token Frequency, Trends, Topic Modelling, and other full-table functions submit
-Run-All-scoped Analyses directly. Topic Modelling Data Block Creation remains
-an ordinary Supporting Analysis and may create multiple ordered output Data
-Blocks.
+Run-All-scoped Analyses directly. Trends and Topic Modelling Data Block Creation
+remain ordinary Supporting Analyses. Trends creates one filtered original-row
+Data Block; Topic Modelling may create multiple ordered output Data Blocks.
 
 A Topic Modelling Analysis request owns one segmentation method, maximum token
 count, and HDBSCAN minimum cluster size for all selected Data Blocks. Minimum
@@ -272,7 +276,7 @@ selection.
 
 Closing and reopening a Workspace restores Tabs, terminal Analysis forests,
 immutable requests, stored Results, Artifacts, and retained query inputs.
-Native Workspace schema 19 and portable archive format 18 accept only this
+Native Workspace schema 20 and portable archive format 19 accept only this
 forest representation. Older layouts are rejected without runtime migration.
 Browser-local active Tab selection and Active Analysis Drafts are outside both
 storage forms.

@@ -7,6 +7,13 @@ import polars as pl
 import pytest
 from pydantic import ValidationError
 
+from ldaca_wordflow.analysis.sequential_core import (
+    SEQUENTIAL_GROUP_INDEX_COLUMN,
+    SEQUENTIAL_PERIOD_INDEX_COLUMN,
+    SEQUENTIAL_PUBLICATION_GROUP_INDEX_COLUMN,
+    SEQUENTIAL_PUBLICATION_PERIOD_INDEX_COLUMN,
+    _build_sequential_result_frames,
+)
 from ldaca_wordflow.domain.workspace import Node, Workspace
 from ldaca_wordflow.workers.input_snapshots import create_worker_input_snapshot
 from ldaca_wordflow.workers.sequential import run_sequential_analysis
@@ -27,9 +34,12 @@ def _snapshot(tmp_path: Path) -> Path:
                     "occurred_at": [
                         datetime(2026, 1, 1, tzinfo=timezone.utc),
                         datetime(2026, 1, 15, tzinfo=timezone.utc),
-                    ]
+                    ],
+                    "text": ["first", "second"],
+                    "group": ["A", "a"],
                 }
             ).lazy(),
+            document="text",
         )
     )
     return create_worker_input_snapshot(
@@ -61,6 +71,64 @@ def test_sequential_worker_validates_and_executes_the_typed_request(
     table = pl.read_ipc_stream(result["table"]["artifact"])
     assert table.height == 1
     assert table["sequential_count"].to_list() == [2]
+    assert table[SEQUENTIAL_PERIOD_INDEX_COLUMN].to_list() == [0]
+    assert table[SEQUENTIAL_GROUP_INDEX_COLUMN].to_list() == [0]
+    publication = pl.read_parquet(result["publication_artifact"])
+    assert publication.columns == [
+        "occurred_at",
+        "text",
+        "group",
+        SEQUENTIAL_PUBLICATION_PERIOD_INDEX_COLUMN,
+        SEQUENTIAL_PUBLICATION_GROUP_INDEX_COLUMN,
+    ]
+    assert publication.height == 2
+    assert result["source"] == {
+        "node_id": NODE_ID,
+        "node_name": "Events",
+        "document_column": "text",
+        "columns": ["occurred_at", "text", "group"],
+        "period_count": 1,
+        "group_count": 1,
+    }
+
+
+def test_sequential_frames_share_stable_indices_and_preserve_original_groups() -> None:
+    aggregate, publication = _build_sequential_result_frames(
+        pl.DataFrame(
+            {
+                "value": [15.0, float("nan"), 5.0, None, 25.0],
+                "group": ["B", "ignored", "A", "ignored", None],
+                "text": ["fifteen", "nan", "five", "null", "twenty-five"],
+            }
+        ).lazy(),
+        time_column="value",
+        group_by_columns=["group"],
+        column_type="numeric",
+        numeric_interval=10,
+        case_sensitive=False,
+    )
+
+    assert aggregate.select(
+        SEQUENTIAL_PERIOD_INDEX_COLUMN,
+        SEQUENTIAL_GROUP_INDEX_COLUMN,
+        "group",
+    ).rows() == [
+        (0, 1, "a"),
+        (1, 2, "b"),
+        (2, 0, None),
+    ]
+    assert publication["text"].to_list() == ["fifteen", "five", "twenty-five"]
+    assert publication["group"].to_list() == ["B", "A", None]
+    assert publication[SEQUENTIAL_PUBLICATION_PERIOD_INDEX_COLUMN].to_list() == [
+        1,
+        0,
+        2,
+    ]
+    assert publication[SEQUENTIAL_PUBLICATION_GROUP_INDEX_COLUMN].to_list() == [
+        2,
+        1,
+        0,
+    ]
 
 
 def test_sequential_worker_rejects_noncanonical_request_fields(tmp_path: Path) -> None:

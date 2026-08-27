@@ -2,6 +2,7 @@ import React from 'react';
 
 import { Button } from '@/components/ui/button';
 import { MultiSeriesChart } from '@/features/views/common/components/MultiSeriesChart';
+import { FilterableSeriesLegend } from '@/features/views/common/components/FilterableSeriesLegend';
 import type { SequentialChartModel } from '../hooks/sequentialChartModel';
 
 interface SequentialChartProps {
@@ -10,6 +11,8 @@ interface SequentialChartProps {
   onPeriodClick: (index: number, shiftHeld: boolean) => void;
   onPeriodRangeSelect: (startIndex: number, endIndex: number, shiftHeld: boolean) => void;
   onClearSelection: () => void;
+  dataResetKey: string;
+  toolbarStart?: React.ReactNode;
   containerRef?: React.RefObject<HTMLDivElement | null>;
 }
 
@@ -28,6 +31,8 @@ export function SequentialChart({
   onPeriodClick,
   onPeriodRangeSelect,
   onClearSelection,
+  dataResetKey,
+  toolbarStart,
   containerRef,
 }: SequentialChartProps) {
   // A refreshed result can invalidate indices held by the interaction hook.
@@ -58,10 +63,8 @@ export function SequentialChart({
         series={model.series}
         chartType={model.chartType}
         xAxis={model.xAxis}
-        margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
         height={CHART_HEIGHT_PX}
         tooltip={{
-          indicator: model.tooltip.indicator,
           labelFormatter: model.tooltip.labelFormatter,
         }}
         selection={{
@@ -70,45 +73,24 @@ export function SequentialChart({
           onSelectRange: onPeriodRangeSelect,
         }}
         ariaLabel="Trends and Sequence chart"
-        dataResetKey={model.chartData
+        dataResetKey={`${dataResetKey}:${model.chartData
           .map((row) => (typeof row.__period_key__ === 'string' ? row.__period_key__ : ''))
-          .join('|')}
-        interactive
+          .join('|')}`}
+        toolbarStart={toolbarStart}
       />
-      <div className="mt-4 flex flex-wrap items-center justify-center gap-4 px-4">
-        {model.groups.map((group) => {
-          const isHidden = group.hidden;
-          return (
-            <button
-              key={group.id}
-              type="button"
-              className="flex cursor-pointer items-center gap-2 rounded-sm px-1 py-0.5 transition-opacity hover:bg-panel/60"
-              style={{ opacity: isHidden ? 0.4 : 1 }}
-              onClick={() => {
-                onToggleKey(group.id);
-              }}
-              aria-pressed={!isHidden}
-              aria-label={isHidden ? `Show ${group.label}` : `Hide ${group.label}`}
-            >
-              {model.chartType === 'line' ? (
-                <div className="flex items-center">
-                  <div className="h-2 w-2 rounded-full" style={{ backgroundColor: group.color }} />
-                  <div className="h-0.5 w-3" style={{ backgroundColor: group.color }} />
-                  <div className="h-2 w-2 rounded-full" style={{ backgroundColor: group.color }} />
-                </div>
-              ) : (
-                <div className="h-3 w-3 rounded-sm" style={{ backgroundColor: group.color }} />
-              )}
-              <span
-                className="text-body font-medium text-description"
-                style={{ textDecoration: isHidden ? 'line-through' : 'none' }}
-              >
-                {group.label}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+      <FilterableSeriesLegend
+        items={model.groups.map((group) => ({
+          key: group.id,
+          color: group.color,
+          text: group.legendText,
+          label: group.label,
+          hidden: group.hidden,
+          marker: model.chartType === 'bar' ? 'bar' : model.chartType,
+        }))}
+        onToggle={onToggleKey}
+        ariaLabel="Trends groups"
+        className="mt-4 flex flex-wrap items-center justify-center gap-4 px-4 text-body font-medium text-description"
+      />
       <div className="mt-4 flex justify-end px-4 pb-2">
         <Button
           type="button"

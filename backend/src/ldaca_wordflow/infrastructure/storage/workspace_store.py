@@ -42,7 +42,7 @@ from ...domain.workspace import (
 )
 
 logger = logging.getLogger(__name__)
-WORKSPACE_SCHEMA_VERSION = 19
+WORKSPACE_SCHEMA_VERSION = 20
 _WORKSPACE_ENVELOPE_FIELDS = {"workspace_metadata", "nodes", "tabs", "analyses"}
 _WORKSPACE_METADATA_FIELDS = {
     "id",

@@ -19,6 +19,8 @@ describe('buildSequentialChartExportMetadata', () => {
       results: {
         data: [
           {
+            period_index: 0,
+            group_index: 0,
             time_period: '2024-01',
             period_start: '2024-01-01',
             period_end: '2024-02-01',
@@ -26,6 +28,8 @@ describe('buildSequentialChartExportMetadata', () => {
             sequential_count: 2,
           },
           {
+            period_index: 0,
+            group_index: 1,
             time_period: '2024-01',
             period_start: '2024-01-01',
             period_end: '2024-02-01',
@@ -52,6 +56,8 @@ describe('buildSequentialChartExportMetadata', () => {
       results: {
         data: [
           {
+            period_index: 0,
+            group_index: 0,
             time_period: '2024-01',
             period_start: '2024-01-01',
             period_end: '2024-02-01',
@@ -59,6 +65,8 @@ describe('buildSequentialChartExportMetadata', () => {
             sequential_count: 2,
           },
           {
+            period_index: 0,
+            group_index: 1,
             time_period: '2024-01',
             period_start: '2024-01-01',
             period_end: '2024-02-01',
@@ -87,14 +95,14 @@ describe('buildSequentialChartExportMetadata', () => {
       { label: 'Data Block', value: 'Interviews' },
       { label: 'Time Column', value: 'date' },
       { label: 'Frequency', value: 'monthly' },
-      { label: 'Total', value: '2/30' },
+      { label: 'Total', value: '2/5' },
       { label: 'Shown', value: '1/2' },
       { label: 'Chosen', value: '0/0' },
       { label: 'Groups', value: 'speaker' },
     ]);
     expect(metadata.legend).toEqual([
-      { label: 'Ada', color: '#2563eb', type: 'area', hidden: false },
-      { label: 'Grace', color: '#16a34a', type: 'area', hidden: true },
+      { label: 'Ada (2 · 100.0%)', color: '#2563eb', type: 'area', hidden: false },
+      { label: 'Grace (3 · Hidden)', color: '#16a34a', type: 'area', hidden: true },
     ]);
   });
 });

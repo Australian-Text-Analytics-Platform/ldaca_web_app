@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { MousePointer2, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
 import { BarChart, LineChart } from 'echarts/charts';
 import {
@@ -35,7 +35,7 @@ registerEChartsModules([
   SVGRenderer,
 ]);
 
-export interface EChartsZoomRange {
+interface EChartsZoomRange {
   start: number;
   end: number;
 }
@@ -70,6 +70,7 @@ interface EChartsViewProps {
   getPointSummary?: (index: number) => string;
   className?: string;
   testId?: string;
+  toolbarStart?: ReactNode;
 }
 
 const FULL_ZOOM: EChartsZoomRange = { start: 0, end: 100 };
@@ -121,6 +122,7 @@ function EChartsInstance({
   getPointSummary,
   className,
   testId,
+  toolbarStart,
 }: EChartsViewProps) {
   const plotRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<EChartsType | null>(null);
@@ -130,10 +132,12 @@ function EChartsInstance({
   const selectionModeRef = useRef<'point' | 'range'>('point');
   const shiftHeldRef = useRef(false);
   const suppressBrushEventRef = useRef(false);
+  const zoomRangeRef = useRef<EChartsZoomRange>(FULL_ZOOM);
   const [selectionMode, setSelectionMode] = useState<'point' | 'range'>('point');
   const [activeIndex, setActiveIndex] = useState(0);
   const [zoomRange, setZoomRange] = useState<EChartsZoomRange>(FULL_ZOOM);
   const [liveText, setLiveText] = useState('');
+  const rangeSelectionEnabled = onSelectRange !== undefined;
 
   useEffect(() => {
     selectRef.current = onSelect;
@@ -178,7 +182,10 @@ function EChartsInstance({
     };
     const handleDataZoom = (event: EChartsDataZoomEvent) => {
       const next = zoomFromEvent(event);
-      if (next) setZoomRange(next);
+      if (next) {
+        zoomRangeRef.current = next;
+        setZoomRange(next);
+      }
     };
     const handlePointerDown = (event: { event?: { shiftKey?: boolean } }) => {
       shiftHeldRef.current = !!event.event?.shiftKey;
@@ -208,6 +215,7 @@ function EChartsInstance({
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart) return;
+    const currentZoom = zoomRangeRef.current;
     chart.setOption(
       {
         ...option,
@@ -221,19 +229,19 @@ function EChartsInstance({
             id: 'wordflow-inside-zoom',
             type: 'inside',
             xAxisIndex: 0,
-            start: zoomRange.start,
-            end: zoomRange.end,
+            start: currentZoom.start,
+            end: currentZoom.end,
             filterMode: 'none',
             zoomOnMouseWheel: true,
-            moveOnMouseMove: true,
+            moveOnMouseMove: false,
             moveOnMouseWheel: false,
           },
           {
             id: 'wordflow-slider-zoom',
             type: 'slider',
             xAxisIndex: 0,
-            start: zoomRange.start,
-            end: zoomRange.end,
+            start: currentZoom.start,
+            end: currentZoom.end,
             filterMode: 'none',
             bottom: 4,
             height: 18,
@@ -241,14 +249,13 @@ function EChartsInstance({
             brushSelect: false,
           },
         ],
-        brush: selectRangeRef.current
+        toolbox: { show: false },
+        brush: rangeSelectionEnabled
           ? {
               id: 'wordflow-range-brush',
-              xAxisIndex: 'all',
+              xAxisIndex: 0,
               brushType: 'lineX',
               brushMode: 'single',
-              transformable: true,
-              removeOnClick: true,
               throttleType: 'debounce',
               throttleDelay: 80,
             }
@@ -256,12 +263,19 @@ function EChartsInstance({
       },
       { notMerge: true, lazyUpdate: false },
     );
+  }, [ariaLabel, option, rangeSelectionEnabled]);
+
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
     chart.dispatchAction({
       type: 'takeGlobalCursor',
       key: 'brush',
-      brushOption: { brushType: selectionMode === 'range' ? 'lineX' : false },
+      brushOption: {
+        brushType: selectionMode === 'range' && rangeSelectionEnabled ? 'lineX' : false,
+      },
     });
-  }, [ariaLabel, option, selectionMode, zoomRange]);
+  }, [rangeSelectionEnabled, selectionMode]);
 
   const moveActivePoint = (nextIndex: number) => {
     if (pointCount <= 0) return;
@@ -294,8 +308,15 @@ function EChartsInstance({
   };
 
   const setZoom = (next: EChartsZoomRange, announcement: string) => {
+    zoomRangeRef.current = next;
     setZoomRange(next);
     setLiveText(announcement);
+    chartRef.current?.dispatchAction({
+      type: 'dataZoom',
+      dataZoomId: 'wordflow-inside-zoom',
+      start: next.start,
+      end: next.end,
+    });
   };
 
   const isFullZoom = zoomRange.start === 0 && zoomRange.end === 100;
@@ -303,9 +324,10 @@ function EChartsInstance({
   return (
     <div className={className} data-testid={testId}>
       <div
-        className="mb-2 flex flex-wrap items-center justify-end gap-2"
+        className="mb-2 flex flex-nowrap items-center justify-end gap-2 overflow-x-auto pb-1"
         aria-label="Chart controls"
       >
+        {toolbarStart}
         {onSelectRange ? (
           <Button
             type="button"

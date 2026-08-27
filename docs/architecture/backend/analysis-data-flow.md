@@ -255,7 +255,14 @@ causes are retained only in request- or Analysis-correlated logs.
 Terminal Analysis forests, Results, Artifacts, and queryable snapshots persist
 with the Workspace. Annotation query snapshots materialize only the source and
 optional Example Data Block because the validated class list is already part of
-the immutable request. Native schema 19 and portable archive format 18 validate
+the immutable request. A successful Trends Run All also retains a private
+Parquet publication artifact from the same input snapshot as its public Arrow
+aggregate. Original source rows in that artifact carry reserved period and
+group indices; the public aggregate exposes the corresponding `period_index`
+and `group_index` values. Trends Data Block Creation filters only this immutable
+artifact and never re-reads the live source Data Block.
+
+Native schema 20 and portable archive format 19 validate
 parent ownership, ordered Tab membership, terminal archive state, output
 identities, and retained query inputs. Older layouts are rejected without
 runtime migration.

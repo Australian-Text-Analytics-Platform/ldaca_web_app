@@ -60,8 +60,8 @@ global.ResizeObserver = class ResizeObserver {
   }
 
   /**
-   * Triggers a deterministic measurement for components such as ECharts
-   * ResponsiveContainer. Used by: chart and resizable-layout tests because
+   * Triggers a deterministic measurement for ECharts and resizable layouts. Used by:
+   * chart and resizable-layout tests because
    * jsdom has no layout engine, so a no-op observer leaves elements at -1/0
    * dimensions and produces noisy false warnings.
    */

@@ -1,9 +1,7 @@
 import type { SequentialAnalysisRequest, SequentialAnalysisResponse } from '@/api';
-import type {
-  MultiSeriesChartSeries,
-  MultiSeriesChartXAxisConfig,
-} from '@/features/views/common/components/MultiSeriesChart';
+import type { MultiSeriesChartSeries } from '@/features/views/common/components/MultiSeriesChart';
 import type { ChartExportLegendItem } from '@/lib/chartExport';
+import type { XAxisComponentOption } from 'echarts/types/dist/option';
 
 type SequentialAnalysisDatum = Record<string, unknown>;
 export type ChartTypeOption = 'line' | 'bar' | 'area';
@@ -12,6 +10,7 @@ type SequentialFrequency = NonNullable<SequentialAnalysisRequest['frequency']>;
 type SequentialCustomIntervalUnit = NonNullable<SequentialAnalysisRequest['custom_interval_unit']>;
 
 const NUMERIC_X_KEY = '__x_numeric__';
+const CATEGORY_X_KEY = '__period_key__';
 
 const SEQUENTIAL_ANALYSIS_PALETTE = [
   '#2563eb',
@@ -101,6 +100,7 @@ interface SequentialChartDiagnostic {
     | 'invalid-period'
     | 'invalid-count'
     | 'invalid-group-value'
+    | 'invalid-result-index'
     | 'invalid-parameters';
   message: string;
   rowIndex?: number;
@@ -109,6 +109,7 @@ interface SequentialChartDiagnostic {
 type SequentialGroupValue = string | number | boolean | null;
 
 interface SequentialCanonicalRow {
+  periodIndex: number;
   periodKey: string;
   timePeriod: string | number;
   axisValue: string | number;
@@ -116,16 +117,21 @@ interface SequentialCanonicalRow {
   periodEnd: string | number;
   count: number;
   groupId: string;
+  groupIndex: number;
   groupLabel: string;
   groupValues: Record<string, SequentialGroupValue>;
 }
 
 interface SequentialChartGroup {
   id: string;
+  index: number;
   label: string;
   color: string;
   hidden: boolean;
   values: Record<string, SequentialGroupValue>;
+  totalCount: number;
+  selectedCount: number;
+  legendText: string;
 }
 
 interface SequentialVisibilityCounts {
@@ -145,7 +151,6 @@ export interface BuildSequentialChartModelInput {
   xAxisType: SequentialXAxisType;
   hiddenKeys: Set<string>;
   selectedPeriodIndices: Set<number>;
-  sourceDocumentCount?: number;
 }
 
 export interface SequentialChartModel {
@@ -156,10 +161,9 @@ export interface SequentialChartModel {
   summary: SequentialResultSummary;
   chartData: SequentialAnalysisDatum[];
   axisData: SequentialAnalysisDatum[];
-  xKey: 'time_period' | typeof NUMERIC_X_KEY;
-  xAxis: MultiSeriesChartXAxisConfig;
+  xKey: typeof CATEGORY_X_KEY | typeof NUMERIC_X_KEY;
+  xAxis: XAxisComponentOption;
   tooltip: {
-    indicator: 'line' | 'dot';
     labelFormatter: (value: string | number) => string;
   };
   groups: SequentialChartGroup[];
@@ -169,7 +173,10 @@ export interface SequentialChartModel {
     selectedIndices: Set<number>;
     selectedCount: number;
     hasInvalidSelection: boolean;
+    selectedPeriodIds: number[];
   };
+  excludedGroupIndices: number[];
+  eligibleDocumentCount: number;
   counts: SequentialVisibilityCounts;
 }
 
@@ -272,11 +279,19 @@ function buildGroupIdentity(
   groupBy: string[],
 ): {
   id: string;
+  index: number;
   label: string;
   values: Record<string, SequentialGroupValue>;
 } | null {
+  const groupIndex = row.group_index;
+  if (!Number.isInteger(groupIndex) || Number(groupIndex) < 0) return null;
   if (groupBy.length === 0) {
-    return { id: 'sequential_count', label: 'Sequential Count', values: {} };
+    return {
+      id: `group:${String(groupIndex)}`,
+      index: Number(groupIndex),
+      label: 'Sequential Count',
+      values: {},
+    };
   }
   const values = Object.create(null) as Record<string, SequentialGroupValue>;
   const tuple: SequentialGroupValue[] = [];
@@ -287,7 +302,8 @@ function buildGroupIdentity(
     tuple.push(value);
   }
   return {
-    id: `series:${JSON.stringify(tuple)}`,
+    id: `group:${String(groupIndex)}`,
+    index: Number(groupIndex),
     label: tuple.map((value) => String(value ?? '')).join(' - '),
     values,
   };
@@ -302,6 +318,14 @@ function normalizeRows(
 
   const rows: SequentialCanonicalRow[] = [];
   data.forEach((row, rowIndex) => {
+    if (!Number.isInteger(row.period_index) || Number(row.period_index) < 0) {
+      diagnostics.push({
+        code: 'invalid-result-index',
+        message: 'Ignored a row without a valid period index.',
+        rowIndex,
+      });
+      return;
+    }
     if (!isPeriodBoundary(row.period_start) || !isPeriodBoundary(row.period_end)) {
       diagnostics.push({
         code: 'invalid-period',
@@ -346,39 +370,38 @@ function normalizeRows(
       return;
     }
     const rawTimePeriod = isPeriodBoundary(row.time_period) ? row.time_period : null;
-    let axisValue: string | number = row.period_start;
-    if (summary.columnType === 'numeric') {
-      if (rawTimePeriod === null || !Number.isFinite(Number(rawTimePeriod))) {
-        diagnostics.push({
-          code: 'invalid-period',
-          message: 'Ignored a numeric row without a finite raw time-period value.',
-          rowIndex,
-        });
-        return;
-      }
-      axisValue = rawTimePeriod;
+    if (
+      rawTimePeriod === null ||
+      !Number.isFinite(periodCoordinate(rawTimePeriod, summary.columnType))
+    ) {
+      diagnostics.push({
+        code: 'invalid-period',
+        message: 'Ignored a row without a valid raw time-period value.',
+        rowIndex,
+      });
+      return;
     }
     const timePeriod = isPeriodBoundary(row.time_period_formatted)
       ? row.time_period_formatted
-      : (rawTimePeriod ?? row.period_start);
+      : rawTimePeriod;
     rows.push({
-      periodKey: JSON.stringify([row.period_start, row.period_end]),
+      periodIndex: Number(row.period_index),
+      periodKey: String(row.period_index),
       timePeriod,
-      axisValue,
+      axisValue: rawTimePeriod,
       periodStart: row.period_start,
       periodEnd: row.period_end,
       count: row.sequential_count,
       groupId: group.id,
+      groupIndex: group.index,
       groupLabel: group.label,
       groupValues: group.values,
     });
   });
   return rows.sort((left, right) => {
-    const leftValue = summary.columnType === 'numeric' ? left.axisValue : left.periodStart;
-    const rightValue = summary.columnType === 'numeric' ? right.axisValue : right.periodStart;
     return (
-      periodCoordinate(leftValue, summary.columnType) -
-      periodCoordinate(rightValue, summary.columnType)
+      periodCoordinate(left.axisValue, summary.columnType) -
+      periodCoordinate(right.axisValue, summary.columnType)
     );
   });
 }
@@ -402,53 +425,127 @@ export function buildSequentialChartModel({
   xAxisType,
   hiddenKeys,
   selectedPeriodIndices,
-  sourceDocumentCount,
 }: BuildSequentialChartModelInput): SequentialChartModel {
   const diagnostics: SequentialChartDiagnostic[] = [];
   const summary = buildSummary(parameters, fallbacks, diagnostics);
   const canonicalRows = normalizeRows(results, summary, diagnostics);
 
-  const groupsById = new Map<string, Omit<SequentialChartGroup, 'color' | 'hidden'>>();
+  const groupsById = new Map<
+    string,
+    Pick<SequentialChartGroup, 'id' | 'index' | 'label' | 'values'>
+  >();
   canonicalRows.forEach((row) => {
     groupsById.set(row.groupId, {
       id: row.groupId,
+      index: row.groupIndex,
       label: row.groupLabel,
       values: row.groupValues,
     });
   });
-  const groupBases = Array.from(groupsById.values()).sort((left, right) =>
-    left.id.localeCompare(right.id),
+  const groupBases = Array.from(groupsById.values()).sort(
+    (left, right) => left.index - right.index,
   );
 
   const buckets = new Map<string, SequentialAnalysisDatum>();
   canonicalRows.forEach((row) => {
-    const entry = buckets.get(row.periodKey) ?? {
-      __period_key__: row.periodKey,
+    const existing = buckets.get(row.periodKey);
+    const entry = existing ?? {
+      [CATEGORY_X_KEY]: row.periodKey,
+      __period_index__: row.periodIndex,
       time_period: row.timePeriod,
       __axis_value__: row.axisValue,
       period_start: row.periodStart,
       period_end: row.periodEnd,
     };
     entry[row.groupId] = Number(entry[row.groupId] ?? 0) + row.count;
+    if (existing) {
+      if (
+        periodCoordinate(row.periodStart, summary.columnType) <
+        periodCoordinate(existing.period_start as string | number, summary.columnType)
+      ) {
+        entry.period_start = row.periodStart;
+      }
+      if (
+        periodCoordinate(row.periodEnd, summary.columnType) >
+        periodCoordinate(existing.period_end as string | number, summary.columnType)
+      ) {
+        entry.period_end = row.periodEnd;
+      }
+    }
     buckets.set(row.periodKey, entry);
   });
   const chartData = Array.from(buckets.values()).sort((left, right) => {
-    const leftValue = summary.columnType === 'numeric' ? left.__axis_value__ : left.period_start;
-    const rightValue = summary.columnType === 'numeric' ? right.__axis_value__ : right.period_start;
-    return (
-      periodCoordinate(leftValue as string | number, summary.columnType) -
-      periodCoordinate(rightValue as string | number, summary.columnType)
-    );
+    return Number(left.__period_index__) - Number(right.__period_index__);
   });
   chartData.forEach((row) => {
     groupBases.forEach((group) => {
       if (row[group.id] === undefined) row[group.id] = 0;
     });
   });
+  const categoryLabelsByKey = new Map<string, string | number>();
+  chartData.forEach((row) => {
+    const key = row[CATEGORY_X_KEY];
+    const label = row.time_period;
+    if (typeof key === 'string' && isPeriodBoundary(label)) {
+      categoryLabelsByKey.set(key, label);
+    }
+  });
+  const categoryLabelFor = (value: unknown): string | number => {
+    if (typeof value === 'string') {
+      const label = categoryLabelsByKey.get(value);
+      if (label !== undefined) return label;
+    }
+    return isPeriodBoundary(value) ? value : '';
+  };
 
+  const orderedSelection = Array.from(selectedPeriodIndices).sort((left, right) => left - right);
+  const validSelectedEntries = orderedSelection
+    .map((index) => ({ index, row: chartData[index] }))
+    .filter((entry): entry is { index: number; row: SequentialAnalysisDatum } =>
+      Boolean(entry.row),
+    );
+  const hasInvalidSelection = validSelectedEntries.length !== orderedSelection.length;
+  const validSelectedIndices = new Set(validSelectedEntries.map((entry) => entry.index));
+  const selectedPeriodIds = validSelectedEntries.map((entry) => Number(entry.row.__period_index__));
+  const selectedPeriodIdSet = new Set(selectedPeriodIds);
+  const sumCounts = (rows: SequentialCanonicalRow[]) =>
+    rows.reduce((total, row) => total + row.count, 0);
+  const groupTotals = new Map<number, number>();
+  const selectedGroupTotals = new Map<number, number>();
+  canonicalRows.forEach((row) => {
+    groupTotals.set(row.groupIndex, (groupTotals.get(row.groupIndex) ?? 0) + row.count);
+    if (selectedPeriodIdSet.has(row.periodIndex)) {
+      selectedGroupTotals.set(
+        row.groupIndex,
+        (selectedGroupTotals.get(row.groupIndex) ?? 0) + row.count,
+      );
+    }
+  });
+  const visibleTotal = groupBases.reduce(
+    (total, group) =>
+      hiddenKeys.has(group.id) ? total : total + (groupTotals.get(group.index) ?? 0),
+    0,
+  );
   const groups: SequentialChartGroup[] = groupBases.map((group, index) => {
     const color = getSequentialPaletteColor(index);
-    return { ...group, color, hidden: hiddenKeys.has(group.id) };
+    const hidden = hiddenKeys.has(group.id);
+    const totalCount = groupTotals.get(group.index) ?? 0;
+    const selectedCount = selectedGroupTotals.get(group.index) ?? 0;
+    const countText =
+      validSelectedIndices.size > 0
+        ? `${String(selectedCount)}/${String(totalCount)}`
+        : String(totalCount);
+    const detail = hidden
+      ? `${countText} · Hidden`
+      : `${countText} · ${visibleTotal > 0 ? ((totalCount / visibleTotal) * 100).toFixed(1) : '0.0'}%`;
+    return {
+      ...group,
+      color,
+      hidden,
+      totalCount,
+      selectedCount,
+      legendText: `${group.label} (${detail})`,
+    };
   });
   const axisData =
     xAxisType === 'number'
@@ -460,67 +557,44 @@ export function buildSequentialChartModel({
           ),
         }))
       : chartData;
-  const xAxis: MultiSeriesChartXAxisConfig =
+  const xAxis: XAxisComponentOption =
     xAxisType === 'number'
       ? {
-          type: 'number',
-          domain: ['dataMin', 'dataMax'],
-          tickCount: 10,
-          tickFormatter: (value) => formatSequentialAxisTick(value, summary.columnType),
-          angle: -45,
-          height: 100,
-          minTickGap: 20,
+          type: 'value',
+          min: 'dataMin',
+          max: 'dataMax',
+          splitNumber: 10,
+          axisLabel: {
+            formatter: (value) => formatSequentialAxisTick(value, summary.columnType),
+            rotate: 45,
+          },
         }
-      : { angle: -45, height: 100, minTickGap: 20 };
+      : {
+          type: 'category',
+          axisLabel: {
+            formatter: (value) => String(categoryLabelFor(value)),
+            rotate: 45,
+          },
+        };
   const visibleGroups = groups.filter((group) => !group.hidden);
   const series: MultiSeriesChartSeries[] = visibleGroups.map((group) => ({
     key: group.id,
     color: group.color,
     label: group.label,
-    singlePoint: chartData.length <= 1,
   }));
   const legendType = chartType === 'line' ? 'line' : chartType === 'bar' ? 'bar' : 'area';
   const legend: ChartExportLegendItem[] = groups.map((group) => ({
-    label: group.label,
+    label: group.legendText,
     color: group.color,
     type: legendType,
     hidden: group.hidden,
   }));
 
-  const orderedSelection = Array.from(selectedPeriodIndices).sort((left, right) => left - right);
-  const validSelectedEntries = orderedSelection
-    .map((index) => ({ index, row: chartData[index] }))
-    .filter((entry): entry is { index: number; row: SequentialAnalysisDatum } =>
-      Boolean(entry.row),
-    );
-  const hasInvalidSelection = validSelectedEntries.length !== orderedSelection.length;
-  const selectedChartRows = validSelectedEntries.map((entry) => entry.row);
-  const validSelectedIndices = new Set(validSelectedEntries.map((entry) => entry.index));
-  const selectedPeriodKeys = new Set(
-    selectedChartRows.map((row) =>
-      typeof row.__period_key__ === 'string' ? row.__period_key__ : '',
-    ),
-  );
   const shownRows = canonicalRows.filter((row) => !hiddenKeys.has(row.groupId));
-  const chosenRows = shownRows.filter((row) => selectedPeriodKeys.has(row.periodKey));
-  const sumCounts = (rows: SequentialCanonicalRow[]) =>
-    rows.reduce((total, row) => total + row.count, 0);
-  const hasValidSourceDocumentCount =
-    typeof sourceDocumentCount === 'number' &&
-    Number.isFinite(sourceDocumentCount) &&
-    Number.isInteger(sourceDocumentCount) &&
-    sourceDocumentCount >= 0;
-  if (sourceDocumentCount !== undefined && !hasValidSourceDocumentCount) {
-    diagnostics.push({
-      code: 'invalid-count',
-      message: 'Source document count was not a non-negative whole number.',
-    });
-  }
+  const chosenRows = shownRows.filter((row) => selectedPeriodIdSet.has(row.periodIndex));
   const counts: SequentialVisibilityCounts = {
     totalPointCount: canonicalRows.length,
-    totalDocumentCount: hasValidSourceDocumentCount
-      ? sourceDocumentCount
-      : sumCounts(canonicalRows),
+    totalDocumentCount: sumCounts(canonicalRows),
     shownPointCount: shownRows.length,
     shownDocumentCount: sumCounts(shownRows),
     chosenPointCount: validSelectedIndices.size > 0 ? chosenRows.length : 0,
@@ -534,16 +608,18 @@ export function buildSequentialChartModel({
     summary,
     chartData,
     axisData,
-    xKey: xAxisType === 'number' ? NUMERIC_X_KEY : 'time_period',
+    xKey: xAxisType === 'number' ? NUMERIC_X_KEY : CATEGORY_X_KEY,
     xAxis,
     tooltip: {
-      indicator: chartType === 'line' ? 'line' : 'dot',
       labelFormatter:
         xAxisType === 'number'
           ? (value) => formatSequentialAxisTick(value, summary.columnType)
-          : summary.columnType === 'datetime'
-            ? formatSequentialTimeLabel
-            : (value) => String(value),
+          : (value) => {
+              const label = categoryLabelFor(value);
+              return summary.columnType === 'datetime'
+                ? formatSequentialTimeLabel(label)
+                : String(label);
+            },
     },
     groups,
     series,
@@ -552,7 +628,11 @@ export function buildSequentialChartModel({
       selectedIndices: validSelectedIndices,
       selectedCount: validSelectedIndices.size,
       hasInvalidSelection,
+      selectedPeriodIds,
     },
+    excludedGroupIndices: groups.filter((group) => group.hidden).map((group) => group.index),
+    eligibleDocumentCount:
+      validSelectedIndices.size > 0 ? sumCounts(chosenRows) : sumCounts(shownRows),
     counts,
   };
 }
