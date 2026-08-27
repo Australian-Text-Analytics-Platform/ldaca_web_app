@@ -8,7 +8,6 @@ import {
 import { flattenConcordanceGroups, toCellText } from '../concordanceTableDomain';
 
 export type ConcordanceRow = Record<string, unknown>;
-export type ConcordanceGroupedRow = ConcordanceRow[];
 
 const CORE_COLS = [...CONCORDANCE_CORE_COLUMNS];
 const FREQ_COLS = [...CONCORDANCE_FREQ_COLUMNS];

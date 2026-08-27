@@ -21,7 +21,7 @@ import {
 import type { WorkspaceGraphNodeCard } from '../graphNodeModel';
 import { cn } from '@/lib/utils';
 import { normalizeNodeAccentColor } from '@/lib/nodeColor';
-import { GREY, foregroundForVizColor } from '@/features/views/common/vizPalette';
+import { GREY, VIZ_TINT_FOREGROUND, toBgColor } from '@/features/views/common/vizPalette';
 import { DataBlockName } from '@/components/DataBlockName';
 import type { NodeInputPointerPosition } from '@/stores/nodeInputRequestsStore';
 import { CUSTOM_NODE_TOOLBAR_BUTTON_CLASS, CustomNodeActionMenu } from './CustomNodeActionMenu';
@@ -199,10 +199,18 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
   const nodeShape = node.shape;
 
   // Per-node colour. A valid ``#rrggbb`` ``Node.color`` is the block's identity
-  // colour; unset / un-analysed blocks default to grey. Saturated colour fills
-  // the identity surface, with the higher-contrast light or dark name colour.
+  // colour; unset / un-analysed blocks default to grey. The colour is drawn as a
+  // 6px solid left spine on both cards, and a light background tint (`fillColor`)
+  // fills the whole compact card when zoomed out, or just the header strip when
+  // zoomed in. The tint is theme-independent, so text on it always uses the dark
+  // tint foreground while the body keeps the theme surface.
   const effectiveColor = normalizeNodeAccentColor(node.color) ?? GREY;
-  const identityForeground = foregroundForVizColor(effectiveColor);
+  const accentBorderStyle: React.CSSProperties = {
+    borderLeftColor: effectiveColor,
+    borderLeftWidth: 6,
+    borderLeftStyle: 'solid',
+  };
+  const fillColor = toBgColor(effectiveColor);
 
   /** Shows this node's toolbar and claims singleton ownership so any other
    * node's hover toolbar hides at once. Called on node/toolbar mouse-enter. */
@@ -510,8 +518,11 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
           minWidth: '220px',
           maxWidth: '360px',
           position: 'relative',
-          backgroundColor: effectiveColor,
-          color: identityForeground,
+          // Zoomed out: fill the whole compact card with the block's background
+          // tint, keeping the 6px colour spine and the detached selection outline.
+          backgroundColor: fillColor,
+          color: VIZ_TINT_FOREGROUND,
+          ...accentBorderStyle,
           // ``isFresh`` red "new" dot rendered below marks newly-created
           // nodes the user hasn't acknowledged yet.
         }}
@@ -520,7 +531,7 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
         {nodeToolbar}
         <DataBlockName
           name={nodeName}
-          backgroundColor={effectiveColor}
+          backgroundColor={fillColor}
           maxLines={3}
           fadeEdge="head"
           className="w-full text-heading-1 font-semibold leading-snug"
@@ -553,20 +564,21 @@ function CustomNode({ id, data, selected }: NodeProps<ReactFlowNode<CustomNodeDa
         minWidth: '320px',
         minHeight: '120px',
         position: 'relative',
+        ...accentBorderStyle,
       }}
     >
       {newDot}
-      {/* The saturated header is the persistent identity surface; the neutral
-          body keeps metadata quiet and selection stays outside the card. */}
+      {/* Zoomed in, only this top strip carries the block's background tint; the
+          neutral body keeps metadata quiet and selection stays outside the card. */}
       <div
         data-testid="custom-node-identity-header"
         className="relative flex min-h-fit items-start justify-between rounded-t-md border-b border-surface-border px-3 py-2"
-        style={{ backgroundColor: effectiveColor, color: identityForeground }}
+        style={{ backgroundColor: fillColor, color: VIZ_TINT_FOREGROUND }}
       >
         <div className="flex min-w-0 flex-1 items-center">
           <DataBlockName
             name={nodeName}
-            backgroundColor={effectiveColor}
+            backgroundColor={fillColor}
             maxLines={3}
             className="w-full text-body font-semibold leading-snug"
             title={nodeName}

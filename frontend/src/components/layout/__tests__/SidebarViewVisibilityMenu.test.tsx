@@ -236,7 +236,9 @@ describe('Sidebar view visibility menu', () => {
     const count = within(nodesHeader).getByText('1/2');
 
     expect(clearButton).toBeEnabled();
-    expect(within(clearButton).getByTestId('clear-selection-icon')).toHaveClass('lucide-circle-off');
+    expect(within(clearButton).getByTestId('clear-selection-icon')).toHaveClass(
+      'lucide-circle-off',
+    );
     expect(clearButton.compareDocumentPosition(count)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
 
     await user.hover(clearButton);
