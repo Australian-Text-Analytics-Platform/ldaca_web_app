@@ -130,6 +130,18 @@ const reconcileProjectedNodes = (existingNodes: Node[], incomingNodes: Node[]): 
 };
 
 /**
+ * Reports whether a node mouse event started inside the node's own DOM. A node renders
+ * dialogs and menus through portals; React still bubbles their clicks to the node
+ * wrapper, so without this check a dialog's submit button would be treated as a node
+ * click, cancelling its default action and toggling selection.
+ * Called by: handleNodeClick and handleNodeDoubleClick.
+ */
+const isEventWithinNode = (event: { currentTarget: unknown; target: unknown }): boolean => {
+  const { currentTarget, target } = event;
+  if (!(currentTarget instanceof Node) || !(target instanceof Node)) return true;
+  return currentTarget.contains(target);
+};
+/**
  * Builds the React Flow view model consumed by `WorkspaceGraphFeature`.
  * Used by: `WorkspaceGraphFeature`, whose React Flow shell needs backend graph
  * data, semantic selection handlers, and node commands in one view model.
@@ -422,6 +434,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
   /** Toggles app-level node selection when a graph node is clicked. */
   const handleNodeClick: NodeMouseHandler = useCallback(
     (event, node) => {
+      if (!isEventWithinNode(event)) return;
       event.preventDefault();
       event.stopPropagation();
       if (node.id) {
@@ -444,6 +457,7 @@ export const useWorkspaceGraph = (): WorkspaceGraphViewModel => {
    */
   const handleNodeDoubleClick: NodeMouseHandler = useCallback(
     (event, node) => {
+      if (!isEventWithinNode(event)) return;
       event.preventDefault();
       event.stopPropagation();
       if (node.id) {
