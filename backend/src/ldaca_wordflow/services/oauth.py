@@ -98,7 +98,6 @@ class OAuthService:
             email=email,
             name=name if isinstance(name, str) and name else email,
             picture=picture if isinstance(picture, str) else None,
-            email_verified=True,
         )
 
     async def cilogon_config(self) -> dict[str, JsonData]:
@@ -203,8 +202,11 @@ class OAuthService:
 
         if not isinstance(userinfo, dict):
             raise BadGatewayError("CILogon user information is invalid")
-        if userinfo.get("email_verified") is not True:
+        email_verified = userinfo.get("email_verified")
+        if email_verified is False:
             raise InvalidInputError("CILogon email is not verified")
+        if email_verified is not None and not isinstance(email_verified, bool):
+            raise BadGatewayError("CILogon user information is invalid")
         email = userinfo.get("email")
         subject = userinfo.get("sub")
         if (
@@ -233,7 +235,6 @@ class OAuthService:
             email=email,
             name=raw_name,
             picture=picture if isinstance(picture, str) else None,
-            email_verified=True,
         )
 
 

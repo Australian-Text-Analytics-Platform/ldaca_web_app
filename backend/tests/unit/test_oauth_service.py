@@ -8,6 +8,7 @@ import httpx
 import pytest
 from google.auth.exceptions import GoogleAuthError, TransportError
 
+from ldaca_wordflow.models.session import SessionUser
 from ldaca_wordflow.shared.errors import BadGatewayError, InvalidInputError
 from ldaca_wordflow.services import oauth as oauth_module
 from ldaca_wordflow.services.oauth import OAuthService
@@ -18,6 +19,19 @@ from ldaca_wordflow.settings import Settings
 class _Sessions:
     async def upsert_oidc_user(self, **_identity: object):
         raise AssertionError("Identity provisioning should not be reached")
+
+
+class _RecordingSessions:
+    def __init__(self) -> None:
+        self.identity: dict[str, object] | None = None
+
+    async def upsert_oidc_user(self, **identity: object) -> SessionUser:
+        self.identity = identity
+        return SessionUser(
+            id="user-id",
+            email=str(identity["email"]),
+            name=str(identity["name"]),
+        )
 
 
 def _settings() -> Settings:
@@ -39,6 +53,24 @@ def _discovery(**overrides: str) -> dict[str, str]:
     }
     payload.update(overrides)
     return payload
+
+
+def _cilogon_userinfo_service(
+    userinfo: dict[str, object],
+    sessions: _Sessions | _RecordingSessions,
+) -> OAuthService:
+    def provider(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("openid-configuration"):
+            return httpx.Response(200, json=_discovery())
+        if request.url.path == "/token":
+            return httpx.Response(200, json={"access_token": "opaque"})
+        return httpx.Response(200, json=userinfo)
+
+    return OAuthService(
+        _settings(),
+        cast(SessionService, sessions),
+        http_client=httpx.AsyncClient(transport=httpx.MockTransport(provider)),
+    )
 
 
 @pytest.mark.anyio
@@ -89,6 +121,9 @@ async def test_cilogon_maps_malformed_provider_json_to_safe_gateway_errors() -> 
         )
     await service.close()
 
+
+@pytest.mark.anyio
+async def test_cilogon_maps_malformed_userinfo_to_safe_gateway_error() -> None:
     def malformed_userinfo(request: httpx.Request) -> httpx.Response:
         if request.url.path.endswith("openid-configuration"):
             return httpx.Response(200, json=_discovery())
@@ -104,6 +139,72 @@ async def test_cilogon_maps_malformed_provider_json_to_safe_gateway_errors() -> 
         ),
     )
     with pytest.raises(BadGatewayError, match="user information"):
+        await service.complete_cilogon(
+            code="code",
+            redirect_uri="https://app/callback",
+            code_verifier="verifier",
+        )
+    await service.close()
+
+
+@pytest.mark.anyio
+async def test_cilogon_accepts_email_when_provider_omits_verification_claim() -> None:
+    sessions = _RecordingSessions()
+    service = _cilogon_userinfo_service(
+        {
+            "sub": "subject",
+            "email": "person@example.test",
+            "name": "Person",
+        },
+        sessions,
+    )
+    user = await service.complete_cilogon(
+        code="code",
+        redirect_uri="https://app/callback",
+        code_verifier="verifier",
+    )
+    await service.close()
+
+    assert user.email == "person@example.test"
+    assert sessions.identity == {
+        "issuer": "https://issuer.example",
+        "subject": "subject",
+        "email": "person@example.test",
+        "name": "Person",
+        "picture": None,
+    }
+
+
+@pytest.mark.anyio
+async def test_cilogon_rejects_explicitly_unverified_email() -> None:
+    service = _cilogon_userinfo_service(
+        {
+            "sub": "subject",
+            "email": "person@example.test",
+            "email_verified": False,
+        },
+        _Sessions(),
+    )
+    with pytest.raises(InvalidInputError, match="email is not verified"):
+        await service.complete_cilogon(
+            code="code",
+            redirect_uri="https://app/callback",
+            code_verifier="verifier",
+        )
+    await service.close()
+
+
+@pytest.mark.anyio
+async def test_cilogon_rejects_malformed_email_verification_claim() -> None:
+    service = _cilogon_userinfo_service(
+        {
+            "sub": "subject",
+            "email": "person@example.test",
+            "email_verified": "true",
+        },
+        _Sessions(),
+    )
+    with pytest.raises(BadGatewayError, match="user information is invalid"):
         await service.complete_cilogon(
             code="code",
             redirect_uri="https://app/callback",

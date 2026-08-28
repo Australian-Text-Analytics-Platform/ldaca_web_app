@@ -114,7 +114,6 @@ def multi_user_test_client(
                 email="fixture@example.test",
                 name="Fixture User",
                 picture=None,
-                email_verified=True,
             )
             return await runtime.session_service.issue(user)
 

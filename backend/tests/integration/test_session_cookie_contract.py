@@ -292,7 +292,6 @@ def test_hosted_callback_issues_hashed_multi_session_cookie_and_exact_logout(
                 email=user.email,
                 name=user.name,
                 picture=None,
-                email_verified=True,
             )
 
         monkeypatch.setattr(runtime.oauth_service, "verify_google", fake_verify)

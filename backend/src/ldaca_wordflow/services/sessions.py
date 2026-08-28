@@ -206,12 +206,9 @@ class SessionService:
         email: str,
         name: str,
         picture: str | None,
-        email_verified: bool,
     ) -> SessionUser:
-        """Provision only a verified identity without implicit account linking."""
+        """Provision a provider-validated identity without implicit account linking."""
 
-        if email_verified is not True:
-            raise InvalidInputError("OAuth email is not verified")
         normalized_email = email.strip().lower()
         if not normalized_email:
             raise InvalidInputError("OAuth identity is missing an email")

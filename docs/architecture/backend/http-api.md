@@ -59,6 +59,12 @@ through the same dependency without issuing a cookie. Unsafe requests require
 an exact allowed Origin and `X-CSRF-Token`; provider callbacks use their own
 one-use validation.
 
+`OAuthService` validates provider identities before `SessionService` persists
+them. Google identities require an explicit verified-email claim. CILogon
+identities accept an email when that optional claim is absent, reject an
+explicitly unverified or malformed claim, and use the configured issuer plus
+the provider subject as identity. Email never links identities implicitly.
+
 CORS and trusted Host rules are explicit settings. No Wordflow API route accepts
 bearer authentication or query-string credentials; typed write-only body
 fields carry external-provider credentials where required. Cross-user
