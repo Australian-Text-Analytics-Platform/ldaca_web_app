@@ -21,6 +21,9 @@ import anyio
 from anyio.to_thread import run_sync as run_sync_in_worker_thread
 
 from ..infrastructure.storage.layout import USER_FILE_IMPORT_STAGING_DIRECTORY
+from ..infrastructure.storage.safe_paths import (
+    is_link_or_reparse as _is_link_or_reparse,
+)
 from ..infrastructure.storage.workspace_access import (
     WorkspaceAccessInvalidError,
     read_workspace_owner,
@@ -415,12 +418,6 @@ def _entry_allocated_bytes(metadata: os.stat_result, unit: int) -> int:
     if not isinstance(blocks, int) or blocks < 0:
         raise RuntimeError("Filesystem entry lacks allocated-block metrics")
     return max(blocks * 512, unit)
-
-
-def _is_link_or_reparse(metadata: os.stat_result) -> bool:
-    attributes = int(getattr(metadata, "st_file_attributes", 0))
-    reparse = int(getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400))
-    return stat.S_ISLNK(metadata.st_mode) or bool(attributes & reparse)
 
 
 def _allocated_tree_bytes(root: Path, unit: int) -> int:

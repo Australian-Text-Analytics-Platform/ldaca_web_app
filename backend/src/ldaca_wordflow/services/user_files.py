@@ -60,9 +60,14 @@ from ..infrastructure.storage.durable_fs import (
     fsync_directory as _fsync_directory,
     fsync_file as _fsync_file,
 )
-from .storage_admission import StorageAdmissionService, StorageReservation
-from .safe_paths import SafePathResolver
+from ..infrastructure.storage.safe_paths import (
+    SafePathResolver,
+    is_link_or_reparse as _is_link_or_reparse,
+    is_real_directory as _is_real_directory,
+    is_real_file as _is_real_file,
+)
 from .response_snapshots import ResponseSnapshot, ResponseSnapshotService
+from .storage_admission import StorageAdmissionService, StorageReservation
 
 _IMPORT_OWNER_MARKER = ".wordflow-import-owner"
 T = TypeVar("T")
@@ -532,30 +537,6 @@ class UserFileStore:
             abandon_on_cancel=False,
             limiter=self._limiter,
         )
-
-
-def _is_real_directory(path: Path) -> bool:
-    try:
-        metadata = path.lstat()
-        return not _is_link_or_reparse(metadata) and stat.S_ISDIR(metadata.st_mode)
-    except FileNotFoundError:
-        return False
-
-
-def _is_real_file(path: Path) -> bool:
-    try:
-        metadata = path.lstat()
-        return not _is_link_or_reparse(metadata) and stat.S_ISREG(metadata.st_mode)
-    except FileNotFoundError:
-        return False
-
-
-def _is_link_or_reparse(metadata: os.stat_result) -> bool:
-    reparse_flag = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
-    attributes = getattr(metadata, "st_file_attributes", 0)
-    return stat.S_ISLNK(metadata.st_mode) or bool(
-        reparse_flag and attributes & reparse_flag
-    )
 
 
 def _mkdir_checked(resolver: SafePathResolver, destination: Path) -> None:

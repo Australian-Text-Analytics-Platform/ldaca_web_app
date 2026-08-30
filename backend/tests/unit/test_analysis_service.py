@@ -30,6 +30,7 @@ from ldaca_wordflow.domain.workspace import (
 from ldaca_wordflow.models.analyses import AnalysisCreate
 from ldaca_wordflow.domain.workspace.provenance import CloneDerivation
 from ldaca_wordflow.infrastructure.storage.workspace_store import WorkspaceStore
+from ldaca_wordflow.infrastructure.storage.private_toml import PrivateTomlPersistence
 from ldaca_wordflow.models.tabs import TabCreate
 from ldaca_wordflow.models.node_resources import (
     CastNodeEditRequest,
@@ -169,9 +170,15 @@ def _credential_store(
         multi_user=multi_user,
         google_client_id="google-client" if multi_user else "",
     )
+    limiter = anyio.CapacityLimiter(4)
+    persistence = PrivateTomlPersistence(
+        settings.get_users_root_folder(),
+        unlimited_storage_admission(tmp_path, limiter=limiter),
+        limiter=limiter,
+    )
     return ProviderCredentialStore(
         settings,
-        io_limiter=anyio.CapacityLimiter(4),
+        persistence,
     )
 
 

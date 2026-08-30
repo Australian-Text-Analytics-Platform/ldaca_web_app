@@ -64,7 +64,9 @@ this direction and the absence of removed facades.
   `ProviderCredentialStore` independently owns the single-user root's ordered
   Annotation Provider Configuration collection, Data Portal credential, and
   mode-aware transient credential resolution. It never reads or writes
-  personal credential files in multi-user mode.
+  personal credential files in multi-user mode. Both business stores delegate
+  bounded, no-follow, quota-admitted TOML publication to one infrastructure
+  storage primitive while retaining independent schemas.
 - `UserFileStore` and `WorkspaceArchiveService` own their respective storage
   boundaries.
 

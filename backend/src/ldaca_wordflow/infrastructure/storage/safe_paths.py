@@ -20,11 +20,11 @@ import os
 import secrets
 import stat
 from contextlib import contextmanager
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from pathlib import Path
 
-from ..shared.errors import UnsafePathError
-from ..shared.portable_names import (
+from ...shared.errors import UnsafePathError
+from ...shared.portable_names import (
     MAX_PORTABLE_COMPONENT_BYTES,
     MAX_RELATIVE_PATH_BYTES,
     MAX_RELATIVE_PATH_DEPTH,
@@ -33,6 +33,98 @@ from ..shared.portable_names import (
 )
 
 _O_DIRECTORY = getattr(os, "O_DIRECTORY", 0)
+
+
+def is_link_or_reparse(metadata: os.stat_result) -> bool:
+    """Return whether one no-follow stat identifies an unsafe link-like entry."""
+
+    reparse_flag = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
+    file_attributes = getattr(metadata, "st_file_attributes", 0)
+    return stat.S_ISLNK(metadata.st_mode) or bool(
+        reparse_flag and file_attributes & reparse_flag
+    )
+
+
+def is_real_directory(path: Path) -> bool:
+    """Return whether one path currently names a no-follow directory."""
+
+    try:
+        metadata = path.lstat()
+    except FileNotFoundError:
+        return False
+    return not is_link_or_reparse(metadata) and stat.S_ISDIR(metadata.st_mode)
+
+
+def is_real_file(path: Path) -> bool:
+    """Return whether one path currently names a no-follow regular file."""
+
+    try:
+        metadata = path.lstat()
+    except FileNotFoundError:
+        return False
+    return not is_link_or_reparse(metadata) and stat.S_ISREG(metadata.st_mode)
+
+
+def logical_tree_usage(
+    roots: Iterable[str | Path],
+    byte_limit: int,
+    file_limit: int,
+) -> tuple[int, int]:
+    """Count private regular-file ``st_size`` without following special entries.
+
+    The scan stops as soon as either caller-owned limit is exceeded. Directory
+    entries are also bounded so a child cannot evade supervision with an
+    arbitrarily wide tree containing few regular files.
+    """
+
+    if byte_limit < 0 or file_limit < 0:
+        raise ValueError("Logical tree limits cannot be negative")
+    total_bytes = 0
+    total_files = 0
+    visited_entries = 0
+    entry_limit = max(1, file_limit * 8)
+    seen: set[Path] = set()
+    for raw_root in roots:
+        root = Path(raw_root)
+        if not is_real_directory(root):
+            continue
+        for current_root, directory_names, file_names in os.walk(
+            root,
+            topdown=True,
+            followlinks=False,
+        ):
+            current = Path(current_root)
+            safe_directories: list[str] = []
+            for name in directory_names:
+                candidate = current / name
+                visited_entries += 1
+                if visited_entries > entry_limit:
+                    return total_bytes, file_limit + 1
+                if is_real_directory(candidate):
+                    safe_directories.append(name)
+            directory_names[:] = safe_directories
+            for name in file_names:
+                candidate = current / name
+                visited_entries += 1
+                if visited_entries > entry_limit:
+                    return total_bytes, file_limit + 1
+                try:
+                    metadata = candidate.lstat()
+                    resolved = candidate.resolve(strict=True)
+                except FileNotFoundError:
+                    continue
+                if (
+                    is_link_or_reparse(metadata)
+                    or not stat.S_ISREG(metadata.st_mode)
+                    or resolved in seen
+                ):
+                    continue
+                seen.add(resolved)
+                total_bytes += metadata.st_size
+                total_files += 1
+                if total_bytes > byte_limit or total_files > file_limit:
+                    return total_bytes, total_files
+    return total_bytes, total_files
 
 
 class SafePathResolver:
@@ -385,11 +477,7 @@ class SafePathResolver:
     @staticmethod
     def _reject_special_component(path: Path) -> None:
         metadata = path.lstat()
-        reparse_flag = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
-        file_attributes = getattr(metadata, "st_file_attributes", 0)
-        if stat.S_ISLNK(metadata.st_mode) or (
-            reparse_flag and file_attributes & reparse_flag
-        ):
+        if is_link_or_reparse(metadata):
             raise UnsafePathError("Path contains a link or reparse point")
 
 
@@ -398,4 +486,8 @@ __all__ = [
     "MAX_RELATIVE_PATH_BYTES",
     "MAX_RELATIVE_PATH_DEPTH",
     "SafePathResolver",
+    "is_link_or_reparse",
+    "is_real_directory",
+    "is_real_file",
+    "logical_tree_usage",
 ]

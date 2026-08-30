@@ -11,6 +11,7 @@ from ldaca_wordflow.infrastructure.storage.layout import (
     user_preferences_path,
     user_provider_credentials_path,
 )
+from ldaca_wordflow.infrastructure.storage.private_toml import PrivateTomlPersistence
 from ldaca_wordflow.models.provider_credentials import (
     AnnotationProviderConfigurationCreate,
     DataPortalCredentialPatch,
@@ -30,6 +31,8 @@ from ldaca_wordflow.shared.errors import (
     UserPreferencesCorruptError,
 )
 
+from ._storage import unlimited_storage_admission
+
 
 def _stores(
     tmp_path: Path,
@@ -48,13 +51,15 @@ def _stores(
         google_client_id="google-client" if multi_user else "",
     )
     limiter = anyio.CapacityLimiter(2)
-    preferences = UserPreferenceStore(
-        settings,
-        io_limiter=limiter,
+    persistence = PrivateTomlPersistence(
+        settings.get_users_root_folder(),
+        unlimited_storage_admission(tmp_path, limiter=limiter),
+        limiter=limiter,
     )
+    preferences = UserPreferenceStore(persistence)
     credentials = ProviderCredentialStore(
         settings,
-        io_limiter=limiter,
+        persistence,
     )
     return preferences, credentials, settings
 

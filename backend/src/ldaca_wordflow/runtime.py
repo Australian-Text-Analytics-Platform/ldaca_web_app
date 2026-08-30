@@ -60,6 +60,7 @@ from .infrastructure.storage.layout import (
     workspaces_root,
 )
 from .infrastructure.storage.durable_fs import mkdir_durable
+from .infrastructure.storage.private_toml import PrivateTomlPersistence
 from .services.storage_admission import StorageAdmissionService
 from .services.quota import QuotaService
 from .services.response_snapshots import ResponseSnapshotService
@@ -883,13 +884,15 @@ async def runtime_context(settings: Settings) -> AsyncIterator[Runtime]:
             io_limiter=io_limiter,
         )
         await session_service.initialize()
-        user_preference_store = UserPreferenceStore(
-            settings,
-            io_limiter=io_limiter,
+        private_toml = PrivateTomlPersistence(
+            settings.get_users_root_folder(),
+            storage_admission,
+            limiter=io_limiter,
         )
+        user_preference_store = UserPreferenceStore(private_toml)
         provider_credential_store = ProviderCredentialStore(
             settings,
-            io_limiter=io_limiter,
+            private_toml,
         )
         oauth_service = OAuthService(settings, session_service)
         resources.push_async_callback(oauth_service.close)

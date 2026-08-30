@@ -4,18 +4,15 @@ from __future__ import annotations
 
 import logging
 import uuid
-from collections.abc import Callable
-from functools import partial
-from pathlib import Path
 
 import anyio
-import rtoml
-from anyio.to_thread import run_sync as run_sync_in_worker_thread
 from pydantic import SecretStr, ValidationError
 
 from ..domain.annotation import AnnotationProviderSnapshot
-from ..infrastructure.storage.durable_fs import atomic_output_path
-from ..infrastructure.storage.layout import user_provider_credentials_path
+from ..infrastructure.storage.private_toml import (
+    PrivateTomlError,
+    PrivateTomlPersistence,
+)
 from ..models.provider_credentials import (
     AnnotationProviderConfigurationCreate,
     AnnotationProviderConfigurationUpdate,
@@ -36,6 +33,7 @@ from ..shared.errors import (
 from .sessions import SINGLE_USER
 
 logger = logging.getLogger(__name__)
+_CREDENTIALS_FILENAME = "provider-credentials.toml"
 
 
 class ProviderCredentialStore:
@@ -44,11 +42,10 @@ class ProviderCredentialStore:
     def __init__(
         self,
         settings: Settings,
-        *,
-        io_limiter: anyio.CapacityLimiter,
+        persistence: PrivateTomlPersistence,
     ) -> None:
         self._settings = settings
-        self._io_limiter = io_limiter
+        self._persistence = persistence
         self._lock = anyio.Lock()
 
     async def summary(self) -> ProviderCredentialSummary:
@@ -87,7 +84,7 @@ class ProviderCredentialStore:
                     ]
                 }
             )
-            await self._run_io(_write_credentials, self._path(), updated)
+            await self._write(updated)
         return _configuration_resource(configuration)
 
     async def update_annotation_provider(
@@ -128,7 +125,7 @@ class ProviderCredentialStore:
                     updated = stored.model_copy(
                         update={"annotation_providers": configurations}
                     )
-                    await self._run_io(_write_credentials, self._path(), updated)
+                    await self._write(updated)
                     return _configuration_resource(updated_configuration)
         raise NotFoundError("Annotation provider configuration not found")
 
@@ -149,14 +146,14 @@ class ProviderCredentialStore:
             updated = stored.model_copy(
                 update={"annotation_providers": configurations}
             )
-            await self._run_io(_write_credentials, self._path(), updated)
+            await self._write(updated)
 
     async def clear_annotation_providers(self) -> None:
         self._require_backend_storage()
         async with self._lock:
             stored = await self._load()
             updated = stored.model_copy(update={"annotation_providers": []})
-            await self._run_io(_write_credentials, self._path(), updated)
+            await self._write(updated)
 
     async def update_data_portal_credential(
         self,
@@ -166,22 +163,14 @@ class ProviderCredentialStore:
         async with self._lock:
             stored = await self._load()
             updated = self._apply_data_portal_patch(stored, patch)
-            await self._run_io(
-                _write_credentials,
-                self._path(),
-                updated,
-            )
+            await self._write(updated)
         return self._summary(updated)
 
     async def clear(self) -> None:
         self._require_backend_storage()
         async with self._lock:
             await self._load()
-            await self._run_io(
-                _write_credentials,
-                self._path(),
-                StoredProviderCredentials(schema_version=2),
-            )
+            await self._write(StoredProviderCredentials(schema_version=2))
 
     async def resolve_annotation_provider(
         self,
@@ -243,16 +232,30 @@ class ProviderCredentialStore:
 
     async def _load(self) -> StoredProviderCredentials:
         try:
-            result = await self._run_io(_load_credentials, self._path())
-        except _InvalidCredentials as exc:
+            raw = await self._persistence.read(
+                SINGLE_USER.id,
+                _CREDENTIALS_FILENAME,
+            )
+        except PrivateTomlError as exc:
             logger.warning("Invalid provider credentials for single-user root")
             raise ProviderCredentialsCorruptError() from exc
-        if not isinstance(result, StoredProviderCredentials):
-            raise TypeError("Provider credential reader returned an invalid value")
-        return result
+        if raw is None:
+            return StoredProviderCredentials(schema_version=2)
+        try:
+            return StoredProviderCredentials.model_validate(raw)
+        except ValidationError as exc:
+            logger.warning("Invalid provider credentials for single-user root")
+            raise ProviderCredentialsCorruptError() from exc
 
-    def _path(self) -> Path:
-        return user_provider_credentials_path(self._settings, SINGLE_USER.id)
+    async def _write(self, credentials: StoredProviderCredentials) -> None:
+        try:
+            await self._persistence.write(
+                SINGLE_USER.id,
+                _CREDENTIALS_FILENAME,
+                _credentials_payload(credentials),
+            )
+        except PrivateTomlError as exc:
+            raise ProviderCredentialsCorruptError() from exc
 
     def _deployment_credential(self) -> str | None:
         return _secret_value(self._settings.ldaca_oni_api_token)
@@ -296,43 +299,16 @@ class ProviderCredentialStore:
             },
         )
 
-    async def _run_io(self, function: Callable[..., object], *args: object) -> object:
-        return await run_sync_in_worker_thread(
-            partial(function, *args),
-            abandon_on_cancel=False,
-            limiter=self._io_limiter,
-        )
-
-
-class _InvalidCredentials(ValueError):
-    pass
-
-
 def _secret_value(value: SecretStr | str | None) -> str | None:
     if isinstance(value, SecretStr):
         return value.get_secret_value()
     return value
 
 
-def _load_credentials(path: Path) -> StoredProviderCredentials:
-    if not path.exists():
-        return StoredProviderCredentials(schema_version=2)
-    if path.is_symlink() or not path.is_file():
-        raise _InvalidCredentials("Stored file must be a regular file")
-    try:
-        raw = rtoml.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError) as exc:
-        raise _InvalidCredentials("Stored TOML is invalid") from exc
-    if not isinstance(raw, dict):
-        raise _InvalidCredentials("Stored TOML must contain a table")
-    try:
-        return StoredProviderCredentials.model_validate(raw)
-    except ValidationError as exc:
-        raise _InvalidCredentials("Provider credential schema is invalid") from exc
-
-
-def _write_credentials(path: Path, credentials: StoredProviderCredentials) -> None:
-    payload: dict[str, object] = {
+def _credentials_payload(
+    credentials: StoredProviderCredentials,
+) -> dict[str, object]:
+    return {
         "schema_version": credentials.schema_version,
         "annotation_providers": [
             {
@@ -358,11 +334,6 @@ def _write_credentials(path: Path, credentials: StoredProviderCredentials) -> No
             else {}
         ),
     }
-    with atomic_output_path(path) as temporary:
-        temporary.chmod(0o600)
-        temporary.write_text(rtoml.dumps(payload), encoding="utf-8")
-        temporary.chmod(0o600)
-    path.chmod(0o600)
 
 
 def _configuration_resource(

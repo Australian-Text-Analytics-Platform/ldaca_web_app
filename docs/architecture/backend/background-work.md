@@ -25,12 +25,14 @@ flowchart TB
     AS --> EVENTS["EventHub"]
     IS --> EVENTS
     EVENTS --> SSE["GET /api/events"]
-    SELECTOR["FairUserQueue"] -. "private scheduling primitive" .-> AQ
-    SELECTOR -. "private scheduling primitive" .-> IQ
+    KERNEL["FairSchedulerKernel"] -. "private runtime mechanics" .-> AQ
+    KERNEL -. "private runtime mechanics" .-> IQ
 ```
 
 The shared `BackgroundState`, `Progress`, `Failure`, event models, and fair
-queue are small value-level primitives. They do not create cross-resource
+scheduler kernel are private runtime primitives. The kernel owns per-user
+rotation, FIFO ordering, capacity, wakeup, queued cancellation, close, and idle
+detection for each independent scheduler instance. These primitives do not create cross-resource
 identity, persistence, cancellation, parentage, result, or cleanup ownership.
 
 ## Analysis Execution
@@ -65,7 +67,7 @@ package or read a local sample-data checkout. The service owns staging, quota
 reservations, atomic publication, terminal persistence, and cleanup for both
 kinds.
 
-The import scheduler uses the same fair-selection primitive as Analysis but no
+The import scheduler uses the same scheduler kernel as Analysis but no
 shared queue, capacity slot, executor, record, or cancellation state. One
 resource's failure is caught at its service boundary and cannot cancel sibling
 work or another user's resources.

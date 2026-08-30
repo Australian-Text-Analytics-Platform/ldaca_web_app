@@ -77,7 +77,7 @@ from ..infrastructure.storage.layout import (
     SAFE_WORKSPACE_IMPORT_MARKER_CONTENT,
     validate_workspace_name,
 )
-from .safe_paths import SafePathResolver
+from ..infrastructure.storage.safe_paths import SafePathResolver
 from .storage_admission import StorageAdmissionService, StorageReservation
 from .user_files import AsyncUploadSource
 from .response_snapshots import ResponseSnapshot, ResponseSnapshotService

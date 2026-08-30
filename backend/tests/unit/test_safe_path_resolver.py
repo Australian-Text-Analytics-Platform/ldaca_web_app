@@ -7,9 +7,12 @@ from pathlib import Path
 
 import pytest
 
-from ldaca_wordflow.services import safe_paths as safe_paths_module
+from ldaca_wordflow.infrastructure.storage import safe_paths as safe_paths_module
+from ldaca_wordflow.infrastructure.storage.safe_paths import (
+    SafePathResolver,
+    logical_tree_usage,
+)
 from ldaca_wordflow.shared.errors import UnsafePathError
-from ldaca_wordflow.services.safe_paths import SafePathResolver
 
 
 @pytest.mark.parametrize(
@@ -131,3 +134,28 @@ def test_resolver_rejects_existing_case_or_unicode_collisions(tmp_path: Path) ->
 
     with pytest.raises(UnsafePathError, match="collides"):
         resolver.resolve("report.csv")
+
+
+def test_logical_tree_usage_counts_regular_files_once_and_ignores_links(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "private"
+    root.mkdir()
+    file_path = root / "value.bin"
+    file_path.write_bytes(b"12345")
+    link = root / "linked.bin"
+    try:
+        link.symlink_to(file_path)
+    except NotImplementedError, OSError:
+        pytest.skip("symlinks are unavailable on this platform")
+
+    assert logical_tree_usage((root, root), 100, 10) == (5, 1)
+
+
+def test_logical_tree_usage_bounds_directory_only_trees(tmp_path: Path) -> None:
+    root = tmp_path / "private"
+    root.mkdir()
+    for index in range(9):
+        (root / f"directory-{index}").mkdir()
+
+    assert logical_tree_usage((root,), 100, 1) == (0, 2)

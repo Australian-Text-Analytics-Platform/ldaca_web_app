@@ -11,6 +11,7 @@ from pydantic import ValidationError
 from ldaca_wordflow.infrastructure.storage.layout import (
     user_provider_credentials_path,
 )
+from ldaca_wordflow.infrastructure.storage.private_toml import PrivateTomlPersistence
 from ldaca_wordflow.domain.annotation import AnnotationProviderSnapshot
 from ldaca_wordflow.models.provider_credentials import (
     AnnotationProviderConfigurationCreate,
@@ -26,6 +27,8 @@ from ldaca_wordflow.shared.errors import (
     ProviderCredentialsCorruptError,
 )
 
+from ._storage import unlimited_storage_admission
+
 
 def _store(tmp_path: Path, *, multi_user: bool = False) -> tuple[
     ProviderCredentialStore,
@@ -36,10 +39,13 @@ def _store(tmp_path: Path, *, multi_user: bool = False) -> tuple[
         multi_user=multi_user,
         google_client_id="google-client" if multi_user else "",
     )
-    return (
-        ProviderCredentialStore(settings, io_limiter=anyio.CapacityLimiter(2)),
-        settings,
+    limiter = anyio.CapacityLimiter(2)
+    persistence = PrivateTomlPersistence(
+        settings.get_users_root_folder(),
+        unlimited_storage_admission(tmp_path, limiter=limiter),
+        limiter=limiter,
     )
+    return ProviderCredentialStore(settings, persistence), settings
 
 
 @pytest.mark.anyio
