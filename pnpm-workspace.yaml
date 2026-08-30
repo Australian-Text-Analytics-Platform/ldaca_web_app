@@ -6,3 +6,9 @@ allowBuilds:
   esbuild: true
   msw: false
   protobufjs: false
+
+peerDependencyRules:
+  allowedVersions:
+    # echarts-wordcloud 2.1.0 declares ECharts 5, but this exact package pair
+    # is verified against the frontend's Vite 8 and ECharts 6.1.0 toolchain.
+    'echarts-wordcloud@2.1.0>echarts': '6'

@@ -17,32 +17,41 @@ vi.mock('@/components/help/InfoIcon', () => ({
   default: () => <span data-testid="info-icon" />,
 }));
 
-vi.mock('@visx/wordcloud', () => ({
-  Wordcloud: ({
-    children,
+vi.mock('@/features/views/common/components/ResponsiveWordCloud', () => ({
+  ResponsiveWordCloud: ({
     words,
+    color = 'currentColor',
+    svgRef,
+    onWordClick,
+    onWordContextMenu,
   }: {
-    children: (cloudWords: Record<string, unknown>[]) => React.ReactNode;
-    words: Record<string, unknown>[];
+    words: { text: string; value: number; color?: string }[];
+    color?: string;
+    svgRef?: (element: SVGSVGElement | null) => void;
+    onWordClick?: (word: string) => void;
+    onWordContextMenu?: (word: string) => void;
   }) => (
-    <g data-testid="mock-wordcloud">
-      {children(
-        words.map((word, index) => ({
-          ...word,
-          x: index * 10,
-          y: index * 12,
-          rotate: 0,
-          size: 18,
-          font: 'sans-serif',
-        })),
-      )}
-    </g>
-  ),
-}));
-
-vi.mock('@visx/text', () => ({
-  Text: ({ children, ...props }: React.SVGProps<SVGTextElement>) => (
-    <text {...props}>{children}</text>
+    <svg
+      ref={svgRef}
+      data-testid="mock-wordcloud"
+      aria-label={words.map((word) => `${word.text}: ${String(word.value)}`).join(', ')}
+    >
+      {words.map((word) => (
+        <text
+          key={word.text}
+          fill={word.color ?? color}
+          onClick={() => {
+            onWordClick?.(word.text);
+          }}
+          onContextMenu={(event) => {
+            event.preventDefault();
+            onWordContextMenu?.(word.text);
+          }}
+        >
+          {word.text}
+        </text>
+      ))}
+    </svg>
   ),
 }));
 
@@ -103,9 +112,6 @@ const baseUnifiedSectionProps = {
   onDownloadWordCloud: vi.fn(),
   onTokenClick: vi.fn(),
   onTokenRightClick: vi.fn(),
-  unifiedCloudWidth: 640,
-  unifiedCloudHeight: 340,
-  unifiedCloudContainerRef: { current: null },
   registerWordCloudRef: vi.fn(),
   onDownloadFrequencyCsv: vi.fn(),
   view: 'cloud' as const,
@@ -299,7 +305,7 @@ describe('Token frequency result layouts', () => {
       await user.click(screen.getByRole('button', { name: 'Download frequencies' }));
 
       expect(onTokenClick).toHaveBeenCalledWith('token-1');
-      expect(onTokenRightClick).toHaveBeenCalledWith('token-1', expect.anything());
+      expect(onTokenRightClick).toHaveBeenCalledWith('token-1');
       expect(onDownloadFrequencyCsv).toHaveBeenCalledWith('Node 1', fullVocabulary);
     } finally {
       restoreViewport();
@@ -657,12 +663,13 @@ describe('Token frequency result layouts', () => {
         lastCompareNodeIds={['node-a', 'node-b']}
         statistics={statistics}
         tokenFilter="keep*"
+        getColorForNode={(nodeId) => (nodeId === 'node-a' ? '#ff0000' : '#0000ff')}
         onDownloadFrequencyCsv={onDownloadFrequencyCsv}
       />,
     );
 
     const cloud = screen.getByTestId('mock-wordcloud');
-    expect(within(cloud).getByText('keep-token')).toBeInTheDocument();
+    expect(within(cloud).getByText('keep-token')).toHaveAttribute('fill', '#990066');
     expect(within(cloud).queryByText('drop-token')).not.toBeInTheDocument();
 
     rerender(

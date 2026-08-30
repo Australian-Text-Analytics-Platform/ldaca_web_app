@@ -1,12 +1,10 @@
-import { Text } from '@visx/text';
-import { Wordcloud } from '@visx/wordcloud';
 import { Download } from 'lucide-react';
 import { memo, useMemo } from 'react';
 import HelpIcon from '@/components/help/HelpIcon';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { useElementWidth } from '@/lib/useElementWidth';
+import { ResponsiveWordCloud } from '@/features/views/common/components/ResponsiveWordCloud';
 import {
   createTokenFilterMatcher,
   type NodeResultView,
@@ -19,18 +17,9 @@ import { TokenFrequencyStatisticsTable } from './TokenFrequencyStatisticsTable';
 // the cloud "landscape-ish" without dominating tall corpora layouts.
 const UNIFIED_CLOUD_ASPECT_RATIO = 0.55;
 
-// Floor on the SVG width so the cloud is still legible in a narrow panel
-// before d3-cloud falls back to truncating big words.
+// Floors keep the comparative cloud legible before the card's measured width is available.
 const UNIFIED_CLOUD_MIN_WIDTH = 320;
-
-// Font envelope scaled with width — see the matching constants in
-// ``TokenFrequencySingleTokenSection`` for the rationale. A hardcoded
-// 12-54 px range (the original) clustered words in the centre of a
-// 1500-wide canvas and left a huge margin of white space around them.
-const UNIFIED_CLOUD_MAX_FONT_FRACTION = 0.11;
-const UNIFIED_CLOUD_MIN_FONT_PX = 12;
-const UNIFIED_CLOUD_MAX_FONT_FLOOR = 40;
-const UNIFIED_CLOUD_MAX_FONT_CEILING = 170;
+const UNIFIED_CLOUD_MIN_HEIGHT = 340;
 
 interface TokenFrequencyUnifiedTokenSectionProps {
   normalizedNodeResults: NormalizedNodeResult[];
@@ -44,10 +33,7 @@ interface TokenFrequencyUnifiedTokenSectionProps {
   getColorForNode: (nodeId: string, index?: number) => string;
   onDownloadWordCloud: (nodeKey: string, displayName: string) => void;
   onTokenClick: (token: string) => void;
-  onTokenRightClick: (token: string, event?: React.MouseEvent) => void;
-  unifiedCloudWidth: number;
-  unifiedCloudHeight: number;
-  unifiedCloudContainerRef: React.RefObject<HTMLDivElement | null>;
+  onTokenRightClick: (token: string) => void;
   registerWordCloudRef: (nodeKey: string, element: SVGSVGElement | null) => void;
   onDownloadFrequencyCsv: (label: string, rows: unknown[]) => void;
   /** Active sub-view from the parent results panel. */
@@ -83,17 +69,11 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
   onDownloadWordCloud,
   onTokenClick,
   onTokenRightClick,
-  unifiedCloudWidth,
-  unifiedCloudHeight,
-  unifiedCloudContainerRef,
   registerWordCloudRef,
   onDownloadFrequencyCsv,
   view,
   tokenFilter = '',
 }: TokenFrequencyUnifiedTokenSectionProps) => {
-  // Hook must come before any early return so React sees a stable call order
-  // across renders, regardless of whether the comparative panel is showing.
-  const measuredCardWidth = useElementWidth(unifiedCloudContainerRef);
   const filteredStatistics = useMemo(
     () => (statistics ?? []).filter((entry) => !appliedStopSet.has(entry.token.toLowerCase())),
     [appliedStopSet, statistics],
@@ -167,8 +147,6 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
     .filter((s) => (selectedSeen.has(s.token) ? false : (selectedSeen.add(s.token), true)))
     .slice(0, Math.min(cloudLimit, selectedCloudStats.length));
 
-  const maxCloudTotal = Math.max(1, ...selectedCloudStats.map((s) => s.total || 0));
-
   /** Used by: TokenFrequencyUnifiedTokenSectionInner color blending to convert hex swatches into RGB channels. */
   const hexToRgb = (hex: string) => {
     const h = hex.replace('#', '');
@@ -184,7 +162,7 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
   const colorA = hexToRgb(nodeAColor);
   const colorB = hexToRgb(nodeBColor);
   /**
-   * Used by: unified word-cloud Text fill to blend between study and reference colors.
+   * Used by: unified word-cloud data to blend between study and reference colors.
    * Flow: interpolate each RGB channel, round it, and convert the blended color
    * back to a hex swatch.
    */
@@ -199,48 +177,13 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
 
   const words = selectedCloudStats.map((s) => {
     const denom = s.p1 + s.p2;
+    const proportion = denom > 0 ? s.p1 / denom : 0.5;
     return {
       text: s.token,
       value: s.total,
-      proportion: denom > 0 ? s.p1 / denom : 0.5,
+      color: blend(Math.max(0, Math.min(1, proportion))),
     };
   });
-  const proportionByToken = new Map<string, number>(
-    words.map((word) => [word.text, word.proportion || 0.5]),
-  );
-
-  // Measure the card body so the SVG fills the actual available width
-  // instead of a hardcoded 640 px. Falls back to the prop value before the
-  // first ResizeObserver tick lands so SSR / pre-mount renders still get a
-  // usable size. (useElementWidth is hoisted above the early return.)
-  const effectiveCloudWidth = Math.max(
-    UNIFIED_CLOUD_MIN_WIDTH,
-    measuredCardWidth > 0 ? measuredCardWidth - /* padding */ 24 : unifiedCloudWidth,
-  );
-  const effectiveCloudHeight = Math.max(
-    unifiedCloudHeight,
-    Math.round(effectiveCloudWidth * UNIFIED_CLOUD_ASPECT_RATIO),
-  );
-  // Tie the font envelope to the measured width so d3-cloud's spiral
-  // actually fills the SVG. Hardcoded 12-54 px clustered words in the
-  // centre on wide panels and left a large white margin around them.
-  const maxFontSize = Math.max(
-    UNIFIED_CLOUD_MAX_FONT_FLOOR,
-    Math.min(
-      UNIFIED_CLOUD_MAX_FONT_CEILING,
-      Math.round(effectiveCloudWidth * UNIFIED_CLOUD_MAX_FONT_FRACTION),
-    ),
-  );
-  const minFontSize = Math.max(UNIFIED_CLOUD_MIN_FONT_PX, Math.round(maxFontSize / 6));
-  /** Used by: TokenFrequencyUnifiedTokenSectionInner Wordcloud prop to scale words within measured bounds. */
-  const fontSizeSetter = (datum: { value: number }) =>
-    Math.max(
-      minFontSize,
-      Math.min(
-        maxFontSize,
-        (datum.value / maxCloudTotal) * (maxFontSize - minFontSize) + minFontSize,
-      ),
-    );
 
   if (view === 'list') {
     return (
@@ -302,11 +245,7 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
         </CardHeader>
 
         <CardContent>
-          <div
-            ref={unifiedCloudContainerRef}
-            className="rounded-lg border p-3"
-            style={{ minHeight: effectiveCloudHeight }}
-          >
+          <div className="rounded-lg border p-3">
             {isComparative && selectedCloudStats.length > 0 ? (
               <div className="space-y-3">
                 <TooltipProvider delayDuration={0} skipDelayDuration={0}>
@@ -358,59 +297,18 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
                   </div>
                 </TooltipProvider>
 
-                <div className="flex w-full justify-center overflow-visible">
-                  <svg
-                    ref={(element) => {
+                <div className="flex w-full justify-center">
+                  <ResponsiveWordCloud
+                    words={words}
+                    minWidth={UNIFIED_CLOUD_MIN_WIDTH}
+                    minHeight={UNIFIED_CLOUD_MIN_HEIGHT}
+                    aspectRatio={UNIFIED_CLOUD_ASPECT_RATIO}
+                    svgRef={(element) => {
                       registerWordCloudRef('unified', element);
                     }}
-                    width={effectiveCloudWidth}
-                    height={effectiveCloudHeight}
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="overflow-visible"
-                    style={{ overflow: 'visible' }}
-                  >
-                    <Wordcloud
-                      words={words}
-                      width={effectiveCloudWidth}
-                      height={effectiveCloudHeight}
-                      fontSize={fontSizeSetter}
-                      font="Segoe UI, Roboto, sans-serif"
-                      padding={2}
-                      spiral="archimedean"
-                      rotate={0}
-                      random={() => 0.5}
-                    >
-                      {(cloudWords) =>
-                        cloudWords.map((word) => {
-                          const tokenText = word.text ?? '';
-                          const proportion = proportionByToken.get(tokenText) ?? 0.5;
-                          return (
-                            <Text
-                              key={tokenText}
-                              fill={blend(Math.max(0, Math.min(1, proportion)))}
-                              textAnchor="middle"
-                              transform={`translate(${String(word.x)}, ${String(word.y)}) rotate(${String(word.rotate)})`}
-                              fontSize={word.size}
-                              fontFamily={word.font}
-                              className="cursor-pointer transition-colors"
-                              onClick={() => {
-                                if (tokenText) onTokenClick(tokenText);
-                              }}
-                              onContextMenu={(event) => {
-                                event.preventDefault();
-                                if (tokenText) {
-                                  onTokenRightClick(tokenText, event);
-                                }
-                              }}
-                              style={{ cursor: 'pointer' }}
-                            >
-                              {tokenText}
-                            </Text>
-                          );
-                        })
-                      }
-                    </Wordcloud>
-                  </svg>
+                    onWordClick={onTokenClick}
+                    onWordContextMenu={onTokenRightClick}
+                  />
                 </div>
               </div>
             ) : (
@@ -428,9 +326,8 @@ const TokenFrequencyUnifiedTokenSectionInner = ({
 };
 
 /**
- * ``React.memo`` wrap. The unified-cloud section is one of the two hot
- * paths on a stop-word keystroke — d3-cloud's spiral layout runs inside
- * ``<Wordcloud>`` on every render, which is 50-200 ms for 50-100 words.
+ * ``React.memo`` wrap. The unified-cloud section owns an external ECharts
+ * layout that should not be updated on unrelated stop-word keystrokes.
  * With every prop now referentially stable across keystrokes
  * (``useCallback`` on the handlers in token-frequency feature hooks,
  * ``useMemo`` on the derived collections), the default shallow compare

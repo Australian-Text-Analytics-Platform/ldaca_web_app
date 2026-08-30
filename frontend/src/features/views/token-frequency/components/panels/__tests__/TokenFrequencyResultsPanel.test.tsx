@@ -53,9 +53,6 @@ const baseProps = {
   onDownloadWordCloud: vi.fn(),
   onTokenClick: vi.fn(),
   onTokenRightClick: vi.fn(),
-  unifiedCloudWidth: 640,
-  unifiedCloudHeight: 340,
-  unifiedCloudContainerRef: { current: null },
   registerWordCloudRef: vi.fn(),
   onDownloadFrequencyCsv: vi.fn(),
 };

@@ -5,14 +5,13 @@ import { useEffect, useState } from 'react';
  *
  * Returns ``0`` until the ref attaches and the first measurement lands. Use
  * the returned width to drive responsive layouts inside components whose
- * container width changes with the panel layout (e.g. word clouds that should
- * fill their card rather than rendering at a fixed pixel size).
+ * container width changes with the panel layout.
  *
  * No-ops in environments without ResizeObserver (older test runners), in
  * which case the width stays at its initial measurement after mount.
  */
 /**
- * Used by: src/features/views/token-frequency/components/results/TokenFrequencySingleTokenSection.tsx, src/features/views/token-frequency/components/results/TokenFrequencyUnifiedTokenSection.tsx.
+ * Used by: src/features/views/common/components/ResponsiveWordCloud.tsx.
  */
 export function useElementWidth(ref: React.RefObject<HTMLElement | null>): number {
   const [width, setWidth] = useState(0);

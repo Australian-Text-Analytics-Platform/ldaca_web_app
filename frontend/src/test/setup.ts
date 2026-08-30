@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { afterAll, afterEach, beforeAll } from 'vitest';
+import { afterAll, afterEach, beforeAll, vi } from 'vitest';
 import { JSDOM } from 'jsdom';
 // Vitest is configured without globals, so Testing Library cannot register its
 // automatic cleanup hook. Keep the explicit teardown to prevent DOM leakage
@@ -11,6 +11,11 @@ import { enableMapSet } from 'immer';
 import { server } from './msw/server';
 
 enableMapSet();
+
+// echarts-wordcloud probes Canvas 2D at module evaluation, which JSDOM does
+// not implement. Adapter tests cover its registration and option contract;
+// browser QA and the production build exercise the real extension bundle.
+vi.mock('echarts-wordcloud', () => ({}));
 
 // Node 25 exposes an incomplete process-level localStorage unless a backing
 // file is configured. Bind the global name to jsdom's real Storage instance so

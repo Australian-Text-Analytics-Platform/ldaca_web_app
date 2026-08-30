@@ -63,11 +63,8 @@ interface TokenFrequencyResultsPanelProps {
 
   onDownloadWordCloud: (nodeKey: string, displayName: string) => void;
   onTokenClick: (token: string) => void;
-  onTokenRightClick: (token: string, event?: React.MouseEvent) => void;
+  onTokenRightClick: (token: string) => void;
 
-  unifiedCloudWidth: number;
-  unifiedCloudHeight: number;
-  unifiedCloudContainerRef: React.RefObject<HTMLDivElement | null>;
   registerWordCloudRef: (nodeKey: string, element: SVGSVGElement | null) => void;
 
   onDownloadFrequencyCsv: (label: string, rows: unknown[]) => void;
@@ -106,9 +103,6 @@ export const TokenFrequencyResultsPanel = ({
   onDownloadWordCloud,
   onTokenClick,
   onTokenRightClick,
-  unifiedCloudWidth,
-  unifiedCloudHeight,
-  unifiedCloudContainerRef,
   registerWordCloudRef,
   onDownloadFrequencyCsv,
 }: TokenFrequencyResultsPanelProps) => {
@@ -349,9 +343,6 @@ export const TokenFrequencyResultsPanel = ({
             onDownloadWordCloud={onDownloadWordCloud}
             onTokenClick={onTokenClick}
             onTokenRightClick={onTokenRightClick}
-            unifiedCloudWidth={unifiedCloudWidth}
-            unifiedCloudHeight={unifiedCloudHeight}
-            unifiedCloudContainerRef={unifiedCloudContainerRef}
             registerWordCloudRef={registerWordCloudRef}
             onDownloadFrequencyCsv={onDownloadFrequencyCsv}
             view={resultsView}

@@ -50,7 +50,6 @@ export const useTokenFrequencyDownloads = ({
   computeDisplayName,
 }: UseTokenFrequencyDownloadsArgs) => {
   const wordCloudRefs = useRef<Record<string, SVGSVGElement | null>>({});
-  const unifiedCloudContainerRef = useRef<HTMLDivElement | null>(null);
   const pendingDownloadRef = useRef<PendingDownloadContext | null>(null);
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
   const [downloadDialogMode, setDownloadDialogMode] = useState<DownloadDialogMode>('wordcloud');
@@ -193,7 +192,6 @@ export const useTokenFrequencyDownloads = ({
     downloadDialogOpen,
     setDownloadDialogOpen,
     downloadDialogMode,
-    unifiedCloudContainerRef,
     registerWordCloudRef,
     openWordCloudDownload,
     openFrequencyDownload,

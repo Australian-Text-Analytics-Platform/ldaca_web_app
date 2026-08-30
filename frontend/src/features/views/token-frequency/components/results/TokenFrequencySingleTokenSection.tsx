@@ -12,7 +12,7 @@ interface TokenFrequencySingleTokenSectionProps {
   nodeDisplayResults: NodeResultView[];
   getColorForNode: (nodeId: string, index?: number) => string;
   onTokenClick: (token: string) => void;
-  onTokenRightClick: (token: string, event?: React.MouseEvent) => void;
+  onTokenRightClick: (token: string) => void;
   onDownloadWordCloud: (nodeKey: string, displayName: string) => void;
   onDownloadFrequencyCsv: (label: string, rows: unknown[]) => void;
   registerWordCloudRef: (nodeKey: string, element: SVGSVGElement | null) => void;
@@ -49,7 +49,7 @@ interface SingleNodeWordCloudProps {
   color: string;
   registerWordCloudRef: (nodeKey: string, element: SVGSVGElement | null) => void;
   onTokenClick: (token: string) => void;
-  onTokenRightClick: (token: string, event?: React.MouseEvent) => void;
+  onTokenRightClick: (token: string) => void;
 }
 
 /**
@@ -98,7 +98,7 @@ interface VirtualizedTokenListProps {
   registerScrollElement: (element: HTMLDivElement | null) => void;
   onScroll: (event: React.UIEvent<HTMLDivElement>) => void;
   onTokenClick: (token: string) => void;
-  onTokenRightClick: (token: string, event?: React.MouseEvent) => void;
+  onTokenRightClick: (token: string) => void;
 }
 
 /** Returns the largest frequency without spreading a potentially full vocabulary into function arguments. */
@@ -194,7 +194,7 @@ const VirtualizedTokenList = ({
                 }}
                 onContextMenu={(event) => {
                   event.preventDefault();
-                  onTokenRightClick(row.token, event);
+                  onTokenRightClick(row.token);
                 }}
                 title="Click to inspect in concordance. Right-click to add to stop words."
               >
@@ -368,7 +368,7 @@ const TokenFrequencySingleTokenSectionInner = ({
 
             <CardContent className="space-y-2">
               {view === 'cloud' ? (
-                <div className="mb-4 flex w-full justify-center overflow-visible">
+                <div className="mb-4 flex w-full justify-center">
                   <SingleNodeWordCloud
                     nodeKey={nodeKey}
                     words={words}
@@ -405,11 +405,9 @@ const TokenFrequencySingleTokenSectionInner = ({
 };
 
 /**
- * ``React.memo`` wrap. Like the unified section, this is one of the hot
- * paths on a stop-word keystroke — d3-cloud's spiral runs inside every
- * per-card ``<Wordcloud>``. With every prop now referentially stable
- * across keystrokes the default shallow compare is enough to skip the
- * re-render entirely when only ``stopWords`` (which this component
- * doesn't take) changed.
+ * ``React.memo`` wrap. Like the unified section, this owns external ECharts
+ * layouts that should not be updated on unrelated stop-word keystrokes. With
+ * every prop referentially stable across keystrokes, the default shallow
+ * compare skips the re-render when only ``stopWords`` changes.
  */
 export const TokenFrequencySingleTokenSection = memo(TokenFrequencySingleTokenSectionInner);

@@ -39,8 +39,6 @@ import {
 } from './tokenFrequencyUtils';
 
 const MAX_TOKEN_LIMIT_INPUT = 100;
-const UNIFIED_WORDCLOUD_WIDTH = 640;
-const UNIFIED_WORDCLOUD_HEIGHT = 340;
 const EMPTY_STOP_SET = new Set<string>();
 
 /** Coordinates token-frequency selection, execution, and export wiring for the analysis tab. */
@@ -193,7 +191,7 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
   // useCallback so the section components below stay React.memo-stable
   // across stopword-keystroke re-renders of this feature. Without it,
   // every render hands a fresh function ref to the sections, busting
-  // memoisation and re-running d3-cloud layout per keystroke.
+  // memoisation and updating the external ECharts layout per keystroke.
   const getColorForNode = useCallback(
     (nodeId: string, index = 0) => {
       return nodeColors[nodeId] ?? defaultPalette[index % defaultPalette.length] ?? '#000000';
@@ -295,7 +293,6 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
     downloadDialogOpen,
     setDownloadDialogOpen,
     downloadDialogMode,
-    unifiedCloudContainerRef,
     registerWordCloudRef,
     openWordCloudDownload,
     openFrequencyDownload,
@@ -486,9 +483,6 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
         onDownloadWordCloud={openWordCloudDownload}
         onTokenClick={handleTokenClick}
         onTokenRightClick={stopWordsEnabled ? handleTokenRightClick : () => undefined}
-        unifiedCloudWidth={UNIFIED_WORDCLOUD_WIDTH}
-        unifiedCloudHeight={UNIFIED_WORDCLOUD_HEIGHT}
-        unifiedCloudContainerRef={unifiedCloudContainerRef}
         registerWordCloudRef={registerWordCloudRef}
         onDownloadFrequencyCsv={openFrequencyDownload}
       />

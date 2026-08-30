@@ -134,8 +134,8 @@ export const useTokenFrequencyTaskFlow = ({
   // every time the user types in the stopwords textarea. Without this,
   // ``handleTokenRightClick`` would have ``stopWords`` in its useCallback
   // deps — making it unstable per keystroke — which would in turn defeat
-  // the React.memo on the word-cloud sections that take it as a prop,
-  // causing d3-cloud's layout to re-run on every keypress.
+  // the React.memo on the word-cloud sections that take it as a prop and
+  // cause the external ECharts layout to update on every keypress.
   const stopWordsRef = useRef(stopWords);
   useEffect(() => {
     stopWordsRef.current = stopWords;
@@ -239,8 +239,7 @@ export const useTokenFrequencyTaskFlow = ({
   );
 
   const handleTokenRightClick = useCallback(
-    (token: string, event?: React.MouseEvent) => {
-      if (event) event.preventDefault();
+    (token: string) => {
       const tokenNormalized = token.trim().toLowerCase();
       const current = stopWordsRef.current
         .split(',')
