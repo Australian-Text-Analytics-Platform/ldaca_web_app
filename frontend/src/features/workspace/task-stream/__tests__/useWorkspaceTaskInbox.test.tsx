@@ -3,7 +3,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { HttpResponse, http } from 'msw';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { UserFileImport, WorkspaceCatalogueItem } from '@/api';
+import type { UnavailableUserFileImport, UserFileImport, WorkspaceCatalogueItem } from '@/api';
 import { useTabAnalysisForest } from '@/features/views/common/hooks/useTabAnalysisForest';
 import { queryKeys } from '@/lib/queryKeys';
 import { useFreshNodesStore } from '@/stores/freshNodesStore';
@@ -31,6 +31,7 @@ vi.mock('../useWorkspaceTaskStreamClient', () => ({
 }));
 
 const userFileImportResponse = (overrides: Partial<UserFileImport> = {}): UserFileImport => ({
+  availability: 'available',
   id: 'import-1',
   state: 'running',
   cancellation_requested_at: null,
@@ -45,7 +46,7 @@ const userFileImportResponse = (overrides: Partial<UserFileImport> = {}): UserFi
   ...overrides,
 });
 
-const importPage = (items: UserFileImport[]) => ({
+const importPage = (items: (UserFileImport | UnavailableUserFileImport)[]) => ({
   items,
   page: 1,
   page_size: 100,
@@ -505,6 +506,36 @@ describe('useWorkspaceTaskInbox', () => {
       expect(view.result.current.tasks).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ task_id: 'import-1', state: 'cancelled' }),
+        ]),
+      ),
+    );
+  });
+
+  it('renders an unavailable User File Import as a clearable warning task', async () => {
+    const unavailable: UnavailableUserFileImport = {
+      availability: 'unavailable',
+      id: 'import-unavailable',
+      user_id: 'user-1',
+      reason: 'record_invalid',
+      warning: 'This User File Import is unavailable because its stored record is invalid.',
+    };
+    server.use(
+      http.get('*/api/user-file-imports', () => HttpResponse.json(importPage([unavailable]))),
+    );
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+    const view = renderHook(() => useWorkspaceTaskInbox('workspace-1'), { wrapper });
+
+    await waitFor(() =>
+      expect(view.result.current.tasks).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            task_id: 'import-unavailable',
+            state: 'failed',
+            message: unavailable.warning,
+          }),
         ]),
       ),
     );

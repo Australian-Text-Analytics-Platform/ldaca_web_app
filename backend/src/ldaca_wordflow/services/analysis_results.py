@@ -15,7 +15,7 @@ from typing import TypeVar, cast
 import anyio
 import polars as pl
 from anyio.to_thread import run_sync as run_sync_in_worker_thread
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, ConfigDict, TypeAdapter, ValidationError
 
 from ..analysis.concordance_core import compute_node_concordance_page
 from ..analysis.annotation_examples import prepare_annotation_examples
@@ -23,12 +23,18 @@ from ..analysis.concordance_projection import filter_concordance_documents
 from ..analysis.quotation_core import compute_quotation_page
 from ..analysis.token_cache import tokenize_lazyframe, tokens_cache_path
 from ..analysis.topic_inclusion import topic_inclusion_descriptor
+from ..analysis.topic_projection import (
+    TopicNodeInfo,
+    build_topic_projection_payload,
+    decode_topic_projection_basis,
+    encode_topic_projection_basis,
+    project_rust_topic_projection_basis,
+)
 from ..analysis.generated_columns import (
     CONC_MATCHED_TEXT_COLUMN,
     CONC_START_IDX_COLUMN,
     QUOTE_COLUMN_NAMES,
     QUOTE_ROW_IDX_COLUMN,
-    TOPIC_DISTRIBUTION_COLUMN,
 )
 from ..domain.workspace import (
     AnalysisArtifactRecord,
@@ -38,18 +44,19 @@ from ..domain.workspace import (
     QuotationAnalysisRequest,
 )
 from ..infrastructure.providers.quotation_client import QuotationProviderClient
+from ..infrastructure.providers.quotation_engines import resolve_quotation_engine
 from ..infrastructure.providers.annotation_ai import (
     AnnotationAiError,
     annotate_preview,
 )
 from ..models.analysis_results import (
     ANALYSIS_STORED_RESULT_MODELS,
+    AnalysisResult,
     AnalysisResultQuery,
     AnnotationResultQuery,
     AnnotationRunAllStoredResult,
     ConcordanceResultQuery,
     ConcordanceDocumentProjectionQuery,
-    ConcordanceStoredResult,
     ConcordanceRunAllStoredResult,
     PublishedDataBlockStoredResult,
     QuotationPreviewQuery,
@@ -58,6 +65,8 @@ from ..models.analysis_results import (
     ConcordanceDensityResult,
     PreviewReadyStoredResult,
     RunAllSourceTable,
+    SequentialSourceDescriptor,
+    CompleteTableIdentity,
     DataBlockCreationStoredResult,
     SequentialStoredResult,
     ProjectedTableIdentity,
@@ -83,22 +92,13 @@ from ..shared.table_transport import (
     IpcTablePage,
     encode_ipc_stream,
     encode_schema_stream,
-    topic_distribution_dtype,
 )
-from ..shared.topic_types import topic_count_from_storage_dtype
-from ..workers.input_snapshots import (
+from ..infrastructure.storage.input_snapshots import (
     clone_worker_input_snapshot,
     load_snapshot_node,
 )
-from ..workers.topic_pipeline import _project_rust_topic_projection_basis
-from ..workers.topic_result import (
-    _build_topic_projection_payload,
-    _decode_topic_projection_basis,
-    _encode_topic_projection_basis,
-)
 from .analyses import AnalysisService
 from .analysis_artifacts import AnalysisArtifactService
-from .analysis_preparation import resolve_analysis_quotation_engine
 from .provider_credentials import ProviderCredentialStore
 from .response_snapshots import ResponseSnapshot
 from .storage_admission import StorageAdmissionService, StorageReservation
@@ -109,14 +109,24 @@ from .topic_projection_cache import (
 from .workspace import WorkspaceLease
 
 T = TypeVar("T")
+_RESULT_ADAPTER = TypeAdapter(AnalysisResult)
+
+
+class _SequentialResultBody(BaseModel):
+    """Public semantic fields from a stored Sequential Result."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    table: CompleteTableIdentity[StoredArtifactIdentity]
+    source: SequentialSourceDescriptor
 
 
 @dataclass(frozen=True, slots=True)
 class ResultMaterialization:
-    """One strict stored Result plus its requested public projection payload."""
+    """One strict semantic Result tree awaiting URL presentation."""
 
-    payload: dict[str, JsonData]
-    stored: BaseModel
+    kind: str
+    value: BaseModel
 
 
 @dataclass(slots=True)
@@ -164,8 +174,8 @@ class AnalysisResultService:
     async def artifact_response_snapshot(
         self,
         user_id: str,
-        workspace_id: str,
-        analysis_id: str,
+        workspace_id: uuid.UUID,
+        analysis_id: uuid.UUID,
         artifact_name: str,
     ) -> tuple[ResponseSnapshot, AnalysisArtifactRecord]:
         """Create a download snapshot without retaining the Workspace gate."""
@@ -185,8 +195,8 @@ class AnalysisResultService:
     async def table_response_snapshot(
         self,
         user_id: str,
-        workspace_id: str,
-        analysis_id: str,
+        workspace_id: uuid.UUID,
+        analysis_id: uuid.UUID,
         table_id: str,
     ) -> ResponseSnapshot:
         """Snapshot one declared complete Result table by semantic identity."""
@@ -225,59 +235,11 @@ class AnalysisResultService:
             )
             return snapshot
 
-    async def paged_table_page(
-        self,
-        user_id: str,
-        workspace_id: str,
-        analysis_id: str,
-        table_id: str,
-        *,
-        page: int,
-        page_size: int,
-        sort_by: str | None,
-        descending: bool,
-    ) -> IpcTablePage:
-        """Materialize one independent Arrow page from a declared Result table."""
-
-        snapshot = await self._paged_table_snapshot(
-            user_id, workspace_id, analysis_id, table_id
-        )
-        try:
-            return await self._run_sync(
-                _paged_artifact_page,
-                snapshot.path,
-                page,
-                page_size,
-                sort_by,
-                descending,
-            )
-        finally:
-            with anyio.CancelScope(shield=True):
-                await snapshot.cleanup()
-
-    async def paged_table_schema(
-        self,
-        user_id: str,
-        workspace_id: str,
-        analysis_id: str,
-        table_id: str,
-    ) -> bytes:
-        """Return a zero-row Arrow stream for a declared paged Result table."""
-
-        snapshot = await self._paged_table_snapshot(
-            user_id, workspace_id, analysis_id, table_id
-        )
-        try:
-            return await self._run_sync(_paged_artifact_schema, snapshot.path)
-        finally:
-            with anyio.CancelScope(shield=True):
-                await snapshot.cleanup()
-
     async def projected_table_page(
         self,
         user_id: str,
-        workspace_id: str,
-        analysis_id: str,
+        workspace_id: uuid.UUID,
+        analysis_id: uuid.UUID,
         table_id: str,
         *,
         row_unit: str,
@@ -310,8 +272,8 @@ class AnalysisResultService:
     async def projected_table_schema(
         self,
         user_id: str,
-        workspace_id: str,
-        analysis_id: str,
+        workspace_id: uuid.UUID,
+        analysis_id: uuid.UUID,
         table_id: str,
         *,
         row_unit: str,
@@ -333,8 +295,8 @@ class AnalysisResultService:
     async def concordance_density(
         self,
         user_id: str,
-        workspace_id: str,
-        analysis_id: str,
+        workspace_id: uuid.UUID,
+        analysis_id: uuid.UUID,
         table_id: str,
     ) -> ConcordanceDensityResult:
         snapshot, source, kind = await self._projected_table_snapshot(
@@ -357,8 +319,8 @@ class AnalysisResultService:
     async def concordance_document_projection_page(
         self,
         user_id: str,
-        workspace_id: str,
-        analysis_id: str,
+        workspace_id: uuid.UUID,
+        analysis_id: uuid.UUID,
         table_id: str,
         query: ConcordanceDocumentProjectionQuery,
     ) -> IpcTablePage:
@@ -381,39 +343,11 @@ class AnalysisResultService:
             with anyio.CancelScope(shield=True):
                 await snapshot.cleanup()
 
-    async def _paged_table_snapshot(
-        self,
-        user_id: str,
-        workspace_id: str,
-        analysis_id: str,
-        table_id: str,
-    ) -> ResponseSnapshot:
-        async with self._analyses.successful_record_context(
-            user_id,
-            workspace_id,
-            analysis_id,
-            allow_closing=True,
-        ) as (lease, record):
-            stored_model = ANALYSIS_STORED_RESULT_MODELS.get(record.request.kind)
-            if stored_model is None or record.result_payload is None:
-                raise AnalysisCorruptError("Analysis data is corrupt")
-            try:
-                stored = stored_model.model_validate(record.result_payload)
-            except ValidationError as exc:
-                raise AnalysisCorruptError("Analysis data is corrupt") from exc
-            artifact = _paged_table_artifact(stored, table_id)
-            snapshot, _reference = await self._artifacts.response_snapshot(
-                lease,
-                record,
-                artifact.name,
-            )
-            return snapshot
-
     async def _projected_table_snapshot(
         self,
         user_id: str,
-        workspace_id: str,
-        analysis_id: str,
+        workspace_id: uuid.UUID,
+        analysis_id: uuid.UUID,
         table_id: str,
     ) -> tuple[
         ResponseSnapshot,
@@ -444,8 +378,8 @@ class AnalysisResultService:
     async def quotation_preview_page(
         self,
         user_id: str,
-        workspace_id: str,
-        analysis_id: str,
+        workspace_id: uuid.UUID,
+        analysis_id: uuid.UUID,
         query: QuotationPreviewQuery,
     ) -> IpcTablePage:
         """Compute one Quotation Preview page as native Arrow IPC."""
@@ -475,12 +409,12 @@ class AnalysisResultService:
             snapshot_node = await self._run_sync(
                 load_snapshot_node,
                 input_snapshot.path,
-                str(request.node_id),
+                request.node_id,
             )
             page = await compute_quotation_page(
                 snapshot_node.to_node(),
                 request.column,
-                resolve_analysis_quotation_engine(request, self._settings),
+                resolve_quotation_engine(request.engine, self._settings),
                 page=query.page,
                 page_size=query.page_size,
                 sort_by=query.sort_by,
@@ -488,7 +422,6 @@ class AnalysisResultService:
                 quotation_service_max_batch_size=(
                     self._settings.quotation_service_max_batch_size
                 ),
-                quotation_service_timeout=self._settings.quotation_service_timeout,
                 extract_remote_fn=self._quotation_client.extract,
                 run_blocking=self._run_sync,
             )
@@ -505,8 +438,8 @@ class AnalysisResultService:
     async def query(
         self,
         user_id: str,
-        workspace_id: str,
-        analysis_id: str,
+        workspace_id: uuid.UUID,
+        analysis_id: uuid.UUID,
         query: AnalysisResultQuery | None,
         *,
         allow_closing: bool,
@@ -535,27 +468,20 @@ class AnalysisResultService:
                             "Child Analysis Results do not accept queries"
                         )
                     await self._artifacts.ensure_available(lease, record)
-                    payload = cast(
-                        dict[str, JsonData],
-                        stored.model_dump(mode="json"),
-                    )
-                    payload["kind"] = kind
-                    return ResultMaterialization(payload=payload, stored=stored)
+                    return ResultMaterialization(kind=kind, value=stored)
                 if isinstance(stored, SequentialStoredResult):
                     if query is not None:
                         raise AnalysisKindMismatchError(
                             "Complete Analysis Results do not accept queries"
                         )
                     await self._artifacts.ensure_available(lease, record)
-                    payload = cast(
-                        dict[str, JsonData],
-                        stored.model_dump(
-                            mode="json",
-                            exclude={"publication_artifact"},
+                    return ResultMaterialization(
+                        kind=kind,
+                        value=_SequentialResultBody(
+                            table=stored.table,
+                            source=stored.source,
                         ),
                     )
-                    payload["kind"] = kind
-                    return ResultMaterialization(payload=payload, stored=stored)
                 if isinstance(
                     stored,
                     TokenFrequencyStoredResult | AnnotationRunAllStoredResult,
@@ -565,12 +491,7 @@ class AnalysisResultService:
                             "Complete Analysis Results do not accept queries"
                         )
                     await self._artifacts.ensure_available(lease, record)
-                    payload = cast(
-                        dict[str, JsonData],
-                        stored.model_dump(mode="json"),
-                    )
-                    payload["kind"] = kind
-                    return ResultMaterialization(payload=payload, stored=stored)
+                    return ResultMaterialization(kind=kind, value=stored)
                 if isinstance(
                     stored,
                     ConcordanceRunAllStoredResult
@@ -582,22 +503,9 @@ class AnalysisResultService:
                             "Run All Results do not accept Preview queries"
                         )
                     await self._artifacts.ensure_available(lease, record)
-                    payload = cast(
-                        dict[str, JsonData],
-                        stored.model_dump(mode="json"),
-                    )
-                    payload["kind"] = kind
-                    return ResultMaterialization(payload=payload, stored=stored)
+                    return ResultMaterialization(kind=kind, value=stored)
                 if query is None and isinstance(stored, PreviewReadyStoredResult):
-                    payload = cast(
-                        dict[str, JsonData],
-                        stored.model_dump(mode="json"),
-                    )
-                    payload["kind"] = kind
-                    return ResultMaterialization(
-                        payload=payload,
-                        stored=stored,
-                    )
+                    return ResultMaterialization(kind=kind, value=stored)
                 effective_query = query or _default_query(kind)
                 if effective_query.kind != kind:
                     raise AnalysisKindMismatchError(
@@ -632,18 +540,19 @@ class AnalysisResultService:
                             / str(record.id)
                             / reference.relative_path
                         )
+                payload = await self._run_sync(
+                    _query_topics,
+                    topic_stored,
+                    effective_query,
+                    context_path,
+                    self._topic_projection_cache,
+                    user_id,
+                    workspace_id,
+                    analysis_id,
+                )
                 return ResultMaterialization(
-                    payload=await self._run_sync(
-                        _query_topics,
-                        topic_stored,
-                        effective_query,
-                        context_path,
-                        self._topic_projection_cache,
-                        user_id,
-                        workspace_id,
-                        analysis_id,
-                    ),
-                    stored=stored,
+                    kind=kind,
+                    value=_RESULT_ADAPTER.validate_python(payload),
                 )
             if isinstance(effective_query, ConcordanceResultQuery) and isinstance(
                 request,
@@ -651,16 +560,16 @@ class AnalysisResultService:
             ):
                 if input_snapshot is None:
                     raise RuntimeError("Concordance query input was not prepared")
+                payload = await self._run_sync(
+                    _query_concordance_snapshot,
+                    input_snapshot.path,
+                    request,
+                    effective_query,
+                    str(tokens_cache_path(self._cache_root(user_id))),
+                )
                 return ResultMaterialization(
-                    payload=await self._run_sync(
-                        _query_concordance_snapshot,
-                        input_snapshot.path,
-                        request,
-                        effective_query,
-                        str(tokens_cache_path(self._cache_root(user_id))),
-                        ConcordanceStoredResult.model_validate(stored),
-                    ),
-                    stored=stored,
+                    kind=kind,
+                    value=_RESULT_ADAPTER.validate_python(payload),
                 )
             if isinstance(effective_query, AnnotationResultQuery) and isinstance(
                 request,
@@ -678,7 +587,10 @@ class AnalysisResultService:
                     effective_query,
                     credential,
                 )
-                return ResultMaterialization(payload=payload, stored=stored)
+                return ResultMaterialization(
+                    kind=kind,
+                    value=_RESULT_ADAPTER.validate_python(payload),
+                )
             raise AnalysisKindMismatchError(
                 "Result query kind does not match the Analysis"
             )
@@ -753,13 +665,6 @@ def _default_query(kind: str) -> AnalysisResultQuery:
 
 
 
-def _paged_table_artifact(
-    stored: BaseModel,
-    table_id: str,
-) -> StoredArtifactIdentity:
-    raise ArtifactGoneError("Analysis Result table is unavailable")
-
-
 def _projected_table_source(
     stored: BaseModel,
     table_id: str,
@@ -776,41 +681,6 @@ def _projected_table_source(
     ):
         raise ArtifactGoneError("Analysis Result table is unavailable")
     return source
-
-
-def _paged_artifact_lazyframe(path: Path) -> pl.LazyFrame:
-    return pl.scan_parquet(path)
-
-
-def _paged_artifact_page(
-    path: Path,
-    page: int,
-    page_size: int,
-    sort_by: str | None,
-    descending: bool,
-) -> IpcTablePage:
-    if page < 1 or page_size < 1:
-        raise InvalidInputError("Page and page size must be positive")
-    lazyframe = _paged_artifact_lazyframe(path)
-    schema = lazyframe.collect_schema()
-    topic_count = _topic_distribution_topic_count(schema)
-    if sort_by is not None:
-        if sort_by not in schema:
-            raise InvalidInputError("Table sort column not found")
-        lazyframe = lazyframe.sort(sort_by, descending=descending)
-    frame = lazyframe.slice((page - 1) * page_size, page_size + 1).collect()
-    has_next = len(frame) > page_size
-    frame = _apply_topic_extension(frame.head(page_size), topic_count)
-    return IpcTablePage(content=encode_ipc_stream(frame), has_next=has_next)
-
-
-def _paged_artifact_schema(path: Path) -> bytes:
-    schema = _paged_artifact_lazyframe(path).collect_schema()
-    if TOPIC_DISTRIBUTION_COLUMN in schema:
-        schema[TOPIC_DISTRIBUTION_COLUMN] = topic_distribution_dtype(
-            _topic_distribution_topic_count(schema)
-        )
-    return encode_schema_stream(schema)
 
 
 def _projected_artifact_lazyframe(
@@ -985,29 +855,6 @@ def _concordance_density(
     )
 
 
-def _topic_distribution_topic_count(schema: pl.Schema) -> int:
-    if TOPIC_DISTRIBUTION_COLUMN not in schema:
-        return 0
-    try:
-        return topic_count_from_storage_dtype(schema[TOPIC_DISTRIBUTION_COLUMN])
-    except ValueError as exc:
-        raise AnalysisCorruptError(
-            "Analysis Topic Distribution artifact has an invalid schema"
-        ) from exc
-
-
-def _apply_topic_extension(frame: pl.DataFrame, topic_count: int) -> pl.DataFrame:
-    if TOPIC_DISTRIBUTION_COLUMN not in frame:
-        return frame
-    return frame.with_columns(
-        pl.Series(
-            TOPIC_DISTRIBUTION_COLUMN,
-            frame[TOPIC_DISTRIBUTION_COLUMN].to_list(),
-            dtype=topic_distribution_dtype(topic_count),
-        )
-    )
-
-
 def _sort_and_page(
     rows: list[dict[str, JsonData]],
     *,
@@ -1066,10 +913,10 @@ def _query_topics(
     stored: TopicModelingStoredResult,
     query: TopicModelingResultQuery,
     context_path: Path | None,
-    projection_cache: TopicProjectionBasisCache | None = None,
-    user_id: str = "test-user",
-    workspace_id: str = "test-workspace",
-    analysis_id: str = "test-analysis",
+    projection_cache: TopicProjectionBasisCache | None,
+    user_id: str,
+    workspace_id: uuid.UUID,
+    analysis_id: uuid.UUID,
 ) -> dict[str, JsonData]:
     requested_count = query.cluster_count
     natural_count = stored.clustering.default_cluster_count
@@ -1129,22 +976,28 @@ def _query_topics(
                     raise ArtifactGoneError(
                         "Topic clustering context is unavailable"
                     ) from exc
-                basis = _project_rust_topic_projection_basis(
+                basis = project_rust_topic_projection_basis(
                     clustering_context=context_bytes,
                     cluster_count=applied_count,
                     corpus_sizes=stored.corpus_sizes,
                 )
-                return _encode_topic_projection_basis(basis)
+                return encode_topic_projection_basis(basis)
 
             basis_bytes = (
                 projection_cache.get_or_build(cache_key, build_basis)
                 if projection_cache is not None
                 else build_basis()
             )
-            projection = _build_topic_projection_payload(
-                basis=_decode_topic_projection_basis(basis_bytes),
+            projection = build_topic_projection_payload(
+                basis=decode_topic_projection_basis(basis_bytes),
                 node_infos=[
-                    source.model_dump(mode="json") for source in stored.sources
+                    TopicNodeInfo(
+                        node_id=source.node_id,
+                        node_name=source.node_name,
+                        text_column=source.text_column,
+                        original_columns=tuple(source.original_columns),
+                    )
+                    for source in stored.sources
                 ],
                 corpus_sizes=stored.corpus_sizes,
                 top_n_topics=applied_top_n,
@@ -1153,12 +1006,7 @@ def _query_topics(
                 {
                     **stored.model_dump(mode="json"),
                     "topics": projection["topics"],
-                    "per_corpus_topic_counts": projection["per_corpus_topic_counts"],
                     "topic_inclusion": projection["topic_inclusion"],
-                    "meta": {
-                        **stored.meta.model_dump(mode="json"),
-                        **projection["meta"],
-                    },
                     "clustering": {
                         **stored.clustering.model_dump(mode="json"),
                         "cluster_count": applied_count,
@@ -1204,7 +1052,6 @@ def _query_concordance_snapshot(
     request: ConcordanceAnalysisRequest,
     query: ConcordanceResultQuery,
     token_cache: str,
-    stored: ConcordanceStoredResult,
 ) -> dict[str, JsonData]:
     node_ids = [query.node_id] if query.node_id is not None else request.node_ids
     if any(node_id not in request.node_ids for node_id in node_ids):
@@ -1212,7 +1059,7 @@ def _query_concordance_snapshot(
     request_payload = request.model_dump(mode="json", exclude={"kind"})
     sources: list[JsonData] = []
     for node_id in node_ids:
-        snapshot = load_snapshot_node(snapshot_dir, str(node_id))
+        snapshot = load_snapshot_node(snapshot_dir, node_id)
         column = request.node_columns[node_id]
         node_data = snapshot.data
         tokenization_column: str | None = None
@@ -1245,11 +1092,17 @@ def _query_concordance_snapshot(
                 },
             )
         )
-    payload = cast(dict[str, JsonData], stored.model_dump(mode="json"))
-    payload["kind"] = "concordance"
-    payload["sources"] = sources
-    payload["query"] = cast(JsonData, query.model_dump(mode="json"))
-    return payload
+    return cast(
+        dict[str, JsonData],
+        {
+            "kind": "concordance",
+            "result": {
+                "variant": "queried",
+                "sources": sources,
+                "query": query.model_dump(mode="json"),
+            },
+        },
+    )
 
 
 async def _query_annotation_snapshot(
@@ -1258,7 +1111,7 @@ async def _query_annotation_snapshot(
     query: AnnotationResultQuery,
     credential: str | None,
 ) -> dict[str, JsonData]:
-    source = load_snapshot_node(snapshot_dir, str(request.node_id))
+    source = load_snapshot_node(snapshot_dir, request.node_id)
     schema = source.data.collect_schema()
     columns = [request.text_column, request.annotation_column]
     if request.correction_column is not None:
@@ -1281,7 +1134,7 @@ async def _query_annotation_snapshot(
     if request.example_node_id is not None:
         assert request.example_text_column is not None
         assert request.example_annotation_column is not None
-        example = load_snapshot_node(snapshot_dir, str(request.example_node_id))
+        example = load_snapshot_node(snapshot_dir, request.example_node_id)
         example_frame = example.data.select(
             request.example_text_column,
             request.example_annotation_column,
@@ -1306,17 +1159,19 @@ async def _query_annotation_snapshot(
         dict[str, JsonData],
         {
             "kind": "annotation",
-            "ready": True,
-            "node_id": str(request.node_id),
-            "page": query.page,
-            "page_size": query.page_size,
-            "total_rows": total_rows,
-            "rows": rows,
-            "labels": [
-                {"row_index": start + offset, "label": label}
-                for offset, label in enumerate(labels)
-            ],
-            "query": query.model_dump(mode="json", exclude={"api_key"}),
+            "result": {
+                "variant": "queried",
+                "node_id": str(request.node_id),
+                "page": query.page,
+                "page_size": query.page_size,
+                "total_rows": total_rows,
+                "rows": rows,
+                "labels": [
+                    {"row_index": start + offset, "label": label}
+                    for offset, label in enumerate(labels)
+                ],
+                "query": query.model_dump(mode="json", exclude={"api_key"}),
+            },
         },
     )
 

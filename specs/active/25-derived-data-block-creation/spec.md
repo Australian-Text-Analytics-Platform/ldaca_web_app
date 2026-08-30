@@ -28,8 +28,8 @@ Issue: [#25](https://github.com/Australian-Text-Analytics-Platform/ldaca-wordflo
 The persisted kinds are `concordance_match_data_block_creation`,
 `concordance_document_data_block_creation`,
 `quotation_result_data_block_creation`, `topic_modeling_data_block_creation`,
-and `sequential_data_block_creation`. Native Workspace schema 21 and portable
-archive format 20 are the current strict cutover with no alias or data
+and `sequential_data_block_creation`. Native Workspace schema 22 and portable
+archive format 21 are the current strict cutover with no alias or data
 migration.
 
 Device-local guidance acknowledgments migrate the three former contextual-hint

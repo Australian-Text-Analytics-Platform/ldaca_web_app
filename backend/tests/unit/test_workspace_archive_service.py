@@ -46,7 +46,7 @@ from ldaca_wordflow.services.workspace_archives import (
     WorkspaceArchiveStorage,
     _create_workspace_export,
 )
-from ldaca_wordflow.workers.input_snapshots import (
+from ldaca_wordflow.infrastructure.storage.input_snapshots import (
     create_worker_input_snapshot,
     load_snapshot_node,
     rebase_worker_input_snapshot_sources,
@@ -91,7 +91,7 @@ def test_export_rejects_single_node_before_crossing_hard_byte_limit(
     workspace = Workspace(name="bounded")
     workspace.add_node(
         Node(
-            id=str(uuid.uuid4()),
+            id=uuid.uuid4(),
             name="large",
             data=pl.DataFrame({"text": ["x" * 4096]}).lazy(),
         )
@@ -151,7 +151,7 @@ class FakeWorkspaceStorage:
             if record.query_snapshot is not None:
                 rebase_worker_input_snapshot_sources(
                     destination / record.query_snapshot.relative_path,
-                    workspace_id=workspace_id,
+                    workspace_id=uuid.UUID(workspace_id),
                 )
         return {
             "id": workspace_id,
@@ -184,7 +184,7 @@ def _valid_archive(
     name: str = "Imported",
     tabs: list[dict[str, Any]] | None = None,
     analyses: list[dict[str, Any]] | None = None,
-    version: int = 20,
+    version: int = 21,
 ) -> bytes:
     node_id = str(uuid.uuid4())
     manifest = {
@@ -296,10 +296,10 @@ async def test_valid_archive_is_staged_then_atomically_installed(
 async def test_archive_round_trip_preserves_terminal_analysis_result_and_tab(
     tmp_path: Path,
 ) -> None:
-    source = Workspace(name="Analysis archive", workspace_id=str(uuid.uuid4()))
+    source = Workspace(name="Analysis archive", workspace_id=uuid.uuid4())
     node = source.add_node(
         Node(
-            id=str(uuid.uuid4()),
+            id=uuid.uuid4(),
             name="Corpus",
             data=pl.DataFrame({"text": ["hello"]}).lazy(),
             tokenizer_model="native:plain_words_en",
@@ -314,26 +314,54 @@ async def test_archive_round_trip_preserves_terminal_analysis_result_and_tab(
     source.add_tab(tab)
     analysis = AnalysisRecord.create(
         TokenFrequencyAnalysisRequest(
-            node_ids=[uuid.UUID(node.id)],
-            node_columns={uuid.UUID(node.id): "text"},
-            node_tokenizer_models={
-                uuid.UUID(node.id): "native:plain_words_en"
-            },
+            node_ids=[node.id],
+            node_columns={node.id: "text"},
+            node_tokenizer_models={node.id: "native:plain_words_en"},
         ),
         tab_id=tab.id,
         execution_scope=AnalysisExecutionScope.RUN_ALL,
         timestamp=timestamp,
     ).start(timestamp)
+    artifact_relative = "artifacts/tokens.arrows"
+    artifact = tmp_path / "analyses" / str(analysis.id) / artifact_relative
+    artifact.parent.mkdir(parents=True)
+    artifact.write_bytes(b"strict artifact fixture")
     analysis = analysis.succeed(
         timestamp,
-        result_payload={"node_results": [{"node_id": node.id, "tokens": []}]},
+        result_payload={
+            "metadata": {"effective_token_limit": 100},
+            "tables": {
+                "version": 1,
+                "nodes": [
+                    {
+                        "node_id": str(node.id),
+                        "node_name": node.name,
+                        "table": {
+                            "table_id": "tokens",
+                            "artifact": {
+                                "name": "tokens",
+                                "media_type": "application/vnd.apache.arrow.stream",
+                            },
+                        },
+                    }
+                ],
+                "statistics": None,
+            },
+        },
+        artifact_references=[
+            AnalysisArtifactRecord(
+                name="tokens",
+                relative_path=artifact_relative,
+                media_type="application/vnd.apache.arrow.stream",
+            )
+        ],
     )
     source.add_analysis(analysis)
     exported = tmp_path / "analysis.zip"
     _create_workspace_export(source, tmp_path, exported, 1024 * 1024)
     with zipfile.ZipFile(exported) as archive:
         manifest = json.loads(archive.read("workspace/workspace.json"))
-    assert manifest["version"] == 20
+    assert manifest["version"] == 21
     assert len(manifest["analyses"]) == 1
 
     storage = FakeWorkspaceStorage(tmp_path / "installed")
@@ -348,23 +376,24 @@ async def test_archive_round_trip_preserves_terminal_analysis_result_and_tab(
         max_snapshot_bytes=1024 * 1024 * 1024,
     ).load(installed).workspace
 
-    assert loaded.tabs[str(tab.id)].analysis_ids == [analysis.id]
+    assert loaded.tabs[tab.id].analysis_ids == [analysis.id]
     assert loaded.nodes[node.id].tokenizer_model == "native:plain_words_en"
-    restored = loaded.analyses[str(analysis.id)]
+    restored = loaded.analyses[analysis.id]
     assert restored.request == analysis.request
     assert restored.result_payload == analysis.result_payload
+    assert restored.artifact_references == analysis.artifact_references
     assert restored.state == analysis.state
 
 
-async def test_archive_round_trip_preserves_artifact_and_query_snapshot(
+async def test_archive_round_trip_preserves_query_snapshot(
     tmp_path: Path,
 ) -> None:
     source_root = tmp_path / "source"
     (source_root / "data").mkdir(parents=True)
-    source = Workspace(name="Query archive", workspace_id=str(uuid.uuid4()))
+    source = Workspace(name="Query archive", workspace_id=uuid.uuid4())
     node = source.add_node(
         Node(
-            id=str(uuid.uuid4()),
+            id=uuid.uuid4(),
             name="Corpus",
             data=pl.DataFrame({"text": ["one", "two"]}).lazy(),
         )
@@ -378,8 +407,8 @@ async def test_archive_round_trip_preserves_artifact_and_query_snapshot(
     source.add_tab(tab)
     analysis = AnalysisRecord.create(
         ConcordanceAnalysisRequest(
-            node_ids=[uuid.UUID(node.id)],
-            node_columns={uuid.UUID(node.id): "text"},
+            node_ids=[node.id],
+            node_columns={node.id: "text"},
             search_word="one",
         ),
         tab_id=tab.id,
@@ -395,20 +424,9 @@ async def test_archive_round_trip_preserves_artifact_and_query_snapshot(
         snapshot_dir=source_root / query_relative,
         max_snapshot_bytes=1024 * 1024,
     )
-    artifact_relative = "artifacts/result.json"
-    artifact = source_root / "analyses" / str(analysis.id) / artifact_relative
-    artifact.parent.mkdir(parents=True)
-    artifact.write_text('{"result":true}\n', encoding="utf-8")
     analysis = analysis.succeed(
         timestamp,
-        result_payload={"nodes": []},
-        artifact_references=[
-            AnalysisArtifactRecord(
-                name="result",
-                relative_path=artifact_relative,
-                media_type="application/json",
-            )
-        ],
+        result_payload={"ready": True},
         query_snapshot=AnalysisQuerySnapshotRecord(relative_path=query_relative),
     )
     source.add_analysis(analysis)
@@ -426,11 +444,8 @@ async def test_archive_round_trip_preserves_artifact_and_query_snapshot(
         max_nodes=10_000,
         max_snapshot_bytes=1024 * 1024 * 1024,
     ).load(installed).workspace
-    restored_record = loaded.analyses[str(analysis.id)]
-    assert restored_record.artifact_references == analysis.artifact_references
-    assert (installed / "analyses" / str(analysis.id) / artifact_relative).read_text(
-        encoding="utf-8"
-    ) == '{"result":true}\n'
+    restored_record = loaded.analyses[analysis.id]
+    assert restored_record.artifact_references == []
     restored_snapshot = installed / query_relative
     restored_node = load_snapshot_node(restored_snapshot, node.id)
     assert restored_node.data.collect().to_dicts() == [

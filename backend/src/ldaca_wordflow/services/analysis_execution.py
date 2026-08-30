@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import shutil
+import uuid
 from datetime import datetime
 from functools import partial
 from typing import cast
@@ -85,10 +86,12 @@ class AnalysisExecutionRuntime(AnalysisExecutionControl):
     async def cancel(self, key: AnalysisExecutionKey) -> None:
         await self._scheduler.cancel(key)
 
-    async def has_workspace_work(self, user_id: str, workspace_id: str) -> bool:
+    async def has_workspace_work(
+        self, user_id: str, workspace_id: uuid.UUID
+    ) -> bool:
         return await self._scheduler.has_workspace_work(user_id, workspace_id)
 
-    async def cancel_workspace(self, user_id: str, workspace_id: str) -> None:
+    async def cancel_workspace(self, user_id: str, workspace_id: uuid.UUID) -> None:
         """Stop every queued or active execution owned by a deleting Workspace."""
 
         await self._scheduler.cancel_workspace(user_id, workspace_id)

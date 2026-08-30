@@ -14,6 +14,7 @@ import logging
 from pathlib import Path
 from typing import Any
 from collections.abc import Callable
+import uuid
 
 from .utils import process_entrypoint
 
@@ -31,21 +32,74 @@ _COMPARATIVE_STATISTICS_COLUMN_NAMES = {
 }
 
 
-def _compute_token_frequencies(
-    workspace_id: str,
-    node_corpora: dict[str, list[str]],
-    node_display_names: dict[str, str],
-    artifact_dir: str,
+def _prepare_snapshot_inputs(
+    *,
+    input_snapshot_dir: str,
     scratch_dir: str,
-    artifact_prefix: str,
+    node_ids: list[uuid.UUID],
+    node_columns: dict[uuid.UUID, str],
+    node_tokenizer_models: dict[uuid.UUID, str],
+    token_cache_path: str | None,
+) -> tuple[
+    dict[uuid.UUID, list[str]],
+    dict[uuid.UUID, str],
+    dict[uuid.UUID, str],
+]:
+    """Load one canonical snapshot into computation-only corpus inputs."""
+
+    import polars as pl
+
+    from ..analysis.token_cache import PLAIN_WORDS_EN_MODEL, tokenize_lazyframe
+    from ..infrastructure.storage.input_snapshots import load_snapshot_node
+
+    scratch_root = Path(scratch_dir)
+    scratch_root.mkdir(parents=True, exist_ok=True)
+    corpora: dict[uuid.UUID, list[str]] = {}
+    display_names: dict[uuid.UUID, str] = {}
+    token_streams: dict[uuid.UUID, str] = {}
+    for node_id in node_ids:
+        snapshot_node = load_snapshot_node(input_snapshot_dir, node_id)
+        source_column = node_columns[node_id]
+        display_names[node_id] = snapshot_node.name
+        tokenizer_model = node_tokenizer_models[node_id]
+        if tokenizer_model == PLAIN_WORDS_EN_MODEL:
+            docs_df = snapshot_node.data.select(
+                pl.col(source_column).alias("__doc_col__")
+            ).collect()
+            corpora[node_id] = [
+                str(value) if value is not None else ""
+                for value in docs_df["__doc_col__"].to_list()
+            ]
+            continue
+        node_data, tokenization_col = tokenize_lazyframe(
+            data=snapshot_node.data,
+            source_column=source_column,
+            model=tokenizer_model,
+            cache_path=token_cache_path,
+        )
+        stream_path = scratch_root / f"token-stream-{node_id}.parquet"
+        (
+            node_data.select(
+                pl.col(tokenization_col)
+                .list.eval(pl.element().struct.field("token"))
+                .explode()
+                .alias("token")
+            )
+            .filter(pl.col("token").is_not_null())
+            .sink_parquet(stream_path)
+        )
+        token_streams[node_id] = str(stream_path)
+    return corpora, display_names, token_streams
+
+
+def _compute_token_frequencies(
+    node_corpora: dict[uuid.UUID, list[str]],
+    node_display_names: dict[uuid.UUID, str],
+    artifact_dir: str,
     token_limit: int = 10,
     progress_callback: Callable[[float, str], None] | None = None,
-    node_token_streams: dict[str, str] | None = None,
-    node_tokenizer_models: dict[str, str] | None = None,
-    input_snapshot_dir: str | None = None,
-    node_ids: list[str] | None = None,
-    node_columns: dict[str, str] | None = None,
-    token_cache_path: str | None = None,
+    node_token_streams: dict[uuid.UUID, str] | None = None,
+    node_tokenizer_models: dict[uuid.UUID, str] | None = None,
 ) -> dict[str, Any]:
     """Execute token-frequency analysis inside a worker process.
 
@@ -66,12 +120,10 @@ def _compute_token_frequencies(
         import polars as pl
         import polars_text as pt
 
-        logger.info("Starting token-frequency Analysis for workspace %s", workspace_id)
+        logger.info("Starting token-frequency Analysis")
 
         artifact_root = Path(artifact_dir)
         artifact_root.mkdir(parents=True, exist_ok=True)
-        scratch_root = Path(scratch_dir)
-        scratch_root.mkdir(parents=True, exist_ok=True)
 
         if progress_callback:
             progress_callback(0.1, "Validating payload...")
@@ -83,14 +135,6 @@ def _compute_token_frequencies(
             raise ValueError("token_limit must be positive")
         effective_limit = token_limit
 
-        DEFAULT_TOKEN_LIMIT = 25
-        SERVER_LIMIT_MULTIPLIER = 5
-        MAX_SERVER_TOKEN_LIMIT = 5000
-        server_limit = min(
-            max(effective_limit * SERVER_LIMIT_MULTIPLIER, DEFAULT_TOKEN_LIMIT),
-            MAX_SERVER_TOKEN_LIMIT,
-        )
-
         token_streams = dict(node_token_streams or {})
         corpora = dict(node_corpora or {})
         display_names = dict(node_display_names or {})
@@ -99,78 +143,6 @@ def _compute_token_frequencies(
             for node_id, model in (node_tokenizer_models or {}).items()
             if model and model.strip()
         }
-
-        if input_snapshot_dir is not None:
-            if progress_callback:
-                progress_callback(0.25, "Preparing token frequency inputs...")
-            from .input_snapshots import load_snapshot_node
-            from ..analysis.token_cache import (
-                PLAIN_WORDS_EN_MODEL,
-                tokenize_lazyframe,
-            )
-
-            if not node_ids:
-                raise ValueError("Token frequency snapshot input requires node_ids")
-            if not node_columns:
-                raise ValueError("Token frequency snapshot input requires node_columns")
-            for node_id in node_ids:
-                snapshot_node = load_snapshot_node(input_snapshot_dir, node_id)
-                source_column = node_columns.get(node_id)
-                if not source_column:
-                    raise ValueError(
-                        f"Missing token-frequency column for node {node_id}"
-                    )
-                display_names[node_id] = snapshot_node.name
-                tokenizer_model = requested_node_tokenizer_models.get(node_id)
-                if tokenizer_model is None:
-                    raise ValueError(
-                        f"Missing tokenizer model for Data Block {node_id}"
-                    )
-
-                def collect_source_corpus(
-                    snapshot_node=snapshot_node,
-                    source_column=source_column,
-                ) -> list[str]:
-                    """Collect raw source text for direct token-frequency counting.
-
-                    Called by:
-                    - The snapshot-input preparation branch in this worker
-                      because raw text inputs and stateless plain-English
-                      tokenizer preferences should use the direct frequency
-                      counter instead of materializing temporary token streams.
-                    """
-
-                    docs_df = snapshot_node.data.select(
-                        pl.col(source_column).alias("__doc_col__")
-                    ).collect()
-                    return [
-                        str(value) if value is not None else ""
-                        for value in docs_df["__doc_col__"].to_list()
-                    ]
-
-                if tokenizer_model == PLAIN_WORDS_EN_MODEL:
-                    corpora[node_id] = collect_source_corpus()
-                    continue
-                node_data, tokenization_col = tokenize_lazyframe(
-                    data=snapshot_node.data,
-                    source_column=source_column,
-                    model=tokenizer_model,
-                    cache_path=token_cache_path,
-                )
-                stream_path = (
-                    scratch_root / f"{artifact_prefix}_tokens_stream_{node_id}.parquet"
-                )
-                (
-                    node_data.select(
-                        pl.col(tokenization_col)
-                        .list.eval(pl.element().struct.field("token"))
-                        .explode()
-                        .alias("token")
-                    )
-                    .filter(pl.col("token").is_not_null())
-                    .sink_parquet(stream_path)
-                )
-                token_streams[node_id] = str(stream_path)
 
         prepared_node_ids = list({**corpora, **token_streams}.keys())
         if not prepared_node_ids:
@@ -185,11 +157,11 @@ def _compute_token_frequencies(
         if missing_tokenizer_model_node_ids:
             raise ValueError(
                 "node_tokenizer_models must include a tokenizer model for raw-text nodes: "
-                + ", ".join(missing_tokenizer_model_node_ids)
+                + ", ".join(map(str, missing_tokenizer_model_node_ids))
             )
 
         for i, node_id in enumerate(prepared_node_ids):
-            node_name = display_names.get(node_id) or node_id
+            node_name = display_names.get(node_id) or str(node_id)
 
             if progress_callback:
                 progress_callback(
@@ -200,7 +172,7 @@ def _compute_token_frequencies(
         if progress_callback:
             progress_callback(0.6, "Computing token frequencies...")
 
-        frequency_results: dict[str, dict[str, int]] = {}
+        frequency_results: dict[uuid.UUID, dict[str, int]] = {}
         stats_df = None
         for node_id in prepared_node_ids:
             if node_id in token_streams:
@@ -274,7 +246,7 @@ def _compute_token_frequencies(
             from ..shared.table_transport import write_ipc_stream
 
             write_ipc_stream(token_frame, str(token_path))
-            display_name = display_names.get(frame_key, frame_key)
+            display_name = display_names.get(frame_key, str(frame_key))
             node_artifacts.append(
                 {
                     "node_id": frame_key,
@@ -305,7 +277,6 @@ def _compute_token_frequencies(
             },
             "metadata": {
                 "effective_token_limit": effective_limit,
-                "server_token_limit": server_limit,
             },
         }
 
@@ -320,36 +291,36 @@ def _compute_token_frequencies(
 @process_entrypoint
 def run_token_frequency_analysis(
     *,
-    user_id: str,
-    workspace_id: str,
-    node_ids: list[str],
-    node_columns: dict[str, str],
+    node_ids: list[uuid.UUID],
+    node_columns: dict[uuid.UUID, str],
     artifact_dir: str,
     scratch_dir: str,
-    artifact_prefix: str,
     input_snapshot_dir: str,
-    token_limit: int = 10,
+    token_limit: int,
+    node_tokenizer_models: dict[uuid.UUID, str],
+    token_cache_path: str,
     progress_callback: Callable[[float, str], None] | None = None,
-    node_tokenizer_models: dict[str, str],
-    token_cache_path: str | None = None,
 ) -> dict[str, Any]:
     """Run the canonical snapshot-only token-frequency process contract."""
 
     if set(node_tokenizer_models) != set(node_ids):
         raise ValueError("Tokenizer models must exactly match token-frequency nodes")
-    return _compute_token_frequencies(
-        workspace_id=workspace_id,
-        node_corpora={},
-        node_display_names={},
-        artifact_dir=artifact_dir,
-        scratch_dir=scratch_dir,
-        artifact_prefix=artifact_prefix,
-        token_limit=token_limit,
-        progress_callback=progress_callback,
-        node_token_streams=None,
-        node_tokenizer_models=node_tokenizer_models,
+    if set(node_columns) != set(node_ids):
+        raise ValueError("Columns must exactly match token-frequency nodes")
+    corpora, display_names, token_streams = _prepare_snapshot_inputs(
         input_snapshot_dir=input_snapshot_dir,
+        scratch_dir=scratch_dir,
         node_ids=node_ids,
         node_columns=node_columns,
+        node_tokenizer_models=node_tokenizer_models,
         token_cache_path=token_cache_path,
+    )
+    return _compute_token_frequencies(
+        node_corpora=corpora,
+        node_display_names=display_names,
+        artifact_dir=artifact_dir,
+        token_limit=token_limit,
+        progress_callback=progress_callback,
+        node_token_streams=token_streams,
+        node_tokenizer_models=node_tokenizer_models,
     )

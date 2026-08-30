@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import os
+import hashlib
+import hmac
 import tempfile
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -153,6 +155,7 @@ class SampleDataService:
                 entry.path,
                 destination,
                 entry.size,
+                entry.sha256,
             )
             total_bytes += downloaded
             await report_progress(
@@ -177,9 +180,11 @@ class SampleDataService:
         remote_path: str,
         destination: Path,
         expected_size: int,
+        expected_sha256: str,
     ) -> int:
         temporary = await self._run_io(_new_download_path, destination)
         bytes_written = 0
+        digest = hashlib.sha256()
         try:
             async with self._client.stream(
                 "GET",
@@ -191,9 +196,12 @@ class SampleDataService:
                         bytes_written += len(chunk)
                         if bytes_written > expected_size:
                             raise BadGatewayError("Sample file integrity check failed")
+                        digest.update(chunk)
                         await handle.write(chunk)
             if bytes_written != expected_size:
                 raise BadGatewayError("Sample file size does not match the catalogue")
+            if not hmac.compare_digest(digest.hexdigest(), expected_sha256):
+                raise BadGatewayError("Sample file digest does not match the catalogue")
             await self._run_io(_publish_download, temporary, destination)
             return bytes_written
         except httpx.HTTPError as exc:
@@ -218,6 +226,18 @@ class SampleDataService:
 
     async def cleanup_import(self, user_id: str, import_id: str) -> None:
         await self._files.cleanup_import_staging(user_id, import_id)
+
+    async def is_import_published(
+        self,
+        user_id: str,
+        import_id: str,
+        result: SampleUserFileImportResult,
+    ) -> bool:
+        return await self._files.is_import_published(
+            user_id,
+            import_id,
+            result.destination_path,
+        )
 
     async def _run_io(
         self,

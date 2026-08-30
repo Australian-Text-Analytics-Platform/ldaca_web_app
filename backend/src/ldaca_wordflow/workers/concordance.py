@@ -14,6 +14,7 @@ import logging
 from pathlib import Path
 from typing import Any, cast
 from collections.abc import Callable
+import uuid
 
 from ..analysis.concordance_core import build_concordance_search_pattern
 from ..analysis.concordance_tokens import (
@@ -71,7 +72,7 @@ def _source_text_filter(document_column: str):
 def _collect_source_input_from_snapshot(
     *,
     input_snapshot_dir: str,
-    node_id: str,
+    node_id: uuid.UUID,
     document_column: str,
     token_cache_path: str | None,
     extra_column_names: list[str] | None,
@@ -100,7 +101,7 @@ def _collect_source_input_from_snapshot(
 
     import polars as pl
 
-    from .input_snapshots import load_snapshot_node
+    from ..infrastructure.storage.input_snapshots import load_snapshot_node
 
     snapshot_node = load_snapshot_node(input_snapshot_dir, node_id)
     node_data = snapshot_node.data
@@ -205,11 +206,13 @@ def _build_concordance_occurrence_dataframe(
 
     corpus = [str(v) if v is not None else "" for v in node_corpus]
     non_empty_mask = [bool(v.strip()) for v in corpus]
-    corpus = [v for v, keep in zip(corpus, non_empty_mask, strict=False) if keep]
+    corpus = [v for v, keep in zip(corpus, non_empty_mask, strict=True) if keep]
 
     source_column_name = "__concordance_source__"
     filtered_source_row_ids = [
-        value for value, keep in zip(source_row_ids, non_empty_mask, strict=False) if keep
+        value
+        for value, keep in zip(source_row_ids, non_empty_mask, strict=True)
+        if keep
     ]
     data: dict[str, list] = {
         source_column_name: corpus,
@@ -225,7 +228,9 @@ def _build_concordance_occurrence_dataframe(
 
     if extra_columns_data:
         for col_name, col_values in extra_columns_data.items():
-            filtered = [v for v, keep in zip(col_values, non_empty_mask, strict=False) if keep]
+            filtered = [
+                v for v, keep in zip(col_values, non_empty_mask, strict=True) if keep
+            ]
             data[col_name] = filtered
             base_columns.append(pl.col(col_name))
             output_columns.append(col_name)
@@ -321,21 +326,27 @@ def _build_tokens_concordance_occurrence_dataframe(
     # Mirror the regex builder's empty-row filter so the document index
     # stays aligned with extra columns.
     keep_mask = [bool(text.strip()) for text in corpus]
-    corpus = [text for text, keep in zip(corpus, keep_mask, strict=False) if keep]
-    tokens_per_row = [tokens for tokens, keep in zip(tokens_per_row, keep_mask, strict=False) if keep]
+    corpus = [text for text, keep in zip(corpus, keep_mask, strict=True) if keep]
+    tokens_per_row = [
+        tokens
+        for tokens, keep in zip(tokens_per_row, keep_mask, strict=True)
+        if keep
+    ]
     filtered_source_row_ids = [
-        value for value, keep in zip(source_row_ids, keep_mask, strict=False) if keep
+        value for value, keep in zip(source_row_ids, keep_mask, strict=True) if keep
     ]
 
     filtered_extras: dict[str, list] = {}
     if extra_columns_data:
         for col_name, col_values in extra_columns_data.items():
             filtered_extras[col_name] = [
-                v for v, keep in zip(col_values, keep_mask, strict=False) if keep
+                v for v, keep in zip(col_values, keep_mask, strict=True) if keep
             ]
 
     hits: list[dict[str, Any]] = []
-    for row_index, (raw_text, tokens) in enumerate(zip(corpus, tokens_per_row, strict=False)):
+    for row_index, (raw_text, tokens) in enumerate(
+        zip(corpus, tokens_per_row, strict=True)
+    ):
         if not isinstance(tokens, list) or not tokens:
             continue
         # ``tokens`` may include None entries (polars struct nulls). The
@@ -414,7 +425,7 @@ def _build_tokens_concordance_occurrence_dataframe(
 def run_concordance_run_all(
     artifact_dir: str,
     input_snapshot_dir: str,
-    parent_node_id: str,
+    parent_node_id: uuid.UUID,
     document_column: str,
     search_word: str,
     num_left_tokens: int,
@@ -437,7 +448,7 @@ def run_concordance_run_all(
 
         import polars as pl
 
-        from .input_snapshots import load_snapshot_node
+        from ..infrastructure.storage.input_snapshots import load_snapshot_node
 
         logger.info("[Worker %d] Starting concordance Run All", os.getpid())
         snapshot_node = load_snapshot_node(input_snapshot_dir, parent_node_id)

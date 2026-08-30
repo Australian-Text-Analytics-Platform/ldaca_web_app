@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+import uuid
 
 import anyio
 import pytest
@@ -17,8 +18,23 @@ from ldaca_wordflow.services.analysis_scheduler import (
 )
 
 
+_WORKSPACE_ID = uuid.UUID("11111111-1111-4111-8111-111111111111")
+
+
+def _analysis_id(label: str) -> uuid.UUID:
+    return uuid.uuid5(uuid.NAMESPACE_URL, f"analysis-scheduler:{label}")
+
+
+def _label(value: uuid.UUID) -> str:
+    return next(
+        label
+        for label in ("before", "after", "one", "two", "a1", "a2", "b1", "running", "queued")
+        if _analysis_id(label) == value
+    )
+
+
 def _key(user_id: str, analysis_id: str) -> AnalysisExecutionKey:
-    return AnalysisExecutionKey(user_id, "workspace", analysis_id)
+    return AnalysisExecutionKey(user_id, _WORKSPACE_ID, _analysis_id(analysis_id))
 
 
 async def _ignore_key(_key: AnalysisExecutionKey) -> None:
@@ -55,8 +71,9 @@ async def test_scheduler_is_work_conserving_up_to_global_capacity() -> None:
     releases = {"one": anyio.Event(), "two": anyio.Event()}
 
     async def runner(item: ScheduledAnalysis) -> None:
-        started.append(item.key.analysis_id)
-        await releases[item.key.analysis_id].wait()
+        label = _label(item.key.analysis_id)
+        started.append(label)
+        await releases[label].wait()
 
     async def cancel_running(_key: AnalysisExecutionKey) -> None:
         return
@@ -92,8 +109,9 @@ async def test_scheduler_rotates_users_and_preserves_per_user_fifo() -> None:
     release = anyio.Event()
 
     async def runner(item: ScheduledAnalysis) -> None:
-        started.append(item.key.analysis_id)
-        if item.key.analysis_id == "a1":
+        label = _label(item.key.analysis_id)
+        started.append(label)
+        if label == "a1":
             await release.wait()
 
     async def cancel_running(_key: AnalysisExecutionKey) -> None:
@@ -133,12 +151,13 @@ async def test_queued_cancellation_never_calls_runner() -> None:
     running_cancellations: list[str] = []
 
     async def runner(item: ScheduledAnalysis) -> None:
-        started.append(item.key.analysis_id)
-        if item.key.analysis_id == "running":
+        label = _label(item.key.analysis_id)
+        started.append(label)
+        if label == "running":
             await first_release.wait()
 
     async def cancel_running(key: AnalysisExecutionKey) -> None:
-        running_cancellations.append(key.analysis_id)
+        running_cancellations.append(_label(key.analysis_id))
 
     scheduler = AnalysisScheduler(
         capacity=1,
@@ -177,11 +196,11 @@ async def test_scheduler_reports_queued_and_running_work_removal() -> None:
     release = anyio.Event()
 
     async def runner(item: ScheduledAnalysis) -> None:
-        if item.key.analysis_id == "running":
+        if _label(item.key.analysis_id) == "running":
             await release.wait()
 
     async def work_removed(key: AnalysisExecutionKey) -> None:
-        removed.append(key.analysis_id)
+        removed.append(_label(key.analysis_id))
 
     scheduler = AnalysisScheduler(
         capacity=1,

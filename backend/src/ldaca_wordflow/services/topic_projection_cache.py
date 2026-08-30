@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import threading
+import uuid
 from collections import OrderedDict
 from collections.abc import Callable
 from concurrent.futures import Future
@@ -12,8 +13,8 @@ from dataclasses import dataclass
 @dataclass(frozen=True, slots=True)
 class TopicProjectionCacheKey:
     user_id: str
-    workspace_id: str
-    analysis_id: str
+    workspace_id: uuid.UUID
+    analysis_id: uuid.UUID
     context_path: str
     context_inode: int
     context_size: int

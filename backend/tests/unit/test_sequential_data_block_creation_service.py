@@ -47,7 +47,7 @@ def _sequential_data_block_creation_fixture(
     workspace = Workspace(name="Trends Data Block Creation")
     workspace.add_node(
         Node(
-            id=str(source_id),
+            id=source_id,
             name="Events",
             data=pl.DataFrame(columns).lazy(),
             document=document_column,
@@ -121,8 +121,8 @@ def _sequential_data_block_creation_fixture(
     result = run_result_data_block_creation(
         artifact_dir=str(output_dir),
         request_payload=child.request.model_dump(mode="json"),
-        result_paths={str(source_id): str(publication_path)},
-        document_columns={str(source_id): document_column},
+        result_paths={source_id: str(publication_path)},
+        document_columns={source_id: document_column},
     )
     return workspace, child, result, source_id
 
@@ -147,12 +147,12 @@ def test_sequential_data_block_creation_publishes_valid_output(
     )
 
     output_id = stored.output_node_ids[0]
-    output = workspace.nodes[str(output_id)]
+    output = workspace.nodes[output_id]
     assert stored.outputs[0].source_node_id == source_id
     assert output.name == "Selected trends"
     assert output.document == document_column
     assert output.color is None
-    assert output.parents[0].id == str(source_id)
+    assert output.parents[0].id == source_id
     assert isinstance(child.request, SequentialDataBlockCreationAnalysisRequest)
     assert output.data.collect_schema().names() == child.request.source.selected_columns
     assert output.data.collect().height == 1
@@ -177,5 +177,5 @@ def test_sequential_data_block_creation_rejects_wrong_document_identity(
             10_000_000,
         )
 
-    assert set(workspace.nodes) == {str(source_id)}
+    assert set(workspace.nodes) == {source_id}
     assert list((tmp_path / "data").glob("*.parquet")) == []

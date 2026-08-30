@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+import uuid
 
 import anyio
 
@@ -34,7 +35,7 @@ class WorkspaceLifecycleService:
     async def open(
         self,
         user_id: str,
-        workspace_id: str,
+        workspace_id: uuid.UUID,
     ) -> WorkspaceRecord:
         """Make the target the user's sole open Workspace.
 
@@ -64,7 +65,7 @@ class WorkspaceLifecycleService:
     async def request_close(
         self,
         user_id: str,
-        workspace_id: str,
+        workspace_id: uuid.UUID,
     ) -> WorkspaceRecord | None:
         """Return a closing resource, or ``None`` after immediate closure."""
 
@@ -78,7 +79,7 @@ class WorkspaceLifecycleService:
     async def delete(
         self,
         user_id: str,
-        workspace_id: str,
+        workspace_id: uuid.UUID,
     ) -> None:
         """Stop Workspace-owned execution and atomically remove the Workspace."""
 

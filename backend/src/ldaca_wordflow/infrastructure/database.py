@@ -8,6 +8,7 @@ does not interpret, copy, or silently mutate older layouts.
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -73,7 +74,7 @@ CREATE TABLE IF NOT EXISTS oauth_transactions (
 )
 """
 
-_SCHEMA_VERSION = 6
+_SCHEMA_VERSION = 7
 _EXPECTED_COLUMNS = {
     "users": [
         ("id", "TEXT", 0, None, 1),
@@ -321,8 +322,6 @@ async def _validate_schema(connection: aiosqlite.Connection) -> None:
     for table, expected in _EXPECTED_COLUMNS.items():
         if await _table_columns(connection, table) != expected:
             raise RuntimeError(f"Unsupported {table} database schema")
-    if not await _has_positive_nullable_storage_quota(connection):
-        raise RuntimeError("Unsupported users storage quota constraint")
     for table in ("user_identities", "user_sessions"):
         rows = await (
             await connection.execute(f'PRAGMA foreign_key_list("{table}")')
@@ -353,6 +352,7 @@ async def _validate_schema(connection: aiosqlite.Connection) -> None:
     ):
         if not await _has_named_index(connection, "user_sessions", name, columns):
             raise RuntimeError("Unsupported session indexes")
+    await _validate_schema_behavior(connection)
 
 
 async def _has_exact_index(
@@ -364,25 +364,15 @@ async def _has_exact_index(
 ) -> bool:
     rows = await (await connection.execute(f'PRAGMA index_list("{table}")')).fetchall()
     for row in rows:
-        if bool(row["unique"]) is not unique:
+        if (
+            bool(row["unique"]) is not unique
+            or str(row["origin"]) != "u"
+            or bool(row["partial"])
+        ):
             continue
-        if await _index_columns(connection, str(row["name"])) == columns:
+        if await _index_key_columns(connection, str(row["name"])) == columns:
             return True
     return False
-
-
-async def _has_positive_nullable_storage_quota(
-    connection: aiosqlite.Connection,
-) -> bool:
-    row = await (
-        await connection.execute(
-            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'users'"
-        )
-    ).fetchone()
-    if row is None or row["sql"] is None:
-        return False
-    normalized = "".join(str(row["sql"]).upper().split())
-    return "CHECK(STORAGE_QUOTA_BYTESISNULLORSTORAGE_QUOTA_BYTES>0)" in normalized
 
 
 async def _has_named_index(
@@ -393,15 +383,135 @@ async def _has_named_index(
 ) -> bool:
     rows = await (await connection.execute(f'PRAGMA index_list("{table}")')).fetchall()
     for row in rows:
-        if str(row["name"]) != name or bool(row["unique"]):
+        if (
+            str(row["name"]) != name
+            or bool(row["unique"])
+            or str(row["origin"]) != "c"
+            or bool(row["partial"])
+        ):
             continue
-        return await _index_columns(connection, name) == columns
+        return await _index_key_columns(connection, name) == columns
     return False
 
 
-async def _index_columns(
+async def _index_key_columns(
     connection: aiosqlite.Connection,
     name: str,
 ) -> tuple[str, ...]:
-    rows = await (await connection.execute(f'PRAGMA index_info("{name}")')).fetchall()
-    return tuple(str(row["name"]) for row in rows)
+    rows = await (await connection.execute(f'PRAGMA index_xinfo("{name}")')).fetchall()
+    key_rows = sorted((row for row in rows if bool(row["key"])), key=lambda row: row["seqno"])
+    if any(
+        int(row["cid"]) < 0
+        or row["name"] is None
+        or bool(row["desc"])
+        or str(row["coll"]).upper() != "BINARY"
+        for row in key_rows
+    ):
+        return ()
+    return tuple(str(row["name"]) for row in key_rows)
+
+
+async def _validate_schema_behavior(connection: aiosqlite.Connection) -> None:
+    """Probe declared constraints inside a savepoint that never publishes rows."""
+
+    probe = uuid.uuid4().hex
+    user_id = f"schema-probe-{probe}"
+    positive_user_id = f"schema-probe-positive-{probe}"
+    missing_user_id = f"schema-probe-missing-{probe}"
+    email = f"{probe}@schema.invalid"
+    token_hash = f"token-{probe}"
+    await connection.execute("SAVEPOINT schema_validation")
+    try:
+        await connection.execute(
+            "INSERT INTO users "
+            "(id,email,name,is_active,created_at,storage_quota_bytes) "
+            "VALUES (?,?,?,?,?,NULL)",
+            (user_id, email, "Schema Probe", 1, "now"),
+        )
+        await connection.execute(
+            "INSERT INTO users "
+            "(id,email,name,is_active,created_at,storage_quota_bytes) "
+            "VALUES (?,?,?,?,?,?)",
+            (positive_user_id, f"positive-{email}", "Positive", 1, "now", 1),
+        )
+        for label, invalid_quota in (("zero", 0), ("negative", -1)):
+            await _require_integrity_error(
+                connection,
+                "INSERT INTO users "
+                "(id,email,name,is_active,created_at,storage_quota_bytes) "
+                "VALUES (?,?,?,?,?,?)",
+                (
+                    f"schema-probe-{label}-{probe}",
+                    f"{label}-{email}",
+                    "Invalid",
+                    1,
+                    "now",
+                    invalid_quota,
+                ),
+                "users storage quota constraint",
+            )
+        await _require_integrity_error(
+            connection,
+            "INSERT INTO users (id,email,name,is_active,created_at) VALUES (?,?,?,?,?)",
+            (f"schema-probe-duplicate-{probe}", email, "Duplicate", 1, "now"),
+            "users email uniqueness",
+        )
+        await _require_integrity_error(
+            connection,
+            "INSERT INTO user_identities (issuer,subject,user_id,created_at) "
+            "VALUES (?,?,?,?)",
+            ("schema", probe, missing_user_id, "now"),
+            "user identities foreign key",
+        )
+        await connection.execute(
+            "INSERT INTO user_identities (issuer,subject,user_id,created_at) "
+            "VALUES (?,?,?,?)",
+            ("schema", probe, user_id, "now"),
+        )
+        await connection.execute(
+            "INSERT INTO user_sessions "
+            "(id,user_id,token_hash,csrf_hash,expires_at,created_at) "
+            "VALUES (?,?,?,?,?,?)",
+            (f"session-{probe}", user_id, token_hash, "csrf", "later", "now"),
+        )
+        await _require_integrity_error(
+            connection,
+            "INSERT INTO user_sessions "
+            "(id,user_id,token_hash,csrf_hash,expires_at,created_at) "
+            "VALUES (?,?,?,?,?,?)",
+            (
+                f"session-duplicate-{probe}",
+                user_id,
+                token_hash,
+                "csrf",
+                "later",
+                "now",
+            ),
+            "session token uniqueness",
+        )
+        await connection.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        for table in ("user_identities", "user_sessions"):
+            row = await (
+                await connection.execute(
+                    f'SELECT 1 FROM "{table}" WHERE user_id = ?',
+                    (user_id,),
+                )
+            ).fetchone()
+            if row is not None:
+                raise RuntimeError(f"Unsupported {table} cascade behavior")
+    finally:
+        await connection.execute("ROLLBACK TO schema_validation")
+        await connection.execute("RELEASE schema_validation")
+
+
+async def _require_integrity_error(
+    connection: aiosqlite.Connection,
+    statement: str,
+    parameters: tuple[object, ...],
+    contract: str,
+) -> None:
+    try:
+        await connection.execute(statement, parameters)
+    except aiosqlite.IntegrityError:
+        return
+    raise RuntimeError(f"Unsupported {contract}")

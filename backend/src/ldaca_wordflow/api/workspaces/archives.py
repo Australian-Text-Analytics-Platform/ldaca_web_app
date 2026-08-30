@@ -90,7 +90,7 @@ async def export_workspace_archive(
 
     snapshot, filename, revision = await archive_service.export_archive(
         principal.user.id,
-        str(workspace_id),
+        workspace_id,
     )
     headers = {"ETag": workspace_etag(revision)} if revision is not None else {}
     return FileResponse(

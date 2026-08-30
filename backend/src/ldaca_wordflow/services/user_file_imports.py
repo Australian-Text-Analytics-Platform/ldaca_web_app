@@ -23,7 +23,11 @@ from ..domain.background import BackgroundState, Failure, Progress
 from ..domain.events import EventResourceType
 from ..infrastructure.storage.user_file_import_store import UserFileImportStore
 from ..models.data_sources import DataPortalImportSubmitRequest
-from ..models.user_file_imports import UserFileImportPage
+from ..models.user_file_imports import (
+    UnavailableUserFileImport,
+    UserFileImportItem,
+    UserFileImportPage,
+)
 from ..shared.errors import (
     AppError,
     BackendStoppingError,
@@ -51,6 +55,9 @@ from .user_file_import_scheduler import (
 
 logger = logging.getLogger(__name__)
 ImportExecution = SampleImportExecution | DataPortalImportExecution
+_UNAVAILABLE_IMPORT_WARNING = (
+    "This User File Import is unavailable because its stored record is invalid."
+)
 
 
 class _CancellationReady(RuntimeError):
@@ -92,6 +99,10 @@ class UserFileImportService:
             runner=self._run,
         )
         self._records: dict[UserFileImportKey, UserFileImport] = {}
+        self._unavailable_records: dict[
+            UserFileImportKey,
+            UnavailableUserFileImport,
+        ] = {}
         self._queued_executions: dict[UserFileImportKey, ImportExecution] = {}
         self._queued_reservations: dict[UserFileImportKey, StorageReservation] = {}
         self._live_progress: dict[UserFileImportKey, Progress] = {}
@@ -108,9 +119,47 @@ class UserFileImportService:
             raise RuntimeError("UserFileImportService is already started")
         snapshot = await self._store.load_all()
         self._corrupt_users = set(snapshot.corrupt_users)
+        recovered_publications: dict[UserFileImportKey, UserFileImport] = {}
+        for prepared in snapshot.prepared_publications:
+            key = UserFileImportKey(prepared.user_id, prepared.resource.id)
+            try:
+                if await self._is_publication_visible(
+                    prepared.user_id,
+                    key.import_id,
+                    prepared.resource.result,
+                ):
+                    await self._store.save(prepared.user_id, prepared.resource)
+                    recovered_publications[key] = prepared.resource
+                else:
+                    await self._cleanup_prepared_publication(
+                        prepared.user_id,
+                        key.import_id,
+                        prepared.resource.result,
+                    )
+                await self._store.clear_prepared_publication(
+                    prepared.user_id,
+                    prepared.resource.id,
+                )
+            except Exception:
+                logger.exception(
+                    "Could not reconcile prepared User File Import "
+                    "import_id=%s user_id=%s",
+                    key.import_id,
+                    prepared.user_id,
+                )
+                self._corrupt_users.add(prepared.user_id)
+        for stored in snapshot.unavailable_records:
+            key = UserFileImportKey(stored.user_id, stored.import_id)
+            self._unavailable_records[key] = UnavailableUserFileImport(
+                availability="unavailable",
+                id=stored.import_id,
+                user_id=stored.user_id,
+                warning=_UNAVAILABLE_IMPORT_WARNING,
+            )
+            self._operation_gates[key] = anyio.Lock()
         for stored in snapshot.records:
-            key = UserFileImportKey(stored.user_id, str(stored.resource.id))
-            record = stored.resource
+            key = UserFileImportKey(stored.user_id, stored.resource.id)
+            record = recovered_publications.pop(key, stored.resource)
             if record.state in {BackgroundState.QUEUED, BackgroundState.RUNNING}:
                 record = record.fail(
                     self._clock(),
@@ -132,6 +181,9 @@ class UserFileImportService:
                     continue
             self._records[key] = record
             self._operation_gates[key] = anyio.Lock()
+        for key, record in recovered_publications.items():
+            self._records[key] = record
+            self._operation_gates[key] = anyio.Lock()
         self._scheduler.start(task_group)
         self._started = True
 
@@ -144,7 +196,7 @@ class UserFileImportService:
 
         self._require_accepting()
         import_id = uuid.uuid4()
-        key = UserFileImportKey(user_id, str(import_id))
+        key = UserFileImportKey(user_id, import_id)
         reservation = await self._acquire_storage(user_id)
         execution: SampleImportExecution | None = None
         persisted = False
@@ -152,7 +204,7 @@ class UserFileImportService:
             execution = await self._samples.prepare_import(
                 user_id,
                 collection_id,
-                key.import_id,
+                str(key.import_id),
             )
             record = UserFileImport.create(
                 SampleUserFileImportRequest(collection_id=collection_id),
@@ -167,7 +219,7 @@ class UserFileImportService:
         except BaseException:
             if execution is not None:
                 with anyio.CancelScope(shield=True):
-                    await self._samples.cleanup_import(user_id, key.import_id)
+                    await self._samples.cleanup_import(user_id, str(key.import_id))
             if persisted:
                 with anyio.CancelScope(shield=True):
                     await self._store.delete(user_id, import_id)
@@ -184,14 +236,14 @@ class UserFileImportService:
 
         self._require_accepting()
         import_id = uuid.uuid4()
-        key = UserFileImportKey(user_id, str(import_id))
+        key = UserFileImportKey(user_id, import_id)
         reservation = await self._acquire_storage(user_id)
         execution: DataPortalImportExecution | None = None
         persisted = False
         try:
             persisted_request, execution = await self._data_portal.prepare_import(
                 user_id,
-                key.import_id,
+                str(key.import_id),
                 request,
             )
             record = UserFileImport.create(
@@ -209,7 +261,7 @@ class UserFileImportService:
                 with anyio.CancelScope(shield=True):
                     await self._data_portal.cleanup_import(
                         user_id,
-                        key.import_id,
+                        str(key.import_id),
                     )
             if persisted:
                 with anyio.CancelScope(shield=True):
@@ -218,12 +270,15 @@ class UserFileImportService:
                 await reservation.release()
             raise
 
-    async def get(self, user_id: str, import_id: uuid.UUID) -> UserFileImport:
-        key = UserFileImportKey(user_id, str(import_id))
+    async def get(self, user_id: str, import_id: uuid.UUID) -> UserFileImportItem:
+        key = UserFileImportKey(user_id, import_id)
         async with self._lock:
             record = self._records.get(key)
             if record is None:
-                raise UserFileImportNotFoundError("User File Import not found")
+                unavailable = self._unavailable_records.get(key)
+                if unavailable is None:
+                    raise UserFileImportNotFoundError("User File Import not found")
+                return unavailable
             return self._project(key, record)
 
     async def list(
@@ -245,7 +300,17 @@ class UserFileImportService:
             ]
             records.sort(key=lambda item: str(item[1].id))
             records.sort(key=lambda item: item[1].created_at, reverse=True)
-            items = [self._project(key, record) for key, record in records]
+            items: list[UserFileImportItem] = [
+                self._project(key, record) for key, record in records
+            ]
+            items.extend(
+                resource
+                for key, resource in sorted(
+                    self._unavailable_records.items(),
+                    key=lambda item: item[0].import_id,
+                )
+                if key.user_id == user_id
+            )
         total_items = len(items)
         start = (page - 1) * page_size
         return UserFileImportPage(
@@ -263,12 +328,16 @@ class UserFileImportService:
     ) -> tuple[UserFileImport, bool]:
         """Cancel queued work now or request confirmed running cancellation."""
 
-        key = UserFileImportKey(user_id, str(import_id))
+        key = UserFileImportKey(user_id, import_id)
         gate = await self._gate_for(key)
         async with gate:
             async with self._lock:
                 record = self._records.get(key)
                 if record is None:
+                    if key in self._unavailable_records:
+                        raise UserFileImportNotCancellableError(
+                            "Unavailable User File Import is not cancellable"
+                        )
                     raise UserFileImportNotFoundError("User File Import not found")
                 if record.state in {BackgroundState.SUCCEEDED, BackgroundState.FAILED}:
                     raise UserFileImportNotCancellableError(
@@ -312,14 +381,15 @@ class UserFileImportService:
                 return self._project(key, requested), True
 
     async def delete(self, user_id: str, import_id: uuid.UUID) -> None:
-        key = UserFileImportKey(user_id, str(import_id))
+        key = UserFileImportKey(user_id, import_id)
         gate = await self._gate_for(key)
         async with gate:
             async with self._lock:
                 record = self._records.get(key)
-                if record is None:
+                unavailable = self._unavailable_records.get(key)
+                if record is None and unavailable is None:
                     raise UserFileImportNotFoundError("User File Import not found")
-                if record.state not in {
+                if record is not None and record.state not in {
                     BackgroundState.SUCCEEDED,
                     BackgroundState.FAILED,
                     BackgroundState.CANCELLED,
@@ -329,9 +399,14 @@ class UserFileImportService:
                     )
             await self._store.delete(user_id, import_id)
             async with self._lock:
-                self._records.pop(key)
+                removed = self._records.pop(key, None)
+                self._unavailable_records.pop(key, None)
                 self._live_progress.pop(key, None)
-            await self._publish_removed(user_id, import_id, record.revision)
+            await self._publish_removed(
+                user_id,
+                import_id,
+                removed.revision if removed is not None else None,
+            )
         async with self._lock:
             self._operation_gates.pop(key, None)
 
@@ -601,33 +676,108 @@ class UserFileImportService:
 
             staging = self._staging_path(execution)
             await reservation.recheck_path(staging)
-            if isinstance(execution, SampleImportExecution):
-                if not isinstance(result, SampleUserFileImportResult):
-                    raise TypeError("Sample import returned the wrong Result")
-                await self._samples.publish_import(
-                    key.user_id,
-                    key.import_id,
-                    result,
-                )
-            else:
-                if not isinstance(result, DataPortalUserFileImportResult):
-                    raise TypeError("Data Portal import returned the wrong Result")
-                await self._data_portal.publish_import(
-                    key.user_id,
-                    key.import_id,
-                    result,
-                )
-
             async with self._lock:
                 current = self._records.get(key)
                 if current is None or current.state is not BackgroundState.RUNNING:
                     return
                 succeeded = current.succeed(self._clock(), result=result)
-            await self._store.save(key.user_id, succeeded)
-            async with self._lock:
-                self._records[key] = succeeded
-                self._live_progress.pop(key, None)
+            await self._store.prepare_publication(key.user_id, succeeded)
+            if isinstance(execution, SampleImportExecution):
+                if not isinstance(result, SampleUserFileImportResult):
+                    raise TypeError("Sample import returned the wrong Result")
+            elif not isinstance(result, DataPortalUserFileImportResult):
+                raise TypeError("Data Portal import returned the wrong Result")
+            with anyio.CancelScope(shield=True):
+                try:
+                    await self._publish_import_result(
+                        key.user_id,
+                        key.import_id,
+                        result,
+                    )
+                except Exception:
+                    if not await self._is_publication_visible(
+                        key.user_id,
+                        key.import_id,
+                        result,
+                    ):
+                        await self._store.clear_prepared_publication(
+                            key.user_id,
+                            succeeded.id,
+                        )
+                        raise
+                record_saved = False
+                try:
+                    await self._store.save(key.user_id, succeeded)
+                    record_saved = True
+                except Exception:
+                    logger.exception(
+                        "Could not commit published User File Import record "
+                        "import_id=%s user_id=%s",
+                        key.import_id,
+                        key.user_id,
+                    )
+                async with self._lock:
+                    self._records[key] = succeeded
+                    self._live_progress.pop(key, None)
+                if record_saved:
+                    try:
+                        await self._store.clear_prepared_publication(
+                            key.user_id,
+                            succeeded.id,
+                        )
+                    except Exception:
+                        logger.exception(
+                            "Could not clear prepared User File Import "
+                            "import_id=%s user_id=%s",
+                            key.import_id,
+                            key.user_id,
+                        )
             await self._publish_record(key.user_id, succeeded)
+
+    async def _publish_import_result(
+        self,
+        user_id: str,
+        import_id: uuid.UUID,
+        result: SampleUserFileImportResult | DataPortalUserFileImportResult,
+    ) -> None:
+        if isinstance(result, SampleUserFileImportResult):
+            await self._samples.publish_import(user_id, str(import_id), result)
+            return
+        await self._data_portal.publish_import(user_id, str(import_id), result)
+
+    async def _is_publication_visible(
+        self,
+        user_id: str,
+        import_id: uuid.UUID,
+        result: SampleUserFileImportResult | DataPortalUserFileImportResult | None,
+    ) -> bool:
+        if isinstance(result, SampleUserFileImportResult):
+            return await self._samples.is_import_published(
+                user_id,
+                str(import_id),
+                result,
+            )
+        if isinstance(result, DataPortalUserFileImportResult):
+            return await self._data_portal.is_import_published(
+                user_id,
+                str(import_id),
+                result,
+            )
+        raise TypeError("Prepared publication is missing its Result")
+
+    async def _cleanup_prepared_publication(
+        self,
+        user_id: str,
+        import_id: uuid.UUID,
+        result: SampleUserFileImportResult | DataPortalUserFileImportResult | None,
+    ) -> None:
+        if isinstance(result, SampleUserFileImportResult):
+            await self._samples.cleanup_import(user_id, str(import_id))
+            return
+        if isinstance(result, DataPortalUserFileImportResult):
+            await self._data_portal.cleanup_import(user_id, str(import_id))
+            return
+        raise TypeError("Prepared publication is missing its Result")
 
     async def _finish_interruption(self, key: UserFileImportKey) -> None:
         gate = await self._gate_for(key)
@@ -710,11 +860,11 @@ class UserFileImportService:
         execution: ImportExecution,
     ) -> None:
         if isinstance(execution, SampleImportExecution):
-            await self._samples.cleanup_import(key.user_id, key.import_id)
+            await self._samples.cleanup_import(key.user_id, str(key.import_id))
         else:
             await self._data_portal.cleanup_import(
                 key.user_id,
-                key.import_id,
+                str(key.import_id),
             )
 
     @staticmethod
@@ -758,7 +908,7 @@ class UserFileImportService:
             await self._events.publish_progress(
                 key.user_id,
                 EventResourceType.USER_FILE_IMPORT,
-                uuid.UUID(key.import_id),
+                key.import_id,
                 progress,
             )
         except Exception:
@@ -772,7 +922,7 @@ class UserFileImportService:
         self,
         user_id: str,
         import_id: uuid.UUID,
-        revision: int,
+        revision: int | None,
     ) -> None:
         try:
             await self._events.publish_removed(

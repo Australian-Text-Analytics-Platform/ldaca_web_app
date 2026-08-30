@@ -6,6 +6,7 @@ import time
 from functools import partial
 from io import BytesIO
 from pathlib import Path
+from typing import Any, cast
 
 from anyio.to_thread import run_sync as run_sync_in_worker_thread
 from fastapi.testclient import TestClient
@@ -15,6 +16,7 @@ from ldaca_wordflow.infrastructure.providers.annotation_ai import AnnotationAllR
 from ldaca_wordflow.main import create_app
 from ldaca_wordflow.services import analysis_executor as analysis_executor_module
 from ldaca_wordflow.settings import Settings
+from ldaca_wordflow.workers.entrypoints import analysis_process
 
 
 def _client(tmp_path: Path) -> TestClient:
@@ -109,7 +111,9 @@ def test_annotation_preview_is_durable_and_run_all_edits_the_source(
         progress = _ProgressQueue()
         result = await run_sync_in_worker_thread(
             partial(
-                invocation.function, **dict(invocation.kwargs), progress_queue=progress
+                analysis_process,
+                invocation=invocation.input,
+                progress_queue=cast(Any, progress),
             )
         )
         for item in progress.items:
@@ -263,8 +267,7 @@ def test_annotation_preview_is_durable_and_run_all_edits_the_source(
             f"/api/workspaces/{workspace_id}/analyses/{preview_id}/result"
         ).json()
         assert marker["kind"] == "annotation"
-        assert marker["ready"] is True
-        assert marker["labels"] is None
+        assert marker["result"] == {"variant": "ready"}
 
         page_url = f"/api/workspaces/{workspace_id}/analyses/{preview_id}/result/query"
         first_page = client.post(
@@ -279,7 +282,7 @@ def test_annotation_preview_is_durable_and_run_all_edits_the_source(
         )
         assert first_page.status_code == 200, first_page.text
         assert second_page.status_code == 200, second_page.text
-        assert first_page.json()["rows"] == second_page.json()["rows"]
+        assert first_page.json()["result"]["rows"] == second_page.json()["result"]["rows"]
         assert preview_retry_limits == [4, 4]
         assert preview_examples[0] == preview_examples[1]
         assert len(preview_examples[0]) == 5

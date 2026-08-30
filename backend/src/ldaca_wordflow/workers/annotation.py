@@ -23,7 +23,7 @@ from ..infrastructure.providers.annotation_ai import (
     annotate_all,
 )
 from ..infrastructure.storage.durable_fs import atomic_output_path
-from .input_snapshots import load_snapshot_node
+from ..infrastructure.storage.input_snapshots import load_snapshot_node
 from .utils import process_entrypoint
 
 logger = logging.getLogger(__name__)
@@ -43,7 +43,7 @@ def run_annotation_analysis(
     try:
         request = AnnotationRunAllAnalysisRequest.model_validate(request_payload)
         source_request = request.source
-        source = load_snapshot_node(input_snapshot_dir, str(source_request.node_id))
+        source = load_snapshot_node(input_snapshot_dir, source_request.node_id)
         schema = source.data.collect_schema()
         if source_request.text_column not in schema:
             raise ValueError("Annotation text column does not exist")
@@ -181,7 +181,7 @@ def _load_examples(
         return []
     assert request.example_text_column is not None
     assert request.example_annotation_column is not None
-    example = load_snapshot_node(input_snapshot_dir, str(request.example_node_id))
+    example = load_snapshot_node(input_snapshot_dir, request.example_node_id)
     frame = example.data.select(
         request.example_text_column,
         request.example_annotation_column,

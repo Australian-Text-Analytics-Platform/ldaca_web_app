@@ -1,4 +1,4 @@
-import type { QuotationEngineConfig, QuotationEngineType } from '@/api';
+import type { QuotationEngineConfig } from '@/api';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
@@ -13,22 +13,22 @@ interface QuotationEngineSettingsFieldsProps {
   className?: string;
 }
 
-const ENGINE_OPTIONS: { value: QuotationEngineType; label: string; description: string }[] = [
+type QuotationEngineType = QuotationEngineConfig['type'];
+
+const ENGINE_OPTIONS: { value: QuotationEngineType; label: string }[] = [
   {
     value: 'local',
     label: 'Built-in',
-    description: 'Use the bundled quotation engine.',
   },
   {
     value: 'remote',
     label: 'Remote',
-    description: 'Send quotation extraction to a remote service endpoint.',
   },
 ];
 
 /**
  * Quotation engine task parameter fields used by the Quotation parameter panel.
- * The backend task request stores `local`/`remote` plus an optional engine id;
+ * The backend task request is a strict local/remote union with a required remote engine id;
  * the UI presents those choices as Built-in/Remote radios with the id input
  * mounted only while Remote is active.
  * Used by: QuotationFeature because each quotation tab needs local task-level engine controls.
@@ -44,15 +44,15 @@ export function QuotationEngineSettingsFields({
   onRemoteEngineIdChange,
   className,
 }: QuotationEngineSettingsFieldsProps) {
-  const selectedType = engineConfig.type ?? 'local';
+  const selectedType = engineConfig.type;
   const engineIdValue =
-    engineConfig.type === 'remote' ? (engineConfig.engine_id ?? '') : lastRemoteEngineId;
+    engineConfig.type === 'remote' ? engineConfig.engine_id : lastRemoteEngineId;
 
   /** Called by: quotation engine radio inputs because the parameter panel needs one local update path for task engine changes. */
   const handleTypeChange = (nextType: QuotationEngineType) => {
     if (nextType === 'remote') {
       const restoredEngineId =
-        lastRemoteEngineId.length > 0 ? lastRemoteEngineId : (engineConfig.engine_id ?? '');
+        engineConfig.type === 'remote' ? engineConfig.engine_id : lastRemoteEngineId;
       onEngineConfigChange({ type: 'remote', engine_id: restoredEngineId });
       return;
     }
@@ -62,9 +62,6 @@ export function QuotationEngineSettingsFields({
   /** Called by: the remote engine id input because changes update both remembered and active task state. */
   const handleEngineIdChange = (value: string) => {
     onRemoteEngineIdChange(value);
-    if (selectedType !== 'remote') {
-      onEngineConfigChange({ type: 'remote', engine_id: value });
-    }
   };
 
   return (

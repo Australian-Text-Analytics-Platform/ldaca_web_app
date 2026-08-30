@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -10,6 +11,7 @@ from pathlib import Path
 
 import polars as pl
 import pytest
+from polars_source_utils import list_source_paths
 
 from ldaca_wordflow.domain.workspace import (
     AnalysisExecutionScope,
@@ -41,7 +43,7 @@ def _store() -> WorkspaceStore:
 def _node(name: str, *, parents: list[Node] | None = None) -> Node:
     resolved_parents = parents or []
     return Node(
-        id=str(uuid.uuid4()),
+        id=uuid.uuid4(),
         name=name,
         data=pl.DataFrame({"text": [name]}).lazy(),
         parents=resolved_parents,
@@ -77,14 +79,14 @@ def _rewrite_workspace_snapshot(path: Path, mutate) -> None:
     snapshot_path.write_text(json.dumps(payload), encoding="utf-8")
 
 
-def _clone_provenance(node_id: str) -> dict[str, object]:
+def _clone_provenance(node_id: uuid.UUID) -> dict[str, object]:
     return {
         "type": "derivation",
         "operation": {"kind": "clone"},
         "inputs": [
             {
                 "role": "source",
-                "value": {"type": "node", "node_id": node_id},
+                "value": {"type": "node", "node_id": str(node_id)},
             }
         ],
     }
@@ -123,12 +125,12 @@ def test_native_round_trip_preserves_tokenizer_and_rejects_previous_schema(
 
     _rewrite_workspace_snapshot(
         path,
-        lambda payload: payload["workspace_metadata"].update({"version": 20}),
+        lambda payload: payload["workspace_metadata"].update({"version": 21}),
     )
     with pytest.raises(WorkspaceSchemaVersionError) as exc_info:
         store.load(path)
-    assert exc_info.value.stored_version == 20
-    assert exc_info.value.supported_version == 21
+    assert exc_info.value.stored_version == 21
+    assert exc_info.value.supported_version == 22
 
 
 @pytest.mark.parametrize("invalid_graph", ["missing", "self", "cycle", "duplicate"])
@@ -140,13 +142,15 @@ def test_load_rejects_invalid_parent_graph(tmp_path: Path, invalid_graph: str) -
         nodes = payload["nodes"]
         by_id = {entry["node_metadata"]["id"]: entry for entry in nodes}
         if invalid_graph == "missing":
-            by_id[child.id]["node_metadata"]["provenance"] = _clone_provenance(
-                str(uuid.uuid4())
+            by_id[str(child.id)]["node_metadata"]["provenance"] = _clone_provenance(
+                uuid.uuid4()
             )
         elif invalid_graph == "self":
-            by_id[child.id]["node_metadata"]["provenance"] = _clone_provenance(child.id)
+            by_id[str(child.id)]["node_metadata"]["provenance"] = _clone_provenance(
+                child.id
+            )
         elif invalid_graph == "cycle":
-            by_id[parent.id]["node_metadata"]["provenance"] = _clone_provenance(
+            by_id[str(parent.id)]["node_metadata"]["provenance"] = _clone_provenance(
                 child.id
             )
         else:
@@ -278,12 +282,12 @@ def test_tab_generations_follow_the_workspace_commit_point(tmp_path: Path) -> No
     second_payload = json.loads((path / "workspace.json").read_text(encoding="utf-8"))
     second_record = path / second_payload["tabs"][0]["record_path"]
 
-    assert first_payload["workspace_metadata"]["version"] == 21
+    assert first_payload["workspace_metadata"]["version"] == 22
     assert first_record != second_record
     assert not first_record.exists()
     assert second_record.exists()
     assert list(second_record.parent.iterdir()) == [second_record]
-    assert store.load(path).workspace.tabs[str(tab.id)] == tab
+    assert store.load(path).workspace.tabs[tab.id] == tab
     assert second.revision == 2
 
 
@@ -365,9 +369,54 @@ def test_analysis_records_round_trip_with_root_and_child_ownership(
     loaded = store.load(path).workspace
 
     assert committed.analysis_count == 2
-    assert loaded.analyses[str(root.id)] == root
-    assert loaded.analyses[str(child.id)] == child
-    assert loaded.analysis_children(str(root.id)) == [child]
+    assert loaded.analyses[root.id] == root
+    assert loaded.analyses[child.id] == child
+    assert loaded.analysis_children(root.id) == [child]
+
+
+def test_invalid_stored_result_is_isolated_without_rewriting_its_record(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "workspace"
+    store = _store()
+    workspace = Workspace(name="result integrity")
+    timestamp = datetime.now(UTC)
+    tab = workspace.add_tab(
+        Tab.create(
+            kind=AnalysisKind.CONCORDANCE,
+            name="Concordance",
+            timestamp=timestamp,
+        )
+    )
+    node_id = uuid.uuid4()
+    record = AnalysisRecord.create(
+        ConcordanceAnalysisRequest(
+            node_ids=[node_id],
+            node_columns={node_id: "text"},
+            search_word="word",
+        ),
+        tab_id=tab.id,
+        execution_scope=AnalysisExecutionScope.PREVIEW,
+        timestamp=timestamp,
+    ).start(timestamp).succeed(timestamp, result_payload={"ready": True})
+    workspace.add_analysis(record)
+    store.commit(path, workspace, expected_revision=None)
+
+    metadata = json.loads((path / "workspace.json").read_text())
+    reference = next(
+        item for item in metadata["analyses"] if item["id"] == str(record.id)
+    )
+    record_path = path / reference["record_path"]
+    payload = json.loads(record_path.read_text())
+    payload["result_payload"] = {"ready": "yes"}
+    record_path.write_text(json.dumps(payload), encoding="utf-8")
+    before = record_path.read_bytes()
+
+    loaded = store.load(path).workspace
+
+    assert record.id not in loaded.analyses
+    assert record.id in loaded.corrupt_analysis_ids
+    assert record_path.read_bytes() == before
 
 
 def test_detached_analysis_remains_persisted_but_is_not_live(
@@ -394,9 +443,9 @@ def test_detached_analysis_remains_persisted_but_is_not_live(
     store.commit(path, workspace, expected_revision=None)
     loaded = store.load(path).workspace
 
-    assert loaded.analyses[str(root.id)] == root
+    assert loaded.analyses[root.id] == root
     assert loaded.live_analysis_ids() == set()
-    assert loaded.reserved_node_ids() == {str(node_id)}
+    assert loaded.reserved_node_ids() == {node_id}
 
 
 def test_analysis_private_execution_storage_survives_commits_until_record_removal(
@@ -427,7 +476,7 @@ def test_analysis_private_execution_storage_survives_commits_until_record_remova
     store.commit(path, workspace, expected_revision=1)
 
     assert (private / "snapshot.json").is_file()
-    workspace.remove_analysis(str(root.id))
+    workspace.remove_analysis(root.id)
     store.commit(path, workspace, expected_revision=2)
     assert not (path / "analyses" / str(root.id)).exists()
 
@@ -465,19 +514,19 @@ def test_corrupt_analysis_is_isolated_and_preserved_across_tab_mutation(
     analysis_path.write_bytes(invalid_bytes)
 
     loaded = store.load(path).workspace
-    assert loaded.tabs[str(tab.id)].name == "Healthy tab"
+    assert loaded.tabs[tab.id].name == "Healthy tab"
     assert loaded.analyses == {}
-    assert loaded.corrupt_analysis_ids == {str(root.id)}
-    assert loaded.corrupt_analysis_bytes(str(root.id)) == invalid_bytes
+    assert loaded.corrupt_analysis_ids == {root.id}
+    assert loaded.corrupt_analysis_bytes(root.id) == invalid_bytes
 
-    loaded.tabs[str(tab.id)].name = "Renamed around corruption"
+    loaded.tabs[tab.id].name = "Renamed around corruption"
     second = store.commit(path, loaded, expected_revision=1)
     second_payload = json.loads((path / "workspace.json").read_text(encoding="utf-8"))
     preserved = path / second_payload["analyses"][0]["record_path"]
 
     assert second.revision == 2
     assert preserved.read_bytes() == invalid_bytes
-    assert store.load(path).workspace.corrupt_analysis_ids == {str(root.id)}
+    assert store.load(path).workspace.corrupt_analysis_ids == {root.id}
 
 
 @pytest.mark.parametrize("revision", [True, 1.0, "1"])
@@ -503,13 +552,17 @@ def test_inspect_rejects_invalid_topology(tmp_path: Path, invalid_graph: str) ->
     def mutate(payload: dict) -> None:
         by_id = {entry["node_metadata"]["id"]: entry for entry in payload["nodes"]}
         if invalid_graph == "self":
-            by_id[child.id]["node_metadata"]["provenance"] = _clone_provenance(child.id)
+            by_id[str(child.id)]["node_metadata"]["provenance"] = _clone_provenance(
+                child.id
+            )
         elif invalid_graph == "cycle":
-            by_id[parent.id]["node_metadata"]["provenance"] = _clone_provenance(
+            by_id[str(parent.id)]["node_metadata"]["provenance"] = _clone_provenance(
                 child.id
             )
         else:
-            by_id[child.id]["node_metadata"]["provenance"]["inputs"][0]["role"] = "left"
+            by_id[str(child.id)]["node_metadata"]["provenance"]["inputs"][0][
+                "role"
+            ] = "left"
 
     _rewrite_workspace_snapshot(path, mutate)
 
@@ -544,6 +597,41 @@ def test_relocated_snapshot_rebase_is_copy_on_write_and_keeps_revision(
     assert loaded.snapshot.revision == 1
     assert (moved / "workspace.json").read_bytes() != before
     collected = loaded.workspace.nodes[node.id].data.collect()
+    assert collected["value"].to_list() == [1, 2]
+
+
+def test_snapshot_can_be_compiled_and_validated_for_future_publication_root(
+    tmp_path: Path,
+) -> None:
+    original = tmp_path / "original"
+    data = original / "data"
+    data.mkdir(parents=True)
+    source = data / "source.parquet"
+    pl.DataFrame({"value": [1, 2]}).write_parquet(source)
+    workspace = Workspace(name="staged")
+    node = workspace.add_node(
+        Node(name="source", data=pl.scan_parquet(source.resolve()))
+    )
+    store = _store()
+    store.commit(original, workspace, expected_revision=None)
+
+    staging = tmp_path / "staging"
+    future = tmp_path / "published"
+    shutil.copytree(original, staging)
+    shutil.rmtree(original)
+
+    store.rebase_snapshot_sources(staging, published_root=future)
+    validated = store.load(staging, published_root=future)
+    plan = staging / json.loads((staging / "workspace.json").read_text())["nodes"][
+        0
+    ]["data_path"]
+
+    assert not future.exists()
+    assert list_source_paths(plan) == [str(future / "data" / "source.parquet")]
+    assert validated.workspace.nodes[node.id].name == "source"
+
+    os.replace(staging, future)
+    collected = store.load(future).workspace.nodes[node.id].data.collect()
     assert collected["value"].to_list() == [1, 2]
 
 
@@ -596,9 +684,9 @@ def test_snapshot_rejects_noncanonical_schema_fields(
 
 
 @pytest.mark.skipif(not hasattr(Path, "symlink_to"), reason="symlinks unavailable")
-def test_load_rejects_symlinked_plan(tmp_path: Path) -> None:
+def test_load_isolates_symlinked_plan_and_its_dependent(tmp_path: Path) -> None:
     path = tmp_path / "workspace"
-    store, _workspace, _parent, _child = _committed_graph(path)
+    store, _workspace, parent, child = _committed_graph(path)
     payload = json.loads((path / "workspace.json").read_text(encoding="utf-8"))
     plan = path / payload["nodes"][0]["data_path"]
     real_plan = plan.with_suffix(".real")
@@ -608,5 +696,48 @@ def test_load_rejects_symlinked_plan(tmp_path: Path) -> None:
     except OSError:
         pytest.skip("symlink creation is unavailable")
 
-    with pytest.raises(WorkspaceSnapshotInvalidError):
-        store.load(path)
+    loaded = store.load(path).workspace
+
+    assert loaded.nodes == {}
+    assert loaded.unavailable_node_ids == {parent.id, child.id}
+    assert plan.is_symlink()
+
+
+def test_load_isolates_schema_mismatch_without_rewriting_healthy_sibling(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "workspace"
+    store, _workspace, parent, child = _committed_graph(path)
+
+    def corrupt_child_schema(payload: dict) -> None:
+        by_id = {entry["node_metadata"]["id"]: entry for entry in payload["nodes"]}
+        by_id[str(child.id)]["node_metadata"]["schema"][0]["dtype"] = "Boolean"
+
+    _rewrite_workspace_snapshot(path, corrupt_child_schema)
+    before = (path / "workspace.json").read_bytes()
+
+    loaded = store.load(path).workspace
+
+    assert list(loaded.nodes) == [parent.id]
+    assert loaded.unavailable_node_ids == {child.id}
+    assert (path / "workspace.json").read_bytes() == before
+
+
+def test_load_isolates_invalid_node_fields_without_rewriting_healthy_sibling(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "workspace"
+    store, _workspace, parent, child = _committed_graph(path)
+
+    def remove_child_name(payload: dict) -> None:
+        by_id = {entry["node_metadata"]["id"]: entry for entry in payload["nodes"]}
+        del by_id[str(child.id)]["node_metadata"]["name"]
+
+    _rewrite_workspace_snapshot(path, remove_child_name)
+    before = (path / "workspace.json").read_bytes()
+
+    loaded = store.load(path).workspace
+
+    assert list(loaded.nodes) == [parent.id]
+    assert loaded.unavailable_node_ids == {child.id}
+    assert (path / "workspace.json").read_bytes() == before

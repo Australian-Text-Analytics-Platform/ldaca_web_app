@@ -24,6 +24,7 @@ import httpx
 from ..infrastructure.providers.tabular_config import load_tabular_config
 from ..infrastructure.providers.oni import OniClient, jsonld_value
 from ..shared.portable_names import portable_name_error
+from .invocations import DataPortalImportInput
 from .utils import process_entrypoint
 
 
@@ -31,32 +32,28 @@ from .utils import process_entrypoint
 def data_portal_import_process(
     *,
     progress_queue: Queue[Any],
-    identifier: str,
-    requested_name: str | None,
-    api_base_url: str,
-    api_token: str | None,
-    timeout: float,
-    download_concurrency: int,
-    staging_dir: str,
-    max_output_bytes: int,
+    invocation: DataPortalImportInput,
 ) -> dict[str, object]:
     """Tabulate/download one portal object into a private completed directory."""
 
     report = cast(Callable[[dict[str, object]], None], progress_queue.put)
-    staging = Path(staging_dir).resolve(strict=True)
+    staging = Path(invocation.staging_dir).resolve(strict=True)
     report({"fraction": 0.05, "message": "Fetching Data Portal metadata"})
     metadata, documents, texts = asyncio.run(
         _fetch_portal_content(
-            identifier=identifier,
-            api_base_url=api_base_url,
-            api_token=api_token,
-            timeout=timeout,
-            download_concurrency=download_concurrency,
+            identifier=invocation.identifier,
+            api_base_url=invocation.api_base_url,
+            api_token=invocation.api_token,
+            timeout=invocation.timeout,
+            download_concurrency=invocation.download_concurrency,
             report=report,
-            max_download_bytes=max_output_bytes,
+            max_download_bytes=invocation.max_output_bytes,
         )
     )
-    corpus_name = requested_name or _metadata_name(metadata, identifier)
+    corpus_name = invocation.requested_name or _metadata_name(
+        metadata,
+        invocation.identifier,
+    )
     folder_name = _safe_name(corpus_name)
     filename = f"{folder_name}.parquet"
     destination = staging / filename
@@ -65,18 +62,18 @@ def data_portal_import_process(
         _write_documents(documents, texts, destination)
     else:
         report({"fraction": 0.25, "message": "Tabulating RO-Crate metadata"})
-        _tabulate_metadata(identifier, metadata, destination)
+        _tabulate_metadata(invocation.identifier, metadata, destination)
 
-    if destination.stat().st_size > max_output_bytes:
+    if destination.stat().st_size > invocation.max_output_bytes:
         raise ValueError("Data Portal import exceeds its storage budget")
 
     readme = staging / "README.md"
     readme.write_text(
-        f"# {corpus_name}\n\nSource: {identifier}\n",
+        f"# {corpus_name}\n\nSource: {invocation.identifier}\n",
         encoding="utf-8",
     )
     total_bytes = destination.stat().st_size + readme.stat().st_size
-    if total_bytes > max_output_bytes:
+    if total_bytes > invocation.max_output_bytes:
         raise ValueError("Data Portal import exceeds its storage limit")
     report({"fraction": 0.95, "message": "Portal import is ready to publish"})
     return {

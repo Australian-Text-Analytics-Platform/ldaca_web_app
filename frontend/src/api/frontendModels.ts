@@ -26,6 +26,7 @@ import type {
   WorkspaceNodeInfo,
   ListWorkspacesResponse,
   UnavailableWorkspaceListItem,
+  UnavailableDataBlock,
 } from './generated/types.gen';
 import type { ArrowField } from '@/lib/arrow/arrowTable';
 
@@ -70,8 +71,8 @@ export type TopicModelingResponse = Omit<TopicModelingResult, 'topics'> & {
   data: {
     topics: TopicModelingResult['topics'];
     corpus_sizes: number[];
-    meta: TopicModelingResult['meta'];
-    per_corpus_topic_counts?: Record<string, number>[] | null;
+    segment_count: number;
+    truncated_segment_count: number;
   };
 };
 
@@ -90,6 +91,7 @@ export interface WorkspaceGraphEdge {
 export interface WorkspaceGraphResponse {
   nodes: WorkspaceGraphNode[];
   edges: WorkspaceGraphEdge[];
+  unavailableNodes?: UnavailableDataBlock[];
 }
 export type WorkspaceSummary = AvailableWorkspaceListItem & { availability: 'available' };
 export type UnavailableWorkspaceSummary = UnavailableWorkspaceListItem & {

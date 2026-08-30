@@ -28,14 +28,18 @@ vi.mock('@/api/tableApi', () => ({
 
 const result: ConcordanceAnalysisResponse = {
   kind: 'concordance',
-  sources: [],
+  result: {
+    variant: 'queried',
+    sources: [],
+    query: { kind: 'concordance', page: 1, page_size: 20 },
+  },
+  combinable: false,
   metadata: {
     metadata_columns: [],
     concordance_columns: ['CONC_matched_text'],
     quotation_columns: [],
     all_columns: ['CONC_matched_text'],
   },
-  query: { page: 1, page_size: 20 },
   data: {
     'node-1': {
       data: [[{ CONC_matched_text: 'Alpha' }, { CONC_matched_text: 'beta' }]],
@@ -76,6 +80,7 @@ const reviewSource: ConcordanceRunAllReviewSource = {
     document_count: 25,
     internal_columns: ['__wordflow_source_row_id'],
     match_count: 25,
+    source_document_count: 25,
     metadata_columns: [],
     node_id: 'node-1',
     node_name: 'Corpus',

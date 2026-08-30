@@ -40,6 +40,7 @@ class DtypeNormalizationChange(_StrictModel):
 class WorkspaceNodeInfo(_StrictModel):
     """Complete addressable node metadata returned by node routes."""
 
+    availability: Literal["available"] = "available"
     id: uuid.UUID
     name: NodeName
     provenance: NodeProvenance
@@ -53,6 +54,22 @@ class WorkspaceNodeInfo(_StrictModel):
     tokenizer_model: str | None = Field(default=None, max_length=500)
     can_undo: bool
     can_redo: bool
+
+
+class UnavailableDataBlock(_StrictModel):
+    """Minimal safe projection of one isolated current-schema Data Block."""
+
+    availability: Literal["unavailable"] = "unavailable"
+    id: uuid.UUID
+    workspace_id: uuid.UUID
+    reason: Literal["record_invalid"] = "record_invalid"
+    warning: str
+
+
+DataBlockResource = Annotated[
+    WorkspaceNodeInfo | UnavailableDataBlock,
+    Field(discriminator="availability"),
+]
 
 
 class WorkspaceResource(_StrictModel):
@@ -216,7 +233,7 @@ class WorkspaceArchiveManifest(_StrictModel):
     """Only accepted client workspace archive manifest."""
 
     format: Literal["wordflow-materialized-workspace"]
-    version: Literal[20]
+    version: Literal[21]
     workspace: WorkspaceArchiveMetadata
     nodes: list[WorkspaceArchiveNode]
     tabs: list[Tab]
@@ -262,6 +279,8 @@ class WorkspaceArchiveManifest(_StrictModel):
 
 
 __all__ = [
+    "DataBlockResource",
+    "UnavailableDataBlock",
     "WorkspaceCreateRequest",
     "WorkspaceArchiveAnalysis",
     "WorkspaceArchiveAnalysisInput",

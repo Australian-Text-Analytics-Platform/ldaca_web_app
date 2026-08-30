@@ -47,6 +47,9 @@ def to_dict(
     if rel_data_path.is_absolute() or ".." in rel_data_path.parts:
         raise ValueError("Node data path must be workspace-relative")
     abs_data_path = root_dir / rel_data_path
+    schema = node.data.collect_schema()
+    if node.document is not None and node.document not in schema.names():
+        raise ValueError("Document Column Preference is absent from Data Block schema")
 
     # A plan file is part of the last committed metadata snapshot. Serialize
     # beside it and replace atomically so cancellation or process failure can
@@ -61,12 +64,16 @@ def to_dict(
 
     return {
         "node_metadata": {
-            "id": node.id,
+            "id": str(node.id),
             "name": node.name,
             "provenance": node.provenance.model_dump(mode="json"),
             "document": node.document,
             "color": node.color,
             "tokenizer_model": node.tokenizer_model,
+            "schema": [
+                {"name": name, "dtype": str(dtype)}
+                for name, dtype in schema.items()
+            ],
         },
         "data_path": rel_data_path.as_posix(),
     }

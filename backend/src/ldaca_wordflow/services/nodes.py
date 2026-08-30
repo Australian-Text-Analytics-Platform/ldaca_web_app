@@ -40,7 +40,11 @@ from ..models.node_resources import (
     NodeEditRequest,
     NodeUpdateRequest,
 )
-from ..models.workspace import WorkspaceNodeInfo
+from ..models.workspace import (
+    DataBlockResource,
+    UnavailableDataBlock,
+    WorkspaceNodeInfo,
+)
 from .node_operations import (
     build_derived_lazyframe,
     build_derived_node,
@@ -57,6 +61,9 @@ from .storage_admission import StorageAdmissionService
 from .workspace import WorkspaceService
 
 T = TypeVar("T")
+_UNAVAILABLE_DATA_BLOCK_WARNING = (
+    "This Data Block is unavailable because its stored data is invalid."
+)
 
 
 class NodeService:
@@ -82,7 +89,7 @@ class NodeService:
     async def create(
         self,
         user_id: str,
-        workspace_id: str,
+        workspace_id: uuid.UUID,
         request: NodeCreateRequest,
     ) -> tuple[WorkspaceNodeInfo, int]:
         """Create a file source or immutable derived node and commit once."""
@@ -102,7 +109,7 @@ class NodeService:
     async def _create_from_file(
         self,
         user_id: str,
-        workspace_id: str,
+        workspace_id: uuid.UUID,
         request: FileNodeCreateRequest,
     ) -> tuple[WorkspaceNodeInfo, int]:
         """Snapshot a user file, stage parquet, add a node, and commit once."""
@@ -125,7 +132,7 @@ class NodeService:
     async def _create_from_file_admitted(
         self,
         user_id: str,
-        workspace_id: str,
+        workspace_id: uuid.UUID,
         request: FileNodeCreateRequest,
     ) -> tuple[WorkspaceNodeInfo, int]:
         """Create one source node after durable storage has been reserved."""
@@ -148,7 +155,7 @@ class NodeService:
             raise InvalidInputError(f"Invalid node name: {reason}")
 
         staged_path: Path | None = None
-        node_id = str(uuid.uuid4())
+        node_id = uuid.uuid4()
         try:
             async with self._workspaces.mutation_context(
                 user_id,
@@ -158,7 +165,7 @@ class NodeService:
                     _stage_dataframe,
                     dataframe,
                     lease.path,
-                    node_id,
+                    str(node_id),
                     self._max_storage_bytes,
                 )
                 node = Node(
@@ -180,7 +187,7 @@ class NodeService:
     async def _create_derived(
         self,
         user_id: str,
-        workspace_id: str,
+        workspace_id: uuid.UUID,
         request: NodeDerivationRequest,
     ) -> tuple[WorkspaceNodeInfo, int]:
         """Build and attach a derived node while the sole mutation gate is held."""
@@ -196,7 +203,7 @@ class NodeService:
     async def preview(
         self,
         user_id: str,
-        workspace_id: str,
+        workspace_id: uuid.UUID,
         request: NodeDerivationRequest,
         *,
         page: int,
@@ -220,28 +227,48 @@ class NodeService:
     async def list_nodes(
         self,
         user_id: str,
-        workspace_id: str,
-    ) -> tuple[list[WorkspaceNodeInfo], int]:
+        workspace_id: uuid.UUID,
+    ) -> tuple[list[DataBlockResource], int]:
         """Return the complete ordered Data Block graph projection."""
 
         async with self._workspaces.read_context(user_id, workspace_id) as lease:
-            records = [
-                WorkspaceNodeInfo.model_validate(
-                    await self._run_io(canonical_node_info, node)
+            records: list[DataBlockResource] = []
+            for node_id in lease.workspace.node_ids:
+                node = lease.workspace.nodes.get(node_id)
+                if node is None:
+                    records.append(
+                        UnavailableDataBlock(
+                            id=node_id,
+                            workspace_id=lease.workspace.id,
+                            warning=_UNAVAILABLE_DATA_BLOCK_WARNING,
+                        )
+                    )
+                    continue
+                records.append(
+                    WorkspaceNodeInfo.model_validate(
+                        await self._run_io(canonical_node_info, node)
+                    )
                 )
-                for node in lease.workspace.nodes.values()
-            ]
             return records, lease.revision
 
     async def get(
         self,
         user_id: str,
-        workspace_id: str,
-        node_id: str,
-    ) -> tuple[WorkspaceNodeInfo, int]:
+        workspace_id: uuid.UUID,
+        node_id: uuid.UUID,
+    ) -> tuple[DataBlockResource, int]:
         async with self._workspaces.read_context(user_id, workspace_id) as lease:
             node = lease.workspace.nodes.get(node_id)
             if node is None:
+                if node_id in lease.workspace.unavailable_node_ids:
+                    return (
+                        UnavailableDataBlock(
+                            id=node_id,
+                            workspace_id=lease.workspace.id,
+                            warning=_UNAVAILABLE_DATA_BLOCK_WARNING,
+                        ),
+                        lease.revision,
+                    )
                 raise NodeNotFoundError("Node not found")
             info = await self._run_io(canonical_node_info, node)
             return WorkspaceNodeInfo.model_validate(info), lease.revision
@@ -249,8 +276,8 @@ class NodeService:
     async def update(
         self,
         user_id: str,
-        workspace_id: str,
-        node_id: str,
+        workspace_id: uuid.UUID,
+        node_id: uuid.UUID,
         request: NodeUpdateRequest,
     ) -> tuple[WorkspaceNodeInfo, int]:
         async with self._workspaces.mutation_context(
@@ -299,8 +326,8 @@ class NodeService:
     async def edit(
         self,
         user_id: str,
-        workspace_id: str,
-        node_id: str,
+        workspace_id: uuid.UUID,
+        node_id: uuid.UUID,
         request: NodeEditRequest,
     ) -> tuple[WorkspaceNodeInfo, int]:
         """Replace one Data Block plan without changing its graph identity."""
@@ -329,8 +356,8 @@ class NodeService:
     async def undo(
         self,
         user_id: str,
-        workspace_id: str,
-        node_id: str,
+        workspace_id: uuid.UUID,
+        node_id: uuid.UUID,
     ) -> tuple[WorkspaceNodeInfo, int]:
         """Restore one Data Block's previous runtime plan."""
 
@@ -344,8 +371,8 @@ class NodeService:
     async def redo(
         self,
         user_id: str,
-        workspace_id: str,
-        node_id: str,
+        workspace_id: uuid.UUID,
+        node_id: uuid.UUID,
     ) -> tuple[WorkspaceNodeInfo, int]:
         """Restore one Data Block's next runtime plan."""
 
@@ -359,8 +386,8 @@ class NodeService:
     async def _move_history(
         self,
         user_id: str,
-        workspace_id: str,
-        node_id: str,
+        workspace_id: uuid.UUID,
+        node_id: uuid.UUID,
         *,
         redo: bool,
     ) -> tuple[WorkspaceNodeInfo, int]:
@@ -381,8 +408,8 @@ class NodeService:
     async def delete(
         self,
         user_id: str,
-        workspace_id: str,
-        node_id: str,
+        workspace_id: uuid.UUID,
+        node_id: uuid.UUID,
     ) -> int:
         async with self._workspaces.mutation_context(
             user_id,
@@ -400,8 +427,8 @@ class NodeService:
     async def schema(
         self,
         user_id: str,
-        workspace_id: str,
-        node_id: str,
+        workspace_id: uuid.UUID,
+        node_id: uuid.UUID,
     ) -> tuple[bytes, int]:
         """Return one Data Block schema as a zero-row IPC stream."""
 
@@ -526,7 +553,7 @@ def _schema_names(lazyframe: pl.LazyFrame) -> list[str]:
     return lazyframe.collect_schema().names()
 
 
-def _editable_node(workspace: Workspace, node_id: str) -> Node:
+def _editable_node(workspace: Workspace, node_id: uuid.UUID) -> Node:
     node = workspace.nodes.get(node_id)
     if node is None:
         raise NodeNotFoundError("Node not found")

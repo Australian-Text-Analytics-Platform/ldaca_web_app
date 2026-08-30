@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol
+import uuid
+
+from ..workers.invocations import AnalysisWorkerInput
 
 
 class AnalysisSchedulingStopped(RuntimeError):
@@ -17,16 +19,15 @@ class AnalysisExecutionKey:
     """Deployment identity used only by the process-local execution runtime."""
 
     user_id: str
-    workspace_id: str
-    analysis_id: str
+    workspace_id: uuid.UUID
+    analysis_id: uuid.UUID
 
 
 @dataclass(frozen=True, slots=True)
 class AnalysisInvocation:
     """Private snapshotted callable and paths that never enter Analysis JSON."""
 
-    function: Callable[..., object]
-    kwargs: Mapping[str, object]
+    input: AnalysisWorkerInput
     storage_roots: tuple[str, ...]
     max_storage_bytes: int
     max_storage_files: int

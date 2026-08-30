@@ -9,7 +9,7 @@ import polars_text  # noqa: F401  (register text namespace side-effects)
 
 from .node import Node
 from .provenance import NodeProvenance, compose_provenance, referenced_node_ids
-from .tab import Tab
+from .tab import Tab, TopicModelingTabSettings
 from .analysis import AnalysisRecord, AnalysisState, analysis_input_ids
 
 
@@ -20,22 +20,27 @@ class Workspace:
         self,
         *,
         name: str | None = None,
-        workspace_id: str | None = None,
-        created_at: str | None = None,
-        modified_at: str | None = None,
+        workspace_id: uuid.UUID | None = None,
+        created_at: datetime | None = None,
+        modified_at: datetime | None = None,
     ) -> None:
-        now = datetime.now(UTC).isoformat()
+        now = datetime.now(UTC)
 
-        self.id = workspace_id or str(uuid.uuid4())
-        self.name = name or f"workspace_{self.id[:8]}"
-        self.nodes: dict[str, Node] = {}
-        self.tabs: dict[str, Tab] = {}
-        self.analyses: dict[str, AnalysisRecord] = {}
-        self._corrupt_analysis_records: dict[str, bytes] = {}
-        self._children_by_parent: dict[str, list[Node]] = {}
+        self.id = workspace_id or uuid.uuid4()
+        self.name = name or f"workspace_{str(self.id)[:8]}"
+        self.nodes: dict[uuid.UUID, Node] = {}
+        self._node_order: list[uuid.UUID] = []
+        self._unavailable_node_parents: dict[
+            uuid.UUID, tuple[uuid.UUID, ...]
+        ] = {}
+        self.tabs: dict[uuid.UUID, Tab] = {}
+        self._corrupt_tab_records: dict[uuid.UUID, bytes] = {}
+        self.analyses: dict[uuid.UUID, AnalysisRecord] = {}
+        self._corrupt_analysis_records: dict[uuid.UUID, bytes] = {}
+        self._children_by_parent: dict[uuid.UUID, list[Node]] = {}
         self.description: str = ""
-        self.created_at: str = created_at or now
-        self.modified_at: str = modified_at or now
+        self.created_at: datetime = created_at or now
+        self.modified_at: datetime = modified_at or now
 
     # Node management -------------------------------------------------
 
@@ -59,31 +64,72 @@ class Workspace:
         if source_workspace is not None and source_workspace is not self:
             raise ValueError("Node already belongs to another workspace")
         self.nodes[node.id] = node
+        self._node_order.append(node.id)
         self._children_by_parent[node.id] = []
         for parent in node.parents:
             self._children_by_parent[parent.id].append(node)
         node.workspace = self
         return node
 
-    def children_of(self, node_id: str) -> list[Node]:
+    def add_unavailable_node(
+        self,
+        node_id: uuid.UUID,
+        parent_ids: list[uuid.UUID],
+    ) -> None:
+        if node_id in self.nodes or node_id in self._unavailable_node_parents:
+            raise ValueError(f"Workspace already contains Data Block {node_id}")
+        self._unavailable_node_parents[node_id] = tuple(parent_ids)
+        self._node_order.append(node_id)
+
+    @property
+    def unavailable_node_ids(self) -> set[uuid.UUID]:
+        return set(self._unavailable_node_parents)
+
+    @property
+    def node_ids(self) -> list[uuid.UUID]:
+        return list(self._node_order)
+
+    @property
+    def root_node_count(self) -> int:
+        return sum(not node.parents for node in self.nodes.values()) + sum(
+            not parents for parents in self._unavailable_node_parents.values()
+        )
+
+    @property
+    def leaf_node_count(self) -> int:
+        parent_ids = {
+            parent.id for node in self.nodes.values() for parent in node.parents
+        } | {
+            parent_id
+            for parents in self._unavailable_node_parents.values()
+            for parent_id in parents
+        }
+        return len(set(self._node_order) - parent_ids)
+
+    def children_of(self, node_id: uuid.UUID) -> list[Node]:
         """Return the aggregate-owned children of one registered node."""
 
         return list(self._children_by_parent[node_id])
 
-    def reorder_nodes(self, ordered_ids: list[str]) -> list[str]:
+    def reorder_nodes(self, ordered_ids: list[uuid.UUID]) -> list[uuid.UUID]:
         """Apply an exact duplicate-free permutation of all workspace nodes."""
 
         if len(ordered_ids) != len(set(ordered_ids)) or set(ordered_ids) != set(
-            self.nodes
+            self._node_order
         ):
             raise ValueError("Node order must be an exact duplicate-free permutation")
-        self.nodes = {node_id: self.nodes[node_id] for node_id in ordered_ids}
-        return list(self.nodes.keys())
+        self._node_order = list(ordered_ids)
+        self.nodes = {
+            node_id: self.nodes[node_id]
+            for node_id in ordered_ids
+            if node_id in self.nodes
+        }
+        return list(self._node_order)
 
     # Tab management --------------------------------------------------
 
     def add_tab(self, tab: Tab) -> Tab:
-        tab_id = str(tab.id)
+        tab_id = tab.id
         if tab_id in self.tabs:
             raise ValueError(f"Workspace already contains tab {tab_id}")
         if len(tab.analysis_ids) != len(set(tab.analysis_ids)):
@@ -98,7 +144,19 @@ class Workspace:
         self.tabs[tab_id] = tab
         return tab
 
-    def remove_tab(self, tab_id: str) -> Tab | None:
+    def add_corrupt_tab(self, tab_id: uuid.UUID, content: bytes) -> None:
+        if tab_id in self.tabs or tab_id in self._corrupt_tab_records:
+            raise ValueError(f"Workspace already contains tab {tab_id}")
+        self._corrupt_tab_records[tab_id] = content
+
+    @property
+    def corrupt_tab_ids(self) -> set[uuid.UUID]:
+        return set(self._corrupt_tab_records)
+
+    def corrupt_tab_bytes(self, tab_id: uuid.UUID) -> bytes:
+        return self._corrupt_tab_records[tab_id]
+
+    def remove_tab(self, tab_id: uuid.UUID) -> Tab | None:
         return self.tabs.pop(tab_id, None)
 
     # Analysis management --------------------------------------------
@@ -109,15 +167,15 @@ class Workspace:
         *,
         link_to_tab: bool = True,
     ) -> AnalysisRecord:
-        analysis_id = str(analysis.id)
+        analysis_id = analysis.id
         if (
             analysis_id in self.analyses
             or analysis_id in self._corrupt_analysis_records
         ):
             raise ValueError(f"Workspace already contains analysis {analysis_id}")
-        tab = self.tabs.get(str(analysis.tab_id))
+        tab = self.tabs.get(analysis.tab_id)
         if analysis.parent_analysis_id is not None:
-            parent = self.analyses.get(str(analysis.parent_analysis_id))
+            parent = self.analyses.get(analysis.parent_analysis_id)
             if parent is None or parent.tab_id != analysis.tab_id:
                 raise ValueError("A Sub-Analysis requires a parent in the same Tab")
         self.analyses[analysis_id] = analysis
@@ -127,10 +185,7 @@ class Workspace:
             tab.analysis_ids.append(analysis.id)
         return analysis
 
-    def add_corrupt_analysis(self, analysis_id: str, content: bytes) -> None:
-        canonical_id = str(uuid.UUID(analysis_id))
-        if canonical_id != analysis_id:
-            raise ValueError("Corrupt Analysis storage identity is invalid")
+    def add_corrupt_analysis(self, analysis_id: uuid.UUID, content: bytes) -> None:
         if (
             analysis_id in self.analyses
             or analysis_id in self._corrupt_analysis_records
@@ -139,13 +194,15 @@ class Workspace:
         self._corrupt_analysis_records[analysis_id] = content
 
     @property
-    def corrupt_analysis_ids(self) -> set[str]:
+    def corrupt_analysis_ids(self) -> set[uuid.UUID]:
         return set(self._corrupt_analysis_records)
 
-    def corrupt_analysis_bytes(self, analysis_id: str) -> bytes:
+    def corrupt_analysis_bytes(self, analysis_id: uuid.UUID) -> bytes:
         return self._corrupt_analysis_records[analysis_id]
 
-    def remove_analysis(self, analysis_id: str) -> AnalysisRecord | bytes | None:
+    def remove_analysis(
+        self, analysis_id: uuid.UUID
+    ) -> AnalysisRecord | bytes | None:
         analysis = self.analyses.get(analysis_id)
         if analysis is None:
             corrupt = self._corrupt_analysis_records.pop(analysis_id, None)
@@ -155,26 +212,28 @@ class Workspace:
 
         descendants = self.analysis_descendants(analysis_id)
         for record in reversed(descendants):
-            child_id = str(record.id)
+            child_id = record.id
             self.analyses.pop(child_id, None)
             self._unlink_analysis_id(child_id)
         removed = self.analyses.pop(analysis_id)
         self._unlink_analysis_id(analysis_id)
         return removed
 
-    def _unlink_analysis_id(self, analysis_id: str) -> None:
-        parsed = uuid.UUID(analysis_id)
+    def _unlink_analysis_id(self, analysis_id: uuid.UUID) -> None:
         for tab in self.tabs.values():
-            if parsed in tab.analysis_ids:
-                tab.analysis_ids.remove(parsed)
-            selection = tab.topic_modeling_projection_selection
-            if selection is not None and selection.analysis_id == parsed:
-                tab.topic_modeling_projection_selection = None
+            if analysis_id in tab.analysis_ids:
+                tab.analysis_ids.remove(analysis_id)
+            settings = tab.settings
+            if not isinstance(settings, TopicModelingTabSettings):
+                continue
+            selection = settings.projection_selection
+            if selection is not None and selection.analysis_id == analysis_id:
+                settings.projection_selection = None
 
     def replace_analysis(self, analysis: AnalysisRecord) -> AnalysisRecord:
         """Replace one valid lifecycle record without changing its identity."""
 
-        analysis_id = str(analysis.id)
+        analysis_id = analysis.id
         if analysis_id not in self.analyses:
             raise ValueError("Analysis does not exist")
         previous = self.analyses[analysis_id]
@@ -185,47 +244,47 @@ class Workspace:
         self.analyses[analysis_id] = analysis
         return analysis
 
-    def analysis_children(self, analysis_id: str) -> list[AnalysisRecord]:
+    def analysis_children(self, analysis_id: uuid.UUID) -> list[AnalysisRecord]:
         return [
             analysis
             for analysis in self.analyses.values()
-            if str(analysis.parent_analysis_id) == analysis_id
+            if analysis.parent_analysis_id == analysis_id
         ]
 
-    def analysis_descendants(self, analysis_id: str) -> list[AnalysisRecord]:
+    def analysis_descendants(self, analysis_id: uuid.UUID) -> list[AnalysisRecord]:
         descendants: list[AnalysisRecord] = []
         pending = list(self.analysis_children(analysis_id))
         while pending:
             child = pending.pop(0)
             descendants.append(child)
-            pending[0:0] = self.analysis_children(str(child.id))
+            pending[0:0] = self.analysis_children(child.id)
         return descendants
 
-    def live_analysis_ids(self) -> set[str]:
+    def live_analysis_ids(self) -> set[uuid.UUID]:
         """Return Analyses owned by the current Tab collection."""
 
         return {
-            str(analysis_id)
+            analysis_id
             for tab in self.tabs.values()
             for analysis_id in tab.analysis_ids
         }
 
-    def analysis_tab_id(self, analysis_id: str) -> str | None:
+    def analysis_tab_id(self, analysis_id: uuid.UUID) -> uuid.UUID | None:
         """Return the sole Tab owning an Analysis."""
 
         for tab_id, tab in self.tabs.items():
-            if any(str(item) == analysis_id for item in tab.analysis_ids):
+            if analysis_id in tab.analysis_ids:
                 return tab_id
         return None
 
-    def reserved_node_ids(self) -> set[str]:
+    def reserved_node_ids(self) -> set[uuid.UUID]:
         """Derive active shared input reservations from durable Analysis state."""
 
-        reserved: set[str] = set()
+        reserved: set[uuid.UUID] = set()
         for analysis in self.analyses.values():
             if analysis.state in {AnalysisState.QUEUED, AnalysisState.RUNNING}:
                 reserved.update(
-                    str(node_id) for node_id in analysis_input_ids(analysis.request)
+                    analysis_input_ids(analysis.request)
                 )
         return reserved
 
@@ -257,20 +316,20 @@ class Workspace:
         order.insert(idx + 1, node.id)
         self.reorder_nodes(order)
 
-    def node_removal_affected_ids(self, node_id: str) -> set[str]:
+    def node_removal_affected_ids(self, node_id: uuid.UUID) -> set[uuid.UUID]:
         """Return the Data Blocks whose state deletion would rewrite."""
 
         if node_id not in self.nodes:
             return set()
         return {node_id, *(child.id for child in self.children_of(node_id))}
 
-    def remove_node(self, node_id: str) -> bool:
+    def remove_node(self, node_id: uuid.UUID) -> bool:
         if node_id not in self.nodes:
             return False
         node = self.nodes[node_id]
         child_nodes = self.children_of(node_id)
         survivors = {key: value for key, value in self.nodes.items() if key != node_id}
-        replacements: dict[str, tuple[NodeProvenance, list[Node]]] = {}
+        replacements: dict[uuid.UUID, tuple[NodeProvenance, list[Node]]] = {}
 
         # Validate every composed lineage before mutating the aggregate.
         for child in child_nodes:
@@ -297,6 +356,7 @@ class Workspace:
         node.parents = []
         node.workspace = None
         del self.nodes[node_id]
+        self._node_order.remove(node_id)
         self._children_by_parent = {key: [] for key in self.nodes}
         for child in self.nodes.values():
             for parent in child.parents:
@@ -310,7 +370,7 @@ class Workspace:
     # Dunder ----------------------------------------------------------
     def __repr__(self) -> str:  # pragma: no cover
         return (
-            f"Workspace(id={self.id[:8]}, name='{self.name}', nodes={len(self.nodes)})"
+            f"Workspace(id={str(self.id)[:8]}, name='{self.name}', nodes={len(self.nodes)})"
         )
 
 

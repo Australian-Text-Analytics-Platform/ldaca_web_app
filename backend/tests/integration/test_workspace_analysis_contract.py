@@ -89,7 +89,10 @@ def test_quotation_preview_page_is_native_arrow_ipc(tmp_path: Path) -> None:
         marker = client.get(
             f"/api/workspaces/{workspace_id}/analyses/{analysis_id}/result"
         )
-        assert marker.json() == {"kind": "quotation", "ready": True}
+        assert marker.json() == {
+            "kind": "quotation",
+            "result": {"variant": "ready"},
+        }
         page = client.post(
             f"/api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/quotation-preview/query",
             json={"page": 1, "page_size": 1, "sort_by": None, "descending": False},
@@ -423,8 +426,14 @@ def test_concordance_result_uses_the_completed_analysis_snapshot(
         before_payload = before.json()
         assert "analysis_params" not in before_payload
         assert "combinable" not in before_payload
-        assert before_payload["sources"][0]["node_id"] == node_id
-        assert before_payload["sources"][0]["result"]["pagination"]["result_count"] == 2
+        assert before_payload["result"]["variant"] == "queried"
+        assert before_payload["result"]["sources"][0]["node_id"] == node_id
+        assert (
+            before_payload["result"]["sources"][0]["result"]["pagination"][
+                "result_count"
+            ]
+            == 2
+        )
 
         edited = client.post(
             f"/api/workspaces/{workspace_id}/nodes/{node_id}/edits",
@@ -471,8 +480,8 @@ def test_concordance_result_uses_the_completed_analysis_snapshot(
             f"/api/workspaces/{workspace_id}/analyses/{analysis_id}/result"
         )
         assert stored.status_code == 200, stored.text
-        assert stored.json()["ready"] is True
-        assert stored.json()["sources"] is None
+        assert stored.json()["result"] == {"variant": "ready"}
+        assert stored.json()["result"] == {"variant": "ready"}
 
         unavailable = client.post(
             f"/api/workspaces/{workspace_id}/analyses/{analysis_id}/result/query",
@@ -598,9 +607,10 @@ def test_concordance_run_all_group_stores_results_without_publishing_nodes(
         )
         assert root_result.status_code == 200, root_result.text
         assert root_result.json()["kind"] == "concordance_run_all"
-        assert root_result.json()["result_type"] == "group"
+        assert root_result.json()["result"]["variant"] == "group"
         assert [
-            source["analysis_id"] for source in root_result.json()["sources"]
+            source["analysis_id"]
+            for source in root_result.json()["result"]["sources"]
         ] == [child["id"] for child in children]
 
         for child in children:
@@ -610,17 +620,18 @@ def test_concordance_run_all_group_stores_results_without_publishing_nodes(
             assert result.status_code == 200, result.text
             payload = result.json()
             assert payload["kind"] == "concordance_run_all"
-            assert payload["result_type"] == "source"
-            assert payload["source"]["document_column"] == "text"
-            assert payload["source"]["metadata_columns"] == ["source"]
-            assert "CONC_matched_text" in payload["source"]["analysis_columns"]
-            assert payload["source"]["table"]["delivery"] == "projected"
+            assert payload["result"]["variant"] == "source"
+            source = payload["result"]["source"]
+            assert source["document_column"] == "text"
+            assert source["metadata_columns"] == ["source"]
+            assert "CONC_matched_text" in source["analysis_columns"]
+            assert source["table"]["delivery"] == "projected"
             page = client.get(
-                payload["source"]["table"]["matches"]["rows_url"],
+                source["table"]["matches"]["rows_url"],
                 params={"page": 1, "page_size": 20},
             )
             assert page.status_code == 200, page.text
-            density = client.get(payload["source"]["table"]["density_url"])
+            density = client.get(source["table"]["density_url"])
             assert density.status_code == 200, density.text
             assert density.json()["document_count"] == 2
             assert density.json()["match_count"] == 2

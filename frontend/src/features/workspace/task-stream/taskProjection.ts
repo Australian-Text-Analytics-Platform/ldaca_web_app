@@ -1,4 +1,9 @@
-import type { Analysis, CorruptAnalysis, UserFileImport } from '@/api';
+import type {
+  Analysis,
+  UnavailableAnalysis,
+  UnavailableUserFileImport,
+  UserFileImport,
+} from '@/api';
 
 type TaskState = 'queued' | 'running' | 'successful' | 'failed' | 'cancelled';
 
@@ -47,10 +52,10 @@ const failureMessage = (value: unknown): string | undefined => {
 };
 
 export const analysisToTask = (
-  resource: Analysis | CorruptAnalysis,
+  resource: Analysis | UnavailableAnalysis,
   workspaceId: string,
 ): TaskItem => {
-  if ('request' in resource) {
+  if (resource.availability === 'available') {
     const progress = 'progress' in resource ? resource.progress : null;
     return {
       resource_type: 'analysis',
@@ -71,15 +76,25 @@ export const analysisToTask = (
   return {
     resource_type: 'analysis',
     task_id: resource.id,
-    task_type: 'analysis_corrupt',
+    task_type: 'analysis_unavailable',
     workspace_id: workspaceId,
     state: 'failed',
-    message: 'This analysis record is corrupt and must be cleared.',
-    error: resource.code ?? 'analysis_corrupt',
+    message: resource.warning,
+    error: resource.reason,
   };
 };
 
-export const importToTask = (resource: UserFileImport): TaskItem => {
+export const importToTask = (resource: UserFileImport | UnavailableUserFileImport): TaskItem => {
+  if (resource.availability === 'unavailable') {
+    return {
+      resource_type: 'user_file_import',
+      task_id: resource.id,
+      task_type: 'user_file_import_unavailable',
+      state: 'failed',
+      message: resource.warning,
+      error: resource.reason,
+    };
+  }
   const progress = resource.progress;
   return {
     resource_type: 'user_file_import',

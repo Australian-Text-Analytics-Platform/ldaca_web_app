@@ -13,6 +13,7 @@ const EMPTY_FRESH_IDS = new Set<string>();
 interface WorkspaceNodeListProps {
   workspaceId: string | null;
   nodes: WorkspaceGraphNode[];
+  unavailableWarnings?: string[];
   selectedNodeIds: string[];
   onToggleNodeSelection: (nodeId: string) => void;
   /** Action rendered for a pinned row while the row is not hovered. */
@@ -37,6 +38,7 @@ const isActivationKey = (event: React.KeyboardEvent<HTMLDivElement>): boolean =>
 function WorkspaceNodeList({
   workspaceId,
   nodes,
+  unavailableWarnings = [],
   selectedNodeIds,
   onToggleNodeSelection,
   renderPinnedRowAction,
@@ -76,6 +78,15 @@ function WorkspaceNodeList({
 
   return (
     <div className="flex flex-col gap-2">
+      {unavailableWarnings.map((warning, index) => (
+        <div
+          key={`${warning}-${String(index)}`}
+          role="alert"
+          className="rounded-md border border-warning bg-warning-background px-2 py-2 text-description text-warning"
+        >
+          {warning}
+        </div>
+      ))}
       <TooltipProvider delayDuration={120} skipDelayDuration={0}>
         <div className="relative">
           {nodes.length ? (

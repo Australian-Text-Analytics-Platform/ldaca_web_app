@@ -102,19 +102,39 @@ def test_analysis_requests_results_and_queries_are_discriminated() -> None:
     analysis_create = app.openapi()["components"]["schemas"]["AnalysisCreate"]
     definitions = (
         analysis_create["properties"]["request"],
-        paths[
-            "/api/workspaces/{workspace_id}/analyses/{analysis_id}/result/query"
-        ]["post"]["requestBody"]["content"]["application/json"]["schema"],
-        paths["/api/workspaces/{workspace_id}/analyses/{analysis_id}/result"]["get"]
-        ["responses"]["200"]["content"]["application/json"]["schema"],
+        paths["/api/workspaces/{workspace_id}/analyses/{analysis_id}/result/query"][
+            "post"
+        ]["requestBody"]["content"]["application/json"]["schema"],
+        paths["/api/workspaces/{workspace_id}/analyses/{analysis_id}/result"]["get"][
+            "responses"
+        ]["200"]["content"]["application/json"]["schema"],
     )
     for definition in definitions:
         assert "oneOf" in definition
         assert definition["discriminator"]["propertyName"] == "kind"
     assert (
-        "/api/workspaces/{workspace_id}/analyses/{analysis_id}/preferences"
-        not in paths
+        "/api/workspaces/{workspace_id}/analyses/{analysis_id}/preferences" not in paths
     )
+
+
+def test_result_projection_variants_are_discriminated_and_strict() -> None:
+    schemas = app.openapi()["components"]["schemas"]
+    expected = {
+        "AnnotationResultProjection": {"ready", "queried"},
+        "ConcordanceResultProjection": {"ready", "queried"},
+        "ConcordanceRunAllProjection": {"source", "group"},
+    }
+    for name, variants in expected.items():
+        projection = schemas[name]
+        assert projection["discriminator"]["propertyName"] == "variant"
+        assert set(projection["discriminator"]["mapping"]) == variants
+        assert len(projection["oneOf"]) == len(variants)
+
+    assert schemas["QuotationResult"]["properties"]["result"] == {
+        "$ref": "#/components/schemas/PreviewReadyResult"
+    }
+    assert set(schemas["PreviewReadyResult"]["properties"]) == {"variant"}
+    assert schemas["PreviewReadyResult"]["required"] == ["variant"]
 
 
 def test_quotation_preview_query_is_a_dedicated_arrow_contract() -> None:
@@ -184,6 +204,7 @@ def test_workspace_owned_analysis_representation_is_exact() -> None:
     schema = app.openapi()
     analysis = schema["components"]["schemas"]["Analysis"]
     assert set(analysis["properties"]) == {
+        "availability",
         "id",
         "tab_id",
         "parent_analysis_id",
@@ -229,34 +250,43 @@ def test_tab_resources_are_exact_and_the_collection_is_unpaginated() -> None:
     schema = app.openapi()
     tab = schema["components"]["schemas"]["Tab"]
     assert set(tab["properties"]) == {
+        "availability",
         "id",
         "kind",
         "name",
         "analysis_ids",
-        "annotation_correction_columns",
-        "stop_words",
-        "topic_modeling_words_per_topic",
-        "topic_modeling_projection_selection",
+        "settings",
         "created_at",
         "modified_at",
         "revision",
     }
-    assert set(tab["required"]) == set(tab["properties"]) - {
-        "analysis_ids",
-        "annotation_correction_columns",
-        "stop_words",
-        "topic_modeling_words_per_topic",
-        "topic_modeling_projection_selection",
+    assert set(tab["required"]) == set(tab["properties"]) - {"analysis_ids"}
+    assert tab["properties"]["settings"] == {"$ref": "#/components/schemas/TabSettings"}
+    settings = schema["components"]["schemas"]["TabSettings"]
+    assert settings["discriminator"]["propertyName"] == "kind"
+    assert set(settings["discriminator"]["mapping"]) == {
+        "annotation",
+        "concordance",
+        "quotation",
+        "sequential",
+        "token_frequency",
+        "topic_modeling",
     }
     collection = schema["paths"]["/api/workspaces/{workspace_id}/tabs"]["get"]
     assert [parameter["name"] for parameter in collection["parameters"]] == [
         "workspace_id"
     ]
-    response = collection["responses"]["200"]["content"]["application/json"][
-        "schema"
-    ]
+    response = collection["responses"]["200"]["content"]["application/json"]["schema"]
     assert response["type"] == "array"
-    assert response["items"] == {"$ref": "#/components/schemas/Tab"}
+    assert response["items"] == {"$ref": "#/components/schemas/TabResource"}
+    item = schema["components"]["schemas"]["TabResource"]
+    assert item["discriminator"] == {
+        "propertyName": "availability",
+        "mapping": {
+            "available": "#/components/schemas/Tab",
+            "unavailable": "#/components/schemas/UnavailableTab",
+        },
+    }
 
 
 def test_pagination_is_one_based_everywhere_it_is_exposed() -> None:
@@ -288,6 +318,30 @@ def test_topic_modeling_result_is_complete_and_not_paginated() -> None:
     query_properties = schemas["TopicModelingResultQuery"]["properties"]
     assert "page" not in query_properties
     assert "page_size" not in query_properties
+
+
+def test_quotation_engine_selection_is_required_and_discriminated() -> None:
+    schemas = app.openapi()["components"]["schemas"]
+
+    request = schemas["QuotationAnalysisRequest"]
+    assert "engine" in request["required"]
+    assert schemas["QuotationEngineSelection"] == {
+        "discriminator": {
+            "propertyName": "type",
+            "mapping": {
+                "local": "#/components/schemas/LocalQuotationEngineSelection",
+                "remote": "#/components/schemas/RemoteQuotationEngineSelection",
+            },
+        },
+        "oneOf": [
+            {"$ref": "#/components/schemas/LocalQuotationEngineSelection"},
+            {"$ref": "#/components/schemas/RemoteQuotationEngineSelection"},
+        ],
+    }
+    assert schemas["RemoteQuotationEngineSelection"]["required"] == [
+        "type",
+        "engine_id",
+    ]
 
 
 def test_every_validation_response_uses_the_safe_api_error_contract() -> None:

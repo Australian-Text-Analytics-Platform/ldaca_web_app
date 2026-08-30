@@ -3,6 +3,7 @@
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from threading import Event, Lock
+import uuid
 
 import pytest
 
@@ -15,8 +16,8 @@ from ldaca_wordflow.services.topic_projection_cache import (
 def _key(value: int) -> TopicProjectionCacheKey:
     return TopicProjectionCacheKey(
         user_id="user",
-        workspace_id="workspace",
-        analysis_id="analysis",
+        workspace_id=uuid.UUID("11111111-1111-4111-8111-111111111111"),
+        analysis_id=uuid.UUID("22222222-2222-4222-8222-222222222222"),
         context_path="/context",
         context_inode=1,
         context_size=2,

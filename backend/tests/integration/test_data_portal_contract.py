@@ -159,9 +159,9 @@ def test_portal_import_token_is_not_persisted_and_publish_is_atomic(
         report_progress,
     ) -> DataPortalUserFileImportResult:
         del self, key, executor
-        assert execution.kwargs["api_token"] == "portal-secret"
+        assert execution.input.api_token == "portal-secret"
         await report_progress(Progress(fraction=0.5, message="Importing"))
-        staging = Path(str(execution.kwargs["staging_dir"]))
+        staging = Path(execution.input.staging_dir)
         (staging / "corpus.parquet").write_bytes(b"parquet")
         (staging / "README.md").write_text("# Corpus\n")
         return DataPortalUserFileImportResult(
@@ -229,8 +229,8 @@ def test_multi_user_portal_import_token_is_execution_only(
         report_progress,
     ) -> DataPortalUserFileImportResult:
         del self, key, executor, report_progress
-        assert execution.kwargs["api_token"] == "browser-import-secret"
-        staging = Path(str(execution.kwargs["staging_dir"]))
+        assert execution.input.api_token == "browser-import-secret"
+        staging = Path(execution.input.staging_dir)
         (staging / "corpus.parquet").write_bytes(b"parquet")
         return DataPortalUserFileImportResult(
             destination_path="LDaCA/corpus",

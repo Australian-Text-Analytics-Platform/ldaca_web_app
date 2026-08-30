@@ -29,7 +29,7 @@ from ldaca_wordflow.domain.workspace.provenance import (
 
 def _source(name: str) -> Node:
     return Node(
-        id=str(uuid.uuid4()),
+        id=uuid.uuid4(),
         name=name,
         data=pl.DataFrame({"value": [1]}).lazy(),
     )
@@ -37,7 +37,7 @@ def _source(name: str) -> Node:
 
 def _unary(name: str, parent: Node, operation) -> Node:
     return Node(
-        id=str(uuid.uuid4()),
+        id=uuid.uuid4(),
         name=name,
         data=parent.data,
         parents=[parent],
@@ -76,7 +76,7 @@ def test_deleting_an_ancestor_composes_its_typed_derivation() -> None:
     assert isinstance(composed_input, DerivationProvenance)
     assert isinstance(composed_input.operation, CloneDerivation)
     assert isinstance(composed_input.inputs[0].value, NodeReference)
-    assert str(composed_input.inputs[0].value.node_id) == source.id
+    assert composed_input.inputs[0].value.node_id == source.id
     assert (
         describe_provenance(
             filtered.provenance,
@@ -93,7 +93,7 @@ def test_deletion_preserves_join_and_concatenation_input_order_and_roles() -> No
     intermediate = workspace.add_node(_unary("Intermediate", left, CloneDerivation()))
     join = workspace.add_node(
         Node(
-            id=str(uuid.uuid4()),
+            id=uuid.uuid4(),
             name="Join",
             data=left.data,
             parents=[intermediate, right],
@@ -117,7 +117,7 @@ def test_deletion_preserves_join_and_concatenation_input_order_and_roles() -> No
     )
     concatenation = workspace.add_node(
         Node(
-            id=str(uuid.uuid4()),
+            id=uuid.uuid4(),
             name="Concatenation",
             data=left.data,
             parents=[intermediate, right],
@@ -157,8 +157,8 @@ def test_derivation_roles_are_closed_and_operation_specific() -> None:
         DerivationProvenance(
             operation=JoinDerivation(left_on="value", right_on="value"),
             inputs=[
-                DerivationInput(role="right", value=node_reference(str(uuid.uuid4()))),
-                DerivationInput(role="left", value=node_reference(str(uuid.uuid4()))),
+                DerivationInput(role="right", value=node_reference(uuid.uuid4())),
+                DerivationInput(role="left", value=node_reference(uuid.uuid4())),
             ],
         )
 
@@ -166,6 +166,6 @@ def test_derivation_roles_are_closed_and_operation_specific() -> None:
         DerivationProvenance(
             operation=ConcatDerivation(),
             inputs=[
-                DerivationInput(role="member", value=node_reference(str(uuid.uuid4())))
+                DerivationInput(role="member", value=node_reference(uuid.uuid4()))
             ],
         )

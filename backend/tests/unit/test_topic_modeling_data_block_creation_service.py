@@ -46,7 +46,7 @@ def _data_block_creation_fixture(
     workspace = Workspace(name="topic Data Block Creation")
     workspace.add_node(
         Node(
-            id=str(source_id),
+            id=source_id,
             name="Source",
             data=pl.DataFrame({"text": ["first", "second"]}).lazy(),
             provenance=SourceProvenance(),
@@ -124,7 +124,7 @@ def _data_block_creation_fixture(
             top_n_topics=1 if invalid_top_n_provenance else 2,
         ),
         inputs=[
-            DerivationInput(role="source", value=node_reference(str(source_id)))
+            DerivationInput(role="source", value=node_reference(source_id))
         ],
     )
     meanings_provenance = DerivationProvenance(
@@ -133,7 +133,7 @@ def _data_block_creation_fixture(
         ),
         inputs=[
             DerivationInput(
-                role="source", value=node_reference(str(topic_data_id))
+                role="source", value=node_reference(topic_data_id)
             )
         ],
     )
@@ -197,16 +197,15 @@ def test_topic_modeling_data_block_creation_preserves_semantic_pair_and_parent_o
         semantic.topic_data_node_id,
         semantic.topic_meanings_node_id,
     ]
-    assert workspace.nodes[str(semantic.topic_data_node_id)].parents[0].id == str(
-        source_id
+    assert workspace.nodes[semantic.topic_data_node_id].parents[0].id == source_id
+    assert (
+        workspace.nodes[semantic.topic_meanings_node_id].parents[0].id
+        == semantic.topic_data_node_id
     )
-    assert workspace.nodes[
-        str(semantic.topic_meanings_node_id)
-    ].parents[0].id == str(semantic.topic_data_node_id)
-    assert workspace.nodes[str(semantic.topic_data_node_id)].color is None
-    assert workspace.nodes[str(semantic.topic_meanings_node_id)].color is None
+    assert workspace.nodes[semantic.topic_data_node_id].color is None
+    assert workspace.nodes[semantic.topic_meanings_node_id].color is None
 
-    topic_data = workspace.nodes[str(semantic.topic_data_node_id)]
+    topic_data = workspace.nodes[semantic.topic_data_node_id]
     page = _query_page(
         [topic_data],
         f'SELECT * FROM "{topic_data.id}"',
@@ -238,7 +237,7 @@ def test_topic_modeling_data_block_creation_rolls_back_every_output_on_failure(
             10_000_000,
         )
 
-    assert set(workspace.nodes) == {str(source_id)}
+    assert set(workspace.nodes) == {source_id}
     assert list((tmp_path / "data").glob("*.parquet")) == []
 
 

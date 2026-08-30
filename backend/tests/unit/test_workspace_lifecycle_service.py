@@ -2,6 +2,7 @@
 
 from pathlib import Path
 from typing import Any, cast
+import uuid
 
 import anyio
 import pytest
@@ -19,14 +20,14 @@ from ._storage import unlimited_storage_admission
 class _Analyses:
     def __init__(self) -> None:
         self.active = False
-        self.active_workspace_ids: set[str] = set()
-        self.cancelled: list[tuple[str, str]] = []
+        self.active_workspace_ids: set[uuid.UUID] = set()
+        self.cancelled: list[tuple[str, uuid.UUID]] = []
 
-    async def has_workspace_work(self, user_id: str, workspace_id: str) -> bool:
+    async def has_workspace_work(self, user_id: str, workspace_id: uuid.UUID) -> bool:
         del user_id
         return self.active or workspace_id in self.active_workspace_ids
 
-    async def cancel_workspace(self, user_id: str, workspace_id: str) -> None:
+    async def cancel_workspace(self, user_id: str, workspace_id: uuid.UUID) -> None:
         self.cancelled.append((user_id, workspace_id))
 
 
@@ -99,7 +100,7 @@ async def test_workspace_switch_publishes_every_runtime_transition(
         "closed",
         "open",
     ]
-    assert [str(event.resource_id) for event in runtime_events] == [
+    assert [event.resource_id for event in runtime_events] == [
         first.id,
         first.id,
         second.id,
@@ -186,7 +187,7 @@ async def test_open_failure_exposes_sibling_transition_without_fake_rollback(
     analyses.active_workspace_ids.add(first.id)
     original_open = workspaces.open_workspace
 
-    async def fail_target(user_id: str, workspace_id: str):
+    async def fail_target(user_id: str, workspace_id: uuid.UUID):
         if workspace_id == second.id:
             raise RuntimeError("target load failed")
         return await original_open(user_id, workspace_id)

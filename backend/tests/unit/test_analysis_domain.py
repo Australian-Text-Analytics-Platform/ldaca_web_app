@@ -23,15 +23,18 @@ from ldaca_wordflow.domain.workspace import (
     ConcordanceMatchDataBlockCreationAnalysisRequest,
     ConcordanceRunAllAnalysisRequest,
     Failure,
+    LocalQuotationEngineSelection,
     Progress,
     Tab,
     TokenFrequencyAnalysisRequest,
     TopicModelingAnalysisRequest,
     TopicModelingProjectionSelection,
+    TopicModelingTabSettings,
     ValidAnalysisIntegrity,
     Workspace,
     TopicModelingDataBlockCreationAnalysisRequest,
     QuotationAnalysisRequest,
+    QuotationEngineType,
     QuotationResultDataBlockCreationAnalysisRequest,
     SequentialDataBlockCreationAnalysisRequest,
     SequentialDataBlockCreationSource,
@@ -108,7 +111,9 @@ def test_presentation_fields_are_rejected_from_analysis_requests() -> None:
         TopicModelingAnalysisRequest.model_validate(topic_payload)
 
 
-def test_data_block_creation_kind_strictly_replaces_result_data_block_creation() -> None:
+def test_data_block_creation_kind_strictly_replaces_result_data_block_creation() -> (
+    None
+):
     source_id = uuid.uuid4()
     payload = {
         "kind": "concordance_match_data_block_creation",
@@ -146,9 +151,7 @@ def test_tokenizer_mappings_follow_each_analysis_mode_contract() -> None:
         node_tokenizer_models={first: "native:plain_words_en"},
         search_word="word",
     )
-    assert text_request.node_tokenizer_models == {
-        first: "native:plain_words_en"
-    }
+    assert text_request.node_tokenizer_models == {first: "native:plain_words_en"}
 
     with pytest.raises(ValidationError, match="Tokens mode"):
         ConcordanceAnalysisRequest(
@@ -225,9 +228,12 @@ def test_topic_modeling_data_block_creation_request_preserves_ordered_sources() 
             )
         ]
     )
-    assert TypeAdapter(AnalysisRequest).validate_python(
-        document_creation.model_dump(mode="json")
-    ) == document_creation
+    assert (
+        TypeAdapter(AnalysisRequest).validate_python(
+            document_creation.model_dump(mode="json")
+        )
+        == document_creation
+    )
     with pytest.raises(ValidationError, match="align"):
         TopicModelingDataBlockCreationAnalysisRequest(
             node_ids=[first, second],
@@ -254,9 +260,10 @@ def test_run_all_and_data_block_creation_have_distinct_strict_requests() -> None
     )
 
     run_all = ConcordanceRunAllAnalysisRequest(source=source)
-    assert TypeAdapter(AnalysisRequest).validate_python(
-        run_all.model_dump(mode="json")
-    ) == run_all
+    assert (
+        TypeAdapter(AnalysisRequest).validate_python(run_all.model_dump(mode="json"))
+        == run_all
+    )
     with pytest.raises(ValidationError):
         ConcordanceRunAllAnalysisRequest.model_validate(
             {
@@ -288,7 +295,11 @@ def test_run_all_and_data_block_creation_have_distinct_strict_requests() -> None
             sources=[creation.sources[0], creation.sources[0]]
         )
 
-    quotation_source = QuotationAnalysisRequest(node_id=first, column="text")
+    quotation_source = QuotationAnalysisRequest(
+        node_id=first,
+        column="text",
+        engine=LocalQuotationEngineSelection(type=QuotationEngineType.LOCAL),
+    )
     quotation_run_all = QuotationResultDataBlockCreationAnalysisRequest(
         source=DataBlockCreationSource(
             source_node_id=quotation_source.node_id,
@@ -296,9 +307,12 @@ def test_run_all_and_data_block_creation_have_distinct_strict_requests() -> None
             new_node_name="Quotations",
         )
     )
-    assert TypeAdapter(AnalysisRequest).validate_python(
-        quotation_run_all.model_dump(mode="json")
-    ) == quotation_run_all
+    assert (
+        TypeAdapter(AnalysisRequest).validate_python(
+            quotation_run_all.model_dump(mode="json")
+        )
+        == quotation_run_all
+    )
 
 
 def test_sequential_data_block_creation_filter_is_strict_and_ordered() -> None:
@@ -384,6 +398,7 @@ def test_analysis_lifecycle_and_public_shape_are_exact() -> None:
     public = public_analysis(record, integrity=ValidAnalysisIntegrity())
 
     assert set(public.model_dump()) == {
+        "availability",
         "id",
         "tab_id",
         "parent_analysis_id",
@@ -468,8 +483,8 @@ def test_workspace_supports_arbitrary_depth_analysis_forests_and_reservations() 
         )
     )
 
-    assert workspace.analysis_children(str(root.id)) == [child]
-    assert workspace.reserved_node_ids() == {str(node_id)}
+    assert workspace.analysis_children(root.id) == [child]
+    assert workspace.reserved_node_ids() == {node_id}
 
     grandchild = _analysis(
         run_all_request,
@@ -480,7 +495,7 @@ def test_workspace_supports_arbitrary_depth_analysis_forests_and_reservations() 
     )
     workspace.add_analysis(grandchild)
 
-    assert workspace.analysis_descendants(str(root.id)) == [child, grandchild]
+    assert workspace.analysis_descendants(root.id) == [child, grandchild]
     assert tab.analysis_ids == [root.id, child.id, grandchild.id]
 
 
@@ -505,15 +520,16 @@ def test_removing_topic_analysis_clears_its_tab_projection_selection() -> None:
             timestamp=datetime.now(UTC),
         )
     )
-    tab.topic_modeling_projection_selection = TopicModelingProjectionSelection(
+    assert isinstance(tab.settings, TopicModelingTabSettings)
+    tab.settings.projection_selection = TopicModelingProjectionSelection(
         analysis_id=analysis.id,
         cluster_count=2,
         top_n_topics=2,
     )
 
-    workspace.remove_analysis(str(analysis.id))
+    workspace.remove_analysis(analysis.id)
 
-    assert tab.topic_modeling_projection_selection is None
+    assert tab.settings.projection_selection is None
 
 
 def test_workspace_separates_live_visibility_from_detached_reservations() -> None:
@@ -538,14 +554,14 @@ def test_workspace_separates_live_visibility_from_detached_reservations() -> Non
         )
     )
 
-    assert workspace.live_analysis_ids() == {str(root.id)}
-    assert workspace.analysis_tab_id(str(root.id)) == str(tab.id)
+    assert workspace.live_analysis_ids() == {root.id}
+    assert workspace.analysis_tab_id(root.id) == tab.id
 
     tab.analysis_ids.clear()
 
     assert workspace.live_analysis_ids() == set()
-    assert workspace.analysis_tab_id(str(root.id)) is None
-    assert workspace.reserved_node_ids() == {str(node_id)}
+    assert workspace.analysis_tab_id(root.id) is None
+    assert workspace.reserved_node_ids() == {node_id}
 
 
 def test_analysis_transition_methods_preserve_request_and_advance_revision() -> None:
@@ -553,12 +569,8 @@ def test_analysis_transition_methods_preserve_request_and_advance_revision() -> 
     record = _analysis(_concordance(), timestamp=created_at)
 
     running = record.start(created_at + timedelta(seconds=1))
-    requested = running.request_running_cancellation(
-        created_at + timedelta(seconds=2)
-    )
-    repeated = requested.request_running_cancellation(
-        created_at + timedelta(seconds=3)
-    )
+    requested = running.request_running_cancellation(created_at + timedelta(seconds=2))
+    repeated = requested.request_running_cancellation(created_at + timedelta(seconds=3))
     cancelled = requested.confirm_cancelled(
         created_at + timedelta(seconds=4),
         progress=Progress(fraction=0.5, message="Stopping"),
@@ -612,9 +624,9 @@ def test_success_is_one_atomic_validated_transition() -> None:
 
 def test_success_records_query_snapshot_as_a_private_explicit_dependency() -> None:
     created_at = datetime.now(UTC)
-    running = _analysis(
-        _concordance(), timestamp=created_at
-    ).start(created_at + timedelta(seconds=1))
+    running = _analysis(_concordance(), timestamp=created_at).start(
+        created_at + timedelta(seconds=1)
+    )
     query_snapshot = AnalysisQuerySnapshotRecord(
         relative_path=f"analyses/{running.id}/query-input"
     )
@@ -626,9 +638,12 @@ def test_success_records_query_snapshot_as_a_private_explicit_dependency() -> No
     )
 
     assert succeeded.query_snapshot == query_snapshot
-    assert "query_snapshot" not in public_analysis(
-        succeeded, integrity=ValidAnalysisIntegrity()
-    ).model_dump()
+    assert (
+        "query_snapshot"
+        not in public_analysis(
+            succeeded, integrity=ValidAnalysisIntegrity()
+        ).model_dump()
+    )
 
     invalid = running.model_dump()
     invalid["query_snapshot"] = query_snapshot.model_dump()
@@ -640,12 +655,14 @@ def test_analysis_output_node_ids_are_required_unique_and_strictly_plural() -> N
     created_at = datetime.now(UTC)
     first = uuid.uuid4()
     second = uuid.uuid4()
-    succeeded = _analysis(
-        _concordance(), timestamp=created_at
-    ).start(created_at + timedelta(seconds=1)).succeed(
-        created_at + timedelta(seconds=2),
-        result_payload={"kind": "concordance"},
-        output_node_ids=[first, second],
+    succeeded = (
+        _analysis(_concordance(), timestamp=created_at)
+        .start(created_at + timedelta(seconds=1))
+        .succeed(
+            created_at + timedelta(seconds=2),
+            result_payload={"kind": "concordance"},
+            output_node_ids=[first, second],
+        )
     )
 
     assert succeeded.output_node_ids == [first, second]

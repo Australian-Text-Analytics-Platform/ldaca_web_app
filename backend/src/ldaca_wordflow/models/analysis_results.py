@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Annotated, Literal, TypeVar, cast
+from typing import Annotated, Literal, cast
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
 
@@ -130,16 +130,10 @@ class ResultColumnMetadata(_StrictModel):
     all_columns: list[str]
 
 
-ArtifactValueT = TypeVar("ArtifactValueT")
 PrivateArtifactPath = Annotated[str, Field(min_length=1)]
 
 
 class CompleteTableIdentity[ArtifactValueT](_StrictModel):
-    table_id: str = Field(min_length=1, max_length=200)
-    artifact: ArtifactValueT
-
-
-class PagedTableIdentity[ArtifactValueT](_StrictModel):
     table_id: str = Field(min_length=1, max_length=200)
     artifact: ArtifactValueT
 
@@ -176,7 +170,6 @@ class _TokenTables[ArtifactValueT](_StrictModel):
 
 class TokenResultMetadata(_StrictModel):
     effective_token_limit: int = Field(ge=1)
-    server_token_limit: int = Field(ge=1)
 
 
 class _TokenFrequencyBody(_StrictModel):
@@ -237,36 +230,14 @@ class _TopicClusteringContext[ArtifactValueT](_StrictModel):
     source_row_indices: list[list[int]]
 
 
-class TopicStageTiming(_StrictModel):
-    stage: str
-    elapsed_ms: float = Field(ge=0)
-
-
-class TopicMetadata(_StrictModel):
-    embeddings_from_ctfidf: bool | None = None
-    total_topics_incl_outlier: int | None = Field(default=None, ge=0)
-    native: bool | None = None
-    engine: str | None = None
-    embedding_model: str | None = None
-    embedding_backend: str | None = None
-    random_state: int | None = None
-    vectorizer_model: str | None = None
-    n_chunks: int | None = Field(default=None, ge=0)
-    truncated_segment_count: int | None = Field(default=None, ge=0)
-    corpus_sizes_before_sample: list[int] | None = None
-    corpus_sizes_after_sample: list[int] | None = None
-    stage_timings_ms: list[TopicStageTiming] | None = None
-    node_names: list[str] = Field(default_factory=list)
-
-
 class _TopicModelingBody(_StrictModel):
     topics: list[TopicItem]
     corpus_sizes: list[int]
-    per_corpus_topic_counts: list[dict[int, int]] | None = None
-    meta: TopicMetadata
     sources: list[TopicSource]
     clustering: TopicClustering
     topic_inclusion: TopicInclusion
+    segment_count: int = Field(ge=0)
+    truncated_segment_count: int = Field(ge=0)
 
 
 class TopicClustering(_StrictModel):
@@ -316,24 +287,38 @@ class PreviewReadyStoredResult(_StrictModel):
     ready: Literal[True] = True
 
 
+class PreviewReadyResult(_StrictModel):
+    variant: Literal["ready"]
+
+
 class ConcordanceStoredResult(PreviewReadyStoredResult):
     pass
 
 
-class ConcordanceResult(PreviewReadyStoredResult):
+class ConcordanceQueriedResult(_StrictModel):
+    variant: Literal["queried"]
+    sources: list[ConcordanceSourceResult] = Field(min_length=1, max_length=2)
+    query: ConcordanceResultQuery
+
+
+type ConcordanceResultProjection = Annotated[
+    PreviewReadyResult | ConcordanceQueriedResult,
+    Field(discriminator="variant"),
+]
+
+
+class ConcordanceResult(_StrictModel):
     kind: Literal["concordance"] = "concordance"
-    sources: list[ConcordanceSourceResult] | None = Field(
-        default=None, min_length=1, max_length=2
-    )
-    query: ConcordanceResultQuery | None = None
+    result: ConcordanceResultProjection
 
 
 class QuotationStoredResult(PreviewReadyStoredResult):
     pass
 
 
-class QuotationResult(PreviewReadyStoredResult):
+class QuotationResult(_StrictModel):
     kind: Literal["quotation"] = "quotation"
+    result: PreviewReadyResult
 
 
 class SequentialSourceDescriptor(_StrictModel):
@@ -403,7 +388,7 @@ class RunAllSourceDescriptor(_StrictModel):
     metadata_columns: list[str]
     analysis_columns: list[str]
     internal_columns: list[str]
-    source_document_count: int | None = Field(default=None, ge=0)
+    source_document_count: int = Field(ge=0)
     document_count: int = Field(ge=0)
     match_count: int = Field(ge=0)
 
@@ -548,32 +533,65 @@ class ConcordanceRunAllGroupSource(RunAllSourceDescriptor):
     analysis_id: uuid.UUID
 
 
-class ConcordanceRunAllStoredResult(_StrictModel):
-    result_type: Literal["source", "group"]
-    source: RunAllSourceTable[StoredArtifactIdentity] | None = None
-    sources: list[ConcordanceRunAllGroupSource] | None = None
+class ConcordanceRunAllStoredSourceResult(_StrictModel):
+    variant: Literal["source"]
+    source: RunAllSourceTable[StoredArtifactIdentity]
 
-    @model_validator(mode="after")
-    def validate_shape(self) -> ConcordanceRunAllStoredResult:
-        if self.result_type == "source":
-            if self.source is None or self.sources is not None:
-                raise ValueError("A source Result requires exactly one source table")
-        elif self.sources is None or self.source is not None:
-            raise ValueError("A group Result requires ordered source descriptors")
-        elif not self.sources:
-            raise ValueError("A group Result requires at least one source")
-        return self
+
+class ConcordanceRunAllStoredGroupResult(_StrictModel):
+    variant: Literal["group"]
+    sources: list[ConcordanceRunAllGroupSource] = Field(min_length=1)
+
+
+type ConcordanceRunAllStoredProjection = Annotated[
+    ConcordanceRunAllStoredSourceResult | ConcordanceRunAllStoredGroupResult,
+    Field(discriminator="variant"),
+]
+
+
+class ConcordanceRunAllStoredResult(_StrictModel):
+    result: ConcordanceRunAllStoredProjection
+
+    @property
+    def result_type(self) -> Literal["source", "group"]:
+        return self.result.variant
+
+    @property
+    def source(self) -> RunAllSourceTable[StoredArtifactIdentity] | None:
+        if isinstance(self.result, ConcordanceRunAllStoredSourceResult):
+            return self.result.source
+        return None
+
+    @property
+    def sources(self) -> list[ConcordanceRunAllGroupSource] | None:
+        if isinstance(self.result, ConcordanceRunAllStoredGroupResult):
+            return self.result.sources
+        return None
 
 
 class RunAllSourceTableResource(RunAllSourceDescriptor):
     table: ProjectedTableResource
 
 
+class ConcordanceRunAllSourceResult(_StrictModel):
+    variant: Literal["source"]
+    source: RunAllSourceTableResource
+
+
+class ConcordanceRunAllGroupResult(_StrictModel):
+    variant: Literal["group"]
+    sources: list[ConcordanceRunAllGroupSource] = Field(min_length=1)
+
+
+type ConcordanceRunAllProjection = Annotated[
+    ConcordanceRunAllSourceResult | ConcordanceRunAllGroupResult,
+    Field(discriminator="variant"),
+]
+
+
 class ConcordanceRunAllResult(_StrictModel):
     kind: Literal["concordance_run_all"] = "concordance_run_all"
-    result_type: Literal["source", "group"]
-    source: RunAllSourceTableResource | None = None
-    sources: list[ConcordanceRunAllGroupSource] | None = None
+    result: ConcordanceRunAllProjection
 
 
 class QuotationRunAllStoredResult(_StrictModel):
@@ -589,20 +607,31 @@ class AnnotationStoredResult(PreviewReadyStoredResult):
     pass
 
 
-class AnnotationResult(PreviewReadyStoredResult):
-    kind: Literal["annotation"] = "annotation"
-    node_id: uuid.UUID | None = None
-    page: int | None = Field(default=None, ge=1)
-    page_size: int | None = Field(default=None, ge=1)
-    total_rows: int | None = Field(default=None, ge=0)
-    rows: list[dict[str, JsonData]] | None = None
-    labels: list[AnnotationPreviewLabel] | None = None
-    query: AnnotationResultQuery | None = None
-
-
 class AnnotationPreviewLabel(_StrictModel):
     row_index: int = Field(ge=0)
     label: str | None
+
+
+class AnnotationQueriedResult(_StrictModel):
+    variant: Literal["queried"]
+    node_id: uuid.UUID
+    page: int = Field(ge=1)
+    page_size: int = Field(ge=1)
+    total_rows: int = Field(ge=0)
+    rows: list[dict[str, JsonData]]
+    labels: list[AnnotationPreviewLabel]
+    query: AnnotationResultQuery
+
+
+type AnnotationResultProjection = Annotated[
+    PreviewReadyResult | AnnotationQueriedResult,
+    Field(discriminator="variant"),
+]
+
+
+class AnnotationResult(_StrictModel):
+    kind: Literal["annotation"] = "annotation"
+    result: AnnotationResultProjection
 
 
 class AnnotationRunAllStoredResult(_AnnotationRunAllCounts):
@@ -756,10 +785,18 @@ def stored_result_payload(kind: str, result: BaseModel) -> dict[str, JsonData]:
         "concordance_run_all": {"state", "message"},
         "quotation_run_all": {"state", "message"},
     }.get(kind, set())
-    return cast(
+    payload = cast(
         dict[str, JsonData],
         result.model_dump(mode="json", exclude=excluded),
     )
+    if kind == "concordance_run_all":
+        result_type = payload.pop("result_type")
+        source = payload.pop("source")
+        return cast(
+            dict[str, JsonData],
+            {"result": {"variant": result_type, "source": source}},
+        )
+    return payload
 
 
 __all__ = [

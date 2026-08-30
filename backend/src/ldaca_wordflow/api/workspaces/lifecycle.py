@@ -96,7 +96,7 @@ async def get_workspace_by_id(
 
     record = await workspace_service.get_workspace(
         current_user.id,
-        str(workspace_id),
+        workspace_id,
     )
     response.headers["ETag"] = workspace_etag(record.revision)
     return _resource(record)
@@ -117,7 +117,7 @@ async def open_workspace_by_id(
 
     record = await runtime.workspace_lifecycle_service.open(
         current_user.id,
-        str(workspace_id),
+        workspace_id,
     )
     response.headers["ETag"] = workspace_etag(record.revision)
     return _resource(record)
@@ -141,7 +141,7 @@ async def close_workspace_by_id(
 
     record = await runtime.workspace_lifecycle_service.request_close(
         current_user.id,
-        str(workspace_id),
+        workspace_id,
     )
     if record is None:
         return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -164,7 +164,7 @@ async def update_workspace_by_id(
 
     record = await workspace_service.update_metadata(
         current_user.id,
-        str(workspace_id),
+        workspace_id,
         request,
     )
     response.headers["ETag"] = workspace_etag(record.revision)
@@ -187,7 +187,7 @@ async def reorder_workspace_nodes_by_id(
 
     record = await workspace_service.reorder_nodes(
         current_user.id,
-        str(workspace_id),
+        workspace_id,
         request,
     )
     response.headers["ETag"] = workspace_etag(record.revision)
@@ -208,6 +208,6 @@ async def delete_workspace_by_id(
 
     await runtime.workspace_lifecycle_service.delete(
         current_user.id,
-        str(workspace_id),
+        workspace_id,
     )
     return Response(status_code=status.HTTP_204_NO_CONTENT)

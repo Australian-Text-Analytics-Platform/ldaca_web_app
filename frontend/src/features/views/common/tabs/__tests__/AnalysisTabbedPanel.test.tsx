@@ -11,7 +11,10 @@ const baseTab: AnalysisTab = {
   title: 'Analysis 1',
   input_sets: { source: [] },
   settings: {},
-  annotation_correction_columns: {},
+  correctionColumns: {},
+  stopWords: [],
+  wordsPerTopic: null,
+  projectionSelection: null,
 };
 
 // EditorTabs uses pointer capture, which jsdom does not implement.
@@ -103,7 +106,10 @@ describe('AnalysisTabbedPanel', () => {
         title: 'Analysis 1',
         input_sets: { source: [] },
         settings: {},
-        annotation_correction_columns: {},
+        correctionColumns: {},
+        stopWords: [],
+        wordsPerTopic: null,
+        projectionSelection: null,
       },
       {
         tab_id: 'tab-2',
@@ -111,7 +117,10 @@ describe('AnalysisTabbedPanel', () => {
         title: 'Analysis 2',
         input_sets: { source: [] },
         settings: {},
-        annotation_correction_columns: {},
+        correctionColumns: {},
+        stopWords: [],
+        wordsPerTopic: null,
+        projectionSelection: null,
       },
     ];
     const { onReorder } = renderPanel(tabs, { multiTabEnabled: true });

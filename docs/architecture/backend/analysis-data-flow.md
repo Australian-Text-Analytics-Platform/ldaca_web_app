@@ -154,9 +154,13 @@ selection when the user invokes **Clear Results**.
 
 ## Result Projection, Tables, And Artifacts
 
-Each successful Analysis stores one strict kind-specific Result. Large tables
-and model data publish beneath the Analysis Artifact directory and are exposed
-by portable semantic identities rather than host paths.
+Each successful Analysis stores one strict kind-specific semantic Result tree.
+There is no second stored/public materialization or optional-field sum type.
+One recursive API presenter replaces every artifact and table identity in that
+tree with its URL resource, so adding a nested Result field cannot bypass a
+hard-coded overlay list. Large tables and model data publish beneath the
+Analysis Artifact directory and are exposed by portable semantic identities
+rather than host paths.
 
 ```mermaid
 flowchart LR
@@ -207,7 +211,9 @@ are not serialized for Result queries. The runtime's bounded single-flight LRU
 retains compact basis bytes by principal, Workspace, Analysis, immutable
 context identity, and K; each request derives fresh Top-N counts and retains no
 per-N Result. Public Results expose ordered source metadata and the applied
-Top-N descriptor but no Artifact URL.
+Top-N descriptor but no Artifact URL, optional diagnostics bag, or per-corpus
+diagnostic count map. Engine, timing, backend, and immutable-seed diagnostics
+are emitted to structured logs.
 
 Topic Modelling Data Block Creation is the only table-materialization path. Its
 Supporting request captures the displayed K, Top N, and projected meaning
@@ -264,7 +270,7 @@ and `group_index` values. Group indices always identify exact source-value
 tuples; optional case folding belongs to the result frontend. Trends Data Block Creation filters only this immutable
 artifact and never re-reads the live source Data Block.
 
-Native schema 21 and portable archive format 20 validate
+Native schema 22 and portable archive format 21 validate
 parent ownership, ordered Tab membership, terminal archive state, output
 identities, and retained query inputs. Older layouts are rejected without
 runtime migration.

@@ -25,25 +25,7 @@ describe('getAnalysisResultResource', () => {
   it('loads an output-only Result without refetching its Analysis resource', async () => {
     const output = {
       kind: 'quotation',
-      data: [],
-      columns: [],
-      metadata: {
-        concordance_columns: [],
-        quotation_columns: [],
-        metadata_columns: [],
-        all_columns: [],
-      },
-      pagination: {
-        page: 1,
-        page_size: 50,
-        total_source_rows: 0,
-        total_source_pages: 0,
-        result_count: 0,
-        has_next: false,
-        has_prev: false,
-      },
-      sorting: { sort_by: null, descending: false },
-      query: { kind: 'quotation', page: 1, page_size: 50, sort_by: null, descending: false },
+      result: { variant: 'ready' },
     };
     getAnalysisResultMock.mockResolvedValue({ data: output });
 
@@ -65,8 +47,8 @@ describe('getAnalysisResultResource', () => {
     const common = {
       kind: 'topic_modeling' as const,
       corpus_sizes: [501],
-      per_corpus_topic_counts: null,
-      meta: { node_names: ['Corpus'], truncated_segment_count: 7 },
+      segment_count: 501,
+      truncated_segment_count: 7,
       artifacts: { version: 1 as const, topic_meanings_parquet_path: {}, nodes: [] },
     };
     getAnalysisResultMock.mockResolvedValue({
@@ -78,12 +60,12 @@ describe('getAnalysisResultResource', () => {
     });
 
     const result = await getAnalysisResultResource<{
-      data: { topics: { id: number }[]; meta: { truncated_segment_count?: number } };
+      data: { topics: { id: number }[]; truncated_segment_count: number };
     }>('workspace-1', 'analysis-1');
 
     expect(result?.data.topics).toHaveLength(501);
     expect(result?.data.topics.at(-1)?.id).toBe(500);
-    expect(result?.data.meta.truncated_segment_count).toBe(7);
+    expect(result?.data.truncated_segment_count).toBe(7);
     expect(queryAnalysisResultMock).not.toHaveBeenCalled();
   });
 
@@ -93,8 +75,8 @@ describe('getAnalysisResultResource', () => {
         kind: 'topic_modeling',
         topics: [],
         corpus_sizes: [],
-        per_corpus_topic_counts: [],
-        meta: {},
+        segment_count: 0,
+        truncated_segment_count: 0,
         sources: [],
         clustering: {
           cluster_count: 3,

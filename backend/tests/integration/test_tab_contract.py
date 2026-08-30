@@ -79,25 +79,21 @@ def test_tabs_are_open_workspace_children_with_exact_resources(tmp_path: Path) -
         assert first.status_code == 201
         tab = first.json()
         assert set(tab) == {
+            "availability",
             "id",
             "kind",
             "name",
             "analysis_ids",
-            "annotation_correction_columns",
-            "stop_words",
-            "topic_modeling_words_per_topic",
-            "topic_modeling_projection_selection",
+            "settings",
             "created_at",
             "modified_at",
             "revision",
         }
+        assert tab["availability"] == "available"
         assert tab["kind"] == "concordance"
         assert tab["name"] == "Shared name"
         assert tab["analysis_ids"] == []
-        assert tab["annotation_correction_columns"] == {}
-        assert tab["stop_words"] == []
-        assert tab["topic_modeling_words_per_topic"] is None
-        assert tab["topic_modeling_projection_selection"] is None
+        assert tab["settings"] == {"kind": "concordance"}
         assert tab["created_at"] == tab["modified_at"]
         assert tab["revision"] == 1
         assert first.headers["Location"] == (
@@ -133,7 +129,7 @@ def test_tab_rename_is_normalized_and_no_op_is_not_persisted(tmp_path: Path) -> 
 
         no_op = client.patch(
             f"/api/workspaces/{workspace_id}/tabs/{created['id']}",
-            json={"name": "  Frequency  "},
+            json={"kind": "token_frequency", "name": "  Frequency  "},
             headers=unsafe,
         )
         assert no_op.status_code == 200
@@ -144,7 +140,7 @@ def test_tab_rename_is_normalized_and_no_op_is_not_persisted(tmp_path: Path) -> 
 
         renamed = client.patch(
             f"/api/workspaces/{workspace_id}/tabs/{created['id']}",
-            json={"name": "Renamed"},
+            json={"kind": "token_frequency", "name": "Renamed"},
             headers=unsafe,
         )
         assert renamed.status_code == 200
@@ -195,28 +191,35 @@ def test_tab_presentation_settings_are_normalized_and_kind_scoped(tmp_path: Path
             json={"kind": "topic_modeling", "name": "Topics"},
             headers=unsafe,
         ).json()
-        assert topic["topic_modeling_words_per_topic"] == 15
-        assert topic["topic_modeling_projection_selection"] is None
+        assert topic["settings"] == {
+            "kind": "topic_modeling",
+            "stop_words": {"words": []},
+            "words_per_topic": 15,
+            "projection_selection": None,
+        }
 
         updated = client.patch(
             f"{collection}/{topic['id']}",
             json={
-                "stop_words": [" The ", "and", "THE", ""],
-                "topic_modeling_words_per_topic": 32,
+                "kind": "topic_modeling",
+                "stop_words": {"words": [" The ", "and", "THE", ""]},
+                "words_per_topic": 32,
             },
             headers=unsafe,
         )
         assert updated.status_code == 200
-        assert updated.json()["stop_words"] == ["the", "and"]
-        assert updated.json()["topic_modeling_words_per_topic"] == 32
+        assert updated.json()["settings"]["stop_words"] == {
+            "words": ["the", "and"]
+        }
+        assert updated.json()["settings"]["words_per_topic"] == 32
         cleared = client.delete(
             f"{collection}/{topic['id']}/analyses",
             headers=unsafe,
         )
         assert cleared.status_code == 204
         preserved = client.get(f"{collection}/{topic['id']}").json()
-        assert preserved["stop_words"] == ["the", "and"]
-        assert preserved["topic_modeling_words_per_topic"] == 32
+        assert preserved["settings"]["stop_words"] == {"words": ["the", "and"]}
+        assert preserved["settings"]["words_per_topic"] == 32
 
         concordance = client.post(
             collection,
@@ -225,14 +228,19 @@ def test_tab_presentation_settings_are_normalized_and_kind_scoped(tmp_path: Path
         ).json()
         assert client.patch(
             f"{collection}/{concordance['id']}",
-            json={"stop_words": []},
+            json={"kind": "token_frequency", "stop_words": {"words": []}},
             headers=unsafe,
         ).status_code == 400
         assert client.patch(
             f"{collection}/{concordance['id']}",
-            json={"topic_modeling_words_per_topic": 15},
+            json={"kind": "topic_modeling", "words_per_topic": 15},
             headers=unsafe,
         ).status_code == 400
+        assert client.patch(
+            f"{collection}/{concordance['id']}",
+            json={"name": "Missing discriminator"},
+            headers=unsafe,
+        ).status_code == 422
 
 
 def test_tab_persists_across_close_and_invalid_record_is_isolated(tmp_path: Path) -> None:
@@ -260,9 +268,20 @@ def test_tab_persists_across_close_and_invalid_record_is_isolated(tmp_path: Path
         assert client.get(f"/api/workspaces/{workspace_id}").status_code == 200
 
         reopened = client.put(f"/api/workspaces/{workspace_id}/open", headers=unsafe)
-        assert reopened.status_code == 500
-        assert reopened.json()["code"] == "tab_corrupt"
-        assert reopened.json()["details"] == {"tab_id": created["id"]}
+        assert reopened.status_code == 200
+        unavailable = client.get(f"/api/workspaces/{workspace_id}/tabs").json()
+        assert unavailable == [
+            {
+                "availability": "unavailable",
+                "id": created["id"],
+                "workspace_id": workspace_id,
+                "reason": "record_invalid",
+                "warning": (
+                    "This Tab is unavailable because its stored record is invalid."
+                ),
+            }
+        ]
+        assert tab_path.read_text(encoding="utf-8") == "not json"
 
         deleted = client.delete(f"/api/workspaces/{workspace_id}", headers=unsafe)
         assert deleted.status_code == 204
@@ -285,13 +304,11 @@ def test_workspace_archive_round_trip_preserves_tabs(tmp_path: Path) -> None:
         assert manifest["tabs"] == [
             {
                 "id": original["id"],
+                "availability": "available",
                 "kind": "quotation",
                 "name": "Portable tab",
                 "analysis_ids": [],
-                "annotation_correction_columns": {},
-                "stop_words": [],
-                "topic_modeling_words_per_topic": None,
-                "topic_modeling_projection_selection": None,
+                "settings": {"kind": "quotation"},
                 "created_at": original["created_at"],
                 "modified_at": original["modified_at"],
                 "revision": 1,

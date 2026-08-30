@@ -153,7 +153,7 @@ def test_clone_inherits_document_but_not_tokenizer_preference() -> None:
     workspace = Workspace(name="derived")
     source = workspace.add_node(
         Node(
-            id=str(uuid.uuid4()),
+            id=uuid.uuid4(),
             data=pl.DataFrame({"text": ["hello"]}).lazy(),
             name="source",
             document="text",
@@ -163,7 +163,7 @@ def test_clone_inherits_document_but_not_tokenizer_preference() -> None:
 
     clone = build_derived_node(
         workspace,
-        CloneNodeCreateRequest(source_node_id=uuid.UUID(source.id)),
+        CloneNodeCreateRequest(source_node_id=source.id),
     )
 
     assert clone.document == "text"
@@ -198,7 +198,7 @@ async def test_set_cell_is_identity_preserving_undoable_and_no_op_aware() -> Non
         ),
     )
 
-    assert str(edited.id) == node.id
+    assert edited.id == node.id
     assert revision == 2
     assert node.data.collect()["annotation"].to_list() == [None, "Relevant"]
     assert node.can_undo is True
@@ -276,7 +276,7 @@ async def test_annotation_classes_preserve_extra_columns_and_commit_once() -> No
         ),
     )
 
-    assert str(edited.id) == node.id
+    assert edited.id == node.id
     assert revision == 2
     assert node.data.collect().to_dicts() == [
         {"class": "support", "description": "Supports", "code": 10},

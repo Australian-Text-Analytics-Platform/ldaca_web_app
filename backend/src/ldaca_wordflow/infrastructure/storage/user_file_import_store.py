@@ -9,13 +9,14 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
-from typing import TypeVar
+from typing import Literal, TypeVar
 
 import anyio
 from anyio.to_thread import run_sync as run_sync_in_worker_thread
-from pydantic import ValidationError
+from pydantic import BaseModel, ConfigDict, ValidationError
 
 from ...domain import UserFileImport
+from ...domain.background import BackgroundState
 from .durable_fs import (
     AtomicWriteCapacityError,
     atomic_write_json,
@@ -37,9 +38,37 @@ class StoredUserFileImport:
 
 
 @dataclass(frozen=True, slots=True)
+class UnavailableStoredUserFileImport:
+    user_id: str
+    import_id: uuid.UUID
+
+
+@dataclass(frozen=True, slots=True)
+class PreparedStoredUserFileImport:
+    user_id: str
+    resource: UserFileImport
+
+
+@dataclass(frozen=True, slots=True)
 class UserFileImportStoreSnapshot:
     records: list[StoredUserFileImport]
+    prepared_publications: list[PreparedStoredUserFileImport]
+    unavailable_records: list[UnavailableStoredUserFileImport]
     corrupt_users: frozenset[str]
+
+
+class _StoredUserFileImportEnvelope(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    version: Literal[1] = 1
+    resource: UserFileImport
+
+
+class _PreparedUserFileImportEnvelope(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    version: Literal[1] = 1
+    resource: UserFileImport
 
 
 class UserFileImportStore:
@@ -73,6 +102,29 @@ class UserFileImportStore:
             self._root_for_user(user_id),
             resource,
             self._max_record_bytes,
+        )
+
+    async def prepare_publication(
+        self,
+        user_id: str,
+        resource: UserFileImport,
+    ) -> None:
+        await self._run_io(
+            _save_prepared_publication,
+            self._root_for_user(user_id),
+            resource,
+            self._max_record_bytes,
+        )
+
+    async def clear_prepared_publication(
+        self,
+        user_id: str,
+        import_id: uuid.UUID,
+    ) -> None:
+        await self._run_io(
+            _clear_prepared_publication,
+            self._root_for_user(user_id),
+            import_id,
         )
 
     async def delete(self, user_id: str, import_id: uuid.UUID) -> None:
@@ -114,6 +166,10 @@ def _record_path(root: Path, import_id: uuid.UUID) -> Path:
     return root / f"{import_id}.json"
 
 
+def _prepared_path(root: Path, import_id: uuid.UUID) -> Path:
+    return root / f".prepared-{import_id}.json"
+
+
 def _save(root: Path, resource: UserFileImport, max_record_bytes: int) -> None:
     _require_real_directory(root, create=True)
     target = _record_path(root, resource.id)
@@ -124,11 +180,51 @@ def _save(root: Path, resource: UserFileImport, max_record_bytes: int) -> None:
     try:
         atomic_write_json(
             target,
-            resource.model_dump(mode="json"),
+            _StoredUserFileImportEnvelope(resource=resource).model_dump(mode="json"),
             max_bytes=max_record_bytes,
         )
     except AtomicWriteCapacityError as exc:
         raise UserFileImportStoreError("Import record exceeds its storage limit") from exc
+
+
+def _save_prepared_publication(
+    root: Path,
+    resource: UserFileImport,
+    max_record_bytes: int,
+) -> None:
+    if resource.state is not BackgroundState.SUCCEEDED or resource.result is None:
+        raise UserFileImportStoreError(
+            "Prepared publication must contain a successful import"
+        )
+    _require_real_directory(root, create=True)
+    target = _prepared_path(root, resource.id)
+    if target.exists():
+        metadata = target.lstat()
+        if not stat.S_ISREG(metadata.st_mode) or _is_link_or_reparse(metadata):
+            raise UserFileImportStoreError("Prepared publication is unsafe")
+    try:
+        atomic_write_json(
+            target,
+            _PreparedUserFileImportEnvelope(resource=resource).model_dump(mode="json"),
+            max_bytes=max_record_bytes,
+        )
+    except AtomicWriteCapacityError as exc:
+        raise UserFileImportStoreError(
+            "Prepared publication exceeds its storage limit"
+        ) from exc
+
+
+def _clear_prepared_publication(root: Path, import_id: uuid.UUID) -> None:
+    _require_real_directory(root, create=False)
+    target = _prepared_path(root, import_id)
+    try:
+        metadata = target.lstat()
+    except FileNotFoundError:
+        return
+    if not stat.S_ISREG(metadata.st_mode) or _is_link_or_reparse(metadata):
+        raise UserFileImportStoreError("Prepared publication is unsafe")
+    target.unlink()
+    fsync_directory(root)
 
 
 def _delete(root: Path, import_id: uuid.UUID) -> None:
@@ -144,7 +240,11 @@ def _delete(root: Path, import_id: uuid.UUID) -> None:
     fsync_directory(root)
 
 
-def _load_record(path: Path, max_record_bytes: int) -> UserFileImport:
+def _load_record(
+    path: Path,
+    import_id: uuid.UUID,
+    max_record_bytes: int,
+) -> UserFileImport:
     metadata = path.lstat()
     if (
         not stat.S_ISREG(metadata.st_mode)
@@ -153,28 +253,77 @@ def _load_record(path: Path, max_record_bytes: int) -> UserFileImport:
     ):
         raise UserFileImportStoreError("Import record is invalid")
     try:
-        resource = UserFileImport.model_validate_json(path.read_bytes())
+        envelope = _StoredUserFileImportEnvelope.model_validate_json(path.read_bytes())
     except (OSError, ValidationError, ValueError) as exc:
         raise UserFileImportStoreError("Import record is invalid") from exc
-    if path.name != f"{resource.id}.json":
+    resource = envelope.resource
+    if resource.id != import_id:
         raise UserFileImportStoreError("Import record identity is invalid")
     return resource
 
 
-def _load_user(root: Path, max_record_bytes: int) -> list[UserFileImport]:
+def _load_prepared_publication(
+    path: Path,
+    import_id: uuid.UUID,
+    max_record_bytes: int,
+) -> UserFileImport:
+    metadata = path.lstat()
+    if (
+        not stat.S_ISREG(metadata.st_mode)
+        or _is_link_or_reparse(metadata)
+        or metadata.st_size > max_record_bytes
+    ):
+        raise UserFileImportStoreError("Prepared publication is invalid")
+    try:
+        envelope = _PreparedUserFileImportEnvelope.model_validate_json(
+            path.read_bytes()
+        )
+    except (OSError, ValidationError, ValueError) as exc:
+        raise UserFileImportStoreError("Prepared publication is invalid") from exc
+    resource = envelope.resource
+    if (
+        resource.id != import_id
+        or resource.state is not BackgroundState.SUCCEEDED
+        or resource.result is None
+    ):
+        raise UserFileImportStoreError("Prepared publication is invalid")
+    return resource
+
+
+def _load_user(
+    root: Path,
+    max_record_bytes: int,
+) -> tuple[list[UserFileImport], list[UserFileImport], list[uuid.UUID]]:
     _require_real_directory(root, create=False)
     records: list[UserFileImport] = []
+    prepared: list[UserFileImport] = []
+    unavailable: list[uuid.UUID] = []
     for path in root.iterdir():
+        if path.name.startswith(".prepared-") and path.suffix == ".json":
+            try:
+                raw_import_id = path.name.removeprefix(".prepared-").removesuffix(
+                    ".json"
+                )
+                import_id = uuid.UUID(raw_import_id)
+                prepared.append(
+                    _load_prepared_publication(path, import_id, max_record_bytes)
+                )
+            except (UserFileImportStoreError, ValueError):
+                continue
+            continue
         if path.name.startswith("."):
             continue
         try:
-            uuid.UUID(path.stem)
+            import_id = uuid.UUID(path.stem)
         except ValueError as exc:
             raise UserFileImportStoreError("Import record name is invalid") from exc
         if path.suffix != ".json":
             raise UserFileImportStoreError("Import record name is invalid")
-        records.append(_load_record(path, max_record_bytes))
-    return records
+        try:
+            records.append(_load_record(path, import_id, max_record_bytes))
+        except UserFileImportStoreError:
+            unavailable.append(import_id)
+    return records, prepared, unavailable
 
 
 def _load_all(
@@ -182,9 +331,11 @@ def _load_all(
     max_record_bytes: int,
 ) -> UserFileImportStoreSnapshot:
     if not all_users_root.exists():
-        return UserFileImportStoreSnapshot([], frozenset())
+        return UserFileImportStoreSnapshot([], [], [], frozenset())
     _require_real_directory(all_users_root, create=False)
     records: list[StoredUserFileImport] = []
+    prepared_publications: list[PreparedStoredUserFileImport] = []
+    unavailable_records: list[UnavailableStoredUserFileImport] = []
     corrupt_users: set[str] = set()
     for user_root in all_users_root.iterdir():
         if user_root.name.startswith("."):
@@ -199,7 +350,10 @@ def _load_all(
         if not imports_root.exists():
             continue
         try:
-            user_records = _load_user(imports_root, max_record_bytes)
+            user_records, user_prepared, user_unavailable = _load_user(
+                imports_root,
+                max_record_bytes,
+            )
         except UserFileImportStoreError:
             corrupt_users.add(user_root.name)
             continue
@@ -207,11 +361,26 @@ def _load_all(
             StoredUserFileImport(user_root.name, resource)
             for resource in user_records
         )
-    return UserFileImportStoreSnapshot(records, frozenset(corrupt_users))
+        prepared_publications.extend(
+            PreparedStoredUserFileImport(user_root.name, resource)
+            for resource in user_prepared
+        )
+        unavailable_records.extend(
+            UnavailableStoredUserFileImport(user_root.name, import_id)
+            for import_id in user_unavailable
+        )
+    return UserFileImportStoreSnapshot(
+        records,
+        prepared_publications,
+        unavailable_records,
+        frozenset(corrupt_users),
+    )
 
 
 __all__ = [
     "StoredUserFileImport",
+    "PreparedStoredUserFileImport",
+    "UnavailableStoredUserFileImport",
     "UserFileImportStore",
     "UserFileImportStoreError",
     "UserFileImportStoreSnapshot",

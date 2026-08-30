@@ -2,6 +2,7 @@
 
 from datetime import datetime, UTC
 from pathlib import Path
+import uuid
 
 import polars as pl
 import pytest
@@ -15,16 +16,18 @@ from ldaca_wordflow.analysis.sequential_core import (
     _build_sequential_result_frames,
 )
 from ldaca_wordflow.domain.workspace import Node, Workspace
-from ldaca_wordflow.workers.input_snapshots import create_worker_input_snapshot
+from ldaca_wordflow.infrastructure.storage.input_snapshots import (
+    create_worker_input_snapshot,
+)
 from ldaca_wordflow.workers.sequential import run_sequential_analysis
 
-NODE_ID = "00000000-0000-0000-0000-000000000001"
+NODE_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 
 
 def _snapshot(tmp_path: Path) -> Path:
     data_root = tmp_path / "data"
     data_root.mkdir()
-    workspace = Workspace(name="sequential", workspace_id="workspace")
+    workspace = Workspace(name="sequential", workspace_id=uuid.uuid4())
     workspace.add_node(
         Node(
             id=NODE_ID,
@@ -56,8 +59,6 @@ def test_sequential_worker_validates_and_executes_the_typed_request(
     tmp_path: Path,
 ) -> None:
     result = run_sequential_analysis(
-        user_id="user",
-        workspace_id="workspace",
         input_snapshot_dir=str(_snapshot(tmp_path)),
         artifact_dir=str(tmp_path / "output"),
         node_id=NODE_ID,
@@ -171,8 +172,6 @@ def test_sequential_frames_keep_case_variants_as_exact_multi_column_groups() -> 
 def test_sequential_worker_rejects_noncanonical_request_fields(tmp_path: Path) -> None:
     with pytest.raises(ValidationError):
         run_sequential_analysis(
-            user_id="user",
-            workspace_id="workspace",
             input_snapshot_dir=str(_snapshot(tmp_path)),
             artifact_dir=str(tmp_path / "output"),
             node_id=NODE_ID,

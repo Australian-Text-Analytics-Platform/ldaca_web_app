@@ -1,9 +1,14 @@
 import sys
+import uuid
 from types import ModuleType
 from typing import Any, cast
 
 import polars as pl
 from ldaca_wordflow.workers.token_frequency import _compute_token_frequencies
+
+
+def _id(label: str) -> uuid.UUID:
+    return uuid.uuid5(uuid.NAMESPACE_URL, f"token-frequency:{label}")
 
 
 def test_token_frequency_worker_emits_early_progress_updates(tmp_path, monkeypatch):
@@ -41,15 +46,12 @@ def test_token_frequency_worker_emits_early_progress_updates(tmp_path, monkeypat
     monkeypatch.setitem(sys.modules, "polars_text", fake_polars_text)
 
     result = _compute_token_frequencies(
-        workspace_id="ws-1",
         node_corpora={
-            "node-1": ["alpha beta alpha"],
-            "node-2": ["alpha beta"],
+            _id("node-1"): ["alpha beta alpha"],
+            _id("node-2"): ["alpha beta"],
         },
-        node_display_names={"node-1": "Data Block 1", "node-2": "Data Block 2"},
+        node_display_names={_id("node-1"): "Data Block 1", _id("node-2"): "Data Block 2"},
         artifact_dir=str(tmp_path / "output"),
-        scratch_dir=str(tmp_path / "scratch"),
-        artifact_prefix="token_frequency_test",
         progress_callback=lambda progress, message: progress_updates.append(
             (
                 progress,
@@ -57,8 +59,8 @@ def test_token_frequency_worker_emits_early_progress_updates(tmp_path, monkeypat
             )
         ),
         node_tokenizer_models={
-            "node-1": "lindera:jieba",
-            "node-2": "lindera:jieba",
+            _id("node-1"): "lindera:jieba",
+            _id("node-2"): "lindera:jieba",
         },
     )
 
@@ -125,18 +127,15 @@ def test_token_frequency_worker_uses_per_node_tokenizer_models(tmp_path, monkeyp
     monkeypatch.setitem(sys.modules, "polars_text", fake_polars_text)
 
     result = _compute_token_frequencies(
-        workspace_id="ws-1",
         node_corpora={
-            "node-en": ["alpha beta"],
-            "node-ja": ["吾輩は猫である"],
+            _id("node-en"): ["alpha beta"],
+            _id("node-ja"): ["吾輩は猫である"],
         },
-        node_display_names={"node-en": "English", "node-ja": "Japanese"},
+        node_display_names={_id("node-en"): "English", _id("node-ja"): "Japanese"},
         artifact_dir=str(tmp_path / "output"),
-        scratch_dir=str(tmp_path / "scratch"),
-        artifact_prefix="token_frequency_models",
         node_tokenizer_models={
-            "node-en": "native:plain_words_en",
-            "node-ja": "lindera:ja-ipadic",
+            _id("node-en"): "native:plain_words_en",
+            _id("node-ja"): "lindera:ja-ipadic",
         },
     )
 

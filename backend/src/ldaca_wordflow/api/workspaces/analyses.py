@@ -10,30 +10,29 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, TypeAdapter
 from starlette.background import BackgroundTask
 
-from ...domain.workspace import Analysis, CorruptAnalysis
+from ...domain.workspace import Analysis, AnalysisResource
 from ...models.analysis_results import (
     AnalysisResult,
     AnalysisResultQuery,
     ArtifactResource,
     CompleteTableIdentity,
-    PagedTableIdentity,
     ProjectedTableIdentity,
     ConcordanceDensityResult,
     ConcordanceDocumentProjectionQuery,
     QuotationPreviewQuery,
+    PreviewReadyStoredResult,
     StoredArtifactIdentity,
 )
 from ...models.tables import (
     CompleteTableResource,
-    PagedTableResource,
     ProjectedTableResource,
     TableProjectionResource,
 )
 from ...models.analyses import AnalysisCreate, AnalysisPage
-from ..dependencies import RuntimeDep
 from ...services.analysis_results import ResultMaterialization
 from ...shared.errors import InternalServiceError
 from ...shared.json_data import JsonData
+from ..dependencies import RuntimeDep
 from ..responses import api_errors, route_path
 from ..security import CurrentSessionSecurityDep
 from ..table_responses import (
@@ -62,24 +61,6 @@ def _present_typed_value(
             url=route_path(
                 request,
                 "download_analysis_table",
-                workspace_id=workspace_id,
-                analysis_id=analysis_id,
-                table_id=value.table_id,
-            ),
-        ).model_dump(mode="json")
-    if isinstance(value, PagedTableIdentity):
-        return PagedTableResource(
-            table_id=value.table_id,
-            schema_url=route_path(
-                request,
-                "get_analysis_table_schema",
-                workspace_id=workspace_id,
-                analysis_id=analysis_id,
-                table_id=value.table_id,
-            ),
-            rows_url=route_path(
-                request,
-                "get_analysis_table_rows",
                 workspace_id=workspace_id,
                 analysis_id=analysis_id,
                 table_id=value.table_id,
@@ -172,24 +153,19 @@ def _present_result(
     workspace_id: uuid.UUID,
     analysis_id: uuid.UUID,
 ) -> AnalysisResult:
-    payload = dict(value.payload)
-    stored = _present_typed_value(
-        value.stored,
-        request,
-        workspace_id,
-        analysis_id,
+    payload = (
+        {"result": {"variant": "ready"}}
+        if isinstance(value.value, PreviewReadyStoredResult)
+        else _present_typed_value(
+            value.value,
+            request,
+            workspace_id,
+            analysis_id,
+        )
     )
-    if isinstance(stored, dict):
-        for key in (
-            "artifacts",
-            "tables",
-            "table",
-            "result_type",
-            "source",
-            "sources",
-        ):
-            if key in stored:
-                payload[key] = stored[key]
+    if not isinstance(payload, dict):
+        raise InternalServiceError("Stored Analysis Result is invalid")
+    payload["kind"] = value.kind
     return _RESULT_ADAPTER.validate_python(payload)
 
 
@@ -212,8 +188,8 @@ async def submit_tab_analysis(
 
     analysis = await runtime.analysis_service.submit(
         principal.user.id,
-        str(workspace_id),
-        str(tab_id),
+        workspace_id,
+        tab_id,
         body,
     )
     response.headers["Location"] = route_path(
@@ -227,7 +203,7 @@ async def submit_tab_analysis(
 
 @router.get(
     "/tabs/{tab_id}/analyses",
-    response_model=list[Analysis | CorruptAnalysis],
+    response_model=list[AnalysisResource],
     responses=api_errors(403, 404, 422, 500),
 )
 async def list_tab_analyses(
@@ -235,13 +211,13 @@ async def list_tab_analyses(
     tab_id: uuid.UUID,
     principal: CurrentSessionSecurityDep,
     runtime: RuntimeDep,
-) -> list[Analysis | CorruptAnalysis]:
+) -> list[AnalysisResource]:
     """Return a Tab's complete Analysis forest in creation order."""
 
     return await runtime.analysis_service.for_tab(
         principal.user.id,
-        str(workspace_id),
-        str(tab_id),
+        workspace_id,
+        tab_id,
     )
 
 
@@ -260,8 +236,8 @@ async def clear_tab_analysis(
 
     await runtime.analysis_service.clear_tab(
         principal.user.id,
-        str(workspace_id),
-        str(tab_id),
+        workspace_id,
+        tab_id,
     )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -282,7 +258,7 @@ async def list_analyses(
 
     return await runtime.analysis_service.list_analyses(
         principal.user.id,
-        str(workspace_id),
+        workspace_id,
         page=page,
         page_size=page_size,
     )
@@ -303,8 +279,8 @@ async def get_analysis(
 
     return await runtime.analysis_service.get(
         principal.user.id,
-        str(workspace_id),
-        str(analysis_id),
+        workspace_id,
+        analysis_id,
     )
 
 
@@ -330,8 +306,8 @@ async def cancel_analysis(
 
     analysis, pending = await runtime.analysis_service.cancel(
         principal.user.id,
-        str(workspace_id),
-        str(analysis_id),
+        workspace_id,
+        analysis_id,
     )
     if pending:
         response.status_code = status.HTTP_202_ACCEPTED
@@ -354,8 +330,8 @@ async def get_analysis_result(
 
     value = await runtime.analysis_result_service.query(
         principal.user.id,
-        str(workspace_id),
-        str(analysis_id),
+        workspace_id,
+        analysis_id,
         None,
         allow_closing=True,
     )
@@ -379,8 +355,8 @@ async def query_analysis_result(
 
     value = await runtime.analysis_result_service.query(
         principal.user.id,
-        str(workspace_id),
-        str(analysis_id),
+        workspace_id,
+        analysis_id,
         body,
         allow_closing=False,
     )
@@ -406,8 +382,8 @@ async def query_quotation_preview_table(
 
     result = await runtime.analysis_result_service.quotation_preview_page(
         principal.user.id,
-        str(workspace_id),
-        str(analysis_id),
+        workspace_id,
+        analysis_id,
         body,
     )
     return arrow_page_response(result)
@@ -439,8 +415,8 @@ async def download_analysis_table(
 
     snapshot = await runtime.analysis_result_service.table_response_snapshot(
         principal.user.id,
-        str(workspace_id),
-        str(analysis_id),
+        workspace_id,
+        analysis_id,
         table_id,
     )
     return FileResponse(
@@ -449,66 +425,6 @@ async def download_analysis_table(
         headers={"Cache-Control": "no-store"},
         background=BackgroundTask(snapshot.cleanup),
     )
-
-
-@router.get(
-    "/analyses/{analysis_id}/result/tables/{table_id}/rows",
-    response_class=Response,
-    responses={
-        **api_errors(403, 404, 409, 410, 422, 500, 507),
-        **ARROW_STREAM_RESPONSE,
-    },
-)
-async def get_analysis_table_rows(
-    workspace_id: uuid.UUID,
-    analysis_id: uuid.UUID,
-    table_id: str,
-    principal: CurrentSessionSecurityDep,
-    runtime: RuntimeDep,
-    page: Annotated[int, Query(ge=1)] = 1,
-    page_size: Annotated[int, Query(ge=1, le=500)] = 50,
-    sort_by: str | None = None,
-    descending: bool = False,
-) -> Response:
-    """Return one page of an open-ended Result table as Arrow IPC."""
-
-    result = await runtime.analysis_result_service.paged_table_page(
-        principal.user.id,
-        str(workspace_id),
-        str(analysis_id),
-        table_id,
-        page=page,
-        page_size=page_size,
-        sort_by=sort_by,
-        descending=descending,
-    )
-    return arrow_page_response(result)
-
-
-@router.get(
-    "/analyses/{analysis_id}/result/tables/{table_id}/schema",
-    response_class=Response,
-    responses={
-        **api_errors(403, 404, 409, 410, 422, 500, 507),
-        **ARROW_STREAM_RESPONSE,
-    },
-)
-async def get_analysis_table_schema(
-    workspace_id: uuid.UUID,
-    analysis_id: uuid.UUID,
-    table_id: str,
-    principal: CurrentSessionSecurityDep,
-    runtime: RuntimeDep,
-) -> Response:
-    """Return a paged Result table schema as a zero-row Arrow stream."""
-
-    content = await runtime.analysis_result_service.paged_table_schema(
-        principal.user.id,
-        str(workspace_id),
-        str(analysis_id),
-        table_id,
-    )
-    return arrow_stream_response(content)
 
 
 @router.get(
@@ -533,8 +449,8 @@ async def get_analysis_table_projection_rows(
 ) -> Response:
     result = await runtime.analysis_result_service.projected_table_page(
         principal.user.id,
-        str(workspace_id),
-        str(analysis_id),
+        workspace_id,
+        analysis_id,
         table_id,
         row_unit=row_unit,
         page=page,
@@ -565,8 +481,8 @@ async def query_concordance_document_projection(
 
     result = await runtime.analysis_result_service.concordance_document_projection_page(
         principal.user.id,
-        str(workspace_id),
-        str(analysis_id),
+        workspace_id,
+        analysis_id,
         table_id,
         body,
     )
@@ -591,8 +507,8 @@ async def get_analysis_table_projection_schema(
 ) -> Response:
     content = await runtime.analysis_result_service.projected_table_schema(
         principal.user.id,
-        str(workspace_id),
-        str(analysis_id),
+        workspace_id,
+        analysis_id,
         table_id,
         row_unit=row_unit,
     )
@@ -613,8 +529,8 @@ async def get_concordance_table_density(
 ) -> ConcordanceDensityResult:
     return await runtime.analysis_result_service.concordance_density(
         principal.user.id,
-        str(workspace_id),
-        str(analysis_id),
+        workspace_id,
+        analysis_id,
         table_id,
     )
 
@@ -648,8 +564,8 @@ async def download_analysis_artifact(
         reference,
     ) = await runtime.analysis_result_service.artifact_response_snapshot(
         principal.user.id,
-        str(workspace_id),
-        str(analysis_id),
+        workspace_id,
+        analysis_id,
         artifact_name,
     )
     return FileResponse(

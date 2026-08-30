@@ -41,6 +41,7 @@ def test_import_lifecycle_has_one_exact_public_and_persisted_shape() -> None:
 
     assert set(record.model_dump()) == {
         "id",
+        "availability",
         "request",
         "state",
         "progress",

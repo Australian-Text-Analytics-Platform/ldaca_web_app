@@ -75,18 +75,19 @@ class QuotationEngineType(StrEnum):
     REMOTE = "remote"
 
 
-class QuotationEngineSelection(_StrictModel):
-    type: QuotationEngineType = QuotationEngineType.LOCAL
-    engine_id: str | None = Field(default=None, max_length=64)
+class LocalQuotationEngineSelection(_StrictModel):
+    type: Literal[QuotationEngineType.LOCAL]
 
-    @model_validator(mode="after")
-    def validate_selection(self) -> QuotationEngineSelection:
-        if self.type is QuotationEngineType.LOCAL:
-            if self.engine_id is not None:
-                raise ValueError("A local quotation engine has no engine_id")
-        elif not self.engine_id:
-            raise ValueError("A remote quotation engine requires an engine_id")
-        return self
+
+class RemoteQuotationEngineSelection(_StrictModel):
+    type: Literal[QuotationEngineType.REMOTE]
+    engine_id: NonEmptyText = Field(max_length=64)
+
+
+type QuotationEngineSelection = Annotated[
+    LocalQuotationEngineSelection | RemoteQuotationEngineSelection,
+    Field(discriminator="type"),
+]
 
 
 def _validate_node_columns(
@@ -179,7 +180,7 @@ class QuotationAnalysisRequest(_StrictModel):
     kind: Literal["quotation"] = "quotation"
     node_id: uuid.UUID
     column: NonEmptyText
-    engine: QuotationEngineSelection = Field(default_factory=QuotationEngineSelection)
+    engine: QuotationEngineSelection
 
 
 class SequentialAnalysisRequest(_StrictModel):
@@ -206,6 +207,7 @@ class SequentialAnalysisRequest(_StrictModel):
     custom_interval_unit: (
         Literal["seconds", "minutes", "hours", "days", "weeks"] | None
     ) = None
+
     @model_validator(mode="after")
     def validate_interval(self) -> SequentialAnalysisRequest:
         if self.column_type == "numeric" and (
@@ -347,9 +349,7 @@ class SequentialDataBlockCreationSource(DataBlockCreationSource):
                 raise ValueError("Selected Trends periods must be unique")
             if any(index < 0 for index in self.selected_period_indices):
                 raise ValueError("Selected Trends period is out of range")
-        if len(self.excluded_group_indices) != len(
-            set(self.excluded_group_indices)
-        ):
+        if len(self.excluded_group_indices) != len(set(self.excluded_group_indices)):
             raise ValueError("Excluded Trends groups must be unique")
         if any(index < 0 for index in self.excluded_group_indices):
             raise ValueError("Excluded Trends group is out of range")
@@ -371,10 +371,10 @@ class ConcordanceDocumentDataBlockCreationSource(_StrictModel):
         if len(self.selected_metadata_columns) != len(
             set(self.selected_metadata_columns)
         ):
-            raise ValueError("Document Data Block Creation metadata columns must be unique")
-        if len(self.excluded_matched_texts) != len(
-            set(self.excluded_matched_texts)
-        ):
+            raise ValueError(
+                "Document Data Block Creation metadata columns must be unique"
+            )
+        if len(self.excluded_matched_texts) != len(set(self.excluded_matched_texts)):
             raise ValueError("Excluded Concordance terms must be unique")
         if (self.bin_count is None) != (self.selected_bins is None):
             raise ValueError("Selected bins and bin count must be provided together")
@@ -382,13 +382,17 @@ class ConcordanceDocumentDataBlockCreationSource(_StrictModel):
             if len(self.selected_bins) != len(set(self.selected_bins)):
                 raise ValueError("Selected Concordance bins must be unique")
             assert self.bin_count is not None
-            if any(index < 0 or index >= self.bin_count for index in self.selected_bins):
+            if any(
+                index < 0 or index >= self.bin_count for index in self.selected_bins
+            ):
                 raise ValueError("Selected Concordance bin is out of range")
         return self
 
 
 class ConcordanceMatchDataBlockCreationAnalysisRequest(_StrictModel):
-    kind: Literal["concordance_match_data_block_creation"] = "concordance_match_data_block_creation"
+    kind: Literal["concordance_match_data_block_creation"] = (
+        "concordance_match_data_block_creation"
+    )
     sources: list[DataBlockCreationSource] = Field(min_length=1, max_length=2)
 
     @model_validator(mode="after")
@@ -416,7 +420,9 @@ class ConcordanceDocumentDataBlockCreationAnalysisRequest(_StrictModel):
 
 
 class QuotationResultDataBlockCreationAnalysisRequest(_StrictModel):
-    kind: Literal["quotation_result_data_block_creation"] = "quotation_result_data_block_creation"
+    kind: Literal["quotation_result_data_block_creation"] = (
+        "quotation_result_data_block_creation"
+    )
     source: DataBlockCreationSource
 
 
@@ -458,7 +464,9 @@ class TopicMeaningOverride(_StrictModel):
 
 
 class TopicModelingDataBlockCreationAnalysisRequest(_StrictModel):
-    kind: Literal["topic_modeling_data_block_creation"] = "topic_modeling_data_block_creation"
+    kind: Literal["topic_modeling_data_block_creation"] = (
+        "topic_modeling_data_block_creation"
+    )
     node_ids: list[uuid.UUID] = Field(min_length=1, max_length=2)
     selected_columns: dict[uuid.UUID, list[NonEmptyText]]
     new_node_names: dict[uuid.UUID, NonEmptyText]
@@ -468,23 +476,32 @@ class TopicModelingDataBlockCreationAnalysisRequest(_StrictModel):
     topic_meanings_override: list[TopicMeaningOverride] = Field(default_factory=list)
 
     @model_validator(mode="after")
-    def validate_sources_and_topics(self) -> TopicModelingDataBlockCreationAnalysisRequest:
+    def validate_sources_and_topics(
+        self,
+    ) -> TopicModelingDataBlockCreationAnalysisRequest:
         if len(self.node_ids) != len(set(self.node_ids)):
-            raise ValueError("Topic Modeling Data Block Creation Data Block IDs must be unique")
+            raise ValueError(
+                "Topic Modeling Data Block Creation Data Block IDs must be unique"
+            )
         expected = set(self.node_ids)
         if (
             set(self.selected_columns) != expected
             or set(self.new_node_names) != expected
         ):
-            raise ValueError("Topic Modeling Data Block Creation source fields must align")
+            raise ValueError(
+                "Topic Modeling Data Block Creation source fields must align"
+            )
         if any(len(name) > 475 for name in self.new_node_names.values()):
-            raise ValueError("Topic Modeling Data Block Creation Data Block names are too long")
+            raise ValueError(
+                "Topic Modeling Data Block Creation Data Block names are too long"
+            )
         if self.topic_ids is not None and len(self.topic_ids) != len(
             set(self.topic_ids)
         ):
             raise ValueError("Selected Topic IDs must be unique")
         if self.topic_ids is not None and any(
-            topic_id < 0 or topic_id >= self.cluster_count for topic_id in self.topic_ids
+            topic_id < 0 or topic_id >= self.cluster_count
+            for topic_id in self.topic_ids
         ):
             raise ValueError("Selected Topic IDs must fit the selected cluster count")
         minimum_top_n = 0 if self.cluster_count == 0 else 1
@@ -493,8 +510,12 @@ class TopicModelingDataBlockCreationAnalysisRequest(_StrictModel):
         override_ids = [item.topic_id for item in self.topic_meanings_override]
         if len(override_ids) != len(set(override_ids)):
             raise ValueError("Topic meaning overrides must be unique")
-        if any(topic_id < 0 or topic_id >= self.cluster_count for topic_id in override_ids):
-            raise ValueError("Topic meaning overrides must fit the selected cluster count")
+        if any(
+            topic_id < 0 or topic_id >= self.cluster_count for topic_id in override_ids
+        ):
+            raise ValueError(
+                "Topic meaning overrides must fit the selected cluster count"
+            )
         return self
 
 
@@ -835,16 +856,26 @@ class AnalysisRecord(_AnalysisLifecycle):
 class Analysis(_AnalysisLifecycle):
     """Exact valid public Analysis representation."""
 
+    availability: Literal["available"]
     integrity: AnalysisIntegrity
 
 
-class CorruptAnalysis(_StrictModel):
-    """Minimal collection item for a root record that cannot be parsed."""
+class UnavailableAnalysis(_StrictModel):
+    """Minimal safe item for an invalid persisted Analysis record."""
 
-    type: Literal["corrupt_analysis"] = "corrupt_analysis"
+    availability: Literal["unavailable"]
     id: uuid.UUID
     tab_id: uuid.UUID
-    code: Literal["analysis_corrupt"] = "analysis_corrupt"
+    reason: Literal["record_invalid"]
+    warning: Literal[
+        "This Analysis is unavailable because its stored record is invalid."
+    ]
+
+
+type AnalysisResource = Annotated[
+    Analysis | UnavailableAnalysis,
+    Field(discriminator="availability"),
+]
 
 
 def public_analysis(
@@ -862,6 +893,7 @@ def public_analysis(
     )
     payload["progress"] = progress or record.progress
     payload["integrity"] = integrity
+    payload["availability"] = "available"
     return Analysis.model_validate(payload)
 
 
@@ -884,13 +916,15 @@ __all__ = [
     "ConcordanceDocumentDataBlockCreationSource",
     "ConcordanceMatchDataBlockCreationAnalysisRequest",
     "ConcordanceRunAllAnalysisRequest",
-    "CorruptAnalysis",
+    "AnalysisResource",
     "Failure",
     "InvalidAnalysisIntegrity",
+    "LocalQuotationEngineSelection",
     "Progress",
     "QuotationAnalysisRequest",
     "QuotationEngineSelection",
     "QuotationEngineType",
+    "RemoteQuotationEngineSelection",
     "QuotationRunAllAnalysisRequest",
     "QuotationResultDataBlockCreationAnalysisRequest",
     "PreviewAnalysisRequest",
@@ -905,6 +939,7 @@ __all__ = [
     "TopicModelingDataBlockCreationAnalysisRequest",
     "TopicMeaningOverride",
     "ValidAnalysisIntegrity",
+    "UnavailableAnalysis",
     "analysis_input_ids",
     "analysis_snapshot_input_ids",
     "SupportingAnalysisRequest",

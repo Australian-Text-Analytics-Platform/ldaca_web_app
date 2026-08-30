@@ -8,7 +8,7 @@ from typing import Annotated
 from fastapi import APIRouter, Query, Request, Response, status
 
 from ..domain import UserFileImport
-from ..models.user_file_imports import UserFileImportPage
+from ..models.user_file_imports import UserFileImportItem, UserFileImportPage
 from .dependencies import RuntimeDep
 from .responses import api_errors, route_path
 from .security import CurrentSessionSecurityDep
@@ -42,14 +42,14 @@ async def list_user_file_imports(
 
 @router.get(
     "/{import_id}",
-    response_model=UserFileImport,
+    response_model=UserFileImportItem,
     responses=api_errors(404, 422),
 )
 async def get_user_file_import(
     import_id: uuid.UUID,
     principal: CurrentSessionSecurityDep,
     runtime: RuntimeDep,
-) -> UserFileImport:
+) -> UserFileImportItem:
     """Return one import while concealing cross-user identities."""
 
     return await runtime.user_file_import_service.get(principal.user.id, import_id)

@@ -6,20 +6,24 @@ import { DesktopNavigationHeaderView } from '../DesktopNavigationHeader';
 
 const tabs: Tab[] = [
   {
+    availability: 'available',
     id: 'frequency-1',
     kind: 'token_frequency',
     name: 'Analysis 1',
     created_at: '2026-08-28T00:00:00Z',
     modified_at: '2026-08-28T00:00:00Z',
     revision: 1,
+    settings: { kind: 'token_frequency', stop_words: { words: [] } },
   },
   {
+    availability: 'available',
     id: 'trends-1',
     kind: 'sequential',
     name: 'Timeline comparison',
     created_at: '2026-08-28T00:00:00Z',
     modified_at: '2026-08-28T00:00:00Z',
     revision: 1,
+    settings: { kind: 'sequential' },
   },
 ];
 
@@ -122,5 +126,20 @@ describe('DesktopNavigationHeaderView', () => {
     await user.click(screen.getByRole('button', { name: 'Open quick access' }));
     await user.click(screen.getByRole('button', { name: 'Retry' }));
     expect(onRetry).toHaveBeenCalledOnce();
+  });
+
+  it('renders persisted warnings for unavailable Tabs', async () => {
+    const user = userEvent.setup();
+    render(
+      <DesktopNavigationHeaderView
+        {...baseProps}
+        unavailableTabWarnings={['This Tab is unavailable because its stored record is invalid.']}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Open quick access' }));
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'This Tab is unavailable because its stored record is invalid.',
+    );
   });
 });

@@ -28,6 +28,7 @@ import shutil
 import stat
 import struct
 import tempfile
+import uuid
 import unicodedata
 import zipfile
 from collections import deque
@@ -81,7 +82,7 @@ from ..infrastructure.storage.safe_paths import SafePathResolver
 from .storage_admission import StorageAdmissionService, StorageReservation
 from .user_files import AsyncUploadSource
 from .response_snapshots import ResponseSnapshot, ResponseSnapshotService
-from ..workers.input_snapshots import (
+from ..infrastructure.storage.input_snapshots import (
     create_worker_input_snapshot,
     load_snapshot_node,
 )
@@ -97,13 +98,13 @@ class WorkspaceArchiveStorage(Protocol):
     def submission_context(
         self,
         user_id: str,
-        workspace_id: str,
+        workspace_id: uuid.UUID,
     ) -> AbstractAsyncContextManager[Any]: ...
 
     async def resolve_owned_workspace_dir(
         self,
         user_id: str,
-        workspace_id: str,
+        workspace_id: uuid.UUID,
     ) -> Path: ...
 
     async def install_staged_archive(
@@ -187,7 +188,7 @@ class WorkspaceArchiveService:
     async def export_archive(
         self,
         user_id: str,
-        workspace_id: str,
+        workspace_id: uuid.UUID,
     ) -> tuple[ResponseSnapshot, str, int | None]:
         """Export one Workspace, falling back to a raw ZIP when its schema is incompatible.
 
@@ -242,7 +243,7 @@ class WorkspaceArchiveService:
                     metadata = incompatible.workspace_metadata or {}
                     workspace_name = metadata.get("name")
                     if not isinstance(workspace_name, str) or not workspace_name:
-                        workspace_name = workspace_id
+                        workspace_name = str(workspace_id)
                     source_snapshot = await self._run_sync(
                         _snapshot_workspace_tree,
                         path,
@@ -691,16 +692,16 @@ def _compile_materialized_archive(
 ) -> None:
     """Compile safe materialized Parquet entries into server-owned lazy plans."""
 
-    node_ids = [str(node.id) for node in manifest.nodes]
+    node_ids = [node.id for node in manifest.nodes]
     if len(node_ids) != len(set(node_ids)):
         raise InvalidWorkspaceArchiveError("Workspace archive has duplicate node IDs")
     known_ids = set(node_ids)
     allowed_files = {"workspace.json"}
-    parent_map: dict[str, list[str]] = {}
-    children: dict[str, list[str]] = {node_id: [] for node_id in node_ids}
+    parent_map: dict[uuid.UUID, list[uuid.UUID]] = {}
+    children: dict[uuid.UUID, list[uuid.UUID]] = {node_id: [] for node_id in node_ids}
     edge_count = 0
     for node in manifest.nodes:
-        node_id = str(node.id)
+        node_id = node.id
         expected_file = f"data/{node_id}.parquet"
         if node.data_file != expected_file:
             raise InvalidWorkspaceArchiveError(
@@ -742,13 +743,13 @@ def _compile_materialized_archive(
     workspace = Workspace(
         name=manifest.workspace.name.strip(),
     )
-    workspace.id = str(manifest.workspace.id)
+    workspace.id = manifest.workspace.id
     workspace.description = manifest.workspace.description
-    compiled_at = datetime.now(UTC).isoformat()
+    compiled_at = datetime.now(UTC)
     workspace.created_at = compiled_at
     workspace.modified_at = compiled_at
 
-    nodes_by_id = {str(node.id): node for node in manifest.nodes}
+    nodes_by_id = {node.id: node for node in manifest.nodes}
     indegree = {node_id: len(parent_map[node_id]) for node_id in node_ids}
     ready = deque(node_id for node_id in node_ids if indegree[node_id] == 0)
     processed = 0
@@ -817,7 +818,7 @@ def _compile_materialized_archive(
                     )
                 query_workspace.add_node(
                     Node(
-                        id=str(item.id),
+                        id=item.id,
                         data=lazyframe,
                         name=item.name,
                         document=item.document,
@@ -826,7 +827,7 @@ def _compile_materialized_archive(
                 )
             create_worker_input_snapshot(
                 workspace_id=workspace.id,
-                node_ids=[str(item.id) for item in archived.query_inputs],
+                node_ids=[item.id for item in archived.query_inputs],
                 workspace=query_workspace,
                 workspace_data_dir=query_data_root,
                 snapshot_dir=staging / record.query_snapshot.relative_path,
@@ -839,7 +840,7 @@ def _compile_materialized_archive(
             for record in pending:
                 if (
                     record.parent_analysis_id is not None
-                    and str(record.parent_analysis_id) not in workspace.analyses
+                    and record.parent_analysis_id not in workspace.analyses
                 ):
                     next_pending.append(record)
                     continue
@@ -973,9 +974,7 @@ def _terminal_archive_analyses(workspace: Workspace) -> list[AnalysisRecord]:
         for record in pending:
             if (
                 record.parent_analysis_id is not None
-                and str(record.parent_analysis_id) not in {
-                    str(item.id) for item in ordered
-                }
+                and record.parent_analysis_id not in {item.id for item in ordered}
             ):
                 next_pending.append(record)
                 continue
@@ -1057,7 +1056,7 @@ def _create_workspace_export(
                 )
             nodes.append(
                 {
-                    "id": node.id,
+                    "id": str(node.id),
                     "name": node.name,
                     "provenance": node.provenance.model_dump(mode="json"),
                     "document": node.document,
@@ -1068,7 +1067,7 @@ def _create_workspace_export(
             )
         _fsync_directory(data_root)
         analysis_records = _terminal_archive_analyses(workspace)
-        archived_analysis_ids = {str(record.id) for record in analysis_records}
+        archived_analysis_ids = {record.id for record in analysis_records}
         analyses: list[dict[str, JsonData]] = []
         for record in analysis_records:
             for reference in record.artifact_references:
@@ -1083,7 +1082,7 @@ def _create_workspace_export(
             if record.query_snapshot is not None:
                 query_snapshot = source_root / record.query_snapshot.relative_path
                 for node_id in analysis_snapshot_input_ids(record.request):
-                    snapshot_node = load_snapshot_node(query_snapshot, str(node_id))
+                    snapshot_node = load_snapshot_node(query_snapshot, node_id)
                     data_file = (
                         Path("analyses")
                         / str(record.id)
@@ -1097,7 +1096,7 @@ def _create_workspace_export(
                     )
                     query_inputs.append(
                         {
-                            "id": snapshot_node.id,
+                            "id": str(snapshot_node.id),
                             "name": snapshot_node.name,
                             "document": snapshot_node.document,
                             "color": snapshot_node.color,
@@ -1116,7 +1115,7 @@ def _create_workspace_export(
         manifest = WorkspaceArchiveManifest.model_validate(
             {
                 "format": "wordflow-materialized-workspace",
-                "version": 20,
+                "version": 21,
                 "workspace": {
                     "id": workspace.id,
                     "name": workspace.name,
@@ -1131,7 +1130,7 @@ def _create_workspace_export(
                             "analysis_ids": [
                                 analysis_id
                                 for analysis_id in tab.analysis_ids
-                                if str(analysis_id) in archived_analysis_ids
+                                if analysis_id in archived_analysis_ids
                             ]
                         }
                     ).model_dump(mode="json")

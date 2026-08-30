@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import uuid
+
 from fastapi import APIRouter, Request, Response, status
 
-from ...domain.workspace import Tab
+from ...domain.workspace import Tab, TabResource
 from ...models.tabs import TabCreate, TabUpdate
 from ..dependencies import RuntimeDep
 from ..responses import api_errors, route_path
@@ -20,19 +21,19 @@ router = APIRouter(
 
 @router.get(
     "",
-    response_model=list[Tab],
+    response_model=list[TabResource],
     responses=api_errors(403, 404, 409, 422, 500),
 )
 async def list_tabs(
     workspace_id: uuid.UUID,
     principal: CurrentSessionSecurityDep,
     runtime: RuntimeDep,
-) -> list[Tab]:
+) -> list[TabResource]:
     """Return every Tab in immutable creation order."""
 
     return await runtime.workspace_service.list_tabs(
         principal.user.id,
-        str(workspace_id),
+        workspace_id,
     )
 
 
@@ -54,7 +55,7 @@ async def create_tab(
 
     tab = await runtime.workspace_service.create_tab(
         principal.user.id,
-        str(workspace_id),
+        workspace_id,
         body,
     )
     response.headers["Location"] = route_path(
@@ -68,7 +69,7 @@ async def create_tab(
 
 @router.get(
     "/{tab_id}",
-    response_model=Tab,
+    response_model=TabResource,
     responses=api_errors(403, 404, 409, 422, 500),
 )
 async def get_tab(
@@ -76,13 +77,13 @@ async def get_tab(
     tab_id: uuid.UUID,
     principal: CurrentSessionSecurityDep,
     runtime: RuntimeDep,
-) -> Tab:
+) -> TabResource:
     """Read one Tab by its sole UUID identity."""
 
     return await runtime.workspace_service.get_tab(
         principal.user.id,
-        str(workspace_id),
-        str(tab_id),
+        workspace_id,
+        tab_id,
     )
 
 
@@ -102,8 +103,8 @@ async def update_tab(
 
     return await runtime.workspace_service.update_tab(
         principal.user.id,
-        str(workspace_id),
-        str(tab_id),
+        workspace_id,
+        tab_id,
         body,
     )
 
@@ -123,8 +124,8 @@ async def delete_tab(
 
     await runtime.analysis_service.delete_tab(
         principal.user.id,
-        str(workspace_id),
-        str(tab_id),
+        workspace_id,
+        tab_id,
     )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

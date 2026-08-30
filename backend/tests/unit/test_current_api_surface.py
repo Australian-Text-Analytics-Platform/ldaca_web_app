@@ -122,16 +122,6 @@ EXPECTED_OPERATIONS = {
     ),
     (
         "GET",
-        "/api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}/rows",
-        "get_analysis_table_rows",
-    ),
-    (
-        "GET",
-        "/api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}/schema",
-        "get_analysis_table_schema",
-    ),
-    (
-        "GET",
         "/api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}/projections/{row_unit}/rows",
         "get_analysis_table_projection_rows",
     ),

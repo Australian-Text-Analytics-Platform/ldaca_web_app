@@ -19,6 +19,7 @@ from collections.abc import Iterable
 from polars_source_utils import list_source_paths, replace_source_paths
 import polars as pl
 
+from ...analysis.result_integrity import validate_analysis_result_integrity
 from .durable_fs import (
     AtomicWriteCapacityError,
     atomic_output_path,
@@ -38,12 +39,13 @@ from ...domain.workspace import (
     Node,
     NodeProvenance,
     Tab,
+    analysis_input_ids,
     referenced_node_ids,
     validate_node_provenance,
 )
 
 logger = logging.getLogger(__name__)
-WORKSPACE_SCHEMA_VERSION = 21
+WORKSPACE_SCHEMA_VERSION = 22
 _WORKSPACE_ENVELOPE_FIELDS = {"workspace_metadata", "nodes", "tabs", "analyses"}
 _WORKSPACE_METADATA_FIELDS = {
     "id",
@@ -84,14 +86,6 @@ class WorkspaceSchemaVersionError(WorkspaceSnapshotInvalidError):
         )
 
 
-class TabSnapshotInvalidError(WorkspaceStoreError):
-    """One Workspace-referenced Tab record is missing or invalid."""
-
-    def __init__(self, tab_id: str | None) -> None:
-        super().__init__("Workspace Tab record is invalid")
-        self.tab_id = tab_id
-
-
 class WorkspaceRevisionConflictError(WorkspaceStoreError):
     """The caller attempted to commit against a stale or occupied snapshot."""
 
@@ -115,11 +109,11 @@ class WorkspaceSerializationError(WorkspaceStoreError):
 class WorkspaceSnapshotInfo:
     """Validated identity and revision of one committed workspace snapshot."""
 
-    workspace_id: str
+    workspace_id: uuid.UUID
     name: str
     description: str
-    created_at: str
-    modified_at: str
+    created_at: datetime
+    modified_at: datetime
     revision: int
     node_count: int
     tab_count: int
@@ -181,7 +175,9 @@ def _collect_referenced_sources(plbin_paths: Iterable[Path]) -> set[Path]:
 def _rebase_plan_copy(
     source: Path,
     destination: Path,
-    data_dir: Path,
+    *,
+    source_data_dir: Path,
+    published_data_dir: Path,
 ) -> bool:
     """Write a rebased plan generation without touching the committed source."""
 
@@ -189,24 +185,30 @@ def _rebase_plan_copy(
     mapping: dict[str, str] = {}
     for old in current_sources:
         try:
-            target = _resolve_regular_under(
-                data_dir.parent,
+            staged_source = _resolve_regular_under(
+                source_data_dir.parent,
                 Path(NODE_DATA_DIR) / Path(old).name,
             )
-        except OSError, ValueError:
-            continue
-        if old != str(target):
-            mapping[old] = str(target)
+        except (OSError, ValueError) as exc:
+            raise ValueError("Workspace plan source cannot be relocated") from exc
+        published_source = published_data_dir / staged_source.name
+        if old != str(published_source):
+            mapping[old] = str(published_source)
     if not mapping:
         return False
     with atomic_output_path(destination) as temporary:
         shutil.copyfile(source, temporary)
-        replace_source_paths(temporary, mapping)
+        rewritten = replace_source_paths(temporary, mapping)
+        if rewritten != len(mapping):
+            raise RuntimeError("Workspace plan source rewrite was incomplete")
     return True
 
 
 def _garbage_collect_workspace_data(
-    ws_root_dir: Path, nodes_data: list[dict[str, Any]]
+    ws_root_dir: Path,
+    nodes_data: list[dict[str, Any]],
+    *,
+    published_root: Path | None = None,
 ) -> None:
     """Remove unreferenced parquet and plbin files from the workspace data dir.
 
@@ -226,7 +228,23 @@ def _garbage_collect_workspace_data(
         data_dir / name for name in expected_plbin_names if (data_dir / name).exists()
     ]
 
-    referenced_sources = _collect_referenced_sources(registered_plbins)
+    try:
+        referenced_sources = _collect_referenced_sources(registered_plbins)
+    except Exception:
+        # A current-schema corrupt Data Block is isolated at load. Retain the
+        # complete logical data tree rather than guessing which bytes it owns.
+        return
+    if published_root is not None:
+        remapped_sources: set[Path] = set()
+        for source in referenced_sources:
+            try:
+                relative = source.relative_to(published_root)
+            except ValueError as exc:
+                raise ValueError(
+                    "Workspace plan source escapes its publication root"
+                ) from exc
+            remapped_sources.add((ws_root_dir / relative).resolve())
+        referenced_sources = remapped_sources
 
     for candidate in data_dir.iterdir():
         if not candidate.is_file():
@@ -280,21 +298,24 @@ def _read_tabs(
     references: list[tuple[str, Path]],
     *,
     max_bytes: int,
-) -> tuple[list[Tab], int]:
-    """Read every strict Tab record within one aggregate-wide byte budget."""
+) -> tuple[list[Tab], dict[str, bytes], int]:
+    """Read valid Tabs while retaining invalid bytes as isolated resources."""
 
     tabs: list[Tab] = []
+    corrupt: dict[str, bytes] = {}
     total_bytes = 0
     analysis_ids: set[uuid.UUID] = set()
     for tab_id, relative in references:
         try:
             record_path = _resolve_regular_under(root, relative)
-            record_size = record_path.stat().st_size
-            if record_size < 1 or total_bytes + record_size > max_bytes:
-                raise ValueError("Workspace Tab records exceed their byte budget")
-            with record_path.open("r", encoding="utf-8") as handle:
-                payload = json.load(handle)
-            tab = Tab.model_validate(payload)
+            content = record_path.read_bytes()
+        except OSError, ValueError:
+            content = b""
+        if total_bytes + len(content) > max_bytes:
+            raise WorkspaceCapacityError("Workspace Tab records exceed their byte budget")
+        total_bytes += len(content)
+        try:
+            tab = Tab.model_validate_json(content)
             if str(tab.id) != tab_id:
                 raise ValueError("Workspace Tab identity does not match its reference")
             if len(tab.analysis_ids) != len(set(tab.analysis_ids)):
@@ -302,11 +323,11 @@ def _read_tabs(
             if analysis_ids.intersection(tab.analysis_ids):
                 raise ValueError("An Analysis cannot belong to multiple Tabs")
             analysis_ids.update(tab.analysis_ids)
-        except (OSError, UnicodeError, ValueError) as exc:
-            raise TabSnapshotInvalidError(tab_id) from exc
-        total_bytes += record_size
-        tabs.append(tab)
-    return tabs, total_bytes
+        except ValueError, UnicodeError:
+            corrupt[tab_id] = content
+        else:
+            tabs.append(tab)
+    return tabs, corrupt, total_bytes
 
 
 def _garbage_collect_workspace_tabs(
@@ -461,6 +482,7 @@ def _analysis_private_owner_ids(
 
 def _add_workspace_analyses(
     workspace: Workspace,
+    workspace_root: Path,
     records: list[tuple[AnalysisRecord, bytes]],
     corrupt: dict[str, bytes],
 ) -> None:
@@ -472,35 +494,49 @@ def _add_workspace_analyses(
     """
 
     tab_analysis_ids = {
-        str(analysis_id)
+        analysis_id
         for tab in workspace.tabs.values()
         for analysis_id in tab.analysis_ids
     }
-    by_id = {str(record.id): (record, content) for record, content in records}
+    by_id = {record.id: (record, content) for record, content in records}
     pending = list(records)
     while pending:
         next_pending: list[tuple[AnalysisRecord, bytes]] = []
         progressed = False
         for record, content in pending:
-            analysis_id = str(record.id)
+            analysis_id = record.id
+            try:
+                validate_analysis_result_integrity(
+                    workspace_root,
+                    record,
+                    set(workspace.nodes),
+                )
+            except (OSError, ValueError):
+                corrupt[str(analysis_id)] = content
+                progressed = True
+                continue
+            if set(analysis_input_ids(record.request)) & workspace.unavailable_node_ids:
+                corrupt[str(analysis_id)] = content
+                progressed = True
+                continue
             parent_id = (
-                str(record.parent_analysis_id)
+                record.parent_analysis_id
                 if record.parent_analysis_id is not None
                 else None
             )
             if parent_id is not None and parent_id not in workspace.analyses:
                 next_pending.append((record, content))
                 continue
-            tab = workspace.tabs.get(str(record.tab_id))
+            tab = workspace.tabs.get(record.tab_id)
             linked = analysis_id in tab_analysis_ids
             if linked and (tab is None or record.id not in tab.analysis_ids):
-                corrupt[analysis_id] = content
+                corrupt[str(analysis_id)] = content
                 progressed = True
                 continue
             try:
                 workspace.add_analysis(record, link_to_tab=linked)
             except ValueError:
-                corrupt[analysis_id] = content
+                corrupt[str(analysis_id)] = content
             progressed = True
         if not progressed:
             for record, content in next_pending:
@@ -511,7 +547,9 @@ def _add_workspace_analyses(
     for analysis_id in sorted(tab_analysis_ids):
         if analysis_id in workspace.analyses:
             continue
-        content = corrupt.get(analysis_id, by_id.get(analysis_id, (None, b""))[1])
+        content = corrupt.get(
+            str(analysis_id), by_id.get(analysis_id, (None, b""))[1]
+        )
         workspace.add_corrupt_analysis(analysis_id, content)
 
 
@@ -639,11 +677,13 @@ def _write_workspace(
 
     target = _resolve_metadata_path(Path(path))
     description = workspace.description
-    created_at = workspace.created_at
-    modified_at = workspace.modified_at
+    created_at = workspace.created_at.isoformat()
+    modified_at = workspace.modified_at.isoformat()
 
-    if len(workspace.nodes) > max_nodes:
+    if len(workspace.node_ids) > max_nodes:
         raise WorkspaceCapacityError("Workspace exceeds its node-count limit")
+    if workspace.unavailable_node_ids:
+        raise ValueError("A Workspace with unavailable Data Blocks is read-only")
 
     generation = f"r{revision}-{uuid.uuid4().hex}"
     nodes_data: list[dict[str, Any]] = []
@@ -671,9 +711,10 @@ def _write_workspace(
             remaining -= plan_path.stat().st_size
 
         for tab_id, tab in workspace.tabs.items():
-            if tab_id != str(tab.id):
+            if tab_id != tab.id:
                 raise ValueError("Workspace Tab key does not match its identity")
-            relative = Path("tabs") / tab_id / f"{generation}.json"
+            tab_id_text = str(tab_id)
+            relative = Path("tabs") / tab_id_text / f"{generation}.json"
             record_path = target.parent / relative
             record_bytes = atomic_write_json(
                 record_path,
@@ -681,13 +722,31 @@ def _write_workspace(
                 max_bytes=remaining,
             )
             created_tab_records.append(record_path)
-            tabs_data.append({"id": tab_id, "record_path": relative.as_posix()})
+            tabs_data.append({"id": tab_id_text, "record_path": relative.as_posix()})
             remaining -= record_bytes
 
+        for tab_id in sorted(workspace.corrupt_tab_ids):
+            content = workspace.corrupt_tab_bytes(tab_id)
+            if len(content) > remaining:
+                raise AtomicWriteCapacityError(
+                    "Corrupt Tab record exceeds its storage budget"
+                )
+            tab_id_text = str(tab_id)
+            relative = Path("tabs") / tab_id_text / f"{generation}.json"
+            record_path = target.parent / relative
+            with atomic_output_path(record_path) as temporary:
+                temporary.write_bytes(content)
+            created_tab_records.append(record_path)
+            tabs_data.append({"id": tab_id_text, "record_path": relative.as_posix()})
+            remaining -= len(content)
+
         for analysis_id, analysis in workspace.analyses.items():
-            if analysis_id != str(analysis.id):
+            if analysis_id != analysis.id:
                 raise ValueError("Workspace Analysis key does not match its identity")
-            relative = Path("analyses") / analysis_id / f"{generation}.json"
+            analysis_id_text = str(analysis_id)
+            relative = (
+                Path("analyses") / analysis_id_text / f"{generation}.json"
+            )
             record_path = target.parent / relative
             record_bytes = atomic_write_json(
                 record_path,
@@ -696,7 +755,7 @@ def _write_workspace(
             )
             created_analysis_records.append(record_path)
             analyses_data.append(
-                {"id": analysis_id, "record_path": relative.as_posix()}
+                {"id": analysis_id_text, "record_path": relative.as_posix()}
             )
             remaining -= record_bytes
 
@@ -706,18 +765,21 @@ def _write_workspace(
                 raise AtomicWriteCapacityError(
                     "Corrupt Analysis record exceeds its storage budget"
                 )
-            relative = Path("analyses") / analysis_id / f"{generation}.json"
+            analysis_id_text = str(analysis_id)
+            relative = (
+                Path("analyses") / analysis_id_text / f"{generation}.json"
+            )
             record_path = target.parent / relative
             with atomic_output_path(record_path) as temporary:
                 temporary.write_bytes(content)
             created_analysis_records.append(record_path)
             analyses_data.append(
-                {"id": analysis_id, "record_path": relative.as_posix()}
+                {"id": analysis_id_text, "record_path": relative.as_posix()}
             )
             remaining -= len(content)
 
         workspace_metadata: dict[str, Any] = {
-            "id": workspace.id,
+            "id": str(workspace.id),
             "name": workspace.name,
             "version": WORKSPACE_SCHEMA_VERSION,
             "description": description,
@@ -766,7 +828,7 @@ def _write_workspace(
             target.parent,
             [(entry["id"], Path(entry["record_path"])) for entry in analyses_data],
             execution_owner_ids={
-                analysis_id
+                str(analysis_id)
                 for analysis_id, analysis in workspace.analyses.items()
                 if analysis.state in {AnalysisState.QUEUED, AnalysisState.RUNNING}
                 or (
@@ -774,28 +836,26 @@ def _write_workspace(
                     and analysis.state is AnalysisState.SUCCEEDED
                     and analysis.parent_analysis_id is not None
                     and (
-                        parent := workspace.analyses.get(
-                            str(analysis.parent_analysis_id)
-                        )
+                        parent := workspace.analyses.get(analysis.parent_analysis_id)
                     )
                     is not None
                     and parent.state in {AnalysisState.QUEUED, AnalysisState.RUNNING}
                 )
             }
-            | workspace.corrupt_analysis_ids,
+            | {str(value) for value in workspace.corrupt_analysis_ids},
             artifact_owner_ids={
-                analysis_id
+                str(analysis_id)
                 for analysis_id, analysis in workspace.analyses.items()
                 if analysis.state is AnalysisState.SUCCEEDED
             }
-            | workspace.corrupt_analysis_ids,
+            | {str(value) for value in workspace.corrupt_analysis_ids},
             query_snapshot_owner_ids={
-                analysis_id
+                str(analysis_id)
                 for analysis_id, analysis in workspace.analyses.items()
                 if analysis.state is AnalysisState.SUCCEEDED
                 and analysis.query_snapshot is not None
             }
-            | workspace.corrupt_analysis_ids,
+            | {str(value) for value in workspace.corrupt_analysis_ids},
         )
     except Exception:
         logger.warning(
@@ -851,11 +911,37 @@ def _read_workspace_metadata(path: str | Path) -> dict[str, Any]:
     return payload
 
 
+def _stored_schema_signature(raw_schema: object) -> tuple[tuple[str, str], ...]:
+    if not isinstance(raw_schema, list):
+        raise ValueError("Workspace Data Block schema is invalid")
+    signature: list[tuple[str, str]] = []
+    names: set[str] = set()
+    for raw_field in raw_schema:
+        if not isinstance(raw_field, Mapping) or set(raw_field) != {"name", "dtype"}:
+            raise ValueError("Workspace Data Block schema field is invalid")
+        name = raw_field["name"]
+        dtype = raw_field["dtype"]
+        if (
+            not isinstance(name, str)
+            or not name
+            or name in names
+            or not isinstance(dtype, str)
+            or not dtype
+        ):
+            raise ValueError("Workspace Data Block schema field is invalid")
+        names.add(name)
+        signature.append((name, dtype))
+    return tuple(signature)
+
+
 def _read_workspace(
     path: str | Path,
     tabs: list[Tab],
+    corrupt_tabs: dict[str, bytes],
     analyses: list[tuple[AnalysisRecord, bytes]],
     corrupt_analyses: dict[str, bytes],
+    *,
+    published_root: Path | None = None,
 ) -> Workspace:
     """Strictly reconstruct a committed graph without unresolved live parents.
 
@@ -872,16 +958,16 @@ def _read_workspace(
     ws_meta = data["workspace_metadata"]
     workspace = Workspace(
         name=ws_meta["name"],
-        workspace_id=ws_meta["id"],
-        created_at=ws_meta["created_at"],
-        modified_at=ws_meta["modified_at"],
+        workspace_id=uuid.UUID(ws_meta["id"]),
+        created_at=datetime.fromisoformat(ws_meta["created_at"]),
+        modified_at=datetime.fromisoformat(ws_meta["modified_at"]),
     )
     workspace.description = ws_meta["description"]
 
-    ordered_ids: list[str] = []
-    parent_ids_by_node: dict[str, list[str]] = {}
+    ordered_ids: list[uuid.UUID] = []
+    parent_ids_by_node: dict[uuid.UUID, list[uuid.UUID]] = {}
     node_specs_by_id: dict[
-        str,
+        uuid.UUID,
         tuple[
             pl.LazyFrame,
             str,
@@ -891,8 +977,13 @@ def _read_workspace(
             str | None,
         ],
     ] = {}
+    unavailable_node_ids: set[uuid.UUID] = set()
+    all_node_ids: set[uuid.UUID] = set()
     data_paths: set[Path] = set()
     root = target.parent.resolve()
+    declared_root = (
+        published_root.resolve(strict=False) if published_root is not None else root
+    )
 
     for raw_entry in data["nodes"]:
         if not isinstance(raw_entry, Mapping):
@@ -901,23 +992,15 @@ def _read_workspace(
         if not isinstance(raw_metadata, Mapping):
             raise ValueError("Workspace node metadata must be an object")
         metadata = dict(raw_metadata)
-        if set(metadata) != {
-            "id",
-            "name",
-            "provenance",
-            "document",
-            "color",
-            "tokenizer_model",
-        }:
-            raise ValueError("Workspace node metadata fields are invalid")
         raw_id = metadata.get("id")
         if not isinstance(raw_id, str):
             raise ValueError("Workspace node ID must be a string")
-        node_id = str(uuid.UUID(raw_id))
-        if node_id != raw_id:
+        node_id = uuid.UUID(raw_id)
+        if str(node_id) != raw_id:
             raise ValueError("Workspace node ID must be canonical")
-        if node_id in node_specs_by_id:
+        if node_id in all_node_ids:
             raise ValueError("Workspace contains duplicate node IDs")
+        all_node_ids.add(node_id)
 
         provenance = validate_node_provenance(metadata.get("provenance"))
         parent_ids = referenced_node_ids(provenance)
@@ -935,55 +1018,110 @@ def _read_workspace(
             or relative_data_path.suffix != ".plbin"
         ):
             raise ValueError("Workspace node data path is invalid")
-        absolute_data_path = _resolve_regular_under(root, relative_data_path)
-        if absolute_data_path.parent != (root / NODE_DATA_DIR).resolve(strict=True):
-            raise ValueError("Workspace node data path escapes the data directory")
-        if absolute_data_path in data_paths:
-            raise ValueError("Workspace nodes cannot share a data path")
-        for raw_source in list_source_paths(absolute_data_path):
-            source_path = Path(raw_source)
-            if not source_path.is_absolute():
-                raise ValueError("Workspace plan source must be absolute")
-            try:
-                relative_source = source_path.relative_to(root)
-            except ValueError as exc:
-                raise ValueError("Workspace plan source escapes its workspace") from exc
-            _resolve_regular_under(root, relative_source)
-        data_paths.add(absolute_data_path)
-
-        name = metadata.get("name")
-        if not isinstance(name, str) or not name:
-            raise ValueError("Workspace node name is invalid")
-        for optional_key in ("document", "color", "tokenizer_model"):
-            if metadata.get(optional_key) is not None and not isinstance(
-                metadata.get(optional_key), str
-            ):
-                raise ValueError(f"Workspace node {optional_key} is invalid")
-        raw_tokenizer_model = metadata["tokenizer_model"]
-        tokenizer_model = (
-            raw_tokenizer_model.strip()
-            if isinstance(raw_tokenizer_model, str)
-            else None
-        )
-        if raw_tokenizer_model is not None and (
-            not tokenizer_model or len(tokenizer_model) > 500
-        ):
-            raise ValueError("Workspace node tokenizer model is invalid")
-
-        lazyframe = pl.LazyFrame.deserialize(absolute_data_path, format="binary")
-
-        node_specs_by_id[node_id] = (
-            lazyframe,
-            name,
-            provenance,
-            metadata["document"],
-            metadata["color"],
-            tokenizer_model,
-        )
         ordered_ids.append(node_id)
         parent_ids_by_node[node_id] = parent_ids
+        try:
+            if set(metadata) != {
+                "id",
+                "name",
+                "provenance",
+                "document",
+                "color",
+                "tokenizer_model",
+                "schema",
+            }:
+                raise ValueError("Workspace node metadata fields are invalid")
+            absolute_data_path = _resolve_regular_under(root, relative_data_path)
+            if absolute_data_path.parent != (root / NODE_DATA_DIR).resolve(strict=True):
+                raise ValueError("Workspace node data path escapes the data directory")
+            if absolute_data_path in data_paths:
+                raise ValueError("Workspace nodes cannot share a data path")
+            validation_mapping: dict[str, str] = {}
+            for raw_source in list_source_paths(absolute_data_path):
+                source_path = Path(raw_source)
+                if not source_path.is_absolute():
+                    raise ValueError("Workspace plan source must be absolute")
+                try:
+                    relative_source = source_path.relative_to(declared_root)
+                except ValueError as exc:
+                    raise ValueError(
+                        "Workspace plan source escapes its workspace"
+                    ) from exc
+                staged_source = _resolve_regular_under(root, relative_source)
+                if raw_source != str(staged_source):
+                    validation_mapping[raw_source] = str(staged_source)
+            data_paths.add(absolute_data_path)
 
-    known_ids = set(node_specs_by_id)
+            name = metadata.get("name")
+            if not isinstance(name, str) or not name:
+                raise ValueError("Workspace node name is invalid")
+            for optional_key in ("document", "color", "tokenizer_model"):
+                if metadata.get(optional_key) is not None and not isinstance(
+                    metadata.get(optional_key), str
+                ):
+                    raise ValueError(f"Workspace node {optional_key} is invalid")
+            raw_tokenizer_model = metadata["tokenizer_model"]
+            tokenizer_model = (
+                raw_tokenizer_model.strip()
+                if isinstance(raw_tokenizer_model, str)
+                else None
+            )
+            if raw_tokenizer_model is not None and (
+                not tokenizer_model or len(tokenizer_model) > 500
+            ):
+                raise ValueError("Workspace node tokenizer model is invalid")
+
+            stored_schema = _stored_schema_signature(metadata["schema"])
+            lazyframe = pl.LazyFrame.deserialize(absolute_data_path, format="binary")
+            validation_plan = absolute_data_path
+            temporary_validation_plan: Path | None = None
+            try:
+                if validation_mapping:
+                    temporary_validation_plan = absolute_data_path.with_name(
+                        f".{absolute_data_path.name}.validate-{uuid.uuid4().hex}"
+                    )
+                    shutil.copyfile(absolute_data_path, temporary_validation_plan)
+                    rewritten = replace_source_paths(
+                        temporary_validation_plan,
+                        validation_mapping,
+                    )
+                    if rewritten != len(validation_mapping):
+                        raise ValueError(
+                            "Workspace validation plan rewrite was incomplete"
+                        )
+                    validation_plan = temporary_validation_plan
+                loaded_schema = tuple(
+                    (column, str(dtype))
+                    for column, dtype in pl.LazyFrame.deserialize(
+                        validation_plan,
+                        format="binary",
+                    )
+                    .collect_schema()
+                    .items()
+                )
+            finally:
+                if temporary_validation_plan is not None:
+                    temporary_validation_plan.unlink(missing_ok=True)
+            if loaded_schema != stored_schema:
+                raise ValueError("Workspace Data Block schema does not match metadata")
+            document = metadata["document"]
+            if document is not None and document not in dict(stored_schema):
+                raise ValueError(
+                    "Document Column Preference is absent from Data Block schema"
+                )
+
+            node_specs_by_id[node_id] = (
+                lazyframe,
+                name,
+                provenance,
+                document,
+                metadata["color"],
+                tokenizer_model,
+            )
+        except Exception:
+            unavailable_node_ids.add(node_id)
+
+    known_ids = set(parent_ids_by_node)
     if any(
         parent_id not in known_ids
         for parent_ids in parent_ids_by_node.values()
@@ -991,14 +1129,16 @@ def _read_workspace(
     ):
         raise ValueError("Workspace node parent is missing")
 
-    children: dict[str, list[str]] = {node_id: [] for node_id in ordered_ids}
+    children: dict[uuid.UUID, list[uuid.UUID]] = {
+        node_id: [] for node_id in ordered_ids
+    }
     indegree = {node_id: len(parent_ids_by_node[node_id]) for node_id in ordered_ids}
     for child_id, parent_ids in parent_ids_by_node.items():
         for parent_id in parent_ids:
             children[parent_id].append(child_id)
     ready = deque(node_id for node_id in ordered_ids if indegree[node_id] == 0)
     visited = 0
-    topological_ids: list[str] = []
+    topological_ids: list[uuid.UUID] = []
     while ready:
         parent_id = ready.popleft()
         visited += 1
@@ -1010,8 +1150,14 @@ def _read_workspace(
     if visited != len(ordered_ids):
         raise ValueError("Workspace node graph contains a cycle")
 
-    nodes_by_id: dict[str, Node] = {}
+    nodes_by_id: dict[uuid.UUID, Node] = {}
     for node_id in topological_ids:
+        parent_ids = parent_ids_by_node[node_id]
+        if node_id in unavailable_node_ids or any(
+            parent_id in workspace.unavailable_node_ids for parent_id in parent_ids
+        ):
+            workspace.add_unavailable_node(node_id, parent_ids)
+            continue
         lazyframe, name, provenance, document, color, tokenizer_model = (
             node_specs_by_id[node_id]
         )
@@ -1024,7 +1170,7 @@ def _read_workspace(
             color=color,
             tokenizer_model=tokenizer_model,
             parents=[
-                nodes_by_id[parent_id] for parent_id in parent_ids_by_node[node_id]
+                nodes_by_id[parent_id] for parent_id in parent_ids
             ],
         )
         nodes_by_id[node_id] = node
@@ -1033,25 +1179,34 @@ def _read_workspace(
 
     for tab in tabs:
         workspace.add_tab(tab)
-    _add_workspace_analyses(workspace, analyses, corrupt_analyses)
+    for tab_id, content in corrupt_tabs.items():
+        workspace.add_corrupt_tab(uuid.UUID(tab_id), content)
+    _add_workspace_analyses(
+        workspace,
+        target.parent,
+        analyses,
+        corrupt_analyses,
+    )
 
     return workspace
 
 
 def _rebase_workspace_sources(
     path: str | Path,
+    *,
+    published_root: Path | None = None,
 ) -> None:
-    """Copy stale plans, then atomically publish rebased metadata.
-
-    Call this **after** the workspace folder has reached its final location on
-    disk (i.e. after any rename / move) but **before** deserializing the
-    workspace nodes into memory, so that ``LazyFrame.deserialize`` sees paths
-    that match the current filesystem.
-    """
+    """Copy plans and compile their sources for the declared location."""
 
     target = _resolve_metadata_path(Path(path))
     data = _read_workspace_metadata(path)
-    data_dir = (target.parent / NODE_DATA_DIR).resolve()
+    source_data_dir = (target.parent / NODE_DATA_DIR).resolve()
+    final_root = (
+        published_root.resolve(strict=False)
+        if published_root is not None
+        else target.parent.resolve()
+    )
+    published_data_dir = final_root / NODE_DATA_DIR
 
     changed = False
     generation = uuid.uuid4().hex
@@ -1068,7 +1223,12 @@ def _rebase_workspace_sources(
             f"{node_metadata['id']}.rebase-{generation}.plbin"
         )
         destination = target.parent / relative
-        if _rebase_plan_copy(source, destination, data_dir):
+        if _rebase_plan_copy(
+            source,
+            destination,
+            source_data_dir=source_data_dir,
+            published_data_dir=published_data_dir,
+        ):
             node_entry["data_path"] = relative.as_posix()
             changed = True
 
@@ -1076,7 +1236,11 @@ def _rebase_workspace_sources(
         return
     atomic_write_json(target, data)
     try:
-        _garbage_collect_workspace_data(target.parent, data["nodes"])
+        _garbage_collect_workspace_data(
+            target.parent,
+            data["nodes"],
+            published_root=final_root,
+        )
     except Exception:
         logger.warning(
             "Workspace data cleanup failed after rebase commit path=%s",
@@ -1108,8 +1272,8 @@ class WorkspaceStore:
             raw_workspace_id = metadata["id"]
             if not isinstance(raw_workspace_id, str):
                 raise ValueError("Workspace ID must be a string")
-            workspace_id = str(uuid.UUID(raw_workspace_id))
-            if workspace_id != raw_workspace_id:
+            workspace_id = uuid.UUID(raw_workspace_id)
+            if str(workspace_id) != raw_workspace_id:
                 raise ValueError("Workspace ID is not canonical")
             name = metadata["name"]
             if not isinstance(name, str) or not name:
@@ -1138,9 +1302,9 @@ class WorkspaceStore:
                 raise ValueError("Workspace nodes must be a list")
             tab_references = _tab_references(payload)
             analysis_references = _analysis_references(payload)
-            node_ids: set[str] = set()
-            parent_ids: set[str] = set()
-            parents_by_node: dict[str, list[str]] = {}
+            node_ids: set[uuid.UUID] = set()
+            parent_ids: set[uuid.UUID] = set()
+            parents_by_node: dict[uuid.UUID, list[uuid.UUID]] = {}
             root_node_count = 0
             for entry in nodes:
                 if not isinstance(entry, Mapping):
@@ -1151,8 +1315,8 @@ class WorkspaceStore:
                 raw_node_id = node_metadata["id"]
                 if not isinstance(raw_node_id, str):
                     raise ValueError("Workspace node ID must be a string")
-                node_id = str(uuid.UUID(raw_node_id))
-                if node_id != raw_node_id or node_id in node_ids:
+                node_id = uuid.UUID(raw_node_id)
+                if str(node_id) != raw_node_id or node_id in node_ids:
                     raise ValueError("Workspace node ID is invalid")
                 canonical_parents = referenced_node_ids(
                     validate_node_provenance(node_metadata.get("provenance"))
@@ -1166,7 +1330,9 @@ class WorkspaceStore:
             if not parent_ids <= node_ids:
                 raise ValueError("Workspace node parent is missing")
 
-            children: dict[str, list[str]] = {node_id: [] for node_id in node_ids}
+            children: dict[uuid.UUID, list[uuid.UUID]] = {
+                node_id: [] for node_id in node_ids
+            }
             indegree = {node_id: len(parents_by_node[node_id]) for node_id in node_ids}
             for child_id, parents in parents_by_node.items():
                 for parent_id in parents:
@@ -1190,8 +1356,8 @@ class WorkspaceStore:
             workspace_id=workspace_id,
             name=name,
             description=description,
-            created_at=created_at,
-            modified_at=modified_at,
+            created_at=created_timestamp,
+            modified_at=modified_timestamp,
             revision=revision,
             node_count=len(nodes),
             tab_count=len(tab_references),
@@ -1205,25 +1371,24 @@ class WorkspaceStore:
         self,
         path: str | Path,
         *,
-        workspace_id: str,
+        workspace_id: uuid.UUID,
         name: str,
         revision: int,
-        timestamp: str,
+        timestamp: datetime,
     ) -> WorkspaceSnapshotInfo:
         """Atomically publish validated installation identity metadata."""
 
-        canonical_id = str(uuid.UUID(workspace_id))
-        if canonical_id != workspace_id or not name or revision < 1 or not timestamp:
+        if not name or revision < 1 or timestamp.utcoffset() is None:
             raise WorkspaceSnapshotInvalidError("Workspace identity is invalid")
         try:
             target = _resolve_metadata_path(Path(path))
             payload = _read_workspace_metadata(target)
             metadata = payload["workspace_metadata"]
-            metadata["id"] = workspace_id
+            metadata["id"] = str(workspace_id)
             metadata["name"] = name
             metadata["revision"] = revision
-            metadata["created_at"] = timestamp
-            metadata["modified_at"] = timestamp
+            metadata["created_at"] = timestamp.isoformat()
+            metadata["modified_at"] = timestamp.isoformat()
             atomic_write_json(target, payload, max_bytes=self.max_snapshot_bytes)
             return self._inspect_complete(target)
         except WorkspaceStoreError:
@@ -1268,14 +1433,17 @@ class WorkspaceStore:
         root = target.parent.resolve()
         try:
             for entry in payload["nodes"]:
-                relative = Path(entry["data_path"])
-                if relative.is_absolute() or ".." in relative.parts:
-                    raise ValueError("Workspace plan path is invalid")
-                plan = _resolve_regular_under(root, relative)
-                if plan in seen_paths:
-                    raise ValueError("Workspace nodes cannot share a plan")
-                seen_paths.add(plan)
-                total_bytes += plan.stat().st_size
+                try:
+                    relative = Path(entry["data_path"])
+                    if relative.is_absolute() or ".." in relative.parts:
+                        raise ValueError("Workspace plan path is invalid")
+                    plan = _resolve_regular_under(root, relative)
+                    if plan in seen_paths:
+                        raise ValueError("Workspace nodes cannot share a plan")
+                    seen_paths.add(plan)
+                    total_bytes += plan.stat().st_size
+                except (KeyError, OSError, TypeError, ValueError):
+                    continue
         except (KeyError, OSError, TypeError, ValueError) as exc:
             raise WorkspaceSnapshotInvalidError(
                 "Workspace snapshot plan references are invalid"
@@ -1286,7 +1454,7 @@ class WorkspaceStore:
                     "Workspace snapshot exceeds its byte limit"
                 )
             references = _tab_references(payload)
-            _tabs, tab_bytes = _read_tabs(
+            _tabs, _corrupt_tabs, tab_bytes = _read_tabs(
                 root,
                 references,
                 max_bytes=self.max_snapshot_bytes - total_bytes,
@@ -1342,28 +1510,38 @@ class WorkspaceStore:
             ) from exc
         return info
 
-    def rebase_snapshot_sources(self, path: str | Path) -> WorkspaceSnapshotInfo:
-        """Rebase one relocated snapshot without changing its revision."""
+    def rebase_snapshot_sources(
+        self,
+        path: str | Path,
+        *,
+        published_root: Path | None = None,
+    ) -> WorkspaceSnapshotInfo:
+        """Compile plan sources for their declared publication root."""
 
         self._inspect_complete(path)
         try:
-            _rebase_workspace_sources(path)
+            _rebase_workspace_sources(path, published_root=published_root)
         except WorkspaceStoreError:
             raise
-        except (OSError, ValueError) as exc:
+        except (OSError, RuntimeError, ValueError) as exc:
             raise WorkspaceSnapshotInvalidError(
                 "Workspace plan sources cannot be relocated"
             ) from exc
         return self._inspect_complete(path)
 
-    def load(self, path: str | Path) -> LoadedWorkspace:
+    def load(
+        self,
+        path: str | Path,
+        *,
+        published_root: Path | None = None,
+    ) -> LoadedWorkspace:
         """Reconstruct a graph without mutating its committed snapshot."""
 
         snapshot = self._inspect_complete(path)
         try:
             target = _resolve_metadata_path(Path(path))
             payload = _read_workspace_metadata(target)
-            tabs, _tab_bytes = _read_tabs(
+            tabs, corrupt_tabs, _tab_bytes = _read_tabs(
                 target.parent.resolve(),
                 _tab_references(payload),
                 max_bytes=self.max_snapshot_bytes,
@@ -1373,9 +1551,14 @@ class WorkspaceStore:
                 _analysis_references(payload),
                 max_bytes=self.max_snapshot_bytes,
             )
-            workspace = _read_workspace(path, tabs, analyses, corrupt_analyses)
-        except TabSnapshotInvalidError:
-            raise
+            workspace = _read_workspace(
+                path,
+                tabs,
+                corrupt_tabs,
+                analyses,
+                corrupt_analyses,
+                published_root=published_root,
+            )
         except WorkspaceStoreError:
             raise
         except (OSError, ValueError) as exc:
@@ -1548,7 +1731,6 @@ class WorkspaceStore:
 
 __all__ = [
     "LoadedWorkspace",
-    "TabSnapshotInvalidError",
     "WorkspaceCapacityError",
     "WorkspaceRevisionConflictError",
     "WorkspaceSerializationError",

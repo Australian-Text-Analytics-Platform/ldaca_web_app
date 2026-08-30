@@ -185,8 +185,8 @@ other reasons return those fields as null. Create, direct read, open, update,
 and import continue to return strict `WorkspaceResource` responses. Delete
 continues to authorize from the canonical directory and ownership sidecar.
 
-Native Workspace snapshots use schema version 17 and portable archives use
-format version 16. Readers accept only those exact versions; import and open do
+Native Workspace snapshots use schema version 22 and portable archives use
+format version 21. Readers accept only those exact versions; import and open do
 not migrate an earlier format at runtime.
 
 ## Data Blocks
@@ -245,12 +245,15 @@ reset after load, clone, import, close/reopen, or backend restart.
 | `POST /api/workspaces/{workspace_id}/tabs/{tab_id}/analyses` | `submit_tab_analysis` | 201 | Create one scoped Analysis, optionally with a parent and supersession targets |
 | `DELETE /api/workspaces/{workspace_id}/tabs/{tab_id}/analyses` | `clear_tab_analysis` | 204 | Cancel and remove the complete Analysis forest |
 
-Token Frequency and Topic Modelling Tabs expose normalized `stop_words`.
-Topic Modelling Tabs additionally expose `topic_modeling_words_per_topic`
-(3-100, default 15) and nullable `topic_modeling_projection_selection`. The
+Tabs are a discriminated union keyed by `kind`; only common identity, name,
+Analysis membership, timestamps, and Revision are shared. Each Tab owns one
+matching kind-specific `settings` object, and PATCH uses the corresponding
+kind-specific request. Token Frequency and Topic Modelling settings expose
+normalized `stop_words`. Topic Modelling settings additionally expose
+`words_per_topic` (3-100, default 15) and nullable `projection_selection`. The
 latter identifies a succeeded Topic Modelling Analysis in the same Tab plus
-cluster count and Top topics per document within that Result's bounds. Null means
-both defaults. It is cleared when that Analysis is removed or superseded.
+cluster count and Top topics per document within that Result's bounds. Null
+means both defaults. It is cleared when that Analysis is removed or superseded.
 
 ## Analyses
 
@@ -263,8 +266,6 @@ both defaults. It is cleared when that Analysis is removed or superseded.
 | `POST /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/query` | `query_analysis_result` | 200 | Typed side-effect-free JSON projection for Topic Modelling cluster-tree cuts, Concordance, or Annotation; Quotation is invalid here |
 | `POST /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/quotation-preview/query` | `query_quotation_preview_table` | 200 Arrow | On-demand Quotation Preview document page from the retained snapshot |
 | `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}` | `download_analysis_table` | 200 Arrow | Complete immutable Result table |
-| `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}/rows` | `get_analysis_table_rows` | 200 Arrow | Independent page from an open-ended Result table |
-| `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}/schema` | `get_analysis_table_schema` | 200 Arrow | Zero-row open-ended Result table schema |
 | `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}/projections/{row_unit}/rows` | `get_analysis_table_projection_rows` | 200 Arrow | Document or match page from a nested Run All Result, with optional `sort_by` and `descending` |
 | `POST /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}/projections/documents/query` | `query_concordance_document_projection` | 200 Arrow | Exact-term/bin-filtered Concordance document page with filtered total-row header |
 | `GET /api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}/projections/{row_unit}/schema` | `get_analysis_table_projection_schema` | 200 Arrow | Zero-row schema for a document or match projection |
@@ -334,10 +335,19 @@ these immutable request mappings and the retained input snapshot; current Data
 Block preferences are never fallbacks.
 
 `ConcordanceAnalysisRequest.ignore_punctuation` is an optional boolean that
-defaults to `false` for backward compatibility. In Text mode, `true` excludes
+defaults to `false`. In Text mode, `true` excludes
 punctuation/symbol-only tokens from context counts and L1/R1 while preserving
 their original source text in context and extraction strings. Tokens mode
 ignores this field because tokenization already removes punctuation.
+
+Configured remote Quotation uses only `/api/v2/quotation/extract`. The request
+is version 2 with ordered `{id, text}` documents, and the response must contain
+exactly one valid result for every input ID in the same order. Missing,
+duplicate, reordered, malformed, or failed documents fail the Analysis.
+`QuotationAnalysisRequest.engine` is a required discriminator: local carries
+only `type: local`, while remote carries `type: remote` and a required
+operator-allowlisted `engine_id`. Wordflow sends no arbitrary options and
+accepts no warning, metadata, URL-suffix, or empty-result compatibility shape.
 
 ## Bootstrap, Readiness, And Common Semantics
 
@@ -364,6 +374,11 @@ inaccessible paths. There is no legacy `/health` route or Data Root alias.
   successful Artifact is `410 artifact_gone`; a missing retained input required
   for a completed on-demand Result query is `410 analysis_result_unavailable`.
 - Cross-user resources are concealed as `404`.
+- Current-schema corruption is isolated at the smallest attributable child.
+  Data Block, Tab, Analysis, and User File Import collections may therefore
+  contain an `availability: unavailable` item with its UUID, parent identity,
+  `record_invalid` reason, and safe warning. Healthy siblings remain usable;
+  stored bytes are not rewritten or quarantined.
 - Validation uses sanitized `422 ApiError` responses with `X-Request-ID`.
 - Analysis, Workspace SQL, Arrow row-page, and User File Import pagination is one-based and rejects zero.
   Workspace, Tab, Data Block, and User File collections return complete

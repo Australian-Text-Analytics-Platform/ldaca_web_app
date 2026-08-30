@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import uuid
 import zipfile
 from dataclasses import dataclass
 from functools import partial
@@ -56,12 +57,12 @@ class DataBlockExportService:
     async def export(
         self,
         user_id: str,
-        workspace_id: str,
+        workspace_id: uuid.UUID,
         request: DataBlockExportRequest,
     ) -> tuple[ResponseSnapshot, str, str, int]:
         """Export the exact requested Data Blocks from one stable Workspace view."""
 
-        node_ids = [str(node_id) for node_id in request.node_ids]
+        node_ids = request.node_ids
         spec = _FORMAT_SPECS[request.format]
         multiple = len(node_ids) > 1
         async with self._workspaces.read_context(user_id, workspace_id) as lease:
@@ -74,7 +75,7 @@ class DataBlockExportService:
             filename = (
                 f"{_safe_export_stem(lease.workspace.name, 'workspace')}_data_blocks.zip"
                 if multiple
-                else f"{_safe_export_stem(nodes[0].name, node_ids[0])}.{spec.extension}"
+                else f"{_safe_export_stem(nodes[0].name, str(node_ids[0]))}.{spec.extension}"
             )
             snapshot = await self._response_snapshots.create_generated(
                 suffix=".zip" if multiple else f".{spec.extension}",
@@ -225,7 +226,7 @@ def _archive_names(nodes: tuple[Node, ...], extension: str) -> list[str]:
     counts: dict[str, int] = {}
     names: list[str] = []
     for node in nodes:
-        stem = _safe_export_stem(node.name, node.id)
+        stem = _safe_export_stem(node.name, str(node.id))
         occurrence = counts.get(stem, 0) + 1
         counts[stem] = occurrence
         unique_stem = stem if occurrence == 1 else f"{stem}_{occurrence}"

@@ -40,8 +40,9 @@ identity, persistence, cancellation, parentage, result, or cleanup ownership.
 Analysis creation commits a queued Workspace-owned record before capacity is
 available. A private work-conserving scheduler rotates users under contention
 and preserves per-user FIFO order. When selected, the runtime re-enters the
-Workspace gate, validates reserved Data Blocks, creates an execution-private
-immutable snapshot, reserves a launch entry, and atomically commits `running`.
+Workspace gate, validates reserved Data Blocks, asks infrastructure storage to
+publish an execution-private immutable snapshot, reserves a launch entry, and
+atomically commits `running`.
 
 Each admitted Analysis uses one fresh `spawn` child process. The executor owns
 only its launch entry, eventual process handle, raw progress/result IPC, and

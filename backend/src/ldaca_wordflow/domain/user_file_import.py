@@ -110,6 +110,7 @@ UserFileImportResult = Annotated[
 class UserFileImport(_StrictModel):
     """One complete public and persisted import resource."""
 
+    availability: Literal["available"]
     id: uuid.UUID
     request: UserFileImportRequest
     state: BackgroundState
@@ -253,6 +254,7 @@ class UserFileImport(_StrictModel):
         import_id: uuid.UUID | None = None,
     ) -> UserFileImport:
         return cls(
+            availability="available",
             id=import_id or uuid.uuid4(),
             request=request,
             state=BackgroundState.QUEUED,

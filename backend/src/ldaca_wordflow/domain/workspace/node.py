@@ -41,13 +41,13 @@ class Node:
         name: str,
         parents: Sequence[Node] = (),
         provenance: NodeProvenance | None = None,
-        id: str | None = None,
+        id: uuid.UUID | None = None,
         document: str | None = None,
         color: str | None = None,
         tokenizer_model: str | None = None,
     ) -> None:
-        self.id = id or str(uuid.uuid4())
-        self.name = name or f"node_{self.id[:8]}"
+        self.id = id or uuid.uuid4()
+        self.name = name or f"node_{str(self.id)[:8]}"
 
         if not isinstance(data, pl.LazyFrame):
             raise TypeError(
@@ -168,7 +168,7 @@ class Node:
     # Representation --------------------------------------------------
     def __repr__(self) -> str:  # pragma: no cover
         return (
-            f"Node(id={self.id[:8]}, name='{self.name}', dtype={type(self.data).__name__}, "
+            f"Node(id={str(self.id)[:8]}, name='{self.name}', dtype={type(self.data).__name__}, "
             f"parents={len(self.parents)}, children={len(self.children)}, document={self.document})"
         )
 

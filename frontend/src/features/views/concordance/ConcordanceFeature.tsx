@@ -168,7 +168,7 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
       queryFn: async (): Promise<ConcordanceRunAllResult> => {
         if (!currentWorkspaceId) throw new Error('Run All Result is unavailable');
         const result = await getAnalysisOutputResource(currentWorkspaceId, analysis.id);
-        if (result.kind !== 'concordance_run_all' || result.result_type !== 'source') {
+        if (result.kind !== 'concordance_run_all' || result.result.variant !== 'source') {
           throw new Error('Concordance Run All child Result is invalid');
         }
         return result;
@@ -179,8 +179,8 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
     concordanceRunAll?.state === 'succeeded'
       ? runAllSourceAnalyses.flatMap((analysis, index) => {
           const result = runAllResultQueries[index]?.data;
-          return result?.result_type === 'source' && result.source
-            ? [{ analysisId: analysis.id, source: result.source }]
+          return result?.result.variant === 'source'
+            ? [{ analysisId: analysis.id, source: result.result.source }]
             : [];
         })
       : [];
@@ -412,18 +412,12 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
     binCount,
   });
   const nodeSummaries = isReview
-    ? concordanceReviewSources.flatMap(({ source }) =>
-        source.source_document_count == null
-          ? []
-          : [
-              {
-                nodeId: source.node_id,
-                matchCount: source.match_count,
-                documentCount: source.document_count,
-                sourceDocumentCount: source.source_document_count,
-              },
-            ],
-      )
+    ? concordanceReviewSources.map(({ source }) => ({
+        nodeId: source.node_id,
+        matchCount: source.match_count,
+        documentCount: source.document_count,
+        sourceDocumentCount: source.source_document_count,
+      }))
     : [];
 
   useEffect(() => {

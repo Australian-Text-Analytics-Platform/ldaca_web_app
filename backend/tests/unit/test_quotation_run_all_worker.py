@@ -1,8 +1,11 @@
+import uuid
+
 import polars as pl
 from ldaca_wordflow.analysis.generated_columns import (
     QUOTE_COLUMN_NAMES,
     QUOTE_EXTRACTION_COLUMN,
 )
+from ldaca_wordflow.models.quotation import LocalResolvedQuotationEngine
 from ldaca_wordflow.workers.quotation import run_quotation_run_all
 
 
@@ -62,9 +65,9 @@ def test_quotation_run_all_writes_complete_analysis_table_artifact(
                 },
             )
         ),
-        parent_node_id="11111111-1111-4111-8111-111111111111",
+        parent_node_id=uuid.UUID("11111111-1111-4111-8111-111111111111"),
         document_column="document",
-        engine={"type": "local"},
+        engine=LocalResolvedQuotationEngine(),
         quotation_service_max_batch_size=100,
         quotation_service_timeout=30,
         progress_callback=lambda progress, message: progress_updates.append(
@@ -77,7 +80,7 @@ def test_quotation_run_all_writes_complete_analysis_table_artifact(
 
     assert result["state"] == "successful"
     source = result["source"]
-    assert source["node_id"] == "11111111-1111-4111-8111-111111111111"
+    assert source["node_id"] == uuid.UUID("11111111-1111-4111-8111-111111111111")
     assert source["document_column"] == "document"
     assert source["metadata_columns"] == ["speaker_label"]
     assert source["analysis_columns"] == [

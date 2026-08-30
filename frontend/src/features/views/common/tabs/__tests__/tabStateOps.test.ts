@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { getTabInputSet, reorderTabs, tabFromResource } from '../tabStateOps';
 
 const tab = {
+  availability: 'available' as const,
   id: 'tab-1',
   name: 'Analysis',
   kind: 'concordance' as const,
@@ -10,6 +11,7 @@ const tab = {
   created_at: '2026-01-01T00:00:00Z',
   modified_at: '2026-01-01T00:00:00Z',
   revision: 2,
+  settings: { kind: 'concordance' as const },
 };
 
 describe('tabStateOps', () => {

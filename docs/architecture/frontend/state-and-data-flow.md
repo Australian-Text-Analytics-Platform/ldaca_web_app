@@ -257,9 +257,9 @@ becomes the Tab's sole Analysis immediately. An Active Analysis Draft is
 client-only and is never written into Query data.
 
 Displayed Results resolve source identity, columns, ordering, search semantics,
-counts, seeds, and truncation metadata from immutable Result artifacts or the
-submitted request, with current Workspace metadata only as a fallback. Editing
-the next draft therefore cannot rebind an existing Result. Manual Annotation
+counts, seeds, and truncation data only from the strict Result tree and
+immutable submitted request. They do not fall back to current Workspace state.
+Editing the next draft therefore cannot rebind an existing Result. Manual Annotation
 uses the same principle locally: **Start** captures the source, annotation
 column, Codebook mapping, and related table inputs. The setup remains editable
 while that table is open, **Close** remains available even if the next draft is

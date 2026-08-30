@@ -2,6 +2,7 @@
 
 from datetime import date, datetime
 from io import BytesIO
+from pathlib import Path
 from typing import Any, Literal, cast
 import uuid
 
@@ -9,7 +10,6 @@ import polars as pl
 import pytest
 from pydantic import TypeAdapter, ValidationError
 
-from ldaca_wordflow.analysis.generated_columns import TOPIC_DISTRIBUTION_COLUMN
 from ldaca_wordflow.models.analysis_results import (
     AnalysisResultQuery,
     ConcordanceDocumentProjectionQuery,
@@ -17,18 +17,12 @@ from ldaca_wordflow.models.analysis_results import (
     TopicModelingResultQuery,
     TopicModelingStoredResult,
 )
-from ldaca_wordflow.shared.topic_types import (
-    topic_distribution_dtype,
-    topic_distribution_storage_dtype,
-)
 from ldaca_wordflow.services.analysis_results import (
     _concordance_density,
     _concordance_document_projection_page,
-    _paged_artifact_page,
-    _paged_artifact_schema,
     _projected_artifact_page,
     _projected_artifact_schema,
-    _query_topics,
+    _query_topics as _query_topics_impl,
     _sort_and_page,
 )
 from ldaca_wordflow.services.topic_projection_cache import TopicProjectionBasisCache
@@ -40,6 +34,26 @@ from ldaca_wordflow.shared.errors import (
     InvalidTopicTopNError,
 )
 from ldaca_wordflow.shared.json_data import JsonData
+
+_TEST_WORKSPACE_ID = uuid.UUID("11111111-1111-4111-8111-111111111111")
+_TEST_ANALYSIS_ID = uuid.UUID("22222222-2222-4222-8222-222222222222")
+
+
+def _query_topics(
+    stored: TopicModelingStoredResult,
+    query: TopicModelingResultQuery,
+    context_path: Path | None,
+    projection_cache: TopicProjectionBasisCache | None = None,
+) -> dict[str, JsonData]:
+    return _query_topics_impl(
+        stored,
+        query,
+        context_path,
+        projection_cache,
+        "test-user",
+        _TEST_WORKSPACE_ID,
+        _TEST_ANALYSIS_ID,
+    )
 
 
 def test_quotation_preview_query_contains_only_page_and_sort_controls() -> None:
@@ -70,8 +84,8 @@ def _topic_stored_result() -> TopicModelingStoredResult:
                 for topic_id in range(4)
             ],
             "corpus_sizes": [4],
-            "per_corpus_topic_counts": [{0: 1, 1: 1, 2: 1, 3: 1}],
-            "meta": {"n_chunks": 4},
+            "segment_count": 4,
+            "truncated_segment_count": 0,
             "sources": [
                 {
                     "node_id": source_id,
@@ -155,7 +169,7 @@ def test_explicit_natural_topic_query_runs_projector(tmp_path, monkeypatch) -> N
         }
 
     monkeypatch.setattr(
-        "ldaca_wordflow.services.analysis_results._project_rust_topic_projection_basis",
+        "ldaca_wordflow.services.analysis_results.project_rust_topic_projection_basis",
         fake_project,
     )
 
@@ -194,7 +208,7 @@ def test_changing_only_top_n_reuses_the_projection_basis(tmp_path, monkeypatch) 
         }
 
     monkeypatch.setattr(
-        "ldaca_wordflow.services.analysis_results._project_rust_topic_projection_basis",
+        "ldaca_wordflow.services.analysis_results.project_rust_topic_projection_basis",
         fake_project,
     )
     cache = TopicProjectionBasisCache(max_entries=16, max_bytes=1_000_000)
@@ -213,8 +227,10 @@ def test_changing_only_top_n_reuses_the_projection_basis(tmp_path, monkeypatch) 
     )
 
     assert calls == 1
-    assert first["per_corpus_topic_counts"] == [{"0": 4}]
-    assert tied["per_corpus_topic_counts"] == [{"0": 4, "1": 4, "2": 4}]
+    first_topics = cast(list[dict[str, Any]], first["topics"])
+    tied_topics = cast(list[dict[str, Any]], tied["topics"])
+    assert [row["size"] for row in first_topics] == [[4], [0], [0], [0]]
+    assert [row["size"] for row in tied_topics] == [[4], [4], [4], [0]]
 
 
 def test_topic_query_rejects_count_with_current_bounds() -> None:
@@ -263,7 +279,7 @@ def test_topic_projection_marks_invalid_context_as_analysis_corrupt(
     context_path = tmp_path / "context.msgpack.zst"
     context_path.write_bytes(b"invalid")
     monkeypatch.setattr(
-        "ldaca_wordflow.services.analysis_results._project_rust_topic_projection_basis",
+        "ldaca_wordflow.services.analysis_results.project_rust_topic_projection_basis",
         lambda **_kwargs: (_ for _ in ()).throw(ValueError("invalid context")),
     )
 
@@ -297,7 +313,7 @@ def test_topic_projection_filters_projected_topics(tmp_path, monkeypatch) -> Non
         }
 
     monkeypatch.setattr(
-        "ldaca_wordflow.services.analysis_results._project_rust_topic_projection_basis",
+        "ldaca_wordflow.services.analysis_results.project_rust_topic_projection_basis",
         fake_project,
     )
     payload = _query_topics(
@@ -311,7 +327,7 @@ def test_topic_projection_filters_projected_topics(tmp_path, monkeypatch) -> Non
     assert clustering["cluster_count"] == 2
     assert [row["id"] for row in topics] == [1]
     assert "pagination" not in payload
-    assert payload["per_corpus_topic_counts"] == [{"0": 2, "1": 2}]
+    assert topics[0]["size"] == [2]
 
 
 @pytest.mark.parametrize(
@@ -353,61 +369,6 @@ def test_result_sort_rejects_unknown_columns() -> None:
             descending=False,
             columns={"value"},
         )
-
-
-def test_topic_assignment_pages_use_ipc_and_preserve_semantic_storage(
-    tmp_path,
-) -> None:
-    path = tmp_path / "assignments.parquet"
-    pl.DataFrame(
-        {
-            "__row_nr__": [0, 1],
-            TOPIC_DISTRIBUTION_COLUMN: pl.Series(
-                [
-                    [
-                        {"topic_id": -1, "proportion": 0.25},
-                        {"topic_id": 0, "proportion": 0.75},
-                    ],
-                    [
-                        {"topic_id": -1, "proportion": 0.0},
-                        {"topic_id": 0, "proportion": 1.0},
-                    ],
-                ],
-                dtype=topic_distribution_storage_dtype(1),
-            ),
-        }
-    ).write_parquet(path)
-
-    page = _paged_artifact_page(path, 1, 1, None, False)
-    frame = pl.read_ipc_stream(BytesIO(page.content))
-    schema = pl.read_ipc_stream(BytesIO(_paged_artifact_schema(path)))
-
-    assert page.has_next is True
-    assert frame[TOPIC_DISTRIBUTION_COLUMN].to_list() == [
-        [
-            {"topic_id": -1, "proportion": 0.25},
-            {"topic_id": 0, "proportion": 0.75},
-        ]
-    ]
-    assert schema.height == 0
-    assert schema.schema[TOPIC_DISTRIBUTION_COLUMN] == topic_distribution_dtype(1)
-
-
-def test_variable_list_topic_assignment_artifact_is_rejected(tmp_path) -> None:
-    path = tmp_path / "legacy-assignments.parquet"
-    pl.DataFrame(
-        {
-            TOPIC_DISTRIBUTION_COLUMN: pl.Series(
-                [[{"topic_id": 0, "proportion": 1.0}]],
-                dtype=pl.List(
-                    pl.Struct({"topic_id": pl.Int64, "proportion": pl.Float64})
-                ),
-            )
-        }
-    ).write_parquet(path)
-
-    with pytest.raises(AnalysisCorruptError, match="invalid schema"):
-        _paged_artifact_schema(path)
 
 
 def test_concordance_result_supports_document_and_match_pages(tmp_path) -> None:

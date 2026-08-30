@@ -1,6 +1,7 @@
 """Independent User File Import queue capacity and cancellation."""
 
 from datetime import UTC, datetime, timedelta
+import uuid
 
 import anyio
 import pytest
@@ -15,13 +16,26 @@ from ldaca_wordflow.services.user_file_import_scheduler import (
 )
 
 
+def _import_id(label: str) -> uuid.UUID:
+    return uuid.uuid5(uuid.NAMESPACE_URL, f"import-scheduler:{label}")
+
+
+def _label(value: uuid.UUID) -> str:
+    return next(
+        label
+        for label in ("a1", "a2", "b1", "running", "queued", "late")
+        if _import_id(label) == value
+    )
+
+
 async def test_import_scheduler_is_work_conserving_and_fair() -> None:
     started: list[str] = []
     release = anyio.Event()
 
     async def runner(item: ScheduledUserFileImport) -> None:
-        started.append(item.key.import_id)
-        if item.key.import_id == "a1":
+        label = _label(item.key.import_id)
+        started.append(label)
+        if label == "a1":
             await release.wait()
 
     scheduler = UserFileImportScheduler(capacity=1, runner=runner)
@@ -29,18 +43,18 @@ async def test_import_scheduler_is_work_conserving_and_fair() -> None:
     async with anyio.create_task_group() as tasks:
         scheduler.start(tasks)
         await scheduler.enqueue(
-            UserFileImportKey("alice", "a1"),
+            UserFileImportKey("alice", _import_id("a1")),
             created_at=now,
         )
         await scheduler.enqueue(
-            UserFileImportKey("alice", "a2"),
+            UserFileImportKey("alice", _import_id("a2")),
             created_at=now + timedelta(seconds=1),
         )
         with anyio.fail_after(1):
             while started != ["a1"]:
                 await anyio.sleep(0)
         await scheduler.enqueue(
-            UserFileImportKey("bob", "b1"),
+            UserFileImportKey("bob", _import_id("b1")),
             created_at=now,
         )
         release.set()
@@ -64,8 +78,8 @@ async def test_import_scheduler_distinguishes_queued_and_running_cancellation() 
             raise
 
     scheduler = UserFileImportScheduler(capacity=1, runner=runner)
-    running = UserFileImportKey("user", "running")
-    queued = UserFileImportKey("user", "queued")
+    running = UserFileImportKey("user", _import_id("running"))
+    queued = UserFileImportKey("user", _import_id("queued"))
     async with anyio.create_task_group() as tasks:
         scheduler.start(tasks)
         await scheduler.enqueue(running, created_at=datetime.now(UTC))
@@ -91,6 +105,6 @@ async def test_import_scheduler_rejects_work_after_dispatch_stops() -> None:
 
         with pytest.raises(UserFileImportSchedulingStopped):
             await scheduler.enqueue(
-                UserFileImportKey("user", "late"),
+                UserFileImportKey("user", _import_id("late")),
                 created_at=datetime.now(UTC),
             )

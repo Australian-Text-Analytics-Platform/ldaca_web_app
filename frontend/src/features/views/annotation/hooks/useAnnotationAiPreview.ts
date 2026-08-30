@@ -5,8 +5,8 @@ import { useState } from 'react';
 import {
   queryWorkspaceSqlTable,
   sqlTable,
+  type AnnotationQueriedResult,
   type AnnotationPreviewLabel,
-  type AnnotationResult,
 } from '@/api';
 import { queryAnnotationPreviewWithProviderCredential } from '@/features/provider-credentials/providerCredentialRequests';
 import { queryKeys } from '@/lib/queryKeys';
@@ -74,7 +74,7 @@ export function useAnnotationAiPreview({
     refetchOnMount: 'always',
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
-    queryFn: async ({ signal }): Promise<AnnotationResult> => {
+    queryFn: async ({ signal }): Promise<AnnotationQueriedResult> => {
       if (!workspaceId || !analysisId || !projection.provider_configuration_id) {
         throw new Error('Annotation Preview is not available');
       }
@@ -86,10 +86,10 @@ export function useAnnotationAiPreview({
         pageSize: projection.page_size,
         signal,
       });
-      if (data.kind !== 'annotation' || !data.rows || !data.labels) {
+      if (data.kind !== 'annotation' || data.result.variant !== 'queried') {
         throw new Error('Annotation Preview returned an invalid page');
       }
-      return data;
+      return data.result;
     },
   });
   const sourcePageSql = `SELECT * FROM ${sqlTable(nodeId)}`;

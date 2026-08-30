@@ -48,11 +48,13 @@ def _service(
     *,
     multi_user: bool = False,
     max_open_workspace_bytes: int = 4 * 1024 * 1024 * 1024,
+    max_workspace_nodes: int = 10_000,
 ) -> WorkspaceService:
     settings = Settings(
         data_root=tmp_path,
         multi_user=multi_user,
         max_open_workspace_bytes=max_open_workspace_bytes,
+        max_workspace_nodes=max_workspace_nodes,
         google_client_id="test-client" if multi_user else "",
     )
     limiter = anyio.CapacityLimiter(4)
@@ -73,9 +75,9 @@ def _publish_workspace(
     *,
     owner_id: str,
     name: str,
-) -> str:
-    workspace_id = str(uuid.uuid4())
-    path = workspaces_root(service.settings) / workspace_id
+) -> uuid.UUID:
+    workspace_id = uuid.uuid4()
+    path = workspaces_root(service.settings) / str(workspace_id)
     workspace = Workspace(name=name, workspace_id=workspace_id)
     WorkspaceStore(
         max_nodes=service.settings.max_workspace_nodes,
@@ -92,7 +94,7 @@ async def test_workspace_creation_uses_global_catalogue_and_exact_access_sidecar
     service = _service(tmp_path)
 
     created = await service.create_workspace("owner", "Global")
-    path = workspaces_root(service.settings) / created.id
+    path = workspaces_root(service.settings) / str(created.id)
 
     assert path.is_dir()
     assert (path / "workspace.json").is_file()
@@ -110,7 +112,7 @@ async def test_workspace_discovery_revalidates_ownership_without_a_catalogue_cac
     created = await service.create_workspace("alice", "Owned by Alice")
     assert (await service.get_workspace("alice", created.id)).id == created.id
 
-    path = workspaces_root(service.settings) / created.id
+    path = workspaces_root(service.settings) / str(created.id)
     write_workspace_owner(path, "bob")
 
     with pytest.raises(WorkspaceNotFoundError):
@@ -126,8 +128,8 @@ async def test_corrupt_owned_workspace_is_exposed_and_remains_deletable(
 ) -> None:
     service = _service(tmp_path)
     valid = await service.create_workspace("owner", "Valid")
-    corrupt_id = str(uuid.uuid4())
-    corrupt = workspaces_root(service.settings) / corrupt_id
+    corrupt_id = uuid.uuid4()
+    corrupt = workspaces_root(service.settings) / str(corrupt_id)
     corrupt.mkdir(parents=True)
     write_workspace_owner(corrupt, "owner")
     (corrupt / "workspace.json").write_text("not json", encoding="utf-8")
@@ -142,7 +144,7 @@ async def test_corrupt_owned_workspace_is_exposed_and_remains_deletable(
     )
     with pytest.raises(WorkspaceCorruptError) as exc_info:
         await service.get_workspace("owner", corrupt_id)
-    assert exc_info.value.details == {"workspace_id": corrupt_id}
+    assert exc_info.value.details == {"workspace_id": str(corrupt_id)}
 
     async with service.deletion_context("owner", corrupt_id):
         pass
@@ -157,10 +159,12 @@ async def test_incompatible_workspace_versions_are_distinct_catalogue_entries(
     valid = await service.create_workspace("owner", "Valid")
     incompatible_ids = [
         _publish_workspace(service, owner_id="owner", name=f"Schema {version}")
-        for version in (17, 18)
+        for version in (20, 21)
     ]
-    for workspace_id, version in zip(incompatible_ids, (17, 18), strict=True):
-        snapshot_path = workspaces_root(service.settings) / workspace_id / "workspace.json"
+    for workspace_id, version in zip(incompatible_ids, (20, 21), strict=True):
+        snapshot_path = (
+            workspaces_root(service.settings) / str(workspace_id) / "workspace.json"
+        )
         payload = json.loads(snapshot_path.read_text(encoding="utf-8"))
         payload["workspace_metadata"]["version"] = version
         payload["workspace_metadata"]["description"] = f"Description {version}"
@@ -178,15 +182,15 @@ async def test_incompatible_workspace_versions_are_distinct_catalogue_entries(
         (record.stored_schema_version, record.supported_schema_version)
         for record in unavailable
         if isinstance(record, UnavailableWorkspaceRecord)
-    } == {(17, 21), (18, 21)}
+    } == {(20, 22), (21, 22)}
     assert all(
         isinstance(record, UnavailableWorkspaceRecord)
         and record.reason == "incompatible_format"
         for record in unavailable
     )
     unavailable_by_name = {record.name: record for record in unavailable}
-    assert unavailable_by_name["Schema 17"].description == "Description 17"
-    assert unavailable_by_name["Schema 18"].description == "Description 18"
+    assert unavailable_by_name["Schema 20"].description == "Description 20"
+    assert unavailable_by_name["Schema 21"].description == "Description 21"
     assert all(
         record.created_at == "2024-01-01T00:00:00+00:00"
         and record.modified_at == "2024-01-02T00:00:00+00:00"
@@ -208,9 +212,10 @@ async def test_over_limit_workspace_has_a_distinct_catalogue_reason(
         lease.workspace.add_node(
             Node(data=pl.DataFrame({"value": [2]}).lazy(), name="Second")
         )
-    service._store = WorkspaceStore(max_nodes=1, max_snapshot_bytes=8 * 1024 * 1024)
+    await service.close()
+    constrained = _service(tmp_path, max_workspace_nodes=1)
 
-    assert await service.list_workspaces("owner") == [
+    assert await constrained.list_workspaces("owner") == [
         UnavailableWorkspaceRecord(
             id=created.id,
             reason="configured_limit",
@@ -224,8 +229,8 @@ async def test_other_users_never_parse_an_owned_corrupt_workspace(
     tmp_path: Path,
 ) -> None:
     service = _service(tmp_path)
-    corrupt_id = str(uuid.uuid4())
-    corrupt = workspaces_root(service.settings) / corrupt_id
+    corrupt_id = uuid.uuid4()
+    corrupt = workspaces_root(service.settings) / str(corrupt_id)
     corrupt.mkdir(parents=True)
     write_workspace_owner(corrupt, "alice")
     (corrupt / "workspace.json").write_text("not json", encoding="utf-8")
@@ -246,7 +251,9 @@ async def test_unattributable_workspace_entries_do_not_block_valid_siblings(
         owner_id="owner",
         name="Unattributable",
     )
-    (workspaces_root(service.settings) / unattributable_id / "access.json").unlink()
+    (
+        workspaces_root(service.settings) / str(unattributable_id) / "access.json"
+    ).unlink()
     (workspaces_root(service.settings) / "not-a-workspace").mkdir()
 
     assert [record.id for record in await service.list_workspaces("owner")] == [
@@ -294,7 +301,6 @@ async def test_workspace_creation_stays_closed_until_explicit_open(
     created = await service.create_workspace("user", "Closed", "")
 
     assert created.runtime_state == "closed"
-    assert service._slots == {}
     with pytest.raises(WorkspaceNotOpenError):
         async with service.read_context("user", created.id):
             pass
@@ -338,12 +344,12 @@ async def test_delete_rejects_external_owner_then_succeeds_after_close(
     with pytest.raises(WorkspaceInUseError):
         async with other.deletion_context("user", created.id):
             pass
-    assert (workspaces_root(holder.settings) / created.id).is_dir()
+    assert (workspaces_root(holder.settings) / str(created.id)).is_dir()
 
     await holder.close()
     async with other.deletion_context("user", created.id):
         pass
-    assert not (workspaces_root(holder.settings) / created.id).exists()
+    assert not (workspaces_root(holder.settings) / str(created.id)).exists()
 
 
 @pytest.mark.anyio
@@ -375,7 +381,7 @@ async def test_concurrent_open_loads_one_aggregate_and_reuses_it(
 ) -> None:
     service = _service(tmp_path)
     created = await service.create_workspace("user", "One load")
-    original = service._load_sync
+    original = service._catalogue.load
     calls = 0
 
     def counted_load(path: Path) -> tuple[Workspace, int, int]:
@@ -383,7 +389,7 @@ async def test_concurrent_open_loads_one_aggregate_and_reuses_it(
         calls += 1
         return original(path)
 
-    monkeypatch.setattr(service, "_load_sync", counted_load)
+    monkeypatch.setattr(service._catalogue, "load", counted_load)
     results: list[str] = []
 
     async def open_once() -> None:
@@ -404,7 +410,7 @@ async def test_failed_open_remains_closed_and_can_be_retried(
 ) -> None:
     service = _service(tmp_path)
     created = await service.create_workspace("user", "Retry")
-    original = service._load_sync
+    original = service._catalogue.load
     calls = 0
 
     def fail_once(path: Path) -> tuple[Workspace, int, int]:
@@ -414,7 +420,7 @@ async def test_failed_open_remains_closed_and_can_be_retried(
             raise WorkspaceCorruptError("temporary load failure")
         return original(path)
 
-    monkeypatch.setattr(service, "_load_sync", fail_once)
+    monkeypatch.setattr(service._catalogue, "load", fail_once)
     with pytest.raises(WorkspaceCorruptError):
         await service.open_workspace("user", created.id)
     assert (await service.get_workspace("user", created.id)).runtime_state == "closed"
@@ -436,7 +442,7 @@ async def test_failed_open_releases_process_ownership(
     def fail_load(_path: Path) -> tuple[Workspace, int, int]:
         raise WorkspaceCorruptError("temporary load failure")
 
-    monkeypatch.setattr(failing, "_load_sync", fail_load)
+    monkeypatch.setattr(failing._catalogue, "load", fail_load)
     with pytest.raises(WorkspaceCorruptError):
         await failing.open_workspace("user", created.id)
 
@@ -508,7 +514,6 @@ async def test_hosted_open_capacity_rejects_without_loading_or_eviction(
         await service.open_workspace("user", created.id)
 
     assert (await service.get_workspace("user", created.id)).runtime_state == "closed"
-    assert service._open_capacity_bytes == 0
 
 
 @pytest.mark.anyio
@@ -534,7 +539,7 @@ async def test_close_is_immediate_when_idle_and_open_cancels_deferred_close(
     created = await service.create_workspace("user", "Lifecycle")
     await service.open_workspace("user", created.id)
 
-    async def idle(_user_id: str, _workspace_id: str) -> bool:
+    async def idle(_user_id: str, _workspace_id: uuid.UUID) -> bool:
         return False
 
     assert await service.request_close("user", created.id, idle) is None
@@ -543,7 +548,7 @@ async def test_close_is_immediate_when_idle_and_open_cancels_deferred_close(
     await service.open_workspace("user", created.id)
     active = True
 
-    async def has_work(_user_id: str, _workspace_id: str) -> bool:
+    async def has_work(_user_id: str, _workspace_id: uuid.UUID) -> bool:
         return active
 
     closing = await service.request_close("user", created.id, has_work)
@@ -587,7 +592,7 @@ async def test_failed_metadata_commit_removes_published_mutation_files(
     async def fail_persist(*_args: object, **_kwargs: object) -> int:
         raise OSError("simulated metadata failure")
 
-    monkeypatch.setattr(service, "_persist", fail_persist)
+    monkeypatch.setattr(service._mutation_committer, "persist", fail_persist)
     with pytest.raises(OSError, match="simulated metadata failure"):
         async with service.mutation_context("user", created.id) as lease:
             published.write_bytes(b"published before metadata")
@@ -620,7 +625,7 @@ async def test_failed_publication_restores_plan_and_preexisting_history(
     async def fail_persist(*_args: object, **_kwargs: object) -> int:
         raise OSError("simulated plan publication failure")
 
-    monkeypatch.setattr(service, "_persist", fail_persist)
+    monkeypatch.setattr(service._mutation_committer, "persist", fail_persist)
     with pytest.raises(OSError, match="simulated plan publication failure"):
         async with service.mutation_context("user", created.id) as lease:
             lease.workspace.nodes[node_id].data = pl.DataFrame(
@@ -719,7 +724,7 @@ async def test_cancelled_thread_write_is_not_abandoned(tmp_path: Path) -> None:
         with anyio.CancelScope() as scope:
             cancel_scope.append(scope)
             try:
-                await service._run_io(blocking_write)
+                await service._residency.run_io(blocking_write)
             finally:
                 returned.set()
 

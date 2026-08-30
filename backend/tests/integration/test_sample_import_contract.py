@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import time
 from pathlib import Path
 from typing import Any
@@ -30,7 +31,7 @@ _CATALOGUE = {
                 {
                     "path": "ADO/twitter/README.md",
                     "size": len(_README),
-                    "sha256": "0" * 64,
+                    "sha256": hashlib.sha256(_README).hexdigest(),
                 }
             ],
         },

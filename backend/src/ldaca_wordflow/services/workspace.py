@@ -17,48 +17,38 @@ import os
 import shutil
 import stat
 import uuid
-from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict
 from datetime import UTC, datetime
-from functools import partial
 from pathlib import Path
-from typing import Any, Literal, TypeVar, cast
+from typing import Literal, TypeVar, cast
 
 import anyio
-from anyio.to_thread import run_sync as run_sync_in_worker_thread
-from ..domain.workspace import AnalysisKind, Tab, Workspace
-from ..domain.workspace.node import PlanHistorySnapshot
+from ..domain.workspace import (
+    AnnotationTabSettings,
+    Tab,
+    TabResource,
+    TokenFrequencyTabSettings,
+    TopicModelingTabSettings,
+    UnavailableTab,
+    Workspace,
+)
 from ..domain.events import EventResourceType
 from ..domain.background import BackgroundState, Progress
 from ..infrastructure.storage.workspace_store import (
-    TabSnapshotInvalidError,
     WorkspaceCapacityError,
     WorkspaceRevisionConflictError,
-    WorkspaceSchemaVersionError,
     WorkspaceSerializationError,
     WorkspaceSnapshotInfo,
-    WorkspaceSnapshotInvalidError,
     WorkspaceStore,
 )
-from ..infrastructure.storage.workspace_access import (
-    WorkspaceAccessInvalidError,
-    read_workspace_owner,
-    write_workspace_owner,
-)
-from ..infrastructure.storage.workspace_lock import (
-    WorkspaceLockContendedError,
-    WorkspaceLockStorageError,
-    WorkspaceProcessLock,
-    acquire_workspace_lock,
-)
+from ..infrastructure.storage.workspace_access import write_workspace_owner
 
 from ..shared.errors import (
-    BackendCapacityExceededError,
     InvalidInputError,
     InvalidWorkspaceArchiveError,
     ResourceTooLargeError,
-    TabCorruptError,
     TabNotFoundError,
     WorkspaceConflictError,
     WorkspaceClosingError,
@@ -74,7 +64,13 @@ from ..models.workspace import (
     WorkspaceNodeReorderRequest,
     WorkspaceUpdateRequest,
 )
-from ..models.tabs import TabCreate, TabUpdate
+from ..models.tabs import (
+    AnnotationTabUpdate,
+    TabCreate,
+    TabUpdate,
+    TokenFrequencyTabUpdate,
+    TopicModelingTabUpdate,
+)
 from ..models.analysis_results import TopicModelingStoredResult
 from ..infrastructure.storage.layout import (
     NODE_SOURCE_STAGING_PREFIX,
@@ -84,106 +80,33 @@ from ..infrastructure.storage.layout import (
     validate_workspace_name,
     workspace_staging_root,
     workspace_trash_root,
-    workspace_locks_root,
     workspaces_root,
 )
 from ..infrastructure.storage.durable_fs import (
     fsync_directory as _fsync_directory,
     mkdir_durable as _mkdir_durable,
 )
-from ..workers.input_snapshots import rebase_worker_input_snapshot_sources
+from ..infrastructure.storage.input_snapshots import (
+    rebase_worker_input_snapshot_sources,
+)
 from .storage_admission import StorageAdmissionService, StorageReservation
 from .events import EventHub
+from .workspace_coordination import (
+    UnavailableWorkspaceRecord as UnavailableWorkspaceRecord,
+    WorkspaceLease,
+    WorkspaceListRecord,
+    WorkspaceMutationResult,
+    WorkspaceRecord,
+    _WorkspaceCatalogue,
+    _WorkspaceEventPublisher,
+    _WorkspaceMutationCommitter,
+    _WorkspaceResidency,
+    _WorkspaceSlot,
+)
 
 T = TypeVar("T")
 logger = logging.getLogger(__name__)
 WorkspaceReconciler = Callable[[Workspace], bool]
-
-
-@dataclass(frozen=True, slots=True)
-class WorkspaceRecord:
-    """Materialized workspace resource returned after the gate is released."""
-
-    id: str
-    name: str
-    description: str
-    created_at: str
-    modified_at: str
-    total_nodes: int
-    root_nodes: int
-    leaf_nodes: int
-    revision: int
-    runtime_state: Literal["closed", "open", "closing"]
-
-
-@dataclass(frozen=True, slots=True)
-class UnavailableWorkspaceRecord:
-    """Safely attributable catalogue entry that cannot currently be opened."""
-
-    id: str
-    reason: Literal[
-        "incompatible_format",
-        "corrupt_snapshot",
-        "configured_limit",
-    ]
-    message: str
-    name: str | None = None
-    description: str | None = None
-    created_at: str | None = None
-    modified_at: str | None = None
-    stored_schema_version: int | None = None
-    supported_schema_version: int | None = None
-
-
-def _incompatible_metadata_text(
-    error: WorkspaceSchemaVersionError,
-    field: str,
-) -> str | None:
-    """Read one descriptive text field without weakening the load gate."""
-
-    metadata = error.workspace_metadata
-    value = metadata.get(field) if metadata is not None else None
-    return value if isinstance(value, str) else None
-
-
-WorkspaceListRecord = WorkspaceRecord | UnavailableWorkspaceRecord
-
-
-@dataclass(slots=True)
-class _WorkspaceSlot:
-    """One transient coordination entry for one Workspace identity."""
-
-    gate: anyio.Lock
-    users: int = 0
-    workspace: Workspace | None = None
-    path: Path | None = None
-    revision: int = 0
-    serialized_bytes: int = 0
-    serialized_entries: int = 0
-    closing: bool = False
-    process_lock: WorkspaceProcessLock | None = None
-
-
-@dataclass(slots=True)
-class WorkspaceLease:
-    """Function-scoped workspace object protected by one mutation gate."""
-
-    workspace: Workspace
-    path: Path
-    revision: int
-    slot: _WorkspaceSlot
-    commit_requested: bool = True
-    rollback_paths: list[Path] = field(default_factory=list)
-    rollback_analysis_directories: list[Path] = field(default_factory=list)
-    commit_cleanup_analysis_directories: list[Path] = field(default_factory=list)
-
-
-@dataclass(frozen=True, slots=True)
-class WorkspaceMutationResult[T]:
-    """Materialized callback value paired with its committed revision."""
-
-    value: T
-    revision: int
 
 
 def _cleanup_abandoned_node_staging(workspace_path: Path) -> None:
@@ -220,51 +143,6 @@ def _cleanup_abandoned_node_staging(workspace_path: Path) -> None:
         changed = True
     if changed:
         _fsync_directory(data_root)
-
-
-def _remove_rollback_paths(paths: list[Path]) -> None:
-    """Remove files published by a mutation whose metadata commit failed."""
-
-    parents: set[Path] = set()
-    for path in paths:
-        try:
-            metadata = path.lstat()
-        except FileNotFoundError:
-            continue
-        if stat.S_ISREG(metadata.st_mode) and not path.is_symlink():
-            path.unlink()
-            parents.add(path.parent)
-    for parent in parents:
-        _fsync_directory(parent)
-
-
-def _remove_rollback_analysis_directories(
-    paths: list[Path],
-    workspace_root: Path,
-) -> None:
-    """Remove newly published private Analysis directories after commit failure."""
-
-    resolved_root = workspace_root.resolve(strict=True)
-    parents: set[Path] = set()
-    for path in paths:
-        try:
-            relative = path.resolve(strict=True).relative_to(resolved_root)
-            analysis_id = str(uuid.UUID(relative.parts[1]))
-            metadata = path.lstat()
-        except FileNotFoundError, OSError, ValueError, IndexError:
-            continue
-        if (
-            len(relative.parts) != 3
-            or relative.parts[:2] != ("analyses", analysis_id)
-            or relative.parts[2] not in {"artifacts", "query-input", "staged-output"}
-            or not stat.S_ISDIR(metadata.st_mode)
-            or path.is_symlink()
-        ):
-            continue
-        shutil.rmtree(path)
-        parents.add(path.parent)
-    for parent in parents:
-        _fsync_directory(parent)
 
 
 def _remove_private_entry(path: Path) -> None:
@@ -337,15 +215,16 @@ class WorkspaceService:
         self.settings = settings
         self._store = store
         self._storage_admission = storage_admission
-        self._events = events
-        self._io_limiter = io_limiter
-        self._slots: dict[str, _WorkspaceSlot] = {}
-        self._slot_registry_lock = anyio.Lock()
-        self._capacity_lock = anyio.Lock()
-        self._open_capacity_limit = (
-            settings.max_open_workspace_bytes if settings.multi_user else None
+        self._event_publisher = _WorkspaceEventPublisher(events)
+        self._catalogue = _WorkspaceCatalogue(settings, store)
+        self._residency = _WorkspaceResidency(settings, io_limiter)
+        self._mutation_committer = _WorkspaceMutationCommitter(
+            settings,
+            store,
+            storage_admission,
+            self._residency,
+            self._catalogue,
         )
-        self._open_capacity_bytes = 0
         self._accepting_mutations = True
 
     @asynccontextmanager
@@ -369,337 +248,23 @@ class WorkspaceService:
             with anyio.CancelScope(shield=True):
                 await reservation.release()
 
-    @asynccontextmanager
-    async def _slot(self, workspace_id: str) -> AsyncIterator[_WorkspaceSlot]:
-        """Serialize one Workspace and discard an idle closed coordination slot."""
-
-        async with self._slot_registry_lock:
-            slot = self._slots.get(workspace_id)
-            if slot is None:
-                slot = _WorkspaceSlot(anyio.Lock())
-                self._slots[workspace_id] = slot
-            slot.users += 1
-        try:
-            async with slot.gate:
-                yield slot
-        finally:
-            async with self._slot_registry_lock:
-                slot.users -= 1
-                if (
-                    slot.users == 0
-                    and slot.workspace is None
-                    and not slot.closing
-                    and slot.process_lock is None
-                ):
-                    self._slots.pop(workspace_id, None)
-
-    @staticmethod
-    def _runtime_state(
-        slot: _WorkspaceSlot,
-    ) -> Literal["closed", "open", "closing"]:
-        if slot.closing:
-            return "closing"
-        return "open" if slot.workspace is not None else "closed"
-
-    async def _reserve_open_capacity(self, requested_bytes: int) -> None:
-        if requested_bytes <= 0 or self._open_capacity_limit is None:
-            return
-        async with self._capacity_lock:
-            if self._open_capacity_bytes + requested_bytes > self._open_capacity_limit:
-                raise BackendCapacityExceededError()
-            self._open_capacity_bytes += requested_bytes
-
-    async def _release_open_capacity(self, released_bytes: int) -> None:
-        if released_bytes <= 0 or self._open_capacity_limit is None:
-            return
-        async with self._capacity_lock:
-            self._open_capacity_bytes = max(
-                0,
-                self._open_capacity_bytes - released_bytes,
-            )
-
-    async def _clear_slot(self, slot: _WorkspaceSlot) -> None:
-        """Release one loaded aggregate while its gate is held."""
-
-        released = slot.serialized_bytes
-        process_lock = slot.process_lock
-        slot.workspace = None
-        slot.path = None
-        slot.revision = 0
-        slot.serialized_bytes = 0
-        slot.serialized_entries = 0
-        slot.closing = False
-        slot.process_lock = None
-        with anyio.CancelScope(shield=True):
-            await self._release_open_capacity(released)
-            if process_lock is not None:
-                await self._run_io(process_lock.close)
-
-    async def _acquire_process_lock(self, workspace_id: str) -> WorkspaceProcessLock:
-        try:
-            return await self._run_io(
-                acquire_workspace_lock,
-                workspace_locks_root(self.settings),
-                workspace_id,
-            )
-        except WorkspaceLockContendedError as exc:
-            raise WorkspaceInUseError() from exc
-        except WorkspaceLockStorageError as exc:
-            raise WorkspaceLockUnavailableError() from exc
-
-    @staticmethod
-    def _snapshot_entry_count(
-        *,
-        node_count: int,
-        tab_count: int,
-        analysis_count: int,
-    ) -> int:
-        """Count snapshot-owned files and directories used for quota estimates."""
-
-        return (
-            1
-            + node_count
-            + int(node_count > 0)
-            + 2 * tab_count
-            + int(tab_count > 0)
-            + 2 * analysis_count
-            + int(analysis_count > 0)
-        )
-
-    async def _runtime_states(
-        self,
-    ) -> dict[str, Literal["open", "closing"]]:
-        async with self._slot_registry_lock:
-            states: dict[str, Literal["open", "closing"]] = {}
-            for workspace_id, slot in self._slots.items():
-                if slot.workspace is not None:
-                    states[workspace_id] = "closing" if slot.closing else "open"
-            return states
-
     def workspace_staging_root(self) -> Path:
         """Return the private same-filesystem archive/creation staging root."""
 
         return workspace_staging_root(self.settings)
 
-    async def _run_io(
-        self,
-        function: Callable[..., T],
-        *args: Any,
-        **kwargs: Any,
-    ) -> T:
-        """Run blocking persistence without abandoning a cancelled writer."""
-
-        return await run_sync_in_worker_thread(
-            partial(function, *args, **kwargs),
-            abandon_on_cancel=False,
-            limiter=self._io_limiter,
-        )
-
-    def _scan_owned_paths_sync(self) -> list[tuple[str, Path]]:
-        """Return safe attributed Workspace paths from one isolated scan."""
-
-        root = workspaces_root(self.settings)
-        _mkdir_durable(root)
-        paths: list[tuple[str, Path]] = []
-        for candidate in root.iterdir():
-            if candidate.name.startswith("."):
-                continue
-            try:
-                canonical_id = str(uuid.UUID(candidate.name))
-                metadata = candidate.lstat()
-                attributes = int(getattr(metadata, "st_file_attributes", 0))
-                reparse = int(getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400))
-                if (
-                    canonical_id != candidate.name
-                    or not stat.S_ISDIR(metadata.st_mode)
-                    or stat.S_ISLNK(metadata.st_mode)
-                    or attributes & reparse
-                ):
-                    raise ValueError("Workspace entry is not a canonical directory")
-            except OSError, ValueError:
-                logger.warning(
-                    "Ignoring invalid Workspace catalogue entry name=%s",
-                    candidate.name,
-                    exc_info=True,
-                )
-                continue
-            try:
-                owner_id = read_workspace_owner(candidate)
-            except WorkspaceAccessInvalidError:
-                logger.warning(
-                    "Ignoring unattributable Workspace workspace_id=%s",
-                    canonical_id,
-                    exc_info=True,
-                )
-                continue
-            paths.append((owner_id, candidate))
-        return paths
-
-    def _scan_records_sync(self, user_id: str) -> list[WorkspaceListRecord]:
-        """Materialize available and safely attributable unavailable entries."""
-
-        records: list[WorkspaceRecord] = []
-        unavailable: list[UnavailableWorkspaceRecord] = []
-        for owner_id, candidate in self._scan_owned_paths_sync():
-            if owner_id != user_id:
-                continue
-            try:
-                snapshot = self._store.inspect(candidate)
-                if snapshot.workspace_id != candidate.name:
-                    raise WorkspaceSnapshotInvalidError(
-                        "Workspace directory and snapshot IDs differ"
-                    )
-            except WorkspaceSchemaVersionError as exc:
-                logger.info(
-                    "Catalogue found incompatible owned Workspace "
-                    "workspace_id=%s owner_id=%s stored_schema=%s supported_schema=%s",
-                    candidate.name,
-                    owner_id,
-                    exc.stored_version,
-                    exc.supported_version,
-                )
-                unavailable.append(
-                    UnavailableWorkspaceRecord(
-                        id=candidate.name,
-                        reason="incompatible_format",
-                        message=(
-                            f"Workspace format {exc.stored_version} is incompatible "
-                            f"with supported format {exc.supported_version}."
-                        ),
-                        name=_incompatible_metadata_text(exc, "name"),
-                        description=_incompatible_metadata_text(exc, "description"),
-                        created_at=_incompatible_metadata_text(exc, "created_at"),
-                        modified_at=_incompatible_metadata_text(exc, "modified_at"),
-                        stored_schema_version=exc.stored_version,
-                        supported_schema_version=exc.supported_version,
-                    )
-                )
-                continue
-            except WorkspaceCapacityError:
-                logger.warning(
-                    "Catalogue found over-limit owned Workspace "
-                    "workspace_id=%s owner_id=%s",
-                    candidate.name,
-                    owner_id,
-                    exc_info=True,
-                )
-                unavailable.append(
-                    UnavailableWorkspaceRecord(
-                        id=candidate.name,
-                        reason="configured_limit",
-                        message="Workspace exceeds the configured limits.",
-                    )
-                )
-                continue
-            except WorkspaceSnapshotInvalidError:
-                logger.error(
-                    "Catalogue found corrupt owned Workspace workspace_id=%s owner_id=%s",
-                    candidate.name,
-                    owner_id,
-                    exc_info=True,
-                )
-                unavailable.append(
-                    UnavailableWorkspaceRecord(
-                        id=candidate.name,
-                        reason="corrupt_snapshot",
-                        message="Workspace data is corrupt.",
-                    )
-                )
-                continue
-            records.append(
-                WorkspaceRecord(
-                    id=candidate.name,
-                    name=snapshot.name,
-                    description=snapshot.description,
-                    created_at=snapshot.created_at,
-                    modified_at=snapshot.modified_at,
-                    total_nodes=snapshot.node_count,
-                    root_nodes=snapshot.root_node_count,
-                    leaf_nodes=snapshot.leaf_node_count,
-                    revision=snapshot.revision,
-                    runtime_state="closed",
-                )
-            )
-        records.sort(key=lambda record: record.id)
-        records.sort(key=lambda record: record.modified_at or "", reverse=True)
-        unavailable.sort(key=lambda record: record.id)
-        return [*records, *unavailable]
-
-    def _resolve_owned_path_sync(
-        self,
-        user_id: str,
-        workspace_id: str,
-    ) -> Path | None:
-        """Resolve one live path after exact identity and owner validation."""
-
-        try:
-            canonical_id = str(uuid.UUID(workspace_id))
-        except ValueError:
-            return None
-        if canonical_id != workspace_id:
-            return None
-        path = workspaces_root(self.settings) / workspace_id
-        try:
-            metadata = path.lstat()
-            attributes = int(getattr(metadata, "st_file_attributes", 0))
-            reparse = int(getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400))
-            if (
-                not stat.S_ISDIR(metadata.st_mode)
-                or stat.S_ISLNK(metadata.st_mode)
-                or attributes & reparse
-            ):
-                raise WorkspaceAccessInvalidError(
-                    "Workspace path is not a safe directory"
-                )
-            owner_id = read_workspace_owner(path)
-        except FileNotFoundError:
-            return None
-        except OSError, WorkspaceAccessInvalidError:
-            logger.warning(
-                "Workspace direct lookup found invalid ownership workspace_id=%s",
-                workspace_id,
-                exc_info=True,
-            )
-            return None
-        return path if owner_id == user_id else None
-
-    async def _path(self, user_id: str, workspace_id: str) -> Path | None:
-        return await self._run_io(
-            self._resolve_owned_path_sync,
+    async def _path(self, user_id: str, workspace_id: uuid.UUID) -> Path | None:
+        return await self._residency.run_io(
+            self._catalogue.resolve_owned_path,
             user_id,
             workspace_id,
         )
-
-    def _load_sync(self, path: Path) -> tuple[Workspace, int, int]:
-        """Load one already-located committed workspace without disk mutation."""
-
-        try:
-            loaded = self._store.load(path)
-        except TabSnapshotInvalidError as exc:
-            raise self._tab_corrupt(exc) from exc
-        except (WorkspaceSnapshotInvalidError, WorkspaceCapacityError) as exc:
-            raise WorkspaceCorruptError(
-                "Workspace data is corrupt",
-                details={"workspace_id": path.name},
-            ) from exc
-        return (
-            loaded.workspace,
-            loaded.snapshot.revision,
-            loaded.snapshot.serialized_bytes,
-        )
-
-    @staticmethod
-    def _tab_corrupt(exc: TabSnapshotInvalidError) -> TabCorruptError:
-        details: dict[str, JsonData] | None = (
-            {"tab_id": exc.tab_id} if exc.tab_id is not None else None
-        )
-        return TabCorruptError("Tab data is corrupt", details=details)
 
     async def _require_open(
         self,
         slot: _WorkspaceSlot,
         user_id: str,
-        workspace_id: str,
+        workspace_id: uuid.UUID,
         *,
         allow_closing: bool,
     ) -> WorkspaceLease:
@@ -708,14 +273,14 @@ class WorkspaceService:
         path = await self._path(user_id, workspace_id)
         if path is None:
             if slot.workspace is not None:
-                await self._clear_slot(slot)
+                await self._residency.clear(slot)
             raise WorkspaceNotFoundError("Workspace not found")
         if slot.workspace is None or slot.path is None:
             raise WorkspaceNotOpenError("Workspace is not open")
         if slot.closing and not allow_closing:
             raise WorkspaceClosingError("Workspace is closing")
         if slot.path != path:
-            await self._clear_slot(slot)
+            await self._residency.clear(slot)
             raise WorkspaceNotFoundError("Workspace not found")
         return WorkspaceLease(slot.workspace, path, slot.revision, slot)
 
@@ -733,15 +298,13 @@ class WorkspaceService:
         if not path_was_present:
             _fsync_directory(path.parent)
         if touch_modified:
-            workspace.modified_at = datetime.now(UTC).isoformat()
+            workspace.modified_at = datetime.now(UTC)
         try:
             snapshot = self._store.commit(
                 path,
                 workspace,
                 expected_revision=expected_revision,
             )
-        except TabSnapshotInvalidError as exc:
-            raise self._tab_corrupt(exc) from exc
         except WorkspaceRevisionConflictError as exc:
             raise WorkspaceConflictError(
                 "Workspace revision is stale",
@@ -755,121 +318,9 @@ class WorkspaceService:
         except WorkspaceSerializationError as exc:
             raise WorkspaceCorruptError(
                 "Workspace data could not be persisted",
-                details={"workspace_id": workspace.id},
+                details={"workspace_id": str(workspace.id)},
             ) from exc
         return snapshot
-
-    def _stage_snapshot_sync(
-        self,
-        staging: Path,
-        workspace: Workspace,
-        revision: int,
-    ) -> WorkspaceSnapshotInfo:
-        try:
-            return self._store.stage_snapshot(
-                staging,
-                workspace,
-                revision=revision,
-            )
-        except WorkspaceCapacityError as exc:
-            raise ResourceTooLargeError("Workspace snapshot exceeds its limit") from exc
-        except WorkspaceSerializationError as exc:
-            raise WorkspaceCorruptError(
-                "Workspace data could not be persisted",
-                details={"workspace_id": workspace.id},
-            ) from exc
-
-    async def _persist(self, user_id: str, lease: WorkspaceLease) -> int:
-        """Stage, admit, and atomically publish one exact next generation."""
-
-        old_bytes = lease.slot.serialized_bytes
-        old_entries = lease.slot.serialized_entries
-        next_revision = lease.revision + 1
-        lease.workspace.modified_at = datetime.now(UTC).isoformat()
-        staging = workspace_staging_root(self.settings) / (
-            f".snapshot-{lease.workspace.id}-{uuid.uuid4().hex}"
-        )
-        transient = await self._storage_admission.acquire_transient(
-            self.settings.max_workspace_snapshot_bytes
-        )
-        durable: StorageReservation | None = None
-        reserved_capacity = 0
-        try:
-            staged = await self._run_io(
-                self._stage_snapshot_sync,
-                staging,
-                lease.workspace,
-                next_revision,
-            )
-            with anyio.CancelScope(shield=True):
-                await transient.release()
-
-            growth = max(0, staged.serialized_bytes - old_bytes)
-            staged_entries = self._snapshot_entry_count(
-                node_count=staged.node_count,
-                tab_count=staged.tab_count,
-                analysis_count=staged.analysis_count,
-            )
-            entry_growth = max(0, staged_entries - old_entries)
-            durable = await self._storage_admission.acquire(
-                user_id,
-                growth,
-                requested_entries=entry_growth,
-            )
-            reserved_capacity = growth
-            await self._reserve_open_capacity(reserved_capacity)
-            await durable.recheck_estimate(
-                growth,
-                requested_entries=entry_growth,
-            )
-            try:
-                committed = await self._run_io(
-                    self._store.commit_staged,
-                    lease.path,
-                    staging,
-                    expected_revision=lease.revision,
-                )
-            except TabSnapshotInvalidError as exc:
-                raise self._tab_corrupt(exc) from exc
-            except WorkspaceRevisionConflictError as exc:
-                raise WorkspaceConflictError(
-                    "Workspace persistence changed outside its mutation boundary",
-                    details={
-                        "expected_revision": exc.expected,
-                        "actual_revision": exc.actual,
-                    },
-                ) from exc
-            except WorkspaceSerializationError as exc:
-                raise WorkspaceCorruptError(
-                    "Workspace data could not be persisted",
-                    details={"workspace_id": lease.workspace.id},
-                ) from exc
-
-            lease.revision = committed.revision
-            lease.slot.revision = committed.revision
-            lease.slot.workspace = lease.workspace
-            lease.slot.path = lease.path
-            lease.slot.serialized_bytes = committed.serialized_bytes
-            lease.slot.serialized_entries = self._snapshot_entry_count(
-                node_count=committed.node_count,
-                tab_count=committed.tab_count,
-                analysis_count=committed.analysis_count,
-            )
-            if committed.serialized_bytes < old_bytes:
-                await self._release_open_capacity(
-                    old_bytes - committed.serialized_bytes
-                )
-            return committed.revision
-        except BaseException:
-            if reserved_capacity:
-                await self._release_open_capacity(reserved_capacity)
-            raise
-        finally:
-            with anyio.CancelScope(shield=True):
-                await transient.release()
-                if durable is not None:
-                    await durable.release()
-                await self._run_io(_remove_private_entry, staging)
 
     @staticmethod
     def materialize_record(
@@ -879,189 +330,34 @@ class WorkspaceService:
     ) -> WorkspaceRecord:
         """Copy a live workspace into an immutable response-safe record."""
 
-        nodes = list(workspace.nodes.values())
         return WorkspaceRecord(
             id=workspace.id,
             name=workspace.name,
             description=workspace.description or "",
             created_at=workspace.created_at,
             modified_at=workspace.modified_at,
-            total_nodes=len(nodes),
-            root_nodes=sum(1 for node in nodes if not node.parents),
-            leaf_nodes=sum(1 for node in nodes if not node.children),
+            total_nodes=len(workspace.node_ids),
+            root_nodes=workspace.root_node_count,
+            leaf_nodes=workspace.leaf_node_count,
             revision=revision,
             runtime_state=runtime_state,
         )
 
-    async def _publish_mutation_events(
-        self,
-        user_id: str,
-        lease: WorkspaceLease,
-        *,
-        before_tabs: dict[str, int],
-        before_analyses: dict[str, int],
-        before_corrupt: set[str],
-    ) -> None:
-        """Publish only after the complete Workspace generation is durable."""
-
-        workspace_id = uuid.UUID(lease.workspace.id)
-        await self._publish_changed(
-            user_id,
-            EventResourceType.WORKSPACE,
-            workspace_id,
-            revision=lease.revision,
-            workspace_id=workspace_id,
-        )
-
-        after_tabs = {
-            tab_id: tab.revision for tab_id, tab in lease.workspace.tabs.items()
-        }
-        for tab_id in sorted(after_tabs):
-            if before_tabs.get(tab_id) == after_tabs[tab_id]:
-                continue
-            await self._publish_changed(
-                user_id,
-                EventResourceType.TAB,
-                uuid.UUID(tab_id),
-                revision=after_tabs[tab_id],
-                workspace_id=workspace_id,
-            )
-        for tab_id in sorted(before_tabs.keys() - after_tabs.keys()):
-            await self._publish_removed(
-                user_id,
-                EventResourceType.TAB,
-                uuid.UUID(tab_id),
-                workspace_id=workspace_id,
-                revision=before_tabs[tab_id],
-            )
-
-        after_live = lease.workspace.live_analysis_ids()
-        after_analyses = {
-            analysis_id: record
-            for analysis_id, record in lease.workspace.analyses.items()
-            if analysis_id in after_live
-        }
-        for analysis_id in sorted(after_analyses):
-            record = after_analyses[analysis_id]
-            if before_analyses.get(analysis_id) == record.revision:
-                continue
-            await self._publish_changed(
-                user_id,
-                EventResourceType.ANALYSIS,
-                record.id,
-                revision=record.revision,
-                workspace_id=workspace_id,
-                state=record.state,
-                progress=record.progress,
-            )
-        removed_analyses = (before_analyses.keys() | before_corrupt) - after_live
-        for analysis_id in sorted(removed_analyses):
-            await self._publish_removed(
-                user_id,
-                EventResourceType.ANALYSIS,
-                uuid.UUID(analysis_id),
-                workspace_id=workspace_id,
-                revision=before_analyses.get(analysis_id),
-            )
-
-    async def _publish_changed(
-        self,
-        user_id: str,
-        resource_type: EventResourceType,
-        resource_id: uuid.UUID,
-        *,
-        revision: int,
-        workspace_id: uuid.UUID | None = None,
-        state: BackgroundState | None = None,
-        progress: Progress | None = None,
-    ) -> None:
-        try:
-            await self._events.publish_changed(
-                user_id,
-                resource_type,
-                resource_id,
-                revision=revision,
-                workspace_id=workspace_id,
-                state=state,
-                progress=progress,
-            )
-        except Exception:
-            logger.exception(
-                "Could not publish committed resource event resource_type=%s "
-                "resource_id=%s user_id=%s",
-                resource_type,
-                resource_id,
-                user_id,
-            )
-
-    async def _publish_removed(
-        self,
-        user_id: str,
-        resource_type: EventResourceType,
-        resource_id: uuid.UUID,
-        *,
-        workspace_id: uuid.UUID | None = None,
-        revision: int | None = None,
-    ) -> None:
-        try:
-            await self._events.publish_removed(
-                user_id,
-                resource_type,
-                resource_id,
-                workspace_id=workspace_id,
-                revision=revision,
-            )
-        except Exception:
-            logger.exception(
-                "Could not publish resource removal resource_type=%s "
-                "resource_id=%s user_id=%s",
-                resource_type,
-                resource_id,
-                user_id,
-            )
-
-    async def _publish_runtime_state(
-        self,
-        user_id: str,
-        workspace_id: str,
-        runtime_state: Literal["closed", "open", "closing"],
-    ) -> None:
-        try:
-            await self._events.publish_workspace_runtime(
-                user_id,
-                uuid.UUID(workspace_id),
-                runtime_state,
-            )
-        except Exception:
-            logger.exception(
-                "Could not publish Workspace runtime event workspace_id=%s user_id=%s",
-                workspace_id,
-                user_id,
-            )
-
     async def publish_analysis_progress(
         self,
         user_id: str,
-        workspace_id: str,
-        analysis_id: str,
+        workspace_id: uuid.UUID,
+        analysis_id: uuid.UUID,
         progress: Progress,
     ) -> None:
         """Publish one non-durable live Analysis progress hint."""
 
-        try:
-            await self._events.publish_progress(
-                user_id,
-                EventResourceType.ANALYSIS,
-                uuid.UUID(analysis_id),
-                progress,
-                workspace_id=uuid.UUID(workspace_id),
-            )
-        except Exception:
-            logger.exception(
-                "Could not publish Analysis progress analysis_id=%s user_id=%s",
-                analysis_id,
-                user_id,
-            )
+        await self._event_publisher.analysis_progress(
+            user_id,
+            workspace_id,
+            analysis_id,
+            progress,
+        )
 
     @staticmethod
     def _record_from_snapshot(
@@ -1084,7 +380,7 @@ class WorkspaceService:
     async def update_metadata(
         self,
         user_id: str,
-        workspace_id: str,
+        workspace_id: uuid.UUID,
         request: WorkspaceUpdateRequest,
     ) -> WorkspaceRecord:
         """Validate and commit one partial workspace metadata update."""
@@ -1109,20 +405,20 @@ class WorkspaceService:
         return self.materialize_record(
             lease.workspace,
             lease.revision,
-            self._runtime_state(lease.slot),
+            self._residency.runtime_state(lease.slot),
         )
 
     async def reorder_nodes(
         self,
         user_id: str,
-        workspace_id: str,
+        workspace_id: uuid.UUID,
         request: WorkspaceNodeReorderRequest,
     ) -> WorkspaceRecord:
         """Validate and commit one exact duplicate-free node ordering."""
 
         async with self.mutation_context(user_id, workspace_id) as lease:
             current_ids = list(lease.workspace.nodes)
-            ordered_ids = [str(node_id) for node_id in request.ordered_ids]
+            ordered_ids = request.ordered_ids
             if (
                 len(ordered_ids) != len(set(ordered_ids))
                 or len(ordered_ids) != len(current_ids)
@@ -1138,10 +434,12 @@ class WorkspaceService:
         return self.materialize_record(
             lease.workspace,
             lease.revision,
-            self._runtime_state(lease.slot),
+            self._residency.runtime_state(lease.slot),
         )
 
-    async def list_tabs(self, user_id: str, workspace_id: str) -> list[Tab]:
+    async def list_tabs(
+        self, user_id: str, workspace_id: uuid.UUID
+    ) -> list[TabResource]:
         """Return the complete deterministic Tab collection from an open Workspace."""
 
         async with self.read_context(user_id, workspace_id) as lease:
@@ -1149,26 +447,40 @@ class WorkspaceService:
                 lease.workspace.tabs.values(),
                 key=lambda tab: (tab.created_at, str(tab.id)),
             )
-            return [tab.model_copy(deep=True) for tab in tabs]
+            return [
+                *[tab.model_copy(deep=True) for tab in tabs],
+                *[
+                    UnavailableTab.create(
+                        tab_id=tab_id,
+                        workspace_id=workspace_id,
+                    )
+                    for tab_id in sorted(lease.workspace.corrupt_tab_ids)
+                ],
+            ]
 
     async def get_tab(
         self,
         user_id: str,
-        workspace_id: str,
-        tab_id: str,
-    ) -> Tab:
+        workspace_id: uuid.UUID,
+        tab_id: uuid.UUID,
+    ) -> TabResource:
         """Return one exact Tab without exposing the mutable aggregate object."""
 
         async with self.read_context(user_id, workspace_id) as lease:
             tab = lease.workspace.tabs.get(tab_id)
-            if tab is None:
-                raise TabNotFoundError("Tab not found")
-            return tab.model_copy(deep=True)
+            if tab is not None:
+                return tab.model_copy(deep=True)
+            if tab_id in lease.workspace.corrupt_tab_ids:
+                return UnavailableTab.create(
+                    tab_id=tab_id,
+                    workspace_id=workspace_id,
+                )
+            raise TabNotFoundError("Tab not found")
 
     async def create_tab(
         self,
         user_id: str,
-        workspace_id: str,
+        workspace_id: uuid.UUID,
         request: TabCreate,
     ) -> Tab:
         """Create one backend-identified Tab and commit it with the Workspace."""
@@ -1186,8 +498,8 @@ class WorkspaceService:
     async def update_tab(
         self,
         user_id: str,
-        workspace_id: str,
-        tab_id: str,
+        workspace_id: uuid.UUID,
+        tab_id: uuid.UUID,
         request: TabUpdate,
     ) -> Tab:
         """Update mutable Tab presentation state."""
@@ -1196,99 +508,95 @@ class WorkspaceService:
             tab = lease.workspace.tabs.get(tab_id)
             if tab is None:
                 raise TabNotFoundError("Tab not found")
+            if tab.kind is not request.kind:
+                raise InvalidInputError("Tab update kind does not match the Tab")
             changed = False
             if request.name is not None and tab.name != request.name:
                 tab.name = request.name
                 changed = True
-            if (
-                request.annotation_correction_columns is not None
-                and tab.annotation_correction_columns
-                != request.annotation_correction_columns
-            ):
-                if tab.kind is not AnalysisKind.ANNOTATION:
-                    raise InvalidInputError(
-                        "Correction columns belong only to Annotation Tabs"
-                    )
-                for node_id, column in request.annotation_correction_columns.items():
-                    node = lease.workspace.nodes.get(str(node_id))
-                    if node is None or column not in await self._run_io(
-                        node.data.collect_schema
-                    ):
-                        raise InvalidInputError(
-                            "Annotation correction column is unavailable"
-                        )
-                tab.annotation_correction_columns = (
-                    request.annotation_correction_columns
-                )
-                changed = True
-            if request.stop_words is not None:
-                if tab.kind not in {
-                    AnalysisKind.TOKEN_FREQUENCY,
-                    AnalysisKind.TOPIC_MODELING,
-                }:
-                    raise InvalidInputError(
-                        "Stop words belong only to Token Frequency and Topic Modelling Tabs"
-                    )
-                if tab.stop_words != request.stop_words:
-                    tab.stop_words = request.stop_words
-                    changed = True
-            if "topic_modeling_words_per_topic" in request.model_fields_set:
-                if tab.kind is not AnalysisKind.TOPIC_MODELING:
-                    raise InvalidInputError(
-                        "Words per topic belongs only to Topic Modelling Tabs"
-                    )
-                if request.topic_modeling_words_per_topic is None:
-                    raise InvalidInputError(
-                        "Topic Modelling Tabs require a word display count"
-                    )
+            if isinstance(request, AnnotationTabUpdate):
+                settings = tab.settings
+                if not isinstance(settings, AnnotationTabSettings):
+                    raise InvalidInputError("Annotation Tab settings are invalid")
+                correction_columns = request.correction_columns
                 if (
-                    tab.topic_modeling_words_per_topic
-                    != request.topic_modeling_words_per_topic
+                    correction_columns is not None
+                    and settings.correction_columns != correction_columns
                 ):
-                    tab.topic_modeling_words_per_topic = (
-                        request.topic_modeling_words_per_topic
-                    )
+                    for node_id, column in correction_columns.items():
+                        node = lease.workspace.nodes.get(node_id)
+                        if node is None or column not in await self._residency.run_io(
+                            node.data.collect_schema
+                        ):
+                            raise InvalidInputError(
+                                "Annotation correction column is unavailable"
+                            )
+                    settings.correction_columns = correction_columns
                     changed = True
-            if "topic_modeling_projection_selection" in request.model_fields_set:
-                if tab.kind is not AnalysisKind.TOPIC_MODELING:
-                    raise InvalidInputError(
-                        "Topic projection selection belongs only to Topic Modelling Tabs"
-                    )
-                selection = request.topic_modeling_projection_selection
-                if selection is not None:
-                    record = lease.workspace.analyses.get(str(selection.analysis_id))
-                    if (
-                        record is None
-                        or record.tab_id != tab.id
-                        or record.state is not BackgroundState.SUCCEEDED
-                        or record.request.kind != "topic_modeling"
-                        or record.result_payload is None
-                    ):
-                        raise InvalidInputError(
-                            "Topic projection selection Analysis is unavailable"
-                        )
-                    stored = TopicModelingStoredResult.model_validate(
-                        record.result_payload
-                    )
-                    if not (
-                        stored.clustering.min_cluster_count
-                        <= selection.cluster_count
-                        <= stored.clustering.max_cluster_count
-                    ):
-                        raise InvalidInputError(
-                            "Topic projection cluster count is outside the supported range"
-                        )
-                    if not (
-                        stored.topic_inclusion.min_top_n_topics
-                        <= selection.top_n_topics
-                        <= selection.cluster_count
-                    ):
-                        raise InvalidInputError(
-                            "Top topics per row is outside the supported range"
-                        )
-                if tab.topic_modeling_projection_selection != selection:
-                    tab.topic_modeling_projection_selection = selection
+            elif isinstance(request, TokenFrequencyTabUpdate):
+                settings = tab.settings
+                if not isinstance(settings, TokenFrequencyTabSettings):
+                    raise InvalidInputError("Token Frequency Tab settings are invalid")
+                if (
+                    request.stop_words is not None
+                    and settings.stop_words != request.stop_words
+                ):
+                    settings.stop_words = request.stop_words
                     changed = True
+            elif isinstance(request, TopicModelingTabUpdate):
+                settings = tab.settings
+                if not isinstance(settings, TopicModelingTabSettings):
+                    raise InvalidInputError("Topic Modelling Tab settings are invalid")
+                if (
+                    request.stop_words is not None
+                    and settings.stop_words != request.stop_words
+                ):
+                    settings.stop_words = request.stop_words
+                    changed = True
+                if "words_per_topic" in request.model_fields_set:
+                    if request.words_per_topic is None:
+                        raise InvalidInputError(
+                            "Topic Modelling Tabs require a word display count"
+                        )
+                    if settings.words_per_topic != request.words_per_topic:
+                        settings.words_per_topic = request.words_per_topic
+                        changed = True
+                if "projection_selection" in request.model_fields_set:
+                    selection = request.projection_selection
+                    if selection is not None:
+                        record = lease.workspace.analyses.get(selection.analysis_id)
+                        if (
+                            record is None
+                            or record.tab_id != tab.id
+                            or record.state is not BackgroundState.SUCCEEDED
+                            or record.request.kind != "topic_modeling"
+                            or record.result_payload is None
+                        ):
+                            raise InvalidInputError(
+                                "Topic projection selection Analysis is unavailable"
+                            )
+                        stored = TopicModelingStoredResult.model_validate(
+                            record.result_payload
+                        )
+                        if not (
+                            stored.clustering.min_cluster_count
+                            <= selection.cluster_count
+                            <= stored.clustering.max_cluster_count
+                        ):
+                            raise InvalidInputError(
+                                "Topic projection cluster count is outside the supported range"
+                            )
+                        if not (
+                            stored.topic_inclusion.min_top_n_topics
+                            <= selection.top_n_topics
+                            <= selection.cluster_count
+                        ):
+                            raise InvalidInputError(
+                                "Top topics per row is outside the supported range"
+                            )
+                    if settings.projection_selection != selection:
+                        settings.projection_selection = selection
+                        changed = True
             if changed:
                 tab.modified_at = datetime.now(UTC)
                 tab.revision += 1
@@ -1308,10 +616,10 @@ class WorkspaceService:
         if not self._accepting_mutations:
             raise WorkspaceConflictError("Workspace service is shutting down")
 
-        workspace_id = str(uuid.uuid4())
-        async with self._slot(workspace_id):
+        workspace_id = uuid.uuid4()
+        async with self._residency.slot(workspace_id):
             root = workspaces_root(self.settings)
-            path = root / workspace_id
+            path = root / str(workspace_id)
             staging = workspace_staging_root(self.settings) / (
                 f"{workspace_id}-{uuid.uuid4().hex}"
             )
@@ -1324,36 +632,36 @@ class WorkspaceService:
                 workspace = Workspace(name=name.strip())
                 workspace.id = workspace_id
                 workspace.description = description
-                workspace.created_at = datetime.now(UTC).isoformat()
+                workspace.created_at = datetime.now(UTC)
                 workspace.modified_at = workspace.created_at
-                await self._run_io(self._save_sync, staging, workspace, None, False)
-                await self._run_io(write_workspace_owner, staging, user_id)
+                await self._residency.run_io(self._save_sync, staging, workspace, None, False)
+                await self._residency.run_io(write_workspace_owner, staging, user_id)
                 await reservation.recheck_path(staging)
-                await self._run_io(os.replace, staging, path)
-                await self._run_io(_fsync_directory, root)
+                await self._residency.run_io(os.replace, staging, path)
+                await self._residency.run_io(_fsync_directory, root)
             except BaseException:
-                await self._run_io(shutil.rmtree, staging, True)
+                await self._residency.run_io(shutil.rmtree, staging, True)
                 raise
             finally:
                 with anyio.CancelScope(shield=True):
                     await reservation.release()
             resource = self.materialize_record(workspace, 1, "closed")
-        await self._publish_changed(
+        await self._event_publisher.changed(
             user_id,
             EventResourceType.WORKSPACE,
-            uuid.UUID(workspace_id),
+            workspace_id,
             revision=resource.revision,
-            workspace_id=uuid.UUID(workspace_id),
+            workspace_id=workspace_id,
         )
         return resource
 
     @asynccontextmanager
     async def read_context(
-        self, user_id: str, workspace_id: str
+        self, user_id: str, workspace_id: uuid.UUID
     ) -> AsyncIterator[WorkspaceLease]:
         """Read one explicitly open Workspace, including while it closes."""
 
-        async with self._slot(workspace_id) as slot:
+        async with self._residency.slot(workspace_id) as slot:
             yield await self._require_open(
                 slot,
                 user_id,
@@ -1365,13 +673,13 @@ class WorkspaceService:
     async def submission_context(
         self,
         user_id: str,
-        workspace_id: str,
+        workspace_id: uuid.UUID,
     ) -> AsyncIterator[WorkspaceLease]:
         """Snapshot new work only while the Workspace is fully open."""
 
         if not self._accepting_mutations:
             raise WorkspaceConflictError("Workspace service is shutting down")
-        async with self._slot(workspace_id) as slot:
+        async with self._residency.slot(workspace_id) as slot:
             yield await self._require_open(
                 slot,
                 user_id,
@@ -1379,13 +687,15 @@ class WorkspaceService:
                 allow_closing=False,
             )
 
-    async def ensure_open(self, user_id: str, workspace_id: str) -> None:
+    async def ensure_open(self, user_id: str, workspace_id: uuid.UUID) -> None:
         """Validate child-resource access without leaking the aggregate."""
 
         async with self.read_context(user_id, workspace_id):
             return
 
-    async def ensure_accepting_work(self, user_id: str, workspace_id: str) -> None:
+    async def ensure_accepting_work(
+        self, user_id: str, workspace_id: uuid.UUID
+    ) -> None:
         """Admit one new-work request before it snapshots independent inputs."""
 
         async with self.submission_context(user_id, workspace_id):
@@ -1395,7 +705,7 @@ class WorkspaceService:
     async def mutation_context(
         self,
         user_id: str,
-        workspace_id: str,
+        workspace_id: uuid.UUID,
         *,
         internal: bool = False,
     ) -> AsyncIterator[WorkspaceLease]:
@@ -1407,7 +717,7 @@ class WorkspaceService:
 
         if not self._accepting_mutations:
             raise WorkspaceConflictError("Workspace service is shutting down")
-        async with self._slot(workspace_id) as slot:
+        async with self._residency.slot(workspace_id) as slot:
             lease = await self._require_open(
                 slot,
                 user_id,
@@ -1432,93 +742,30 @@ class WorkspaceService:
                 yield lease
                 if lease.commit_requested:
                     with anyio.CancelScope(shield=True):
-                        await self._persist(user_id, lease)
+                        await self._mutation_committer.persist(user_id, lease)
             except BaseException:
                 with anyio.CancelScope(shield=True):
-                    await self._run_io(_remove_rollback_paths, lease.rollback_paths)
-                    await self._run_io(
-                        _remove_rollback_analysis_directories,
-                        lease.rollback_analysis_directories,
-                        lease.path,
-                    )
-                    await self._restore_slot(
-                        slot,
-                        lease.path,
-                        node_histories=before_node_histories,
+                    await self._mutation_committer.rollback(
+                        lease,
+                        before_node_histories,
                     )
                 raise
             else:
-                lease.rollback_paths.clear()
-                lease.rollback_analysis_directories.clear()
                 if lease.commit_requested:
-                    await self._publish_mutation_events(
+                    await self._event_publisher.publish_mutation(
                         user_id,
-                        lease,
+                        lease.workspace,
+                        lease.revision,
                         before_tabs=before_tabs,
                         before_analyses=before_analyses,
                         before_corrupt=before_corrupt,
                     )
-                if lease.commit_cleanup_analysis_directories:
-                    try:
-                        await self._run_io(
-                            _remove_rollback_analysis_directories,
-                            lease.commit_cleanup_analysis_directories,
-                            lease.path,
-                        )
-                    except OSError:
-                        logger.exception(
-                            "Could not remove committed Workspace staging directories"
-                        )
-                    lease.commit_cleanup_analysis_directories.clear()
-
-    async def _restore_slot(
-        self,
-        slot: _WorkspaceSlot,
-        path: Path,
-        *,
-        node_histories: Mapping[str, PlanHistorySnapshot],
-    ) -> None:
-        """Reload committed state after an in-memory command fails."""
-
-        previous_bytes = slot.serialized_bytes
-        closing = slot.closing
-        try:
-            workspace, revision, serialized_bytes = await self._run_io(
-                self._load_sync,
-                path,
-            )
-            if serialized_bytes > previous_bytes:
-                await self._reserve_open_capacity(serialized_bytes - previous_bytes)
-            elif serialized_bytes < previous_bytes:
-                await self._release_open_capacity(previous_bytes - serialized_bytes)
-            for node_id, history in node_histories.items():
-                node = workspace.nodes.get(node_id)
-                if node is not None:
-                    node.restore_plan_history(history)
-        except BaseException:
-            logger.exception(
-                "Failed to restore Workspace after rejected mutation workspace_id=%s",
-                path.name,
-            )
-            await self._clear_slot(slot)
-            return
-        slot.workspace = workspace
-        slot.path = path
-        slot.revision = revision
-        slot.serialized_bytes = serialized_bytes
-        slot.serialized_entries = self._snapshot_entry_count(
-            node_count=len(workspace.nodes),
-            tab_count=len(workspace.tabs),
-            analysis_count=(
-                len(workspace.analyses) + len(workspace.corrupt_analysis_ids)
-            ),
-        )
-        slot.closing = closing
+                await self._mutation_committer.cleanup_committed(lease)
 
     async def mutate_workspace(
         self,
         user_id: str,
-        workspace_id: str,
+        workspace_id: uuid.UUID,
         mutation: Callable[[Workspace], T],
         *,
         internal: bool = False,
@@ -1533,59 +780,50 @@ class WorkspaceService:
             value = mutation(lease.workspace)
         return WorkspaceMutationResult(value=value, revision=lease.revision)
 
-    def _inspect_sync(self, path: Path) -> WorkspaceSnapshotInfo:
-        try:
-            return self._store.inspect(path)
-        except (WorkspaceSnapshotInvalidError, WorkspaceCapacityError) as exc:
-            raise WorkspaceCorruptError(
-                "Workspace data is corrupt",
-                details={"workspace_id": path.name},
-            ) from exc
-
     @asynccontextmanager
     async def reserve_open(
         self,
         user_id: str,
-        workspace_id: str,
+        workspace_id: uuid.UUID,
     ) -> AsyncIterator[None]:
         """Reserve cross-process ownership before local sibling transitions."""
 
         if not self._accepting_mutations:
             raise WorkspaceConflictError("Workspace service is shutting down")
-        async with self._slot(workspace_id) as slot:
+        async with self._residency.slot(workspace_id) as slot:
             path = await self._path(user_id, workspace_id)
             if path is None:
                 raise WorkspaceNotFoundError("Workspace not found")
             if slot.workspace is not None:
                 if slot.path != path:
-                    await self._clear_slot(slot)
+                    await self._residency.clear(slot)
                     raise WorkspaceNotFoundError("Workspace not found")
             elif slot.process_lock is None:
-                slot.process_lock = await self._acquire_process_lock(workspace_id)
+                slot.process_lock = await self._residency.acquire_process_lock(workspace_id)
         try:
             yield
         finally:
             with anyio.CancelScope(shield=True):
-                async with self._slot(workspace_id) as slot:
+                async with self._residency.slot(workspace_id) as slot:
                     if slot.workspace is None:
-                        await self._clear_slot(slot)
+                        await self._residency.clear(slot)
 
     async def open_workspace(
         self,
         user_id: str,
-        workspace_id: str,
+        workspace_id: uuid.UUID,
     ) -> WorkspaceRecord:
         """Idempotently load one Workspace through its explicit open boundary."""
 
         if not self._accepting_mutations:
             raise WorkspaceConflictError("Workspace service is shutting down")
-        async with self._slot(workspace_id) as slot:
+        async with self._residency.slot(workspace_id) as slot:
             path = await self._path(user_id, workspace_id)
             if path is None:
                 raise WorkspaceNotFoundError("Workspace not found")
             if slot.workspace is not None:
                 if slot.path != path:
-                    await self._clear_slot(slot)
+                    await self._residency.clear(slot)
                     raise WorkspaceNotFoundError("Workspace not found")
                 state_changed = slot.closing
                 slot.closing = False
@@ -1596,44 +834,44 @@ class WorkspaceService:
                 )
             else:
                 if slot.process_lock is None:
-                    slot.process_lock = await self._acquire_process_lock(workspace_id)
+                    slot.process_lock = await self._residency.acquire_process_lock(workspace_id)
                 try:
-                    snapshot = await self._run_io(self._inspect_sync, path)
+                    snapshot = await self._residency.run_io(self._catalogue.inspect, path)
                     reserved_bytes = snapshot.serialized_bytes
-                    await self._reserve_open_capacity(reserved_bytes)
+                    await self._residency.reserve_capacity(reserved_bytes)
                     slot.serialized_bytes = reserved_bytes
-                    workspace, revision, serialized_bytes = await self._run_io(
-                        self._load_sync,
+                    workspace, revision, serialized_bytes = await self._residency.run_io(
+                        self._catalogue.load,
                         path,
                     )
                     if serialized_bytes > reserved_bytes:
-                        await self._reserve_open_capacity(
+                        await self._residency.reserve_capacity(
                             serialized_bytes - reserved_bytes
                         )
                         reserved_bytes = serialized_bytes
                         slot.serialized_bytes = reserved_bytes
                     elif serialized_bytes < reserved_bytes:
-                        await self._release_open_capacity(
+                        await self._residency.release_capacity(
                             reserved_bytes - serialized_bytes
                         )
                         reserved_bytes = serialized_bytes
                         slot.serialized_bytes = reserved_bytes
                 except BaseException:
                     with anyio.CancelScope(shield=True):
-                        await self._clear_slot(slot)
+                        await self._residency.clear(slot)
                     raise
                 if revision != snapshot.revision:
                     with anyio.CancelScope(shield=True):
-                        await self._clear_slot(slot)
+                        await self._residency.clear(slot)
                     raise WorkspaceCorruptError(
                         "Workspace changed while it was opening",
-                        details={"workspace_id": workspace_id},
+                        details={"workspace_id": str(workspace_id)},
                     )
                 slot.workspace = workspace
                 slot.path = path
                 slot.revision = revision
                 slot.serialized_bytes = serialized_bytes
-                slot.serialized_entries = self._snapshot_entry_count(
+                slot.serialized_entries = self._mutation_committer.entry_count(
                     node_count=len(workspace.nodes),
                     tab_count=len(workspace.tabs),
                     analysis_count=(
@@ -1644,24 +882,26 @@ class WorkspaceService:
                 resource = self.materialize_record(workspace, revision, "open")
                 state_changed = True
         if state_changed:
-            await self._publish_runtime_state(user_id, workspace_id, "open")
+            await self._event_publisher.runtime_state(user_id, workspace_id, "open")
         return resource
 
-    async def get_workspace(self, user_id: str, workspace_id: str) -> WorkspaceRecord:
+    async def get_workspace(
+        self, user_id: str, workspace_id: uuid.UUID
+    ) -> WorkspaceRecord:
         """Read lightweight metadata without implicitly opening the Workspace."""
 
-        async with self._slot(workspace_id) as slot:
+        async with self._residency.slot(workspace_id) as slot:
             path = await self._path(user_id, workspace_id)
             if path is None:
                 raise WorkspaceNotFoundError("Workspace not found")
-            snapshot = await self._run_io(self._inspect_sync, path)
-            return self._record_from_snapshot(snapshot, self._runtime_state(slot))
+            snapshot = await self._residency.run_io(self._catalogue.inspect, path)
+            return self._record_from_snapshot(snapshot, self._residency.runtime_state(slot))
 
     async def list_workspaces(self, user_id: str) -> list[WorkspaceListRecord]:
         """Freshly scan metadata and overlay only transient runtime state."""
 
-        records = await self._run_io(self._scan_records_sync, user_id)
-        states = await self._runtime_states()
+        records = await self._residency.run_io(self._catalogue.scan_records, user_id)
+        states = await self._residency.runtime_states()
         return [
             (
                 WorkspaceRecord(
@@ -1682,10 +922,12 @@ class WorkspaceService:
             for record in records
         ]
 
-    async def resolve_workspace_dir(self, user_id: str, workspace_id: str) -> Path:
+    async def resolve_workspace_dir(
+        self, user_id: str, workspace_id: uuid.UUID
+    ) -> Path:
         """Resolve storage for one open or closing Workspace."""
 
-        async with self._slot(workspace_id) as slot:
+        async with self._residency.slot(workspace_id) as slot:
             lease = await self._require_open(
                 slot,
                 user_id,
@@ -1697,7 +939,7 @@ class WorkspaceService:
     async def resolve_owned_workspace_dir(
         self,
         user_id: str,
-        workspace_id: str,
+        workspace_id: uuid.UUID,
     ) -> Path:
         """Resolve one owned Workspace directory without opening its snapshot."""
 
@@ -1709,19 +951,19 @@ class WorkspaceService:
     async def request_close(
         self,
         user_id: str,
-        workspace_id: str,
-        has_active_work: Callable[[str, str], Awaitable[bool]],
+        workspace_id: uuid.UUID,
+        has_active_work: Callable[[str, uuid.UUID], Awaitable[bool]],
     ) -> WorkspaceRecord | None:
         """Close immediately or mark the loaded aggregate for deferred close."""
 
-        async with self._slot(workspace_id) as slot:
+        async with self._residency.slot(workspace_id) as slot:
             path = await self._path(user_id, workspace_id)
             if path is None:
                 raise WorkspaceNotFoundError("Workspace not found")
             if slot.workspace is None:
                 return None
             if slot.path != path:
-                await self._clear_slot(slot)
+                await self._residency.clear(slot)
                 raise WorkspaceNotFoundError("Workspace not found")
             if slot.closing:
                 return self.materialize_record(
@@ -1736,33 +978,35 @@ class WorkspaceService:
                     slot.revision,
                     "closing",
                 )
-                await self._publish_runtime_state(user_id, workspace_id, "closing")
+                await self._event_publisher.runtime_state(
+                    user_id, workspace_id, "closing"
+                )
                 return resource
-            await self._clear_slot(slot)
-            await self._publish_runtime_state(user_id, workspace_id, "closed")
+            await self._residency.clear(slot)
+            await self._event_publisher.runtime_state(user_id, workspace_id, "closed")
             return None
 
     async def finalize_close_if_idle(
         self,
         user_id: str,
-        workspace_id: str,
-        has_active_work: Callable[[str, str], Awaitable[bool]],
+        workspace_id: uuid.UUID,
+        has_active_work: Callable[[str, uuid.UUID], Awaitable[bool]],
     ) -> None:
         """Remove a closing aggregate after its final admitted runner drains."""
 
-        async with self._slot(workspace_id) as slot:
+        async with self._residency.slot(workspace_id) as slot:
             if not slot.closing or slot.workspace is None:
                 return
             if await has_active_work(user_id, workspace_id):
                 return
-            await self._clear_slot(slot)
-            await self._publish_runtime_state(user_id, workspace_id, "closed")
+            await self._residency.clear(slot)
+            await self._event_publisher.runtime_state(user_id, workspace_id, "closed")
 
     @asynccontextmanager
     async def deletion_context(
         self,
         user_id: str,
-        workspace_id: str,
+        workspace_id: uuid.UUID,
     ) -> AsyncIterator[None]:
         """Validate and hold the workspace gate through referential deletion.
 
@@ -1773,33 +1017,33 @@ class WorkspaceService:
 
         if not self._accepting_mutations:
             raise WorkspaceConflictError("Workspace service is shutting down")
-        async with self._slot(workspace_id) as slot:
+        async with self._residency.slot(workspace_id) as slot:
             path = await self._path(user_id, workspace_id)
             if path is None:
                 raise WorkspaceNotFoundError("Workspace not found")
             acquired_for_delete = slot.process_lock is None
             if acquired_for_delete:
-                slot.process_lock = await self._acquire_process_lock(workspace_id)
+                slot.process_lock = await self._residency.acquire_process_lock(workspace_id)
             try:
                 yield
-                await self._run_io(
+                await self._residency.run_io(
                     self._delete_sync,
                     path,
                     workspace_trash_root(self.settings),
                 )
                 revision = slot.revision or None
-                await self._clear_slot(slot)
-                await self._publish_removed(
+                await self._residency.clear(slot)
+                await self._event_publisher.removed(
                     user_id,
                     EventResourceType.WORKSPACE,
-                    uuid.UUID(workspace_id),
-                    workspace_id=uuid.UUID(workspace_id),
+                    workspace_id,
+                    workspace_id=workspace_id,
                     revision=revision,
                 )
             finally:
                 if acquired_for_delete and slot.workspace is None:
                     with anyio.CancelScope(shield=True):
-                        await self._clear_slot(slot)
+                        await self._residency.clear(slot)
 
     @staticmethod
     def _delete_sync(path: Path, trash_root: Path) -> None:
@@ -1829,10 +1073,10 @@ class WorkspaceService:
 
         if not self._accepting_mutations:
             raise WorkspaceConflictError("Workspace service is shutting down")
-        workspace_id = str(uuid.uuid4())
-        async with self._slot(workspace_id):
-            destination = workspaces_root(self.settings) / workspace_id
-            await self._run_io(
+        workspace_id = uuid.uuid4()
+        async with self._residency.slot(workspace_id):
+            destination = workspaces_root(self.settings) / str(workspace_id)
+            record = await self._residency.run_io(
                 self._prepare_staged_import_sync,
                 user_id,
                 staging,
@@ -1841,18 +1085,18 @@ class WorkspaceService:
                 destination,
             )
             await reservation.recheck_path(staging)
-            record = await self._run_io(
+            await self._residency.run_io(
                 self._publish_staged_import_sync,
                 staging,
                 destination,
             )
             resource = cast(dict[str, JsonData], asdict(record))
-        await self._publish_changed(
+        await self._event_publisher.changed(
             user_id,
             EventResourceType.WORKSPACE,
-            uuid.UUID(workspace_id),
+            workspace_id,
             revision=record.revision,
-            workspace_id=uuid.UUID(workspace_id),
+            workspace_id=workspace_id,
         )
         return resource
 
@@ -1860,10 +1104,10 @@ class WorkspaceService:
         self,
         user_id: str,
         staging: Path,
-        workspace_id: str,
+        workspace_id: uuid.UUID,
         workspace_name: str,
         destination: Path,
-    ) -> None:
+    ) -> WorkspaceRecord:
         """Validate and finalize imported bytes before quota publication."""
 
         root = workspaces_root(self.settings)
@@ -1895,7 +1139,7 @@ class WorkspaceService:
             raise InvalidWorkspaceArchiveError(
                 "Workspace import was not compiled from safe materialized data"
             )
-        imported_at = datetime.now(UTC).isoformat()
+        imported_at = datetime.now(UTC)
         self._store.prepare_import_identity(
             staging,
             workspace_id=workspace_id,
@@ -1903,40 +1147,45 @@ class WorkspaceService:
             revision=1,
             timestamp=imported_at,
         )
-        # Load before installation so malformed workspace snapshots never
-        # become addressable resources.
-        self._store.load(staging)
+        # Validate the extracted representation before rewriting its plans.
+        loaded = self._store.load(staging)
+        self._store.rebase_snapshot_sources(
+            staging,
+            published_root=destination,
+        )
+        for analysis in loaded.workspace.analyses.values():
+            if analysis.query_snapshot is None:
+                continue
+            relative_path = Path(analysis.query_snapshot.relative_path)
+            rebase_worker_input_snapshot_sources(
+                staging / relative_path,
+                workspace_id=workspace_id,
+                published_snapshot_dir=destination / relative_path,
+            )
+
+        # Load the complete staged graph against its future logical root. The
+        # backing files remain contained in staging until the commit rename.
+        validated = self._store.load(staging, published_root=destination)
 
         write_workspace_owner(staging, user_id)
         marker.unlink()
         _fsync_directory(staging)
+        return self.materialize_record(
+            validated.workspace,
+            validated.snapshot.revision,
+            "closed",
+        )
 
     def _publish_staged_import_sync(
         self,
         staging: Path,
         destination: Path,
-    ) -> WorkspaceRecord:
-        """Publish one quota-approved import and validate its relocated plans."""
+    ) -> None:
+        """Publish one fully compiled and quota-approved import."""
 
         root = workspaces_root(self.settings)
         os.replace(staging, destination)
         _fsync_directory(root)
-        try:
-            self._store.rebase_snapshot_sources(destination)
-            loaded = self._store.load(destination)
-            for record in loaded.workspace.analyses.values():
-                if record.query_snapshot is not None:
-                    rebase_worker_input_snapshot_sources(
-                        destination / record.query_snapshot.relative_path,
-                        workspace_id=loaded.workspace.id,
-                    )
-            workspace, revision, _serialized_bytes = self._load_sync(destination)
-            _fsync_directory(destination)
-        except BaseException:
-            shutil.rmtree(destination, ignore_errors=True)
-            _fsync_directory(root)
-            raise
-        return self.materialize_record(workspace, revision, "closed")
 
     async def close(self) -> None:
         """Reject mutations and release every clean open aggregate at shutdown.
@@ -1947,18 +1196,12 @@ class WorkspaceService:
         """
 
         self._accepting_mutations = False
-        async with self._slot_registry_lock:
-            slots = list(self._slots.values())
-        for slot in slots:
-            async with slot.gate:
-                await self._clear_slot(slot)
-        async with self._slot_registry_lock:
-            self._slots.clear()
+        await self._residency.close()
 
     async def reconcile_transient_storage(self) -> None:
         """Remove archive/delete crash leftovers once, before serving requests."""
 
-        await self._run_io(
+        await self._residency.run_io(
             _cleanup_workspace_service_temps,
             workspaces_root(self.settings),
         )
@@ -1974,16 +1217,17 @@ class WorkspaceService:
         owner's data cannot block reconciliation for another owner.
         """
 
-        paths = await self._run_io(self._scan_owned_paths_sync)
+        paths = await self._residency.run_io(self._catalogue.scan_owned_paths)
         for owner_id, path in paths:
-            async with self._slot(path.name) as slot:
+            workspace_id = uuid.UUID(path.name)
+            async with self._residency.slot(workspace_id) as slot:
                 if slot.workspace is not None:
                     raise RuntimeError(
                         "Durable Workspace reconciliation must run before serving"
                     )
                 try:
                     if slot.process_lock is None:
-                        slot.process_lock = await self._acquire_process_lock(path.name)
+                        slot.process_lock = await self._residency.acquire_process_lock(workspace_id)
                 except WorkspaceInUseError:
                     logger.info(
                         "Skipping startup reconciliation for a Workspace open "
@@ -2001,13 +1245,14 @@ class WorkspaceService:
                     )
                     continue
                 try:
-                    workspace, revision, _serialized_bytes = await self._run_io(
-                        self._load_sync,
+                    await self._residency.run_io(self._store.reconcile, path)
+                    workspace, revision, _serialized_bytes = await self._residency.run_io(
+                        self._catalogue.load,
                         path,
                     )
                     if not reconcile(workspace):
                         continue
-                    await self._run_io(
+                    await self._residency.run_io(
                         self._save_sync,
                         path,
                         workspace,
@@ -2016,7 +1261,6 @@ class WorkspaceService:
                 except (
                     OSError,
                     ResourceTooLargeError,
-                    TabCorruptError,
                     WorkspaceConflictError,
                     WorkspaceCorruptError,
                 ):
@@ -2028,4 +1272,4 @@ class WorkspaceService:
                     )
                 finally:
                     with anyio.CancelScope(shield=True):
-                        await self._clear_slot(slot)
+                        await self._residency.clear(slot)

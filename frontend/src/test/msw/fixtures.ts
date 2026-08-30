@@ -41,6 +41,7 @@ export const workspaceResponse = (
 });
 
 export const tabResponse = (overrides: Partial<Tab> = {}): Tab => ({
+  availability: 'available',
   id: 'tab-1',
   name: 'Analysis',
   kind: 'token_frequency',
@@ -48,11 +49,13 @@ export const tabResponse = (overrides: Partial<Tab> = {}): Tab => ({
   created_at: TEST_DATE,
   modified_at: TEST_DATE,
   revision: 1,
+  settings: { kind: 'token_frequency', stop_words: { words: [] } },
   ...overrides,
 });
 
 /** Minimal canonical Analysis used by status and tab tests. */
 export const analysisResponse = (overrides: Partial<Analysis> = {}): Analysis => ({
+  availability: 'available',
   id: 'analysis-1',
   tab_id: 'tab-1',
   parent_analysis_id: null,
@@ -79,6 +82,7 @@ export const analysisResponse = (overrides: Partial<Analysis> = {}): Analysis =>
 });
 
 export const nodeResponse = (overrides: Partial<WorkspaceNodeInfo> = {}): WorkspaceNodeInfo => ({
+  availability: 'available',
   id: 'node-1',
   name: 'Text',
   derivation_description: 'Source file',

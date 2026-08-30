@@ -196,7 +196,7 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
       onTabInputSetChange(DEFAULT_TAB_INPUT_SET_ID, [
         { node_id: request.node_id, column: request.column },
       ]);
-      hydrateEngineConfig(request.engine ?? null);
+      hydrateEngineConfig(request.engine);
       setSelectedMetadataColumns([]);
     },
     // Clears quotation-specific state after the shared lifecycle deletes the task result.
@@ -231,14 +231,11 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
     },
   });
   const runAllSource = runAllResultQuery.data?.source ?? null;
-  const resultNodeId =
-    serverRequest && typeof serverRequest.node_id === 'string'
-      ? serverRequest.node_id
-      : (displayedNodes[0]?.id ?? '');
+  const resultNodeId = serverRequest?.node_id ?? displayedNodes[0]?.id ?? '';
   const resultColumn =
-    serverRequest && typeof serverRequest.column === 'string'
-      ? serverRequest.column
-      : (activeSelections.find((selection) => selection.nodeId === resultNodeId)?.column ?? '');
+    serverRequest?.column ??
+    activeSelections.find((selection) => selection.nodeId === resultNodeId)?.column ??
+    '';
   const previewResultNodeInfo = nodeInputs.nodeInfoById[resultNodeId];
   const previewResultNode = previewResultNodeInfo
     ? projectWorkspaceNodeMetadata(previewResultNodeInfo)
@@ -348,24 +345,14 @@ function QuotationFeature({ host }: AnalysisTabFeatureProps) {
     node_id: currentQuotationNodeId,
     column: currentQuotationColumn,
     type: resolvedEnginePayload.type,
-    engine_id:
-      resolvedEnginePayload.type === 'remote' && resolvedEnginePayload.isValid
-        ? resolvedEnginePayload.engineId
-        : null,
+    engine_id: resolvedEnginePayload.type === 'remote' ? resolvedEnginePayload.engine_id : null,
   };
-  const quotationServerParams = (request: Record<string, unknown>) => {
-    const serverEngine = request.engine;
-    const engine =
-      serverEngine && typeof serverEngine === 'object'
-        ? (serverEngine as Record<string, unknown>)
-        : {};
-    return {
-      node_id: typeof request.node_id === 'string' ? request.node_id : '',
-      column: typeof request.column === 'string' ? request.column : '',
-      type: engine.type === 'remote' ? 'remote' : 'local',
-      engine_id: typeof engine.engine_id === 'string' ? engine.engine_id || null : null,
-    };
-  };
+  const quotationServerParams = (request: QuotationAnalysisRequest) => ({
+    node_id: request.node_id,
+    column: request.column,
+    type: request.engine.type,
+    engine_id: request.engine.type === 'remote' ? request.engine.engine_id : null,
+  });
   const hasParamsChanged = !lastRunRequest
     ? true
     : hasParameterDiff(currentQuotationParams, quotationServerParams(lastRunRequest));

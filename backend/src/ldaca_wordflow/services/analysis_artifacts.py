@@ -70,7 +70,7 @@ from .artifact_contracts import ANALYSIS_ARTIFACT_PROJECTORS, ArtifactProjection
 from .node_projection import canonical_node_info
 from .response_snapshots import ResponseSnapshot, ResponseSnapshotService
 from .workspace import WorkspaceLease
-from ..workers.input_snapshots import clone_worker_input_snapshot
+from ..infrastructure.storage.input_snapshots import clone_worker_input_snapshot
 
 
 class AnalysisArtifactService:
@@ -318,7 +318,7 @@ def _publish_annotation_run_all(
     if not isinstance(request, AnnotationRunAllAnalysisRequest):
         raise ValueError("Annotation Run All request is invalid")
     source_request = request.source
-    node = workspace.nodes.get(str(source_request.node_id))
+    node = workspace.nodes.get(source_request.node_id)
     if node is None:
         raise ValueError("Annotation Run All source Data Block is unavailable")
 
@@ -404,7 +404,7 @@ def _publish_analysis_data_block(
             workspace.nodes[item] for item in referenced_node_ids(metadata.provenance)
         ]
         node = Node(
-            id=str(metadata.id),
+            id=metadata.id,
             data=lazyframe,
             name=metadata.name,
             provenance=metadata.provenance,
@@ -489,7 +489,7 @@ def _publish_topic_modeling_data_blocks(
     except BaseException:
         data_dir = workspace_path / "data"
         for node_id in reversed(created_ids):
-            workspace.remove_node(str(node_id))
+            workspace.remove_node(node_id)
             (data_dir / f"{node_id}.parquet").unlink(missing_ok=True)
         if created_ids:
             fsync_directory(data_dir)
@@ -545,7 +545,7 @@ def _create_result_data_blocks(
     except BaseException:
         data_dir = workspace_path / "data"
         for node_id in reversed(created_ids):
-            workspace.remove_node(str(node_id))
+            workspace.remove_node(node_id)
             (data_dir / f"{node_id}.parquet").unlink(missing_ok=True)
         if created_ids:
             fsync_directory(data_dir)
@@ -564,7 +564,7 @@ def _validate_published_data_block_identity(
     """Reject any published Data Block that diverges from its immutable request."""
 
     request = record.request
-    parent = workspace.analyses.get(str(record.parent_analysis_id))
+    parent = workspace.analyses.get(record.parent_analysis_id)
     parent_request = parent.request if parent is not None else None
     if isinstance(
         request,
@@ -577,11 +577,7 @@ def _validate_published_data_block_identity(
             (
                 item
                 for item in request.sources
-                if item.source_node_id
-                in {
-                    uuid.UUID(node_id)
-                    for node_id in referenced_node_ids(metadata.provenance)
-                }
+                if item.source_node_id in set(referenced_node_ids(metadata.provenance))
             ),
             None,
         )
@@ -624,7 +620,7 @@ def _validate_published_data_block_identity(
             inputs=[
                 DerivationInput(
                     role="source",
-                    value=node_reference(str(selection.source_node_id)),
+                    value=node_reference(selection.source_node_id),
                 )
             ],
         )
@@ -635,7 +631,7 @@ def _validate_published_data_block_identity(
             or metadata.provenance != expected_provenance
             or metadata.document != expected_document
             or metadata.color is not None
-            or str(metadata.id) in workspace.nodes
+            or metadata.id in workspace.nodes
         ):
             raise ValueError("Trends Data Block metadata is invalid")
         return
@@ -660,17 +656,16 @@ def _validate_published_data_block_identity(
             raise ValueError("Topic Modeling Data Block Creation provenance is invalid")
         source_id = references[0]
         if operation_value.role == "topic_data":
-            source_uuid = uuid.UUID(source_id)
             source = workspace.nodes.get(source_id)
-            if source is None or source_uuid not in request.node_ids:
+            if source is None or source_id not in request.node_ids:
                 raise ValueError("Topic Modeling source Data Block is unavailable")
-            selected = request.selected_columns[source_uuid]
+            selected = request.selected_columns[source_id]
             if (
-                metadata.name != request.new_node_names[source_uuid]
+                metadata.name != request.new_node_names[source_id]
                 or metadata.document
                 != (source.document if source.document in selected else None)
                 or metadata.color is not None
-                or str(metadata.id) in workspace.nodes
+                or metadata.id in workspace.nodes
             ):
                 raise ValueError("Topic Modeling Data Block metadata is invalid")
             return
@@ -680,7 +675,7 @@ def _validate_published_data_block_identity(
             or metadata.name != f"{topic_data.name} topic meanings"
             or metadata.document is not None
             or metadata.color is not None
-            or str(metadata.id) in workspace.nodes
+            or metadata.id in workspace.nodes
         ):
             raise ValueError("Topic meanings Data Block metadata is invalid")
         return
@@ -691,7 +686,7 @@ def _validate_published_data_block_identity(
         inputs=[
             DerivationInput(
                 role="source",
-                value=node_reference(str(source_node_id)),
+                value=node_reference(source_node_id),
             )
         ],
     )
@@ -702,7 +697,7 @@ def _validate_published_data_block_identity(
         or metadata.provenance != expected_provenance
         or metadata.document != document
         or metadata.color is not None
-        or str(metadata.id) in workspace.nodes
+        or metadata.id in workspace.nodes
     ):
         raise ValueError("Child Analysis Data Block metadata is invalid")
 

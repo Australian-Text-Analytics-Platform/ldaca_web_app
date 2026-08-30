@@ -15,7 +15,7 @@ describe('tokenFrequencyUtils', () => {
   it('derives the canonical token limit from the result resource', () => {
     const result: TokenFrequencyResponse = {
       data: {},
-      metadata: { effective_token_limit: 42, server_token_limit: 100 },
+      metadata: { effective_token_limit: 42 },
     };
 
     expect(deriveBackendTokenLimit(result)).toBe(42);

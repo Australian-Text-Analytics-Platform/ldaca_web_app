@@ -68,7 +68,12 @@ def concordance_run_all_artifacts(
     result: BaseModel,
 ) -> list[ArtifactProjection]:
     value = ConcordanceRunAllWorkerResult.model_validate(result)
-    return [(("source", "table", "artifact"), value.source.table.artifact)]
+    return [
+        (
+            ("result", "source", "table", "artifact"),
+            value.source.table.artifact,
+        )
+    ]
 
 
 def quotation_run_all_artifacts(result: BaseModel) -> list[ArtifactProjection]:

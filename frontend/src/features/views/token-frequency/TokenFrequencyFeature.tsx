@@ -245,7 +245,7 @@ const TokenFrequencyFeature = ({ host }: AnalysisTabFeatureProps) => {
       host.setSetting('tokenFrequency.tokenLimit', String(value));
     },
     onStopWordsChange: (words) => {
-      void host.setPresentationSettings({ stop_words: words });
+      void host.setPresentationSettings({ stopWords: words });
     },
   });
   const effectiveAppliedStopSet = stopWordsEnabled ? appliedStopSet : EMPTY_STOP_SET;

@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 from collections.abc import Callable
+import uuid
 
 from .utils import process_entrypoint
 
@@ -16,8 +17,8 @@ def run_result_data_block_creation(
     *,
     artifact_dir: str,
     request_payload: dict[str, Any],
-    result_paths: dict[str, str],
-    document_columns: dict[str, str | None],
+    result_paths: dict[uuid.UUID, str],
+    document_columns: dict[uuid.UUID, str | None],
     progress_callback: Callable[[float, str], None] | None = None,
 ) -> dict[str, Any]:
     """Create private output files for one atomic Data Block Creation."""
@@ -76,7 +77,7 @@ def run_result_data_block_creation(
 
         outputs: list[dict[str, Any]] = []
         for index, selection in enumerate(selections):
-            source_id = str(selection.source_node_id)
+            source_id = selection.source_node_id
             path = result_paths.get(source_id)
             document_column = document_columns.get(source_id)
             if path is None or (

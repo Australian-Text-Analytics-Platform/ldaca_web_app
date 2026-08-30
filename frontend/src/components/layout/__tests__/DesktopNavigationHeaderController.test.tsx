@@ -17,12 +17,14 @@ const mocks = vi.hoisted(() => {
 });
 
 const frequencyTab: Tab = {
+  availability: 'available',
   id: 'frequency-1',
   kind: 'token_frequency',
   name: 'Analysis 1',
   created_at: '2026-08-28T00:00:00Z',
   modified_at: '2026-08-28T00:00:00Z',
   revision: 1,
+  settings: { kind: 'token_frequency', stop_words: { words: [] } },
 };
 
 vi.mock('@/lib/isMacOSDesktop', () => ({ isMacOSDesktop: () => true }));

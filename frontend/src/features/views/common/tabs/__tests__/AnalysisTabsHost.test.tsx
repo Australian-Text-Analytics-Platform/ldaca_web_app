@@ -50,7 +50,10 @@ const tab: AnalysisTab = {
   kind: 'concordance',
   input_sets: { source: [] },
   settings: {},
-  annotation_correction_columns: {},
+  correctionColumns: {},
+  stopWords: [],
+  wordsPerTopic: null,
+  projectionSelection: null,
 };
 
 const secondTab: AnalysisTab = {
@@ -59,7 +62,10 @@ const secondTab: AnalysisTab = {
   kind: 'concordance',
   input_sets: { source: [] },
   settings: {},
-  annotation_correction_columns: {},
+  correctionColumns: {},
+  stopWords: [],
+  wordsPerTopic: null,
+  projectionSelection: null,
 };
 
 function makeTabsResult(overrides: Partial<UseWorkspaceTabsResult>): UseWorkspaceTabsResult {

@@ -24,12 +24,11 @@ class _PreparedTopicPayload:
 
     The Rust pipeline (``polars_text._internal.run_topic_modeling``) embeds and
     tokenizes raw text itself, so this carries only raw documents per node plus
-    display names.
+    source order.
     """
 
     artifact_root: Path
     corpora: list[list[str]]
-    node_names: list[str]
 
 
 @dataclass(frozen=True)

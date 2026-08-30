@@ -3,7 +3,14 @@
 from __future__ import annotations
 
 import uuid
-from fastapi import APIRouter, Query, Request, Response, status
+
+from fastapi import (
+    APIRouter,
+    Query,
+    Request,
+    Response,
+    status,
+)
 from fastapi.responses import FileResponse
 from starlette.background import BackgroundTask
 
@@ -14,7 +21,7 @@ from ...models.node_resources import (
     NodeEditRequest,
     NodeUpdateRequest,
 )
-from ...models.workspace import WorkspaceNodeInfo
+from ...models.workspace import DataBlockResource, WorkspaceNodeInfo
 from ..dependencies import RuntimeDep
 from ..security import CurrentSessionSecurityDep
 from ..responses import api_errors, route_path, workspace_etag
@@ -33,7 +40,7 @@ router = APIRouter(
 
 @router.get(
     "",
-    response_model=list[WorkspaceNodeInfo],
+    response_model=list[DataBlockResource],
     responses=api_errors(403, 404, 409, 422),
 )
 async def list_nodes(
@@ -41,12 +48,12 @@ async def list_nodes(
     response: Response,
     principal: CurrentSessionSecurityDep,
     runtime: RuntimeDep,
-) -> list[WorkspaceNodeInfo]:
+) -> list[DataBlockResource]:
     """Return every Data Block in the persisted graph order."""
 
     nodes, revision = await runtime.node_service.list_nodes(
         principal.user.id,
-        str(workspace_id),
+        workspace_id,
     )
     response.headers["ETag"] = workspace_etag(revision)
     return nodes
@@ -91,7 +98,7 @@ async def export_data_blocks(
         revision,
     ) = await runtime.data_block_export_service.export(
         principal.user.id,
-        str(workspace_id),
+        workspace_id,
         request,
     )
     return FileResponse(
@@ -121,7 +128,7 @@ async def create_node(
 
     node, revision = await runtime.node_service.create(
         principal.user.id,
-        str(workspace_id),
+        workspace_id,
         request,
     )
     response.headers["Location"] = route_path(
@@ -151,7 +158,7 @@ async def preview_node_creation(
 
     rows, revision = await runtime.node_service.preview(
         principal.user.id,
-        str(workspace_id),
+        workspace_id,
         request,
         page=page,
         page_size=page_size,
@@ -163,7 +170,7 @@ async def preview_node_creation(
 
 @router.get(
     "/{node_id}",
-    response_model=WorkspaceNodeInfo,
+    response_model=DataBlockResource,
     responses=api_errors(404, 422),
 )
 async def get_node(
@@ -172,13 +179,13 @@ async def get_node(
     response: Response,
     principal: CurrentSessionSecurityDep,
     runtime: RuntimeDep,
-) -> WorkspaceNodeInfo:
+) -> DataBlockResource:
     """Return one node's schema and topology metadata."""
 
     node, revision = await runtime.node_service.get(
         principal.user.id,
-        str(workspace_id),
-        str(node_id),
+        workspace_id,
+        node_id,
     )
     response.headers["ETag"] = workspace_etag(revision)
     return node
@@ -201,8 +208,8 @@ async def update_node(
 
     node, revision = await runtime.node_service.update(
         principal.user.id,
-        str(workspace_id),
-        str(node_id),
+        workspace_id,
+        node_id,
         request,
     )
     response.headers["ETag"] = workspace_etag(revision)
@@ -226,8 +233,8 @@ async def edit_node(
 
     node, revision = await runtime.node_service.edit(
         principal.user.id,
-        str(workspace_id),
-        str(node_id),
+        workspace_id,
+        node_id,
         request,
     )
     response.headers["ETag"] = workspace_etag(revision)
@@ -250,8 +257,8 @@ async def undo_node(
 
     node, revision = await runtime.node_service.undo(
         principal.user.id,
-        str(workspace_id),
-        str(node_id),
+        workspace_id,
+        node_id,
     )
     response.headers["ETag"] = workspace_etag(revision)
     return node
@@ -273,8 +280,8 @@ async def redo_node(
 
     node, revision = await runtime.node_service.redo(
         principal.user.id,
-        str(workspace_id),
-        str(node_id),
+        workspace_id,
+        node_id,
     )
     response.headers["ETag"] = workspace_etag(revision)
     return node
@@ -295,8 +302,8 @@ async def delete_node(
 
     revision = await runtime.node_service.delete(
         principal.user.id,
-        str(workspace_id),
-        str(node_id),
+        workspace_id,
+        node_id,
     )
     return Response(
         status_code=status.HTTP_204_NO_CONTENT,
@@ -319,8 +326,8 @@ async def get_node_schema(
 
     content, revision = await runtime.node_service.schema(
         principal.user.id,
-        str(workspace_id),
-        str(node_id),
+        workspace_id,
+        node_id,
     )
     result = arrow_stream_response(content)
     result.headers["ETag"] = workspace_etag(revision)

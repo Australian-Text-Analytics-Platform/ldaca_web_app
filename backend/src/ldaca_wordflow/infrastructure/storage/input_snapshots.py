@@ -12,6 +12,7 @@ import os
 import shutil
 import stat
 import tempfile
+import uuid
 from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
@@ -19,15 +20,15 @@ import polars as pl
 from polars_source_utils import list_source_paths, replace_source_paths
 from pydantic import BaseModel, ConfigDict
 
-from ..domain.workspace import Node, Workspace
-from ..infrastructure.storage.durable_fs import (
+from ...domain.workspace import Node, Workspace
+from .durable_fs import (
     atomic_output_path,
     fsync_directory as _fsync_directory,
     fsync_file,
     mkdir_durable as _mkdir_durable,
 )
 
-from ..shared.errors import ResourceTooLargeError
+from ...shared.errors import ResourceTooLargeError
 _SNAPSHOT_FILENAME = "snapshot.json"
 _SNAPSHOT_DATA_DIR = "data"
 
@@ -35,7 +36,7 @@ _SNAPSHOT_DATA_DIR = "data"
 class _SnapshotNodeManifest(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
-    id: str
+    id: uuid.UUID
     name: str
     document: str | None
     color: str | None
@@ -45,8 +46,8 @@ class _SnapshotNodeManifest(BaseModel):
 class _SnapshotManifest(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
-    workspace_id: str
-    nodes: dict[str, _SnapshotNodeManifest]
+    workspace_id: uuid.UUID
+    nodes: dict[uuid.UUID, _SnapshotNodeManifest]
 
 
 @dataclass(frozen=True)
@@ -58,7 +59,7 @@ class SnapshotNode:
     of domain ``Node`` state needed by Analyses.
     """
 
-    id: str
+    id: uuid.UUID
     name: str
     data: pl.LazyFrame
     document: str | None
@@ -95,8 +96,8 @@ def _node_snapshot_payload(node: Node, rel_data_path: Path) -> _SnapshotNodeMani
 
 def create_worker_input_snapshot(
     *,
-    workspace_id: str,
-    node_ids: list[str],
+    workspace_id: uuid.UUID,
+    node_ids: list[uuid.UUID],
     workspace: Workspace,
     workspace_data_dir: str | Path,
     snapshot_dir: str | Path,
@@ -131,7 +132,7 @@ def create_worker_input_snapshot(
         sources_dir.mkdir()
         published_sources_dir = destination / "sources"
 
-        nodes: dict[str, _SnapshotNodeManifest] = {}
+        nodes: dict[uuid.UUID, _SnapshotNodeManifest] = {}
         for node_id in node_ids:
             node = workspace.nodes.get(node_id)
             if node is None:
@@ -252,11 +253,17 @@ def clone_worker_input_snapshot(
 def rebase_worker_input_snapshot_sources(
     snapshot_dir: str | Path,
     *,
-    workspace_id: str | None = None,
+    workspace_id: uuid.UUID | None = None,
+    published_snapshot_dir: Path | None = None,
 ) -> None:
-    """Retarget a retained snapshot after the owning Workspace is relocated."""
+    """Compile a retained snapshot for its declared publication directory."""
 
     root = Path(snapshot_dir).resolve(strict=True)
+    published_root = (
+        published_snapshot_dir.resolve(strict=False)
+        if published_snapshot_dir is not None
+        else root
+    )
     metadata_path = root / _SNAPSHOT_FILENAME
     manifest = _SnapshotManifest.model_validate_json(metadata_path.read_bytes())
     if workspace_id is not None and manifest.workspace_id != workspace_id:
@@ -282,8 +289,9 @@ def rebase_worker_input_snapshot_sources(
                 str(Path("sources") / source_path.name),
                 required_parent="sources",
             )
-            if raw_source != str(relocated):
-                mapping[raw_source] = str(relocated)
+            published_source = published_root / "sources" / relocated.name
+            if raw_source != str(published_source):
+                mapping[raw_source] = str(published_source)
         if not mapping:
             continue
         with atomic_output_path(plan_path) as temporary:
@@ -295,8 +303,21 @@ def rebase_worker_input_snapshot_sources(
                 )
         _fsync_file(plan_path)
     _fsync_directory(root / _SNAPSHOT_DATA_DIR)
-    for node_id in manifest.nodes:
-        load_snapshot_node(root, node_id)
+    for node in manifest.nodes.values():
+        plan_path = _snapshot_member(
+            root,
+            node.data_path,
+            required_parent=_SNAPSHOT_DATA_DIR,
+        )
+        for raw_source in list_source_paths(plan_path):
+            try:
+                relative_source = Path(raw_source).relative_to(published_root)
+            except ValueError as exc:
+                raise ValueError(
+                    "Execution snapshot plan source escapes its publication root"
+                ) from exc
+            _snapshot_member(root, str(relative_source), required_parent="sources")
+        pl.LazyFrame.deserialize(plan_path, format="binary")
 
 
 def _fsync_file(path: Path) -> None:
@@ -371,7 +392,9 @@ def _require_contained_regular(root: Path, raw_source: str) -> Path:
     return current
 
 
-def load_snapshot_node(snapshot_dir: str | Path, node_id: str) -> SnapshotNode:
+def load_snapshot_node(
+    snapshot_dir: str | Path, node_id: uuid.UUID
+) -> SnapshotNode:
     """Load one snapshotted node plan for worker-side analysis preparation.
 
     Used by:

@@ -1,49 +1,46 @@
 # Persistence Integrity
 
-This page records current persistence guarantees and known hardening
-boundaries. It is a source-linked risk register, not a dated review, a runtime
-health report, or a claim that the listed failure windows have occurred in a
-deployment.
+This page records the current commit, restart, isolation, and repair semantics
+for every backend persistence boundary.
 
 ## Current Guarantees
 
-- Native Workspace schema 21 and portable archive format 20 are strict current
+- Native Workspace schema 22 and portable archive format 21 are strict current
   contracts. Older formats are rejected rather than guessed or migrated at
   runtime.
 - Workspace and User File data use private same-filesystem staging and atomic
   replacement for their normal publication paths.
-- User File Import records are strict, size-bounded JSON files, and each
-  individual record save is atomic.
+- User File Import records and prepared-publication journals are strict,
+  version-1, size-bounded JSON envelopes. Each individual save is atomic.
 - Workspace list operations expose safely attributable incompatible, corrupt,
   and over-limit Workspaces as ID-only unavailable entries while isolating
-  them from healthy siblings. Analysis hydration can expose corrupt Tab-owned
-  records without making healthy sibling Analyses unreadable.
+  them from healthy siblings. Data Blocks, Tabs, Analyses, and User File
+  Imports isolate safely attributable current-schema corruption as minimal
+  unavailable resources without changing the invalid bytes during load.
 - Central storage admission measures allocated bytes and reserves concurrent
   growth for Workspace, User File, import, Analysis, and response-snapshot
   writes.
+- Preferences and single-user provider credentials share a contained private
+  TOML boundary. Reads are strict UTF-8 and capped at 1 MiB without following
+  links or reparse points. Writes stage a `0600` file beside the destination,
+  recheck quota against the staged and replaced files, and use one atomic
+  replacement as the only visibility commit. A failed admission recheck or
+  interrupted pre-commit write leaves the previous file unchanged and removes
+  the staged file; no startup repair is required.
+
+## Boundary Semantics
+
+| Boundary | Commit and restart semantics |
+|---|---|
+| Workspace import | [`WorkspaceService`](../../backend/src/ldaca_wordflow/services/workspace.py) assigns the new identity, compiles Workspace and retained-query plans for their final paths, strictly loads the complete future representation, and remeasures quota while the bytes remain staged. The same-filesystem directory rename is the only publication mutation; startup never repairs a partially visible import. |
+| User File Import | [`UserFileImportService`](../../backend/src/ldaca_wordflow/services/user_file_imports.py) first persists a successful prepared intent, then publishes the owned file collection, saves the succeeded record, and clears the journal. On restart, an owned visible destination completes the saved Result; an absent destination removes staging and the ordinary interrupted-record transition records failure. Execution is never rerun. |
+| Preferences and credentials | The shared private TOML primitive admits and atomically replaces one strict file. A failed pre-commit operation preserves the prior file. There is no multi-file recovery protocol because each business store has one independent commit point. |
+| Samples | [`SampleDataService`](../../backend/src/ldaca_wordflow/services/sample_data.py) hashes every streamed byte and verifies the catalogue size and private SHA-256 digest before the downloaded file is renamed into import staging. Any mismatch removes the temporary download and publishes nothing. |
+| Import records | [`UserFileImportStore`](../../backend/src/ldaca_wordflow/infrastructure/storage/user_file_import_store.py) accepts only version 1. Unversioned, unknown, oversized, linked, or malformed records are isolated independently. Their UUID comes only from a canonical filename, so deletion does not parse an invalid body. |
+| Data Blocks | [`WorkspaceStore`](../../backend/src/ldaca_wordflow/infrastructure/storage/workspace_store.py) persists an ordered schema signature and validates it plus the Document Column Preference both when publishing and loading. A bad plan, owned source, schema, or preference isolates that Data Block and its descendants; healthy siblings load and the invalid committed bytes are not changed by hydration. A Workspace containing an unavailable Data Block is read-only until repaired or exported. |
+| Analysis Results | [`result_integrity.py`](../../backend/src/ldaca_wordflow/analysis/result_integrity.py) validates the kind-specific stored Result, output Data Block identities, semantic Artifact identities, declared paths, exact owned file tree, and inferred media types before success publication and during strict load. Failure before commit makes the Analysis fail; failure during load isolates that Analysis and dependent records without changing stored bytes. |
+| SQLite | [`database.py`](../../backend/src/ldaca_wordflow/infrastructure/database.py) requires schema 7 and compares complete index metadata, including partial predicates. Quota checks, uniqueness, and foreign-key behavior are exercised by rollback-only probes, leaving no validation rows. |
+| Startup reconciliation | Before readiness, each current available Workspace runs [`WorkspaceStore.reconcile`](../../backend/src/ldaca_wordflow/infrastructure/storage/workspace_store.py). Reconciliation removes only unreferenced generations and abandoned private execution storage. Invalid current-schema child records stay in place and are isolated on load; incompatible parent formats remain catalogue-only with bounded raw-ZIP export. |
 
 The detailed storage invariants remain in
-[Files and Storage](../domain/files-and-storage.md). The boundaries below are
-the separate hardening program and are intentionally not repaired by the
-half-wired-component cleanup.
-
-## Open Hardening Boundaries
-
-| Boundary | Current seam and required hardening |
-|---|---|
-| Workspace import publication | [`WorkspaceService`](../../backend/src/ldaca_wordflow/services/workspace.py) renames the staged archive into the live catalogue before rebasing persisted plan and retained-query sources. A crash in that window can publish a Workspace that strict loading cannot reopen. Rebase, validate, and quota-measure the final representation before making the rename the sole commit point. |
-| User File Import publication | [`UserFileImportService`](../../backend/src/ldaca_wordflow/services/user_file_imports.py) publishes visible files before saving the succeeded import record through [`UserFileImportStore`](../../backend/src/ldaca_wordflow/infrastructure/storage/user_file_import_store.py). Failure or interruption between those commits can leave published files paired with a failed or interrupted record. Add a recoverable prepared/publication transaction and startup completion or rollback. |
-| Quota and safe private paths | [`UserPreferenceStore`](../../backend/src/ldaca_wordflow/services/user_preferences.py) and [`ProviderCredentialStore`](../../backend/src/ldaca_wordflow/services/provider_credentials.py) write through the atomic-file helper without central storage admission. Their private-file reads and writes also lack the bounded, no-follow parent-chain contract used by User Files. Bring both stores under admitted, size-bounded, containment-checked persistence. |
-| Sample integrity | The private [`SampleFile`](../../backend/src/ldaca_wordflow/models/data_sources.py) model ignores catalogue hashes, while [`SampleDataService`](../../backend/src/ldaca_wordflow/services/sample_data.py) validates downloaded size only. Retain the repository digest privately and verify it while streaming before publication. |
-| Import-record evolution | [`UserFileImport`](../../backend/src/ldaca_wordflow/domain/user_file_import.py) is persisted directly without a format-version envelope. Add an explicit versioned decoder so incompatible records can be rejected or migrated deliberately. |
-| Data Block and Result integrity | Native [`WorkspaceStore`](../../backend/src/ldaca_wordflow/infrastructure/storage/workspace_store.py) does not fully reconcile a Data Block's display name and Document Column Preference with its loaded schema. [`AnalysisRecord`](../../backend/src/ldaca_wordflow/domain/workspace/analysis.py) and [`AnalysisResultService`](../../backend/src/ldaca_wordflow/services/analysis_results.py) validate stored Results and declared Artifacts at different times, rather than enforcing one persisted identity invariant. Validate both relationships at publication and strict load, isolating a bad Analysis or Data Block without hiding healthy siblings. |
-| SQLite schema validation | [`database.py`](../../backend/src/ldaca_wordflow/infrastructure/database.py) recognizes required indexes by uniqueness and columns without rejecting partial indexes, and recognizes the quota `CHECK` through normalized SQL text. Validate partial predicates and constraints semantically, including rollback-only behavior probes. |
-| Corrupt import isolation | [`UserFileImportStore`](../../backend/src/ldaca_wordflow/infrastructure/storage/user_file_import_store.py) marks an entire user's import history corrupt when one file is invalid. Because the bad record is not loaded, the public delete operation cannot repair it. Isolate corruption per record and make that exact record removable without parsing its body. |
-| Startup reconciliation | [`WorkspaceStore.reconcile`](../../backend/src/ldaca_wordflow/infrastructure/storage/workspace_store.py) can remove abandoned generations but is not wired into production startup. Hydration also skips some Analysis records whose parents are missing. Run store reconciliation before serving and explicitly remove or isolate parentless invalid records. |
-
-## Verification Targets
-
-Hardening work should use fault injection at each publication boundary, strict
-old/new-format fixtures, corrupt-sibling isolation tests, quota-edge tests, and
-restart tests. A fix is complete only when durable documentation and recovery
-procedures describe the same commit and repair boundaries as the source.
+[Files and Storage](../domain/files-and-storage.md).

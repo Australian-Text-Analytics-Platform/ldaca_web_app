@@ -4,9 +4,17 @@ from __future__ import annotations
 
 from enum import StrEnum
 from pathlib import PurePosixPath
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    SecretStr,
+    StringConstraints,
+    model_validator,
+)
+from pydantic.json_schema import SkipJsonSchema
 
 from ..shared.portable_names import portable_collision_key, portable_relative_path_parts
 
@@ -31,6 +39,9 @@ class SampleFile(BaseModel):
 
     path: str
     size: int = Field(ge=0)
+    sha256: SkipJsonSchema[
+        Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{64}$")]
+    ] = Field(exclude=True, repr=False)
 
 
 class SampleCollection(BaseModel):

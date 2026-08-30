@@ -38,13 +38,16 @@ describe('useAnnotationAiPreview', () => {
     queryPreview.mockResolvedValue({
       data: {
         kind: 'annotation',
-        ready: true,
-        rows: [{ text: 'hello', label: null }],
-        labels: [{ row_index: 0, label: 'greeting' }],
-        total_rows: 1,
-        page: 1,
-        page_size: 10,
-        total_pages: 1,
+        result: {
+          variant: 'queried',
+          node_id: 'node-1',
+          rows: [{ text: 'hello', label: null }],
+          labels: [{ row_index: 0, label: 'greeting' }],
+          total_rows: 1,
+          page: 1,
+          page_size: 10,
+          query: { kind: 'annotation', page: 1, page_size: 10 },
+        },
       },
     });
     queryWorkspaceSqlTable.mockReset();
@@ -119,13 +122,16 @@ describe('useAnnotationAiPreview', () => {
     resolveSecondPage({
       data: {
         kind: 'annotation',
-        ready: true,
-        rows: [{ text: 'second page', label: null }],
-        labels: [{ row_index: 10, label: 'other' }],
-        total_rows: 11,
-        page: 2,
-        page_size: 10,
-        total_pages: 2,
+        result: {
+          variant: 'queried',
+          node_id: 'node-1',
+          rows: [{ text: 'second page', label: null }],
+          labels: [{ row_index: 10, label: 'other' }],
+          total_rows: 11,
+          page: 2,
+          page_size: 10,
+          query: { kind: 'annotation', page: 2, page_size: 10 },
+        },
       },
     });
     await waitFor(() =>
@@ -140,13 +146,16 @@ describe('useAnnotationAiPreview', () => {
       Promise.resolve({
         data: {
           kind: 'annotation',
-          ready: true,
-          rows: [{ text: page === 1 ? 'first page' : 'second page', label: null }],
-          labels: [{ row_index: page === 1 ? 0 : 10, label: page === 1 ? 'first' : 'second' }],
-          total_rows: 11,
-          page,
-          page_size: 10,
-          total_pages: 2,
+          result: {
+            variant: 'queried',
+            node_id: 'node-1',
+            rows: [{ text: page === 1 ? 'first page' : 'second page', label: null }],
+            labels: [{ row_index: page === 1 ? 0 : 10, label: page === 1 ? 'first' : 'second' }],
+            total_rows: 11,
+            page,
+            page_size: 10,
+            query: { kind: 'annotation', page, page_size: 10 },
+          },
         },
       }),
     );

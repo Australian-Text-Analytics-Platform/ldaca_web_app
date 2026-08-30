@@ -434,8 +434,8 @@ export function TopicModelingResultsPanel({
     label: 'Topic modelling results',
     tooltip: 'Shows running progress, failures, and final topic modelling outputs.',
   };
-  const truncatedSegmentCount = result?.data.meta.truncated_segment_count ?? 0;
-  const totalSegmentCount = result?.data.meta.n_chunks ?? 0;
+  const truncatedSegmentCount = result?.data.truncated_segment_count ?? 0;
+  const totalSegmentCount = result?.data.segment_count ?? 0;
   const truncationWarning = (() => {
     if (truncatedSegmentCount <= 0) return null;
     const segmentLabel = totalSegmentCount === 1 ? 'Topic Segment' : 'Topic Segments';

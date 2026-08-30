@@ -207,8 +207,8 @@ matching documents, and Concordance Matches. Review presents one source-specific
 summary in the footer of its result shell in both Table View and Dispersion View;
 these totals do not change with pagination or Review filters. Combined View
 retains separate source summaries rather than aggregating them. Older retained
-Results without the source total remain loadable and omit that source's summary
-rather than infer a denominator.
+Results without the source total are invalid in the current schema and are
+isolated rather than interpreted through an older-shape fallback.
 
 Each Concordance Match records L1 (`CONC_l1`), the token immediately left of the
 match, and R1 (`CONC_r1`), the token immediately right of it, together with their
@@ -275,7 +275,8 @@ tree from the natural real-Topic count down to two and recompute all derived
 Topic JSON without changing the Analysis. Each Result advertises a Top-topics-
 per-row range of 1 through K and defaults to `min(2, K)`; empty Results use 0.
 Canonical real Topic IDs are contiguous and ordered by smallest descendant
-leaf ID.
+leaf ID. Public and persisted Results contain required product data only;
+execution engine, timing, backend, and seed diagnostics are structured logs.
 
 Token Frequency and Topic Modelling Tabs may own one normalized stopword list;
 Topic Modelling Tabs also own a 3-100 Words-per-topic cap initialized to 15 and
@@ -289,7 +290,7 @@ selection.
 
 Closing and reopening a Workspace restores Tabs, terminal Analysis forests,
 immutable requests, stored Results, Artifacts, and retained query inputs.
-Native Workspace schema 21 and portable archive format 20 accept only this
+Native Workspace schema 22 and portable archive format 21 accept only this
 forest representation. Older layouts are rejected without runtime migration.
 Browser-local active Tab selection and Active Analysis Drafts are outside both
 storage forms.

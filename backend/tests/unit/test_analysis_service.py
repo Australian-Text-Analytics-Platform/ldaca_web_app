@@ -23,6 +23,7 @@ from ldaca_wordflow.domain.workspace import (
     DerivationInput,
     DerivationProvenance,
     Node,
+    Tab,
     TokenFrequencyAnalysisRequest,
     Workspace,
     node_reference,
@@ -41,6 +42,7 @@ from ldaca_wordflow.services.analysis_execution_types import (
     AnalysisInvocation,
     AnalysisSchedulingStopped,
 )
+from ldaca_wordflow.workers.invocations import PreviewReadyInput
 from ldaca_wordflow.services.events import EventHub
 from ldaca_wordflow.services.analyses import AnalysisService, PublishedAnalysisResult
 from ldaca_wordflow.services.nodes import NodeService
@@ -95,6 +97,8 @@ class _Artifacts:
         del lease, record
         if not isinstance(raw_result, dict):
             raise ValueError("Result must be an object")
+        if raw_result == {"kind": "concordance"}:
+            raw_result = {"ready": True}
         return PublishedAnalysisResult(
             payload=cast(dict[str, JsonData], raw_result),
             artifacts=[],
@@ -122,11 +126,11 @@ async def _opened_workspace_with_tab(
     tmp_path: Path,
     *,
     kind: AnalysisKind = AnalysisKind.CONCORDANCE,
-) -> tuple[WorkspaceService, str, str, str]:
+) -> tuple[WorkspaceService, uuid.UUID, uuid.UUID, uuid.UUID]:
     workspaces = _workspace_service(tmp_path)
     created = await workspaces.create_workspace("user", "Analyses")
     await workspaces.open_workspace("user", created.id)
-    node_id = str(uuid.uuid4())
+    node_id = uuid.uuid4()
 
     def add_node(workspace: Workspace) -> None:
         workspace.add_node(
@@ -143,21 +147,16 @@ async def _opened_workspace_with_tab(
         created.id,
         TabCreate(kind=kind, name=kind.value),
     )
-    return workspaces, created.id, node_id, str(tab.id)
+    return workspaces, created.id, node_id, tab.id
 
 
-def _request(node_id: str) -> ConcordanceAnalysisRequest:
-    value = uuid.UUID(node_id)
+def _request(node_id: uuid.UUID) -> ConcordanceAnalysisRequest:
+    value = node_id
     return ConcordanceAnalysisRequest(
         node_ids=[value],
         node_columns={value: "text"},
         search_word="one",
     )
-
-
-def _worker(*, progress_queue: object) -> dict[str, str]:
-    del progress_queue
-    return {"kind": "concordance"}
 
 
 def _credential_store(
@@ -201,8 +200,8 @@ def _analysis_service(
 async def _submit(
     service: AnalysisService,
     user_id: str,
-    workspace_id: str,
-    tab_id: str,
+    workspace_id: uuid.UUID,
+    tab_id: uuid.UUID,
     request: object,
     *,
     execution_scope: AnalysisExecutionScope = AnalysisExecutionScope.PREVIEW,
@@ -226,14 +225,14 @@ async def _submit(
 
 async def _mark_succeeded(
     workspaces: WorkspaceService,
-    workspace_id: str,
+    workspace_id: uuid.UUID,
     analysis_id: uuid.UUID,
 ) -> None:
     timestamp = datetime.now(UTC)
     async with workspaces.mutation_context(
         "user", workspace_id, internal=True
     ) as lease:
-        record = lease.workspace.analyses[str(analysis_id)]
+        record = lease.workspace.analyses[analysis_id]
         running = record.start(timestamp)
         lease.workspace.replace_analysis(
             running.succeed(
@@ -263,12 +262,12 @@ async def test_submission_atomically_assigns_one_queued_analysis(
 
     assert created.state is AnalysisState.QUEUED
     assert created.request == _request(node_id)
-    assert (await workspaces.get_tab("user", workspace_id, tab_id)).analysis_ids == [
-        created.id
-    ]
+    assert cast(
+        Tab, await workspaces.get_tab("user", workspace_id, tab_id)
+    ).analysis_ids == [created.id]
     page = await service.list_analyses("user", workspace_id, page=1, page_size=50)
     assert [item.id for item in page.items] == [created.id]
-    assert execution.enqueued[0][0].analysis_id == str(created.id)
+    assert execution.enqueued[0][0].analysis_id == created.id
 
     with pytest.raises(TabAnalysisExistsError):
         await _submit(service, "user", workspace_id, tab_id, _request(node_id))
@@ -290,10 +289,10 @@ async def test_multi_user_annotation_secret_reaches_execution_but_not_workspace_
         multi_user=True,
     )
     submission = AnnotationAnalysisSubmission(
-        node_id=uuid.UUID(node_id),
+        node_id=node_id,
         text_column="text",
         annotation_column="class",
-        class_node_id=uuid.UUID(node_id),
+        class_node_id=node_id,
         class_column="text",
         description_column="text",
         classes=[{"name": "Relevant", "description": ""}],
@@ -312,7 +311,9 @@ async def test_multi_user_annotation_secret_reaches_execution_but_not_workspace_
             tab_id,
             submission.model_copy(update={"api_key": None}),
         )
-    assert (await workspaces.get_tab("user", workspace_id, tab_id)).analysis_ids == []
+    assert cast(
+        Tab, await workspaces.get_tab("user", workspace_id, tab_id)
+    ).analysis_ids == []
 
     created = await _submit(
         service,
@@ -347,10 +348,10 @@ async def test_annotation_submission_immediately_replaces_the_previous_analysis(
         multi_user=True,
     )
     preview = AnnotationAnalysisSubmission(
-        node_id=uuid.UUID(node_id),
+        node_id=node_id,
         text_column="text",
         annotation_column="class",
-        class_node_id=uuid.UUID(node_id),
+        class_node_id=node_id,
         class_column="text",
         description_column="text",
         classes=[{"name": "Relevant", "description": ""}],
@@ -449,7 +450,9 @@ async def test_stopped_scheduler_rolls_back_analysis_creation(tmp_path: Path) ->
     with pytest.raises(BackendStoppingError):
         await _submit(service, "user", workspace_id, tab_id, _request(node_id))
 
-    assert (await workspaces.get_tab("user", workspace_id, tab_id)).analysis_ids == []
+    assert cast(
+        Tab, await workspaces.get_tab("user", workspace_id, tab_id)
+    ).analysis_ids == []
     page = await service.list_analyses("user", workspace_id, page=1, page_size=50)
     assert page.items == []
 
@@ -481,7 +484,7 @@ async def test_stopped_scheduler_rolls_back_supporting_analysis_creation(
         )
 
     async with workspaces.read_context("user", workspace_id) as lease:
-        assert lease.workspace.analysis_children(str(root.id)) == []
+        assert lease.workspace.analysis_children(root.id) == []
 
 
 @pytest.mark.anyio
@@ -496,7 +499,9 @@ async def test_unexpected_scheduling_failure_is_not_hidden(tmp_path: Path) -> No
     with pytest.raises(RuntimeError, match="scheduler defect"):
         await _submit(service, "user", workspace_id, tab_id, _request(node_id))
 
-    assert (await workspaces.get_tab("user", workspace_id, tab_id)).analysis_ids == []
+    assert cast(
+        Tab, await workspaces.get_tab("user", workspace_id, tab_id)
+    ).analysis_ids == []
     page = await service.list_analyses("user", workspace_id, page=1, page_size=50)
     assert page.items == []
 
@@ -535,7 +540,7 @@ async def test_supporting_analyses_allow_arbitrary_depth_in_one_tab(
     )
     assert child.parent_analysis_id == root.id
     assert grandchild.parent_analysis_id == child.id
-    assert execution.enqueued[-1][0].analysis_id == str(grandchild.id)
+    assert execution.enqueued[-1][0].analysis_id == grandchild.id
     assert [
         item.id for item in await service.for_tab("user", workspace_id, tab_id)
     ] == [
@@ -556,7 +561,7 @@ async def test_queued_cancel_is_terminal_and_retained_on_the_tab(
     service = _analysis_service(tmp_path, workspaces, execution)
     created = await _submit(service, "user", workspace_id, tab_id, _request(node_id))
 
-    cancelled, pending = await service.cancel("user", workspace_id, str(created.id))
+    cancelled, pending = await service.cancel("user", workspace_id, created.id)
 
     assert pending is False
     assert cancelled.state is AnalysisState.CANCELLED
@@ -565,7 +570,7 @@ async def test_queued_cancel_is_terminal_and_retained_on_the_tab(
     assert [
         item.id for item in await service.for_tab("user", workspace_id, tab_id)
     ] == [created.id]
-    assert execution.cancelled[-1].analysis_id == str(created.id)
+    assert execution.cancelled[-1].analysis_id == created.id
 
 
 @pytest.mark.anyio
@@ -589,11 +594,11 @@ async def test_running_cancel_persists_one_request_and_remains_pending(
     async with workspaces.mutation_context(
         "user", workspace_id, internal=True
     ) as lease:
-        record = lease.workspace.analyses[str(created.id)]
+        record = lease.workspace.analyses[created.id]
         lease.workspace.replace_analysis(record.start(now + timedelta(milliseconds=1)))
 
-    first, first_pending = await service.cancel("user", workspace_id, str(created.id))
-    second, second_pending = await service.cancel("user", workspace_id, str(created.id))
+    first, first_pending = await service.cancel("user", workspace_id, created.id)
+    second, second_pending = await service.cancel("user", workspace_id, created.id)
 
     assert first_pending is second_pending is True
     assert first.cancellation_requested_at == second.cancellation_requested_at
@@ -614,7 +619,9 @@ async def test_clear_hides_analysis_and_allows_immediate_resubmission(
 
     await service.clear_tab("user", workspace_id, tab_id)
 
-    assert (await workspaces.get_tab("user", workspace_id, tab_id)).analysis_ids == []
+    assert cast(
+        Tab, await workspaces.get_tab("user", workspace_id, tab_id)
+    ).analysis_ids == []
     page = await service.list_analyses("user", workspace_id, page=1, page_size=50)
     assert page.items == []
     second = await _submit(service, "user", workspace_id, tab_id, _request(node_id))
@@ -631,25 +638,25 @@ async def test_delete_tab_uses_analysis_cancellation_and_detachment_lifecycle(
     execution = _ExecutionControl()
     service = _analysis_service(tmp_path, workspaces, execution)
     created = await _submit(service, "user", workspace_id, tab_id, _request(node_id))
-    key = AnalysisExecutionKey("user", workspace_id, str(created.id))
+    key = AnalysisExecutionKey("user", workspace_id, created.id)
     async with workspaces.mutation_context(
         "user", workspace_id, internal=True
     ) as lease:
-        record = lease.workspace.analyses[str(created.id)]
+        record = lease.workspace.analyses[created.id]
         lease.workspace.replace_analysis(record.start(datetime.now(UTC)))
 
     await service.delete_tab("user", workspace_id, tab_id)
 
     async with workspaces.read_context("user", workspace_id) as lease:
         assert tab_id not in lease.workspace.tabs
-        detached = lease.workspace.analyses[str(created.id)]
+        detached = lease.workspace.analyses[created.id]
         assert detached.cancellation_requested_at is not None
         assert lease.workspace.live_analysis_ids() == set()
     assert execution.cancelled == [key]
 
     await service.complete_execution(key, {"kind": "concordance"})
     async with workspaces.read_context("user", workspace_id) as lease:
-        assert str(created.id) not in lease.workspace.analyses
+        assert created.id not in lease.workspace.analyses
 
 
 @pytest.mark.anyio
@@ -661,7 +668,7 @@ async def test_dispatch_preserves_expected_domain_failure(
     )
     service = _analysis_service(tmp_path, workspaces, _ExecutionControl())
     created = await _submit(service, "user", workspace_id, tab_id, _request(node_id))
-    key = AnalysisExecutionKey("user", workspace_id, str(created.id))
+    key = AnalysisExecutionKey("user", workspace_id, created.id)
 
     async def prepare(_lease, _record, _credential: str | None) -> AnalysisInvocation:
         raise InvalidInputError("Raw-text Data Blocks require a tokenizer model")
@@ -676,7 +683,7 @@ async def test_dispatch_preserves_expected_domain_failure(
         reserve_launch=launch_control,
         discard_launch=launch_control,
     )
-    failed = await service.get("user", workspace_id, str(created.id))
+    failed = await service.get("user", workspace_id, created.id)
 
     assert invocation is None
     assert failed.state is AnalysisState.FAILED
@@ -695,7 +702,7 @@ async def test_dispatch_hides_unexpected_admission_failure(
     )
     service = _analysis_service(tmp_path, workspaces, _ExecutionControl())
     created = await _submit(service, "user", workspace_id, tab_id, _request(node_id))
-    key = AnalysisExecutionKey("user", workspace_id, str(created.id))
+    key = AnalysisExecutionKey("user", workspace_id, created.id)
 
     async def prepare(_lease, _record, _credential: str | None) -> AnalysisInvocation:
         raise RuntimeError("private diagnostic")
@@ -710,7 +717,7 @@ async def test_dispatch_hides_unexpected_admission_failure(
         reserve_launch=launch_control,
         discard_launch=launch_control,
     )
-    failed = await service.get("user", workspace_id, str(created.id))
+    failed = await service.get("user", workspace_id, created.id)
 
     assert invocation is None
     assert failed.state is AnalysisState.FAILED
@@ -729,13 +736,12 @@ async def test_dispatch_progress_and_success_use_the_expected_write_boundaries(
     execution = _ExecutionControl()
     service = _analysis_service(tmp_path, workspaces, execution)
     created = await _submit(service, "user", workspace_id, tab_id, _request(node_id))
-    key = AnalysisExecutionKey("user", workspace_id, str(created.id))
+    key = AnalysisExecutionKey("user", workspace_id, created.id)
     launch_entries: list[AnalysisExecutionKey] = []
 
     async def prepare(_lease, _record, _credential: str | None) -> AnalysisInvocation:
         return AnalysisInvocation(
-            function=_worker,
-            kwargs={},
+            input=PreviewReadyInput(),
             storage_roots=(),
             max_storage_bytes=1024,
             max_storage_files=1,
@@ -754,7 +760,7 @@ async def test_dispatch_progress_and_success_use_the_expected_write_boundaries(
         reserve_launch=reserve,
         discard_launch=discard,
     )
-    running = await service.get("user", workspace_id, str(created.id))
+    running = await service.get("user", workspace_id, created.id)
     running_workspace = await workspaces.get_workspace("user", workspace_id)
 
     assert invocation is not None
@@ -769,7 +775,7 @@ async def test_dispatch_progress_and_success_use_the_expected_write_boundaries(
         key,
         {"fraction": None, "message": "Still waiting"},
     )
-    live = await service.get("user", workspace_id, str(created.id))
+    live = await service.get("user", workspace_id, created.id)
 
     assert live.progress.fraction is None
     assert live.progress.message == "Still waiting"
@@ -778,7 +784,7 @@ async def test_dispatch_progress_and_success_use_the_expected_write_boundaries(
     ).revision == running_workspace.revision
 
     await service.complete_execution(key, {"kind": "concordance"})
-    succeeded = await service.get("user", workspace_id, str(created.id))
+    succeeded = await service.get("user", workspace_id, created.id)
 
     assert succeeded.state is AnalysisState.SUCCEEDED
     assert succeeded.progress.fraction == 1.0
@@ -799,16 +805,16 @@ async def test_result_context_requires_success_and_current_inputs(
         async with service.successful_record_context(
             "user",
             workspace_id,
-            str(created.id),
+            created.id,
             allow_closing=True,
         ):
             pass
 
-    key = AnalysisExecutionKey("user", workspace_id, str(created.id))
+    key = AnalysisExecutionKey("user", workspace_id, created.id)
     async with workspaces.mutation_context(
         "user", workspace_id, internal=True
     ) as lease:
-        record = lease.workspace.analyses[str(created.id)]
+        record = lease.workspace.analyses[created.id]
         lease.workspace.replace_analysis(record.start(datetime.now(UTC)))
     await service.complete_execution(key, {"kind": "concordance"})
     async with workspaces.mutation_context("user", workspace_id) as lease:
@@ -818,11 +824,11 @@ async def test_result_context_requires_success_and_current_inputs(
         async with service.successful_record_context(
             "user",
             workspace_id,
-            str(created.id),
+            created.id,
             allow_closing=True,
         ):
             pass
-    assert exc_info.value.details == {"missing_input_ids": [node_id]}
+    assert exc_info.value.details == {"missing_input_ids": [str(node_id)]}
 
 
 @pytest.mark.anyio
@@ -833,19 +839,19 @@ async def test_invalid_progress_fails_only_the_owning_analysis(tmp_path: Path) -
     execution = _ExecutionControl()
     service = _analysis_service(tmp_path, workspaces, execution)
     created = await _submit(service, "user", workspace_id, tab_id, _request(node_id))
-    key = AnalysisExecutionKey("user", workspace_id, str(created.id))
+    key = AnalysisExecutionKey("user", workspace_id, created.id)
 
     async with workspaces.mutation_context(
         "user", workspace_id, internal=True
     ) as lease:
-        record = lease.workspace.analyses[str(created.id)]
+        record = lease.workspace.analyses[created.id]
         lease.workspace.replace_analysis(record.start(datetime.now(UTC)))
 
     await service.report_progress(
         key,
         {"fraction": 1.0, "message": "Worker claimed success"},
     )
-    failed = await service.get("user", workspace_id, str(created.id))
+    failed = await service.get("user", workspace_id, created.id)
 
     assert failed.state is AnalysisState.FAILED
     assert failed.error is not None and failed.error.code == "progress_invalid"
@@ -862,18 +868,18 @@ async def test_detached_running_completion_confirms_cancellation_then_cleans_up(
     execution = _ExecutionControl()
     service = _analysis_service(tmp_path, workspaces, execution)
     created = await _submit(service, "user", workspace_id, tab_id, _request(node_id))
-    key = AnalysisExecutionKey("user", workspace_id, str(created.id))
+    key = AnalysisExecutionKey("user", workspace_id, created.id)
     async with workspaces.mutation_context(
         "user", workspace_id, internal=True
     ) as lease:
-        record = lease.workspace.analyses[str(created.id)]
+        record = lease.workspace.analyses[created.id]
         lease.workspace.replace_analysis(record.start(datetime.now(UTC)))
 
     await service.clear_tab("user", workspace_id, tab_id)
     await service.complete_execution(key, {"kind": "concordance"})
 
     async with workspaces.read_context("user", workspace_id) as lease:
-        assert str(created.id) not in lease.workspace.analyses
+        assert created.id not in lease.workspace.analyses
         assert node_id not in lease.workspace.reserved_node_ids()
 
 
@@ -888,9 +894,9 @@ async def test_shutdown_interruption_distinguishes_queued_running_and_user_cance
     service = _analysis_service(tmp_path, workspaces, execution)
 
     queued = await _submit(service, "user", workspace_id, tab_id, _request(node_id))
-    queued_key = AnalysisExecutionKey("user", workspace_id, str(queued.id))
+    queued_key = AnalysisExecutionKey("user", workspace_id, queued.id)
     await service.interrupt_queued_execution(queued_key)
-    queued_terminal = await service.get("user", workspace_id, str(queued.id))
+    queued_terminal = await service.get("user", workspace_id, queued.id)
     assert queued_terminal.state is AnalysisState.FAILED
     assert queued_terminal.error is not None
     assert queued_terminal.error.code == "analysis_interrupted"
@@ -898,29 +904,29 @@ async def test_shutdown_interruption_distinguishes_queued_running_and_user_cance
 
     await service.clear_tab("user", workspace_id, tab_id)
     running = await _submit(service, "user", workspace_id, tab_id, _request(node_id))
-    running_key = AnalysisExecutionKey("user", workspace_id, str(running.id))
+    running_key = AnalysisExecutionKey("user", workspace_id, running.id)
     async with workspaces.mutation_context(
         "user", workspace_id, internal=True
     ) as lease:
-        record = lease.workspace.analyses[str(running.id)]
+        record = lease.workspace.analyses[running.id]
         lease.workspace.replace_analysis(record.start(datetime.now(UTC)))
     await service.interrupt_execution(running_key)
-    running_terminal = await service.get("user", workspace_id, str(running.id))
+    running_terminal = await service.get("user", workspace_id, running.id)
     assert running_terminal.state is AnalysisState.FAILED
     assert running_terminal.error is not None
     assert running_terminal.error.code == "analysis_interrupted"
 
     await service.clear_tab("user", workspace_id, tab_id)
     cancelling = await _submit(service, "user", workspace_id, tab_id, _request(node_id))
-    cancelling_key = AnalysisExecutionKey("user", workspace_id, str(cancelling.id))
+    cancelling_key = AnalysisExecutionKey("user", workspace_id, cancelling.id)
     async with workspaces.mutation_context(
         "user", workspace_id, internal=True
     ) as lease:
-        record = lease.workspace.analyses[str(cancelling.id)]
+        record = lease.workspace.analyses[cancelling.id]
         lease.workspace.replace_analysis(record.start(datetime.now(UTC)))
-    await service.cancel("user", workspace_id, str(cancelling.id))
+    await service.cancel("user", workspace_id, cancelling.id)
     await service.interrupt_execution(cancelling_key)
-    cancelled = await service.get("user", workspace_id, str(cancelling.id))
+    cancelled = await service.get("user", workspace_id, cancelling.id)
     assert cancelled.state is AnalysisState.CANCELLED
     assert cancelled.cancellation_requested_at is not None
 
@@ -943,15 +949,15 @@ async def test_startup_reconciliation_fails_closed_workspace_analyses(
         TabCreate(kind=AnalysisKind.CONCORDANCE, name="Second"),
     )
     running = await _submit(
-        service, "user", workspace_id, str(second_tab.id), _request(node_id)
+        service, "user", workspace_id, second_tab.id, _request(node_id)
     )
     async with workspaces.mutation_context(
         "user", workspace_id, internal=True
     ) as lease:
-        record = lease.workspace.analyses[str(running.id)]
+        record = lease.workspace.analyses[running.id]
         lease.workspace.replace_analysis(record.start(datetime.now(UTC)))
 
-    async def no_active_work(_user_id: str, _workspace_id: str) -> bool:
+    async def no_active_work(_user_id: str, _workspace_id: uuid.UUID) -> bool:
         return False
 
     await workspaces.request_close("user", workspace_id, no_active_work)
@@ -961,8 +967,8 @@ async def test_startup_reconciliation_fails_closed_workspace_analyses(
         await workspaces.get_workspace("user", workspace_id)
     ).runtime_state == "closed"
     await workspaces.open_workspace("user", workspace_id)
-    queued_terminal = await service.get("user", workspace_id, str(queued.id))
-    running_terminal = await service.get("user", workspace_id, str(running.id))
+    queued_terminal = await service.get("user", workspace_id, queued.id)
+    running_terminal = await service.get("user", workspace_id, running.id)
     assert queued_terminal.state is AnalysisState.FAILED
     assert running_terminal.state is AnalysisState.FAILED
     assert queued_terminal.error is not None
@@ -978,7 +984,7 @@ async def test_active_analysis_reservation_blocks_input_and_ancestor_mutation(
     workspaces, workspace_id, source_id, tab_id = await _opened_workspace_with_tab(
         tmp_path
     )
-    child_id = str(uuid.uuid4())
+    child_id = uuid.uuid4()
 
     def add_child(workspace: Workspace) -> None:
         source = workspace.nodes[source_id]

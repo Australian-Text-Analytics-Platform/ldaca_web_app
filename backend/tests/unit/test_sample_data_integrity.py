@@ -1,6 +1,12 @@
 """Remote sample catalogues must map to safe public destinations."""
 
+from typing import cast
+from pathlib import Path
+
+import anyio
+import httpx
 import pytest
+from pytest import MonkeyPatch
 from pydantic import ValidationError
 
 from ldaca_wordflow.models.data_sources import (
@@ -9,10 +15,15 @@ from ldaca_wordflow.models.data_sources import (
     SampleFile,
     sample_destination_path,
 )
+from ldaca_wordflow.services import sample_data as sample_data_module
+from ldaca_wordflow.services.sample_data import SampleDataService, SampleImportExecution
+from ldaca_wordflow.services.user_files import UserFileStore
+from ldaca_wordflow.domain.background import Progress
+from ldaca_wordflow.shared.errors import BadGatewayError
 
 
 def test_collection_manifest_requires_exact_total_and_unique_paths() -> None:
-    file = SampleFile(path="sample/data.csv", size=3)
+    file = SampleFile(path="sample/data.csv", size=3, sha256="0" * 64)
 
     with pytest.raises(ValidationError, match="total_size_bytes"):
         SampleCollection(
@@ -62,6 +73,52 @@ def test_repository_only_fields_are_not_part_of_the_public_resource() -> None:
     payload = catalogue.model_dump(mode="json")
     assert "bundled" not in payload["collections"][0]
     assert "sha256" not in payload["collections"][0]["files"][0]
+
+
+@pytest.mark.anyio
+async def test_sample_download_rejects_a_mismatched_catalogue_digest(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    real_async_client = httpx.AsyncClient
+    transport = httpx.MockTransport(
+        lambda _request: httpx.Response(200, content=b"abc")
+    )
+    monkeypatch.setattr(
+        sample_data_module.httpx,
+        "AsyncClient",
+        lambda *args, **kwargs: real_async_client(
+            *args,
+            transport=transport,
+            **kwargs,
+        ),
+    )
+    service = SampleDataService(
+        cast(UserFileStore, object()),
+        limiter=anyio.CapacityLimiter(1),
+        max_import_bytes=1_000,
+        max_import_files=10,
+    )
+    collection = SampleCollection(
+        id="sample",
+        name="Sample",
+        total_size_bytes=3,
+        files=[
+            SampleFile(path="sample/data.csv", size=3, sha256="0" * 64)
+        ],
+    )
+
+    async def ignore_progress(_progress: Progress) -> None:
+        return None
+
+    try:
+        with pytest.raises(BadGatewayError, match="digest"):
+            await service.execute_import(
+                SampleImportExecution(collection, tmp_path),
+                ignore_progress,
+            )
+    finally:
+        await service.close()
+    assert not (tmp_path / "data.csv").exists()
 
 
 def test_catalogue_requires_unique_portable_collection_ids() -> None:

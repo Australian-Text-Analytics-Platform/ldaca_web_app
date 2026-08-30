@@ -30,6 +30,7 @@ import {
 interface DesktopNavigationHeaderViewProps {
   workspaceName: string;
   tabs: Tab[];
+  unavailableTabWarnings?: string[];
   currentTabId: string | null;
   isLoading: boolean;
   isError: boolean;
@@ -47,6 +48,7 @@ const EMPTY_TABS: Tab[] = [];
 export function DesktopNavigationHeaderView({
   workspaceName,
   tabs,
+  unavailableTabWarnings = [],
   currentTabId,
   isLoading,
   isError,
@@ -184,6 +186,15 @@ export function DesktopNavigationHeaderView({
               aria-label="Workspace analysis tabs"
               className="max-h-[50vh] overflow-y-auto"
             >
+              {unavailableTabWarnings.map((warning) => (
+                <p
+                  role="alert"
+                  key={warning}
+                  className="mx-2 mb-2 rounded-sm border border-warning/40 bg-warning/10 px-2 py-1.5 text-body text-warning"
+                >
+                  {warning}
+                </p>
+              ))}
               {isLoading ? (
                 <p className="px-2 py-4 text-center text-body text-description">Loading Tabs…</p>
               ) : isError ? (
@@ -252,7 +263,11 @@ function DesktopNavigationHeaderController() {
   const activeTabIds = useAnalysisTabsPresentationStore((state) => state.activeTabIds);
   const rememberActiveTab = useAnalysisTabsPresentationStore((state) => state.rememberActiveTab);
   const tabsQuery = useWorkspaceTabResources(currentWorkspaceId);
-  const tabs = tabsQuery.data ?? EMPTY_TABS;
+  const tabResources = tabsQuery.data ?? EMPTY_TABS;
+  const tabs = tabResources.filter((tab): tab is Tab => tab.availability === 'available');
+  const unavailableTabWarnings = tabResources
+    .filter((tab) => tab.availability === 'unavailable')
+    .map((tab) => tab.warning);
   const currentAnalysis = analysisNavigationForView(currentView);
   const storedActiveTabId = currentAnalysis
     ? (activeTabIds[
@@ -312,6 +327,7 @@ function DesktopNavigationHeaderController() {
       workspaceName={currentWorkspace?.name ?? 'No workspace'}
       tabs={tabs}
       currentTabId={currentTabId}
+      unavailableTabWarnings={unavailableTabWarnings}
       isLoading={Boolean(currentWorkspaceId) && tabsQuery.isLoading}
       isError={tabsQuery.isError}
       canGoBack={history.workspaceId === currentWorkspaceId && history.index > 0}

@@ -229,7 +229,7 @@ describe('QuotationFeature Preview lifecycle', () => {
       clearCorrectionColumns: vi.fn(),
       refreshAnalyses: vi.fn(),
     };
-    const persistedResult = { kind: 'quotation', ready: true };
+    const persistedResult = { kind: 'quotation', result: { variant: 'ready' } };
     quotationHydrationMocks.request = {
       kind: 'quotation',
       node_id: 'node-1',
@@ -257,7 +257,7 @@ describe('QuotationFeature Preview lifecycle', () => {
   });
 
   it('hydrates only the canonical ready marker through the generic Result route', async () => {
-    const canonicalResult = { kind: 'quotation', ready: true };
+    const canonicalResult = { kind: 'quotation', result: { variant: 'ready' } };
     resultApiMocks.getAnalysisResult.mockResolvedValueOnce({ data: canonicalResult });
 
     renderFeature(

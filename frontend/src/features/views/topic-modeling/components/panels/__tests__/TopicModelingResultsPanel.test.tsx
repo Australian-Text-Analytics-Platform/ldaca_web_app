@@ -505,7 +505,8 @@ describe('TopicModelingResultsPanel', () => {
             ...baseProps.result,
             data: {
               ...baseProps.result.data,
-              meta: { n_chunks: 742, truncated_segment_count: 18 },
+              segment_count: 742,
+              truncated_segment_count: 18,
             },
           }}
         />

@@ -50,9 +50,9 @@ interface AnalysisFeatureHost {
   setCorrectionColumn: (nodeId: string, column: string | null) => Promise<void>;
   clearCorrectionColumns: () => Promise<void>;
   setPresentationSettings: (patch: {
-    stop_words?: string[];
-    topic_modeling_words_per_topic?: number | null;
-    topic_modeling_projection_selection?: TopicModelingProjectionSelection | null;
+    stopWords?: string[];
+    wordsPerTopic?: number;
+    projectionSelection?: TopicModelingProjectionSelection | null;
   }) => Promise<void>;
   refreshAnalyses: () => void;
 }
@@ -169,10 +169,10 @@ export function AnalysisTabsHost({
             activeAnalysis: analysisForest.active,
             inputSets: activeTab.input_sets,
             settings: activeTab.settings,
-            correctionColumns: activeTab.annotation_correction_columns,
-            stopWords: activeTab.stop_words,
-            topicModelingWordsPerTopic: activeTab.topic_modeling_words_per_topic,
-            topicModelingProjectionSelection: activeTab.topic_modeling_projection_selection,
+            correctionColumns: activeTab.correctionColumns,
+            stopWords: activeTab.stopWords,
+            topicModelingWordsPerTopic: activeTab.wordsPerTopic,
+            topicModelingProjectionSelection: activeTab.projectionSelection,
             setInputSet: (selectorId, inputs) => {
               setTabInputSet(activeTab.tab_id, selectorId, inputs);
             },

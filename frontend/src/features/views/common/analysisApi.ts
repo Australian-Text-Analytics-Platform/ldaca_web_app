@@ -30,10 +30,10 @@ export async function getAnalysisOutputResource(workspaceId: string, analysisId:
 export function projectConcordanceResult(
   concordance: ConcordanceResult,
 ): ConcordanceAnalysisResponse {
-  if (!concordance.sources) {
+  if (concordance.result.variant !== 'queried') {
     throw new Error('Concordance Result page is unavailable');
   }
-  const sources = concordance.sources;
+  const sources = concordance.result.sources;
   const entries = sources.map((source) => {
     const page = source.result;
     return [
@@ -85,7 +85,7 @@ export async function getAnalysisResultResource<TResult>(
       });
   if (result.kind === 'concordance') {
     const page =
-      result.sources == null
+      result.result.variant === 'ready'
         ? (
             await queryAnalysisResult({
               path: { workspace_id: workspaceId, analysis_id: analysisId },
@@ -125,8 +125,8 @@ export async function getAnalysisResultResource<TResult>(
       data: {
         topics: topicResult.topics,
         corpus_sizes: topicResult.corpus_sizes,
-        meta: topicResult.meta,
-        per_corpus_topic_counts: topicResult.per_corpus_topic_counts,
+        segment_count: topicResult.segment_count,
+        truncated_segment_count: topicResult.truncated_segment_count,
       },
     } as TResult;
   }

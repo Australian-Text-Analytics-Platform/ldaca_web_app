@@ -4,9 +4,7 @@ from __future__ import annotations
 
 from collections import deque
 from collections.abc import Callable, Iterable
-from typing import Any, TypeVar
-
-T = TypeVar("T")
+from typing import Any
 
 
 class FairUserQueue[T]:

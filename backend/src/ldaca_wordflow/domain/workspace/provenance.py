@@ -385,8 +385,8 @@ _NODE_PROVENANCE_ADAPTER = TypeAdapter(NodeProvenance)
 ProvenanceValue = SourceProvenance | NodeReference | DerivationProvenance
 
 
-def node_reference(node_id: str) -> NodeReference:
-    return NodeReference(node_id=uuid.UUID(node_id))
+def node_reference(node_id: uuid.UUID) -> NodeReference:
+    return NodeReference(node_id=node_id)
 
 
 def validate_node_provenance(value: object) -> NodeProvenance:
@@ -407,15 +407,15 @@ def derivation_operation_from_model(value: BaseModel) -> DerivationOperation:
     return _DERIVATION_OPERATION_ADAPTER.validate_python(payload)
 
 
-def referenced_node_ids(provenance: NodeProvenance) -> list[str]:
+def referenced_node_ids(provenance: NodeProvenance) -> list[uuid.UUID]:
     """Return live Data Block references in stable first-use order."""
 
-    ordered: list[str] = []
-    seen: set[str] = set()
+    ordered: list[uuid.UUID] = []
+    seen: set[uuid.UUID] = set()
 
     def visit(value: ProvenanceValue) -> None:
         if isinstance(value, NodeReference):
-            node_id = str(value.node_id)
+            node_id = value.node_id
             if node_id not in seen:
                 seen.add(node_id)
                 ordered.append(node_id)
@@ -431,12 +431,12 @@ def referenced_node_ids(provenance: NodeProvenance) -> list[str]:
 def compose_provenance(
     provenance: NodeProvenance,
     *,
-    removed_node_id: str,
+    removed_node_id: uuid.UUID,
     replacement: NodeProvenance,
 ) -> NodeProvenance:
     """Replace every reference to one removed Data Block with its provenance."""
 
-    target = uuid.UUID(removed_node_id)
+    target = removed_node_id
 
     def replace_value(value: ProvenanceValue) -> ProvenanceValue:
         if isinstance(value, NodeReference):
@@ -463,7 +463,7 @@ def compose_provenance(
 def describe_provenance(
     provenance: NodeProvenance,
     *,
-    resolve_name: Callable[[str], str | None],
+    resolve_name: Callable[[uuid.UUID], str | None],
 ) -> str:
     """Generate a human description without storing a second lineage contract."""
 
@@ -471,8 +471,7 @@ def describe_provenance(
         if isinstance(value, SourceProvenance):
             return "source snapshot"
         if isinstance(value, NodeReference):
-            node_id = str(value.node_id)
-            return resolve_name(node_id) or node_id
+            return resolve_name(value.node_id) or str(value.node_id)
         inputs = [describe_value(item.value) for item in value.inputs]
         operation = value.operation
         if isinstance(operation, JoinDerivation):

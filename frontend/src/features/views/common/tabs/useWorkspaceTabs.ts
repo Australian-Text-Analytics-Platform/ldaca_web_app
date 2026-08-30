@@ -6,7 +6,13 @@ import {
   deleteTab as deleteServerTab,
   updateTab as updateServerTab,
 } from '@/api';
-import type { AnalysisKind, Tab, TopicModelingProjectionSelection } from '@/api';
+import type {
+  AnalysisKind,
+  Tab,
+  TabResource,
+  TopicModelingProjectionSelection,
+  UpdateTabData,
+} from '@/api';
 import { toast } from 'sonner';
 import { queryKeys } from '@/lib/queryKeys';
 import { useAuthStore } from '@/stores/authStore';
@@ -46,9 +52,9 @@ export interface UseWorkspaceTabsResult {
 }
 
 interface TabPresentationPatch {
-  stop_words?: string[];
-  topic_modeling_words_per_topic?: number | null;
-  topic_modeling_projection_selection?: TopicModelingProjectionSelection | null;
+  stopWords?: string[];
+  wordsPerTopic?: number;
+  projectionSelection?: TopicModelingProjectionSelection | null;
 }
 
 interface LocalTabState {
@@ -78,6 +84,49 @@ const asAnalysisKind = (value: string): AnalysisKind => {
   }
   throw new Error(`Unsupported analysis tab kind: ${value}`);
 };
+
+function presentationUpdate(
+  kind: AnalysisKind,
+  patch: TabPresentationPatch,
+): UpdateTabData['body'] {
+  if (kind === 'token_frequency' && patch.stopWords !== undefined) {
+    return { kind, stop_words: { words: patch.stopWords } };
+  }
+  if (kind === 'topic_modeling') {
+    return {
+      kind,
+      ...(patch.stopWords === undefined ? {} : { stop_words: { words: patch.stopWords } }),
+      ...(patch.wordsPerTopic === undefined ? {} : { words_per_topic: patch.wordsPerTopic }),
+      ...(patch.projectionSelection === undefined
+        ? {}
+        : { projection_selection: patch.projectionSelection }),
+    };
+  }
+  throw new Error(`Tab kind ${kind} has no presentation settings`);
+}
+
+function withPresentationPatch(tab: Tab, patch: TabPresentationPatch): Tab {
+  if (tab.settings.kind === 'token_frequency' && patch.stopWords !== undefined) {
+    return {
+      ...tab,
+      settings: { ...tab.settings, stop_words: { words: patch.stopWords } },
+    };
+  }
+  if (tab.settings.kind === 'topic_modeling') {
+    return {
+      ...tab,
+      settings: {
+        ...tab.settings,
+        ...(patch.stopWords === undefined ? {} : { stop_words: { words: patch.stopWords } }),
+        ...(patch.wordsPerTopic === undefined ? {} : { words_per_topic: patch.wordsPerTopic }),
+        ...(patch.projectionSelection === undefined
+          ? {}
+          : { projection_selection: patch.projectionSelection }),
+      },
+    };
+  }
+  return tab;
+}
 
 function mergeServerTabs(
   serverTabs: Tab[],
@@ -119,7 +168,9 @@ export function useWorkspaceTabs(
 
   const tabsQuery = useWorkspaceTabResources(workspaceId);
 
-  const serverTabs = (tabsQuery.data ?? []).filter((tab) => tab.kind === kind);
+  const serverTabs = (tabsQuery.data ?? []).filter(
+    (tab): tab is Tab => tab.availability === 'available' && tab.kind === kind,
+  );
   const mergedTabs = mergeServerTabs(
     serverTabs,
     localState,
@@ -203,7 +254,7 @@ export function useWorkspaceTabs(
           ...orderedTabs.map((item) => item.tab_id).filter((id) => id !== tab.id),
           tab.id,
         ];
-        queryClient.setQueryData<Tab[]>(queryKey, (current) => [
+        queryClient.setQueryData<TabResource[]>(queryKey, (current) => [
           ...(current ?? []).filter((item) => item.id !== tab.id),
           tab,
         ]);
@@ -265,7 +316,7 @@ export function useWorkspaceTabs(
       if (!workspaceId) return;
       await updateServerTab({
         path: { workspace_id: workspaceId, tab_id: tabId },
-        body: { name: title },
+        body: { kind, name: title },
         throwOnError: true,
       });
     },
@@ -326,17 +377,19 @@ export function useWorkspaceTabs(
       if (!workspaceId) return;
       const { data } = await updateServerTab({
         path: { workspace_id: workspaceId, tab_id: tabId },
-        body: { annotation_correction_columns: columns },
+        body: { kind: 'annotation', correction_columns: columns },
         throwOnError: true,
       });
       return data;
     },
     onMutate: async ({ tabId, columns }) => {
       await queryClient.cancelQueries({ queryKey });
-      const previous = queryClient.getQueryData<Tab[]>(queryKey);
-      queryClient.setQueryData<Tab[]>(queryKey, (current) =>
+      const previous = queryClient.getQueryData<TabResource[]>(queryKey);
+      queryClient.setQueryData<TabResource[]>(queryKey, (current) =>
         current?.map((tab) =>
-          tab.id === tabId ? { ...tab, annotation_correction_columns: columns } : tab,
+          tab.id === tabId && tab.availability === 'available' && tab.settings.kind === 'annotation'
+            ? { ...tab, settings: { ...tab.settings, correction_columns: columns } }
+            : tab,
         ),
       );
       return { previous };
@@ -346,7 +399,7 @@ export function useWorkspaceTabs(
     },
     onSuccess: (tab) => {
       if (!tab) return;
-      queryClient.setQueryData<Tab[]>(queryKey, (current) =>
+      queryClient.setQueryData<TabResource[]>(queryKey, (current) =>
         current?.map((item) => (item.id === tab.id ? tab : item)),
       );
     },
@@ -357,7 +410,8 @@ export function useWorkspaceTabs(
     async (tabId: string, nodeId: string, column: string | null) => {
       const tab = serverTabs.find((item) => item.id === tabId);
       if (!tab) return;
-      const columns = { ...tab.annotation_correction_columns };
+      if (tab.settings.kind !== 'annotation') return;
+      const columns = { ...tab.settings.correction_columns };
       if (column) columns[nodeId] = column;
       else Reflect.deleteProperty(columns, nodeId);
       await saveCorrectionColumn({
@@ -380,16 +434,20 @@ export function useWorkspaceTabs(
       if (!workspaceId) throw new Error('Workspace is required');
       const { data } = await updateServerTab({
         path: { workspace_id: workspaceId, tab_id: tabId },
-        body: patch,
+        body: presentationUpdate(kind, patch),
         throwOnError: true,
       });
       return data;
     },
     onMutate: async ({ tabId, patch }) => {
       await queryClient.cancelQueries({ queryKey });
-      const previous = queryClient.getQueryData<Tab[]>(queryKey);
-      queryClient.setQueryData<Tab[]>(queryKey, (current) =>
-        current?.map((tab) => (tab.id === tabId ? { ...tab, ...patch } : tab)),
+      const previous = queryClient.getQueryData<TabResource[]>(queryKey);
+      queryClient.setQueryData<TabResource[]>(queryKey, (current) =>
+        current?.map((tab) =>
+          tab.id === tabId && tab.availability === 'available'
+            ? withPresentationPatch(tab, patch)
+            : tab,
+        ),
       );
       return { previous };
     },
@@ -406,7 +464,7 @@ export function useWorkspaceTabs(
       });
     },
     onSuccess: (tab) => {
-      queryClient.setQueryData<Tab[]>(queryKey, (current) =>
+      queryClient.setQueryData<TabResource[]>(queryKey, (current) =>
         current?.map((item) => (item.id === tab.id ? tab : item)),
       );
     },

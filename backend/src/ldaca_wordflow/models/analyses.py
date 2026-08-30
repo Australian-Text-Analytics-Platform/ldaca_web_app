@@ -7,10 +7,9 @@ import uuid
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from ..domain.workspace import (
-    Analysis,
     AnalysisExecutionScope,
     AnalysisSubmission,
-    CorruptAnalysis,
+    AnalysisResource,
 )
 
 
@@ -34,11 +33,11 @@ class AnalysisCreate(BaseModel):
 
 
 class AnalysisPage(BaseModel):
-    """One-based stable page of live valid and corrupt Analyses."""
+    """One-based stable page of available and unavailable Analyses."""
 
     model_config = ConfigDict(extra="forbid")
 
-    items: list[Analysis | CorruptAnalysis]
+    items: list[AnalysisResource]
     page: int = Field(ge=1)
     page_size: int = Field(ge=1)
     total_items: int = Field(ge=0)

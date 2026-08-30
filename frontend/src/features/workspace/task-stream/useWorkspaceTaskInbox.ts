@@ -200,7 +200,7 @@ export const useWorkspaceTaskInbox = (workspaceId: string | null): WorkspaceTask
           });
           queryClient.setQueryData(queryKeys.userFileImport(event.resource_id), data);
           void queryClient.invalidateQueries({ queryKey: queryKeys.userFileImports });
-          if (data.state === 'succeeded') {
+          if (data.availability !== 'unavailable' && data.state === 'succeeded') {
             void queryClient.invalidateQueries({ queryKey: queryKeys.fileList, exact: true });
             void queryClient.invalidateQueries({
               queryKey: queryKeys.sampleCollections,

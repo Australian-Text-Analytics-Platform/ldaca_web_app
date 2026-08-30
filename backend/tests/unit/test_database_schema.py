@@ -20,7 +20,7 @@ async def test_fresh_database_is_created_at_exact_schema_version(
         columns = list(
             await (await connection.execute('PRAGMA table_info("users")')).fetchall()
         )
-    assert version == (6,)
+    assert version == (7,)
     assert columns[-1][1:5] == (
         "storage_quota_bytes",
         "INTEGER",
@@ -75,13 +75,15 @@ async def test_user_storage_quota_defaults_nullable_and_positive_only(
 
 
 @pytest.mark.anyio
-async def test_existing_v1_marker_is_rejected_without_relabeling(
+@pytest.mark.parametrize("stored_version", [1, 6])
+async def test_existing_schema_marker_is_rejected_without_relabeling(
     tmp_path: Path,
+    stored_version: int,
 ) -> None:
     database = Database(tmp_path / "users.db")
     async with aiosqlite.connect(database.path) as connection:
         await connection.execute("CREATE TABLE users (id TEXT PRIMARY KEY)")
-        await connection.execute("PRAGMA user_version = 1")
+        await connection.execute(f"PRAGMA user_version = {stored_version}")
         await connection.commit()
 
     with pytest.raises(RuntimeError, match="schema version"):
@@ -89,7 +91,7 @@ async def test_existing_v1_marker_is_rejected_without_relabeling(
 
     async with aiosqlite.connect(database.path) as connection:
         version = await (await connection.execute("PRAGMA user_version")).fetchone()
-    assert version == (1,)
+    assert version == (stored_version,)
 
 
 @pytest.mark.anyio
@@ -135,6 +137,68 @@ async def test_missing_storage_quota_constraint_is_rejected(
 
     with pytest.raises(RuntimeError, match="storage quota constraint"):
         await database.initialize()
+
+
+@pytest.mark.anyio
+async def test_semantically_different_quota_constraint_is_rejected(
+    tmp_path: Path,
+) -> None:
+    database = Database(tmp_path / "users.db")
+    await database.initialize()
+    async with aiosqlite.connect(database.path) as connection:
+        row = await (
+            await connection.execute(
+                "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'users'"
+            )
+        ).fetchone()
+        assert row is not None
+        altered = str(row[0]).replace("storage_quota_bytes > 0", "storage_quota_bytes != 0")
+        assert altered != row[0]
+        await connection.execute("PRAGMA writable_schema = ON")
+        await connection.execute(
+            "UPDATE sqlite_master SET sql = ? WHERE type = 'table' AND name = 'users'",
+            (altered,),
+        )
+        await connection.execute("PRAGMA writable_schema = OFF")
+        await connection.commit()
+
+    with pytest.raises(RuntimeError, match="storage quota constraint"):
+        await database.initialize()
+
+
+@pytest.mark.anyio
+async def test_partial_session_index_is_rejected(tmp_path: Path) -> None:
+    database = Database(tmp_path / "users.db")
+    await database.initialize()
+    async with aiosqlite.connect(database.path) as connection:
+        await connection.execute("DROP INDEX idx_sessions_user")
+        await connection.execute(
+            "CREATE INDEX idx_sessions_user ON user_sessions(user_id) "
+            "WHERE user_id <> ''"
+        )
+        await connection.commit()
+
+    with pytest.raises(RuntimeError, match="session indexes"):
+        await database.initialize()
+
+
+@pytest.mark.anyio
+async def test_schema_validation_probes_leave_no_rows(tmp_path: Path) -> None:
+    database = Database(tmp_path / "users.db")
+    await database.initialize()
+
+    async with aiosqlite.connect(database.path) as connection:
+        for table in (
+            "users",
+            "user_identities",
+            "user_sessions",
+            "google_login_credentials",
+            "oauth_transactions",
+        ):
+            row = await (
+                await connection.execute(f'SELECT COUNT(*) FROM "{table}"')
+            ).fetchone()
+            assert row == (0,)
 
 
 @pytest.mark.anyio

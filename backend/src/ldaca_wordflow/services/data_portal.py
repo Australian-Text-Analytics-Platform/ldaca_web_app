@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -28,7 +28,7 @@ from ..models.data_sources import (
     DataPortalSearchResource,
 )
 from ..settings import Settings
-from ..workers.data_portal import data_portal_import_process
+from ..workers.invocations import DataPortalImportInput
 from ..infrastructure.storage.layout import validate_display_name
 from .user_files import UserFileStore
 from .user_file_import_execution_types import UserFileImportKey
@@ -40,8 +40,7 @@ ProgressReporter = Callable[[object], Awaitable[None]]
 
 @dataclass(frozen=True, slots=True)
 class DataPortalImportExecution:
-    function: Callable[..., object]
-    kwargs: Mapping[str, object]
+    input: DataPortalImportInput
     staging: Path
 
 
@@ -146,21 +145,20 @@ class DataPortalService:
                     name=name,
                 ),
                 DataPortalImportExecution(
-                    function=data_portal_import_process,
-                    kwargs={
-                        "identifier": identifier,
-                        "requested_name": name,
-                        "api_base_url": self._settings.ldaca_oni_api_base_url,
-                        "api_token": api_token,
-                        "timeout": self._settings.ldaca_oni_timeout,
-                        "download_concurrency": (
+                    input=DataPortalImportInput(
+                        identifier=identifier,
+                        requested_name=name,
+                        api_base_url=self._settings.ldaca_oni_api_base_url,
+                        api_token=api_token,
+                        timeout=self._settings.ldaca_oni_timeout,
+                        download_concurrency=(
                             self._settings.ldaca_oni_download_concurrency
                         ),
-                        "staging_dir": str(staging),
-                        "max_output_bytes": (
+                        staging_dir=str(staging),
+                        max_output_bytes=(
                             self._settings.max_user_file_import_bytes
                         ),
-                    },
+                    ),
                     staging=staging,
                 ),
             )
@@ -178,8 +176,7 @@ class DataPortalService:
     ) -> DataPortalUserFileImportResult:
         result = await executor.execute(
             key,
-            execution.function,
-            execution.kwargs,
+            execution.input,
             report_progress,
             storage_roots=(str(execution.staging),),
             max_storage_bytes=self._settings.max_user_file_import_bytes,
@@ -214,6 +211,18 @@ class DataPortalService:
         import_id: str,
     ) -> None:
         await self._files.cleanup_import_staging(user_id, import_id)
+
+    async def is_import_published(
+        self,
+        user_id: str,
+        import_id: str,
+        result: DataPortalUserFileImportResult,
+    ) -> bool:
+        return await self._files.is_import_published(
+            user_id,
+            import_id,
+            result.destination_path,
+        )
 
     def _client(self, token: str | None) -> OniClient:
         return OniClient(

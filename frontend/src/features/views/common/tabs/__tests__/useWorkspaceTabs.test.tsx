@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { AnalysisKind, Tab, TabSettings } from '@/api';
 
 const mocks = vi.hoisted(() => ({
   listTabs: vi.fn(),
@@ -30,23 +31,32 @@ const wrapper = ({ children }: { children: ReactNode }) => (
   </QueryClientProvider>
 );
 
-const serverTab = (
-  id = 'tab-1',
-  kind: 'annotation' | 'concordance' | 'quotation' | 'topic_modeling' = 'concordance',
-) => ({
-  id,
-  name: id,
-  kind,
-  analysis_ids: [],
-  created_at: '2026-01-01T00:00:00Z',
-  modified_at: '2026-01-01T00:00:00Z',
-  revision: 1,
-  input_sets: {},
-  settings: {},
-  annotation_correction_columns: {},
-  stop_words: [],
-  topic_modeling_words_per_topic: kind === 'topic_modeling' ? 15 : null,
-});
+const serverTab = (id = 'tab-1', kind: AnalysisKind = 'concordance'): Tab => {
+  const settings: TabSettings =
+    kind === 'annotation'
+      ? { kind, correction_columns: {} }
+      : kind === 'token_frequency'
+        ? { kind, stop_words: { words: [] } }
+        : kind === 'topic_modeling'
+          ? {
+              kind,
+              stop_words: { words: [] },
+              words_per_topic: 15,
+              projection_selection: null,
+            }
+          : { kind };
+  return {
+    availability: 'available',
+    id,
+    name: id,
+    kind,
+    analysis_ids: [],
+    created_at: '2026-01-01T00:00:00Z',
+    modified_at: '2026-01-01T00:00:00Z',
+    revision: 1,
+    settings,
+  };
+};
 
 describe('useWorkspaceTabs', () => {
   beforeEach(() => {
@@ -189,7 +199,7 @@ describe('useWorkspaceTabs', () => {
       expect(mocks.updateTab).toHaveBeenCalledWith(
         expect.objectContaining({
           path: { workspace_id: 'workspace-1', tab_id: 'tab-1' },
-          body: { name: 'Renamed' },
+          body: { kind: 'concordance', name: 'Renamed' },
         }),
       ),
     );
@@ -233,7 +243,10 @@ describe('useWorkspaceTabs', () => {
       Promise.resolve({
         data: {
           ...serverTab('tab-1', 'annotation'),
-          annotation_correction_columns: body.annotation_correction_columns ?? {},
+          settings: {
+            kind: 'annotation',
+            correction_columns: body.correction_columns ?? {},
+          },
         },
       }),
     );
@@ -248,7 +261,7 @@ describe('useWorkspaceTabs', () => {
     await waitFor(() => {
       expect(mocks.updateTab).toHaveBeenCalledWith(
         expect.objectContaining({
-          body: { annotation_correction_columns: { 'node-1': 'review' } },
+          body: { kind: 'annotation', correction_columns: { 'node-1': 'review' } },
         }),
       );
     });
@@ -258,7 +271,7 @@ describe('useWorkspaceTabs', () => {
     });
     await waitFor(() => {
       expect(mocks.updateTab).toHaveBeenLastCalledWith(
-        expect.objectContaining({ body: { annotation_correction_columns: {} } }),
+        expect.objectContaining({ body: { kind: 'annotation', correction_columns: {} } }),
       );
     });
   });
@@ -277,7 +290,7 @@ describe('useWorkspaceTabs', () => {
       ).rejects.toThrow('save failed');
     });
 
-    expect(result.current.tabs[0]?.annotation_correction_columns).toEqual({});
+    expect(result.current.tabs[0]?.correctionColumns).toEqual({});
   });
 
   it('optimistically patches and rolls back backend-owned presentation settings', async () => {
@@ -291,14 +304,14 @@ describe('useWorkspaceTabs', () => {
     await act(async () => {
       await expect(
         result.current.setPresentationSettings('tab-1', {
-          stop_words: ['the'],
-          topic_modeling_words_per_topic: 25,
+          stopWords: ['the'],
+          wordsPerTopic: 25,
         }),
       ).rejects.toThrow('save failed');
     });
 
-    expect(result.current.tabs[0]?.stop_words).toEqual([]);
-    expect(result.current.tabs[0]?.topic_modeling_words_per_topic).toBe(15);
+    expect(result.current.tabs[0]?.stopWords).toEqual([]);
+    expect(result.current.tabs[0]?.wordsPerTopic).toBe(15);
   });
 
   it('shares one all-tabs request between analysis kinds', async () => {

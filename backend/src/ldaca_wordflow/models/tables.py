@@ -19,15 +19,6 @@ class CompleteTableResource(_StrictModel):
     url: str = Field(min_length=1)
 
 
-class PagedTableResource(_StrictModel):
-    """One open-ended table fetched as independent Arrow IPC pages."""
-
-    delivery: Literal["paged"] = "paged"
-    table_id: str = Field(min_length=1, max_length=200)
-    schema_url: str = Field(min_length=1)
-    rows_url: str = Field(min_length=1)
-
-
 class TableProjectionResource(_StrictModel):
     schema_url: str = Field(min_length=1)
     rows_url: str = Field(min_length=1)
@@ -45,7 +36,6 @@ class ProjectedTableResource(_StrictModel):
 
 __all__ = [
     "CompleteTableResource",
-    "PagedTableResource",
     "ProjectedTableResource",
     "TableProjectionResource",
 ]

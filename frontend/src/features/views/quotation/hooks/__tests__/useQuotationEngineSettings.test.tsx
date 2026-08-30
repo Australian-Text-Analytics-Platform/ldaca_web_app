@@ -17,7 +17,7 @@ describe('useQuotationEngineSettings', () => {
     const { result } = renderHook(() => useQuotationEngineSettings());
 
     act(() => {
-      result.current.setTaskEngineConfig({ type: 'remote', engine_id: 'quotation-v1' });
+      result.current.setTaskEngineConfig({ type: 'remote', engine_id: 'remote-quotation-engine' });
     });
     act(() => {
       result.current.setTaskEngineConfig({ type: 'local' });
@@ -31,16 +31,16 @@ describe('useQuotationEngineSettings', () => {
 
     expect(result.current.engineConfig).toEqual({
       type: 'remote',
-      engine_id: 'quotation-v1',
+      engine_id: 'remote-quotation-engine',
     });
-    expect(result.current.lastRemoteEngineId).toBe('quotation-v1');
+    expect(result.current.lastRemoteEngineId).toBe('remote-quotation-engine');
   });
 
   it('requires a remote engine id before building request payloads', () => {
     const { result } = renderHook(() => useQuotationEngineSettings());
 
     act(() => {
-      result.current.setTaskEngineConfig({ type: 'remote', engine_id: 'quotation-v1' });
+      result.current.setTaskEngineConfig({ type: 'remote', engine_id: 'remote-quotation-engine' });
     });
 
     let payload: ReturnType<typeof result.current.buildEngineRequest> = null;
@@ -48,10 +48,10 @@ describe('useQuotationEngineSettings', () => {
       payload = result.current.buildEngineRequest();
     });
 
-    expect(payload).toEqual({ type: 'remote', engine_id: 'quotation-v1' });
+    expect(payload).toEqual({ type: 'remote', engine_id: 'remote-quotation-engine' });
     expect(result.current.engineConfig).toEqual({
       type: 'remote',
-      engine_id: 'quotation-v1',
+      engine_id: 'remote-quotation-engine',
     });
     expect(result.current.engineError).toBeNull();
   });

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Any, cast
+import uuid
 
 import anyio
 
@@ -14,6 +15,7 @@ from ldaca_wordflow.services.analysis_execution_types import (
     AnalysisInvocation,
 )
 from ldaca_wordflow.services.analysis_scheduler import ScheduledAnalysis
+from ldaca_wordflow.workers.invocations import PreviewReadyInput
 
 
 class _Executor:
@@ -43,8 +45,7 @@ class _Service:
 
     async def admit_execution(self, _key, **_kwargs):
         return AnalysisInvocation(
-            function=lambda: None,
-            kwargs={},
+            input=PreviewReadyInput(),
             storage_roots=(),
             max_storage_bytes=1,
             max_storage_files=1,
@@ -66,7 +67,7 @@ async def test_safe_worker_failure_is_persisted_without_publication() -> None:
     uninitialized_runtime._executor = _Executor()
     uninitialized_runtime._preparer = object()
     runtime._limiter = anyio.CapacityLimiter(1)
-    key = AnalysisExecutionKey("user", "workspace", "analysis")
+    key = AnalysisExecutionKey("user", uuid.uuid4(), uuid.uuid4())
     item = ScheduledAnalysis(key, datetime.now(UTC), "captured-key")
     service = _Service()
 

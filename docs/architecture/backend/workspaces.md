@@ -43,13 +43,17 @@ to authorize deletion of unavailable content.
 
 ## Service Boundary
 
-`WorkspaceService` is the sole residency and mutation authority. The runtime
-keeps one coordination slot per Workspace ID and at most one aggregate object
-in that slot. Every load, mutation, completion, archive install, or deletion
-for the same Workspace passes through its asynchronous gate. The slot also
-retains a non-blocking operating-system file lock for the complete `open` or
-`closing` lifetime. This makes one Workspace exclusive across cooperating
-backend processes without locking the Data Root or unrelated Workspaces.
+`WorkspaceService` remains the sole public residency and mutation authority.
+It delegates three deep private mechanisms: safe catalogue reads plus
+in-process residency and process locks, staged mutation commit/rollback, and
+post-commit event diff publication. These collaborators expose no second
+Workspace service or mutation path. The runtime keeps one coordination slot
+per Workspace ID and at most one aggregate object in that slot. Every load,
+mutation, completion, archive install, or deletion for the same Workspace
+passes through its asynchronous gate. The slot also retains a non-blocking
+operating-system file lock for the complete `open` or `closing` lifetime. This
+makes one Workspace exclusive across cooperating backend processes without
+locking the Data Root or unrelated Workspaces.
 
 `WorkspaceLifecycleService` owns public open, close, and delete commands. A
 short-lived per-user gate serializes those commands so one user can have at
@@ -152,14 +156,15 @@ data_root/
 Creation builds the snapshot and access sidecar below `.staging/`, then one
 atomic rename publishes the complete live directory. Archive import validates
 portable content, always assigns a fresh Workspace ID and owner sidecar, and
-replaces archived timestamps with one new publication timestamp. Its current
-final-source rebase occurs after the live rename; the resulting crash window is
-tracked in the
-[persistence-integrity reference](../../reference/persistence-integrity.md).
-Export omits `access.json`; import rejects an archive-supplied sidecar. Lock
-files are outside Workspace directories and are never portable archive content.
+replaces archived timestamps with one new publication timestamp. It compiles
+final paths, rebases Data Block plans and retained query snapshots, validates
+the complete representation against its future root, and remeasures quota
+while the bytes remain staged. The atomic rename is the only publication commit
+point; no mutation follows visibility. Export omits `access.json`; import
+rejects an archive-supplied sidecar. Lock files are outside Workspace
+directories and are never portable archive content.
 
-Portable archive format 20 materializes Data Blocks and retained Analysis query
+Portable archive format 21 materializes Data Blocks and retained Analysis query
 inputs as Parquet, includes terminal Analysis forests and declared Artifacts,
 and contains no serialized executable plans. Import reconstructs private lazy
 plans from those safe files, rebases their sources and Workspace identity after

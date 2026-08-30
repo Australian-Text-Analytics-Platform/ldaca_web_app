@@ -11,6 +11,10 @@ export type ClientOptions = {
  */
 export type Analysis = {
     /**
+     * Availability
+     */
+    availability: 'available';
+    /**
      * Cancellation Requested At
      */
     cancellation_requested_at: string | null;
@@ -160,13 +164,13 @@ export type AnalysisKind = 'annotation' | 'concordance' | 'quotation' | 'sequent
 /**
  * AnalysisPage
  *
- * One-based stable page of live valid and corrupt Analyses.
+ * One-based stable page of available and unavailable Analyses.
  */
 export type AnalysisPage = {
     /**
      * Items
      */
-    items: Array<Analysis | CorruptAnalysis>;
+    items: Array<AnalysisResource>;
     /**
      * Page
      */
@@ -184,6 +188,12 @@ export type AnalysisPage = {
      */
     total_pages: number;
 };
+
+export type AnalysisResource = ({
+    availability: 'available';
+} & Analysis) | ({
+    availability: 'unavailable';
+} & UnavailableAnalysis);
 
 /**
  * AnnotationAnalysisRequest
@@ -602,6 +612,43 @@ export type AnnotationProviderConfigurationUpdate = {
 };
 
 /**
+ * AnnotationQueriedResult
+ */
+export type AnnotationQueriedResult = {
+    /**
+     * Labels
+     */
+    labels: Array<AnnotationPreviewLabel>;
+    /**
+     * Node Id
+     */
+    node_id: string;
+    /**
+     * Page
+     */
+    page: number;
+    /**
+     * Page Size
+     */
+    page_size: number;
+    query: AnnotationResultQuery;
+    /**
+     * Rows
+     */
+    rows: Array<{
+        [key: string]: JsonDataOutput;
+    }>;
+    /**
+     * Total Rows
+     */
+    total_rows: number;
+    /**
+     * Variant
+     */
+    variant: 'queried';
+};
+
+/**
  * AnnotationResult
  */
 export type AnnotationResult = {
@@ -609,38 +656,14 @@ export type AnnotationResult = {
      * Kind
      */
     kind?: 'annotation';
-    /**
-     * Labels
-     */
-    labels?: Array<AnnotationPreviewLabel> | null;
-    /**
-     * Node Id
-     */
-    node_id?: string | null;
-    /**
-     * Page
-     */
-    page?: number | null;
-    /**
-     * Page Size
-     */
-    page_size?: number | null;
-    query?: AnnotationResultQuery | null;
-    /**
-     * Ready
-     */
-    ready?: true;
-    /**
-     * Rows
-     */
-    rows?: Array<{
-        [key: string]: JsonDataOutput;
-    }> | null;
-    /**
-     * Total Rows
-     */
-    total_rows?: number | null;
+    result: AnnotationResultProjection;
 };
+
+export type AnnotationResultProjection = ({
+    variant: 'ready';
+} & PreviewReadyResult) | ({
+    variant: 'queried';
+} & AnnotationQueriedResult);
 
 /**
  * AnnotationResultQuery
@@ -738,6 +761,42 @@ export type AnnotationRunAllSubmission = {
      */
     processing_mode?: 'reprocess_all' | 'fill_missing';
     source: AnnotationAnalysisRequest;
+};
+
+/**
+ * AnnotationTabSettings
+ */
+export type AnnotationTabSettings = {
+    /**
+     * Correction Columns
+     */
+    correction_columns: {
+        [key: string]: string;
+    };
+    /**
+     * Kind
+     */
+    kind: 'annotation';
+};
+
+/**
+ * AnnotationTabUpdate
+ */
+export type AnnotationTabUpdate = {
+    /**
+     * Correction Columns
+     */
+    correction_columns?: {
+        [key: string]: string;
+    } | null;
+    /**
+     * Kind
+     */
+    kind: 'annotation';
+    /**
+     * Name
+     */
+    name?: string | null;
 };
 
 /**
@@ -1598,6 +1657,21 @@ export type ConcordancePage = {
 };
 
 /**
+ * ConcordanceQueriedResult
+ */
+export type ConcordanceQueriedResult = {
+    query: ConcordanceResultQuery;
+    /**
+     * Sources
+     */
+    sources: Array<ConcordanceSourceResult>;
+    /**
+     * Variant
+     */
+    variant: 'queried';
+};
+
+/**
  * ConcordanceResult
  */
 export type ConcordanceResult = {
@@ -1605,16 +1679,14 @@ export type ConcordanceResult = {
      * Kind
      */
     kind?: 'concordance';
-    query?: ConcordanceResultQuery | null;
-    /**
-     * Ready
-     */
-    ready?: true;
-    /**
-     * Sources
-     */
-    sources?: Array<ConcordanceSourceResult> | null;
+    result: ConcordanceResultProjection;
 };
+
+export type ConcordanceResultProjection = ({
+    variant: 'ready';
+} & PreviewReadyResult) | ({
+    variant: 'queried';
+} & ConcordanceQueriedResult);
 
 /**
  * ConcordanceResultQuery
@@ -1655,6 +1727,20 @@ export type ConcordanceRunAllAnalysisRequest = {
      */
     kind?: 'concordance_run_all';
     source: ConcordanceAnalysisRequest;
+};
+
+/**
+ * ConcordanceRunAllGroupResult
+ */
+export type ConcordanceRunAllGroupResult = {
+    /**
+     * Sources
+     */
+    sources: Array<ConcordanceRunAllGroupSource>;
+    /**
+     * Variant
+     */
+    variant: 'group';
 };
 
 /**
@@ -1704,8 +1790,14 @@ export type ConcordanceRunAllGroupSource = {
     /**
      * Source Document Count
      */
-    source_document_count?: number | null;
+    source_document_count: number;
 };
+
+export type ConcordanceRunAllProjection = ({
+    variant: 'source';
+} & ConcordanceRunAllSourceResult) | ({
+    variant: 'group';
+} & ConcordanceRunAllGroupResult);
 
 /**
  * ConcordanceRunAllResult
@@ -1715,15 +1807,18 @@ export type ConcordanceRunAllResult = {
      * Kind
      */
     kind?: 'concordance_run_all';
+    result: ConcordanceRunAllProjection;
+};
+
+/**
+ * ConcordanceRunAllSourceResult
+ */
+export type ConcordanceRunAllSourceResult = {
+    source: RunAllSourceTableResource;
     /**
-     * Result Type
+     * Variant
      */
-    result_type: 'source' | 'group';
-    source?: RunAllSourceTableResource | null;
-    /**
-     * Sources
-     */
-    sources?: Array<ConcordanceRunAllGroupSource> | null;
+    variant: 'source';
 };
 
 /**
@@ -1742,27 +1837,27 @@ export type ConcordanceSourceResult = {
 };
 
 /**
- * CorruptAnalysis
- *
- * Minimal collection item for a root record that cannot be parsed.
+ * ConcordanceTabSettings
  */
-export type CorruptAnalysis = {
+export type ConcordanceTabSettings = {
     /**
-     * Code
+     * Kind
      */
-    code?: 'analysis_corrupt';
+    kind: 'concordance';
+};
+
+/**
+ * ConcordanceTabUpdate
+ */
+export type ConcordanceTabUpdate = {
     /**
-     * Id
+     * Kind
      */
-    id: string;
+    kind: 'concordance';
     /**
-     * Tab Id
+     * Name
      */
-    tab_id: string;
-    /**
-     * Type
-     */
-    type?: 'corrupt_analysis';
+    name?: string | null;
 };
 
 /**
@@ -2093,7 +2188,7 @@ export type DataRootResource = {
 /**
  * DataRootUpdateRequest
  *
- * One absolute server filesystem path selected by a single-user client.
+ * One server filesystem path selected by a single-user client.
  */
 export type DataRootUpdateRequest = {
     /**
@@ -2478,12 +2573,7 @@ export type FilterConditionInput = {
      * Regex
      */
     regex?: boolean;
-    /**
-     * Value
-     */
-    value?: string | number | number | boolean | Array<string | number | number | boolean | null> | {
-        [key: string]: JsonDataInput;
-    } | null;
+    value?: FilterValueInput;
 };
 
 /**
@@ -2512,12 +2602,7 @@ export type FilterConditionOutput = {
      * Regex
      */
     regex?: boolean;
-    /**
-     * Value
-     */
-    value?: string | number | number | boolean | Array<string | number | number | boolean | null> | {
-        [key: string]: JsonDataOutput;
-    } | null;
+    value?: FilterValueOutput;
 };
 
 /**
@@ -2584,6 +2669,16 @@ export type FilterNodeEditRequest = {
      * Logic
      */
     logic?: 'and' | 'or';
+};
+
+export type FilterScalar = string | number | number | boolean | null;
+
+export type FilterValueInput = FilterScalar | Array<FilterScalar> | {
+    [key: string]: JsonDataInput;
+};
+
+export type FilterValueOutput = FilterScalar | Array<FilterScalar> | {
+    [key: string]: JsonDataOutput;
 };
 
 /**
@@ -2681,7 +2776,7 @@ export type LiteralExpression = {
     /**
      * Value
      */
-    value: string | number | number | boolean | Array<string | number | number | boolean | null> | null;
+    value: FilterScalar | Array<FilterScalar>;
 };
 
 /**
@@ -2698,6 +2793,16 @@ export type LivenessResponse = {
      * Version
      */
     version: string;
+};
+
+/**
+ * LocalQuotationEngineSelection
+ */
+export type LocalQuotationEngineSelection = {
+    /**
+     * Type
+     */
+    type: 'local';
 };
 
 /**
@@ -2754,6 +2859,16 @@ export type NodeUpdateRequest = {
      * Tokenizer Model
      */
     tokenizer_model?: string | null;
+};
+
+/**
+ * PreviewReadyResult
+ */
+export type PreviewReadyResult = {
+    /**
+     * Variant
+     */
+    variant: 'ready';
 };
 
 /**
@@ -2847,7 +2962,7 @@ export type QuotationAnalysisRequest = {
      * Column
      */
     column: string;
-    engine?: QuotationEngineSelection;
+    engine: QuotationEngineSelection;
     /**
      * Kind
      */
@@ -2858,21 +2973,11 @@ export type QuotationAnalysisRequest = {
     node_id: string;
 };
 
-/**
- * QuotationEngineSelection
- */
-export type QuotationEngineSelection = {
-    /**
-     * Engine Id
-     */
-    engine_id?: string | null;
-    type?: QuotationEngineType;
-};
-
-/**
- * QuotationEngineType
- */
-export type QuotationEngineType = 'local' | 'remote';
+export type QuotationEngineSelection = ({
+    type: 'local';
+} & LocalQuotationEngineSelection) | ({
+    type: 'remote';
+} & RemoteQuotationEngineSelection);
 
 /**
  * QuotationPreviewQuery
@@ -2906,10 +3011,7 @@ export type QuotationResult = {
      * Kind
      */
     kind?: 'quotation';
-    /**
-     * Ready
-     */
-    ready?: true;
+    result: PreviewReadyResult;
 };
 
 /**
@@ -2974,6 +3076,30 @@ export type QuotationRunAllResult = {
 };
 
 /**
+ * QuotationTabSettings
+ */
+export type QuotationTabSettings = {
+    /**
+     * Kind
+     */
+    kind: 'quotation';
+};
+
+/**
+ * QuotationTabUpdate
+ */
+export type QuotationTabUpdate = {
+    /**
+     * Kind
+     */
+    kind: 'quotation';
+    /**
+     * Name
+     */
+    name?: string | null;
+};
+
+/**
  * ReadinessResponse
  *
  * Public Runtime readiness without component or filesystem details.
@@ -2987,6 +3113,20 @@ export type ReadinessResponse = {
      * Version
      */
     version: string;
+};
+
+/**
+ * RemoteQuotationEngineSelection
+ */
+export type RemoteQuotationEngineSelection = {
+    /**
+     * Engine Id
+     */
+    engine_id: string;
+    /**
+     * Type
+     */
+    type: 'remote';
 };
 
 /**
@@ -3308,7 +3448,7 @@ export type RunAllSourceTableResource = {
     /**
      * Source Document Count
      */
-    source_document_count?: number | null;
+    source_document_count: number;
     table: ProjectedTableResource;
 };
 
@@ -3584,6 +3724,30 @@ export type SequentialSourceDescriptor = {
 };
 
 /**
+ * SequentialTabSettings
+ */
+export type SequentialTabSettings = {
+    /**
+     * Kind
+     */
+    kind: 'sequential';
+};
+
+/**
+ * SequentialTabUpdate
+ */
+export type SequentialTabUpdate = {
+    /**
+     * Kind
+     */
+    kind: 'sequential';
+    /**
+     * Name
+     */
+    name?: string | null;
+};
+
+/**
  * SessionResponse
  *
  * No-store bootstrap response for both supported deployment profiles.
@@ -3793,6 +3957,18 @@ export type SqlDerivation = {
 };
 
 /**
+ * StopWordSettings
+ *
+ * Shared normalized stop-word value object.
+ */
+export type StopWordSettings = {
+    /**
+     * Words
+     */
+    words: Array<string>;
+};
+
+/**
  * StringExpression
  */
 export type StringExpressionInput = {
@@ -3879,11 +4055,9 @@ export type Tab = {
      */
     analysis_ids?: Array<string>;
     /**
-     * Annotation Correction Columns
+     * Availability
      */
-    annotation_correction_columns?: {
-        [key: string]: string;
-    };
+    availability: 'available';
     /**
      * Created At
      */
@@ -3905,15 +4079,7 @@ export type Tab = {
      * Revision
      */
     revision: number;
-    /**
-     * Stop Words
-     */
-    stop_words?: Array<string>;
-    topic_modeling_projection_selection?: TopicModelingProjectionSelection | null;
-    /**
-     * Topic Modeling Words Per Topic
-     */
-    topic_modeling_words_per_topic?: number | null;
+    settings: TabSettings;
 };
 
 /**
@@ -3927,30 +4093,25 @@ export type TabCreate = {
     name: string;
 };
 
-/**
- * TabUpdate
- */
-export type TabUpdate = {
-    /**
-     * Annotation Correction Columns
-     */
-    annotation_correction_columns?: {
-        [key: string]: string;
-    } | null;
-    /**
-     * Name
-     */
-    name?: string | null;
-    /**
-     * Stop Words
-     */
-    stop_words?: Array<string> | null;
-    topic_modeling_projection_selection?: TopicModelingProjectionSelection | null;
-    /**
-     * Topic Modeling Words Per Topic
-     */
-    topic_modeling_words_per_topic?: number | null;
-};
+export type TabResource = ({
+    availability: 'available';
+} & Tab) | ({
+    availability: 'unavailable';
+} & UnavailableTab);
+
+export type TabSettings = ({
+    kind: 'annotation';
+} & AnnotationTabSettings) | ({
+    kind: 'concordance';
+} & ConcordanceTabSettings) | ({
+    kind: 'quotation';
+} & QuotationTabSettings) | ({
+    kind: 'sequential';
+} & SequentialTabSettings) | ({
+    kind: 'token_frequency';
+} & TokenFrequencyTabSettings) | ({
+    kind: 'topic_modeling';
+} & TopicModelingTabSettings);
 
 /**
  * TableProjectionResource
@@ -4009,6 +4170,32 @@ export type TokenFrequencyResult = {
 };
 
 /**
+ * TokenFrequencyTabSettings
+ */
+export type TokenFrequencyTabSettings = {
+    /**
+     * Kind
+     */
+    kind: 'token_frequency';
+    stop_words: StopWordSettings;
+};
+
+/**
+ * TokenFrequencyTabUpdate
+ */
+export type TokenFrequencyTabUpdate = {
+    /**
+     * Kind
+     */
+    kind: 'token_frequency';
+    /**
+     * Name
+     */
+    name?: string | null;
+    stop_words?: StopWordSettings | null;
+};
+
+/**
  * TokenResultMetadata
  */
 export type TokenResultMetadata = {
@@ -4016,10 +4203,6 @@ export type TokenResultMetadata = {
      * Effective Token Limit
      */
     effective_token_limit: number;
-    /**
-     * Server Token Limit
-     */
-    server_token_limit: number;
 };
 
 /**
@@ -4134,68 +4317,6 @@ export type TopicMeaningOverride = {
      * Words
      */
     words: Array<string>;
-};
-
-/**
- * TopicMetadata
- */
-export type TopicMetadata = {
-    /**
-     * Corpus Sizes After Sample
-     */
-    corpus_sizes_after_sample?: Array<number> | null;
-    /**
-     * Corpus Sizes Before Sample
-     */
-    corpus_sizes_before_sample?: Array<number> | null;
-    /**
-     * Embedding Backend
-     */
-    embedding_backend?: string | null;
-    /**
-     * Embedding Model
-     */
-    embedding_model?: string | null;
-    /**
-     * Embeddings From Ctfidf
-     */
-    embeddings_from_ctfidf?: boolean | null;
-    /**
-     * Engine
-     */
-    engine?: string | null;
-    /**
-     * N Chunks
-     */
-    n_chunks?: number | null;
-    /**
-     * Native
-     */
-    native?: boolean | null;
-    /**
-     * Node Names
-     */
-    node_names?: Array<string>;
-    /**
-     * Random State
-     */
-    random_state?: number | null;
-    /**
-     * Stage Timings Ms
-     */
-    stage_timings_ms?: Array<TopicStageTiming> | null;
-    /**
-     * Total Topics Incl Outlier
-     */
-    total_topics_incl_outlier?: number | null;
-    /**
-     * Truncated Segment Count
-     */
-    truncated_segment_count?: number | null;
-    /**
-     * Vectorizer Model
-     */
-    vectorizer_model?: string | null;
 };
 
 /**
@@ -4378,14 +4499,11 @@ export type TopicModelingResult = {
      * Kind
      */
     kind?: 'topic_modeling';
-    meta: TopicMetadata;
-    /**
-     * Per Corpus Topic Counts
-     */
-    per_corpus_topic_counts?: Array<{
-        [key: string]: number;
-    }> | null;
     query: TopicModelingResultQuery;
+    /**
+     * Segment Count
+     */
+    segment_count: number;
     /**
      * Sources
      */
@@ -4395,6 +4513,10 @@ export type TopicModelingResult = {
      * Topics
      */
     topics: Array<TopicItem>;
+    /**
+     * Truncated Segment Count
+     */
+    truncated_segment_count: number;
 };
 
 /**
@@ -4428,6 +4550,42 @@ export type TopicModelingResultQuery = {
 };
 
 /**
+ * TopicModelingTabSettings
+ */
+export type TopicModelingTabSettings = {
+    /**
+     * Kind
+     */
+    kind: 'topic_modeling';
+    projection_selection: TopicModelingProjectionSelection | null;
+    stop_words: StopWordSettings;
+    /**
+     * Words Per Topic
+     */
+    words_per_topic: number;
+};
+
+/**
+ * TopicModelingTabUpdate
+ */
+export type TopicModelingTabUpdate = {
+    /**
+     * Kind
+     */
+    kind: 'topic_modeling';
+    /**
+     * Name
+     */
+    name?: string | null;
+    projection_selection?: TopicModelingProjectionSelection | null;
+    stop_words?: StopWordSettings | null;
+    /**
+     * Words Per Topic
+     */
+    words_per_topic?: number | null;
+};
+
+/**
  * TopicSegmentationMethod
  */
 export type TopicSegmentationMethod = 'automatic' | 'paragraph' | 'sentence';
@@ -4452,20 +4610,6 @@ export type TopicSource = {
      * Text Column
      */
     text_column: string;
-};
-
-/**
- * TopicStageTiming
- */
-export type TopicStageTiming = {
-    /**
-     * Elapsed Ms
-     */
-    elapsed_ms: number;
-    /**
-     * Stage
-     */
-    stage: string;
 };
 
 /**
@@ -4526,6 +4670,118 @@ export type UnaryExpressionOutput = {
     } & RoundExpressionOutput) | ({
         op: 'concat_string';
     } & ConcatStringExpressionOutput);
+};
+
+/**
+ * UnavailableAnalysis
+ *
+ * Minimal safe item for an invalid persisted Analysis record.
+ */
+export type UnavailableAnalysis = {
+    /**
+     * Availability
+     */
+    availability: 'unavailable';
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Reason
+     */
+    reason: 'record_invalid';
+    /**
+     * Tab Id
+     */
+    tab_id: string;
+    /**
+     * Warning
+     */
+    warning: 'This Analysis is unavailable because its stored record is invalid.';
+};
+
+/**
+ * UnavailableDataBlock
+ *
+ * Minimal safe projection of one isolated current-schema Data Block.
+ */
+export type UnavailableDataBlock = {
+    /**
+     * Availability
+     */
+    availability?: 'unavailable';
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Reason
+     */
+    reason?: 'record_invalid';
+    /**
+     * Warning
+     */
+    warning: string;
+    /**
+     * Workspace Id
+     */
+    workspace_id: string;
+};
+
+/**
+ * UnavailableTab
+ *
+ * Minimal safe item for an invalid persisted Tab record.
+ */
+export type UnavailableTab = {
+    /**
+     * Availability
+     */
+    availability: 'unavailable';
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Reason
+     */
+    reason: 'record_invalid';
+    /**
+     * Warning
+     */
+    warning: 'This Tab is unavailable because its stored record is invalid.';
+    /**
+     * Workspace Id
+     */
+    workspace_id: string;
+};
+
+/**
+ * UnavailableUserFileImport
+ *
+ * Small safe projection for one invalid persisted import record.
+ */
+export type UnavailableUserFileImport = {
+    /**
+     * Availability
+     */
+    availability: 'unavailable';
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Reason
+     */
+    reason?: 'record_invalid';
+    /**
+     * User Id
+     */
+    user_id: string;
+    /**
+     * Warning
+     */
+    warning: string;
 };
 
 /**
@@ -4595,6 +4851,10 @@ export type UnlimitedStorageResource = {
  */
 export type UserFileImport = {
     /**
+     * Availability
+     */
+    availability: 'available';
+    /**
      * Cancellation Requested At
      */
     cancellation_requested_at: string | null;
@@ -4646,7 +4906,7 @@ export type UserFileImportPage = {
     /**
      * Items
      */
-    items: Array<UserFileImport>;
+    items: Array<UserFileImport | UnavailableUserFileImport>;
     /**
      * Page
      */
@@ -4753,6 +5013,10 @@ export type WorkspaceCreateRequest = {
  * Complete addressable node metadata returned by node routes.
  */
 export type WorkspaceNodeInfo = {
+    /**
+     * Availability
+     */
+    availability?: 'available';
     /**
      * Can Redo
      */
@@ -5194,6 +5458,43 @@ export type AnnotationProviderConfigurationUpdateWritable = {
 };
 
 /**
+ * AnnotationQueriedResult
+ */
+export type AnnotationQueriedResultWritable = {
+    /**
+     * Labels
+     */
+    labels: Array<AnnotationPreviewLabel>;
+    /**
+     * Node Id
+     */
+    node_id: string;
+    /**
+     * Page
+     */
+    page: number;
+    /**
+     * Page Size
+     */
+    page_size: number;
+    query: AnnotationResultQueryWritable;
+    /**
+     * Rows
+     */
+    rows: Array<{
+        [key: string]: JsonDataOutputWritable;
+    }>;
+    /**
+     * Total Rows
+     */
+    total_rows: number;
+    /**
+     * Variant
+     */
+    variant: 'queried';
+};
+
+/**
  * AnnotationResult
  */
 export type AnnotationResultWritable = {
@@ -5201,38 +5502,14 @@ export type AnnotationResultWritable = {
      * Kind
      */
     kind?: 'annotation';
-    /**
-     * Labels
-     */
-    labels?: Array<AnnotationPreviewLabel> | null;
-    /**
-     * Node Id
-     */
-    node_id?: string | null;
-    /**
-     * Page
-     */
-    page?: number | null;
-    /**
-     * Page Size
-     */
-    page_size?: number | null;
-    query?: AnnotationResultQueryWritable | null;
-    /**
-     * Ready
-     */
-    ready?: true;
-    /**
-     * Rows
-     */
-    rows?: Array<{
-        [key: string]: JsonDataOutputWritable;
-    }> | null;
-    /**
-     * Total Rows
-     */
-    total_rows?: number | null;
+    result: AnnotationResultProjectionWritable;
 };
+
+export type AnnotationResultProjectionWritable = ({
+    variant: 'ready';
+} & PreviewReadyResult) | ({
+    variant: 'queried';
+} & AnnotationQueriedResultWritable);
 
 /**
  * AnnotationResultQuery
@@ -5334,6 +5611,14 @@ export type DataPortalSearchRequestWritable = {
      * Query
      */
     query?: string;
+};
+
+export type FilterValueInputWritable = FilterScalar | Array<FilterScalar> | {
+    [key: string]: JsonDataInputWritable;
+};
+
+export type FilterValueOutputWritable = FilterScalar | Array<FilterScalar> | {
+    [key: string]: JsonDataOutputWritable;
 };
 
 export type JsonDataInputWritable = string | number | number | boolean | Array<JsonDataInputWritable> | {
@@ -6356,9 +6641,15 @@ export type GetUserFileImportError = GetUserFileImportErrors[keyof GetUserFileIm
 
 export type GetUserFileImportResponses = {
     /**
+     * Response Get User File Import
+     *
      * Successful Response
      */
-    200: UserFileImport;
+    200: ({
+        availability: 'available';
+    } & UserFileImport) | ({
+        availability: 'unavailable';
+    } & UnavailableUserFileImport);
 };
 
 export type GetUserFileImportResponse = GetUserFileImportResponses[keyof GetUserFileImportResponses];
@@ -8103,155 +8394,6 @@ export type GetAnalysisTableProjectionSchemaResponses = {
 
 export type GetAnalysisTableProjectionSchemaResponse = GetAnalysisTableProjectionSchemaResponses[keyof GetAnalysisTableProjectionSchemaResponses];
 
-export type GetAnalysisTableRowsData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-        /**
-         * Analysis Id
-         */
-        analysis_id: string;
-        /**
-         * Table Id
-         */
-        table_id: string;
-    };
-    query?: {
-        /**
-         * Page
-         */
-        page?: number;
-        /**
-         * Page Size
-         */
-        page_size?: number;
-        /**
-         * Sort By
-         */
-        sort_by?: string | null;
-        /**
-         * Descending
-         */
-        descending?: boolean;
-    };
-    url: '/api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}/rows';
-};
-
-export type GetAnalysisTableRowsErrors = {
-    /**
-     * Authentication required
-     */
-    401: ApiError;
-    /**
-     * Origin, CSRF, or access check failed
-     */
-    403: ApiError;
-    /**
-     * Resource not found
-     */
-    404: ApiError;
-    /**
-     * Resource state conflict
-     */
-    409: ApiError;
-    /**
-     * Retained artifact is no longer available
-     */
-    410: ApiError;
-    /**
-     * Request validation failed
-     */
-    422: ApiError;
-    /**
-     * Stored resource is corrupt
-     */
-    500: ApiError;
-    /**
-     * Storage capacity is exhausted
-     */
-    507: ApiError;
-};
-
-export type GetAnalysisTableRowsError = GetAnalysisTableRowsErrors[keyof GetAnalysisTableRowsErrors];
-
-export type GetAnalysisTableRowsResponses = {
-    /**
-     * Arrow IPC stream
-     */
-    200: Blob | File;
-};
-
-export type GetAnalysisTableRowsResponse = GetAnalysisTableRowsResponses[keyof GetAnalysisTableRowsResponses];
-
-export type GetAnalysisTableSchemaData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace Id
-         */
-        workspace_id: string;
-        /**
-         * Analysis Id
-         */
-        analysis_id: string;
-        /**
-         * Table Id
-         */
-        table_id: string;
-    };
-    query?: never;
-    url: '/api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}/schema';
-};
-
-export type GetAnalysisTableSchemaErrors = {
-    /**
-     * Authentication required
-     */
-    401: ApiError;
-    /**
-     * Origin, CSRF, or access check failed
-     */
-    403: ApiError;
-    /**
-     * Resource not found
-     */
-    404: ApiError;
-    /**
-     * Resource state conflict
-     */
-    409: ApiError;
-    /**
-     * Retained artifact is no longer available
-     */
-    410: ApiError;
-    /**
-     * Request validation failed
-     */
-    422: ApiError;
-    /**
-     * Stored resource is corrupt
-     */
-    500: ApiError;
-    /**
-     * Storage capacity is exhausted
-     */
-    507: ApiError;
-};
-
-export type GetAnalysisTableSchemaError = GetAnalysisTableSchemaErrors[keyof GetAnalysisTableSchemaErrors];
-
-export type GetAnalysisTableSchemaResponses = {
-    /**
-     * Arrow IPC stream
-     */
-    200: Blob | File;
-};
-
-export type GetAnalysisTableSchemaResponse = GetAnalysisTableSchemaResponses[keyof GetAnalysisTableSchemaResponses];
-
 export type ExportWorkspaceArchiveData = {
     body?: never;
     path: {
@@ -8341,7 +8483,7 @@ export type ListNodesResponses = {
      *
      * Successful Response
      */
-    200: Array<WorkspaceNodeInfo>;
+    200: Array<WorkspaceNodeInfo | UnavailableDataBlock>;
 };
 
 export type ListNodesResponse = ListNodesResponses[keyof ListNodesResponses];
@@ -8700,9 +8842,15 @@ export type GetNodeError = GetNodeErrors[keyof GetNodeErrors];
 
 export type GetNodeResponses = {
     /**
+     * Response Get Node
+     *
      * Successful Response
      */
-    200: WorkspaceNodeInfo;
+    200: ({
+        availability: 'available';
+    } & WorkspaceNodeInfo) | ({
+        availability: 'unavailable';
+    } & UnavailableDataBlock);
 };
 
 export type GetNodeResponse = GetNodeResponses[keyof GetNodeResponses];
@@ -9208,7 +9356,7 @@ export type ListTabsResponses = {
      *
      * Successful Response
      */
-    200: Array<Tab>;
+    200: Array<TabResource>;
 };
 
 export type ListTabsResponse = ListTabsResponses[keyof ListTabsResponses];
@@ -9374,13 +9522,28 @@ export type GetTabResponses = {
     /**
      * Successful Response
      */
-    200: Tab;
+    200: TabResource;
 };
 
 export type GetTabResponse = GetTabResponses[keyof GetTabResponses];
 
 export type UpdateTabData = {
-    body: TabUpdate;
+    /**
+     * Body
+     */
+    body: ({
+        kind: 'annotation';
+    } & AnnotationTabUpdate) | ({
+        kind: 'concordance';
+    } & ConcordanceTabUpdate) | ({
+        kind: 'quotation';
+    } & QuotationTabUpdate) | ({
+        kind: 'sequential';
+    } & SequentialTabUpdate) | ({
+        kind: 'token_frequency';
+    } & TokenFrequencyTabUpdate) | ({
+        kind: 'topic_modeling';
+    } & TopicModelingTabUpdate);
     path: {
         /**
          * Workspace Id
@@ -9542,7 +9705,7 @@ export type ListTabAnalysesResponses = {
      *
      * Successful Response
      */
-    200: Array<Analysis | CorruptAnalysis>;
+    200: Array<AnalysisResource>;
 };
 
 export type ListTabAnalysesResponse = ListTabAnalysesResponses[keyof ListTabAnalysesResponses];

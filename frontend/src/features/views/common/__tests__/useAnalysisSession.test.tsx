@@ -18,7 +18,12 @@ vi.mock('../analysisApi', () => ({
 const analysis = {
   id: 'analysis-1',
   state: 'succeeded',
-  request: { kind: 'quotation', node_id: 'node-1', column: 'text' },
+  request: {
+    kind: 'quotation',
+    node_id: 'node-1',
+    column: 'text',
+    engine: { type: 'local' },
+  },
   error: null,
 } as unknown as Analysis;
 

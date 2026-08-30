@@ -385,8 +385,8 @@ def _cast_is_no_op(
     )
 
 
-def _node(workspace: Workspace, node_id: str | uuid.UUID) -> Node:
-    node = workspace.nodes.get(str(node_id))
+def _node(workspace: Workspace, node_id: uuid.UUID) -> Node:
+    node = workspace.nodes.get(node_id)
     if node is None:
         raise NodeNotFoundError("Node not found")
     return node

@@ -243,9 +243,7 @@ const useConcordanceProjectionQuery = ({
         );
         return {
           kind: 'concordance',
-          ready: true,
-          sources: null,
-          query: null,
+          result: { variant: 'ready' },
           data: { [reviewSource.source.node_id]: result },
           combinable: false,
           metadata: result.metadata,

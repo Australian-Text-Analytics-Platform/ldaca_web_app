@@ -9,17 +9,19 @@ cover only the deterministic Python glue:
   (``workers.topic_pipeline``),
 - the reconstruction of the result dict from the ``.text.topic_modeling``
   expression (``_run_rust_topic_modeling``), with the expression itself faked,
-- the payload/parquet assembly and meta in the orchestrator
+- the payload/parquet assembly and diagnostics in the orchestrator
   (``_compute_topic_modeling``) and the exact-count re-aggregation path, with
   ``_run_rust_topic_modeling`` faked to a canned result.
 """
 
 from __future__ import annotations
 
+import uuid
 from typing import Any
 
 import polars as pl
 import pytest
+from ldaca_wordflow.analysis.topic_projection import TopicNodeInfo
 from ldaca_wordflow.workers import topic_modeling, topic_pipeline, topic_result
 from ldaca_wordflow.workers.topic_pipeline import (
     _automatic_segment_overlap,
@@ -85,7 +87,7 @@ def test_sample_corpus_reduces_length_and_is_reproducible():
 def test_sample_corpus_indices_are_original_sorted_positions():
     docs = [f"doc {i}" for i in range(20)]
     sampled_docs, sampled_idx = _sample_corpus(docs, 0.5, seed=7)
-    for doc, idx in zip(sampled_docs, sampled_idx, strict=False):
+    for doc, idx in zip(sampled_docs, sampled_idx, strict=True):
         assert doc == docs[idx]
     assert sampled_idx == sorted(sampled_idx)
 
@@ -468,18 +470,24 @@ def _canned_rust_result(
     }
 
 
-def _node_info(node_id: str = "node-1") -> dict[str, Any]:
-    return {
-        "node_id": node_id,
-        "node_name": f"Node {node_id}",
-        "text_column": "document",
-        "original_columns": ["document"],
-    }
+def _node_info(node_id: str = "node-1") -> TopicNodeInfo:
+    return TopicNodeInfo(
+        node_id=uuid.uuid5(uuid.NAMESPACE_URL, f"topic-modeling:{node_id}"),
+        node_name=f"Node {node_id}",
+        text_column="document",
+        original_columns=("document",),
+    )
 
 
 def test__compute_topic_modeling_writes_only_clustering_context(
     tmp_path, monkeypatch
 ):
+    messages: list[str] = []
+    monkeypatch.setattr(
+        topic_modeling.logger,
+        "info",
+        lambda message, *args: messages.append(message % args),
+    )
     progress: list[tuple[float, str]] = []
 
     seen_run_kwargs: dict[str, Any] = {}
@@ -523,7 +531,6 @@ def test__compute_topic_modeling_writes_only_clustering_context(
     embedding_cache_path = tmp_path / "embeddings.duckdb"
 
     result = topic_modeling._compute_topic_modeling(
-        workspace_id="w",
         corpora=[["doc one", "doc two"]],
         node_infos=[_node_info()],
         artifact_dir=str(tmp_path),
@@ -546,14 +553,13 @@ def test__compute_topic_modeling_writes_only_clustering_context(
     assert topic["y"] == pytest.approx(-2.0)
     assert topic["size"] == [2]
 
-    assert result["meta"]["engine"] == "rust"
-    assert result["meta"]["embedding_backend"] == "ort"
     assert seen_run_kwargs["embedding_cache"] == str(embedding_cache_path)
     assert seen_run_kwargs["segmentation_method"] == "paragraph"
     assert seen_run_kwargs["max_segment_tokens"] == 64
-    assert result["meta"]["n_chunks"] == 7
-    assert result["meta"]["truncated_segment_count"] == 2
-    assert result["meta"]["stage_timings_ms"] == _STAGE_TIMINGS
+    assert result["segment_count"] == 7
+    assert result["truncated_segment_count"] == 2
+    assert any("engine=rust backend=ort" in message for message in messages)
+    assert any("stage_timings=" in message for message in messages)
     assert progress[0][1].startswith("Loading topic modelling")
     assert progress[-1] == (0.9, "Writing topic-modelling results...")
     assert all(0.0 <= fraction < 1.0 for fraction, _message in progress)
@@ -582,7 +588,6 @@ def test__compute_topic_modeling_payload_keeps_all_ranked_candidates(
     monkeypatch.setattr(topic_modeling, "_run_rust_topic_modeling", fake_run)
 
     result = topic_modeling._compute_topic_modeling(
-        workspace_id="w",
         corpora=[["only doc"]],
         node_infos=[_node_info()],
         artifact_dir=str(tmp_path),
@@ -597,6 +602,12 @@ def test__compute_topic_modeling_payload_keeps_all_ranked_candidates(
 def test__compute_topic_modeling_sampling_records_before_after_sizes(
     tmp_path, monkeypatch
 ):
+    messages: list[str] = []
+    monkeypatch.setattr(
+        topic_modeling.logger,
+        "info",
+        lambda message, *args: messages.append(message % args),
+    )
     seen_docs: dict[str, int] = {}
 
     def fake_run(*, all_docs, **_kwargs):
@@ -613,7 +624,6 @@ def test__compute_topic_modeling_sampling_records_before_after_sizes(
 
     corpus = [f"doc {i}" for i in range(20)]
     result = topic_modeling._compute_topic_modeling(
-        workspace_id="w",
         corpora=[corpus],
         node_infos=[_node_info("n1")],
         artifact_dir=str(tmp_path),
@@ -623,8 +633,11 @@ def test__compute_topic_modeling_sampling_records_before_after_sizes(
     )
 
     assert seen_docs["count"] == 10
-    assert result["meta"]["corpus_sizes_before_sample"] == [20]
-    assert result["meta"]["corpus_sizes_after_sample"] == [10]
+    assert result["corpus_sizes"] == [10]
+    assert any(
+        "corpus_sizes_before=[20] corpus_sizes_after=[10]" in message
+        for message in messages
+    )
 
 
 def test__compute_topic_modeling_forwards_requested_minimum_cluster_size(
@@ -648,7 +661,6 @@ def test__compute_topic_modeling_forwards_requested_minimum_cluster_size(
     monkeypatch.setattr(topic_modeling, "_run_rust_topic_modeling", fake_run)
 
     result = topic_modeling._compute_topic_modeling(
-        workspace_id="w",
         corpora=[["doc one", "doc two"]],
         node_infos=[_node_info("n1")],
         artifact_dir=str(tmp_path),

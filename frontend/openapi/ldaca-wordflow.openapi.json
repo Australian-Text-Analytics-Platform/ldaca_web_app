@@ -5,6 +5,11 @@
         "additionalProperties": false,
         "description": "Exact valid public Analysis representation.",
         "properties": {
+          "availability": {
+            "const": "available",
+            "title": "Availability",
+            "type": "string"
+          },
           "cancellation_requested_at": {
             "anyOf": [
               {
@@ -222,6 +227,7 @@
           "finished_at",
           "revision",
           "output_node_ids",
+          "availability",
           "integrity"
         ],
         "title": "Analysis",
@@ -352,18 +358,11 @@
       },
       "AnalysisPage": {
         "additionalProperties": false,
-        "description": "One-based stable page of live valid and corrupt Analyses.",
+        "description": "One-based stable page of available and unavailable Analyses.",
         "properties": {
           "items": {
             "items": {
-              "anyOf": [
-                {
-                  "$ref": "#/components/schemas/Analysis"
-                },
-                {
-                  "$ref": "#/components/schemas/CorruptAnalysis"
-                }
-              ]
+              "$ref": "#/components/schemas/AnalysisResource"
             },
             "title": "Items",
             "type": "array"
@@ -398,6 +397,23 @@
         ],
         "title": "AnalysisPage",
         "type": "object"
+      },
+      "AnalysisResource": {
+        "discriminator": {
+          "mapping": {
+            "available": "#/components/schemas/Analysis",
+            "unavailable": "#/components/schemas/UnavailableAnalysis"
+          },
+          "propertyName": "availability"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/Analysis"
+          },
+          {
+            "$ref": "#/components/schemas/UnavailableAnalysis"
+          }
+        ]
       },
       "AnnotationAnalysisRequest": {
         "additionalProperties": false,
@@ -1239,6 +1255,68 @@
         "title": "AnnotationProviderConfigurationUpdate",
         "type": "object"
       },
+      "AnnotationQueriedResult": {
+        "additionalProperties": false,
+        "properties": {
+          "labels": {
+            "items": {
+              "$ref": "#/components/schemas/AnnotationPreviewLabel"
+            },
+            "title": "Labels",
+            "type": "array"
+          },
+          "node_id": {
+            "format": "uuid",
+            "title": "Node Id",
+            "type": "string"
+          },
+          "page": {
+            "minimum": 1.0,
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "minimum": 1.0,
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "query": {
+            "$ref": "#/components/schemas/AnnotationResultQuery"
+          },
+          "rows": {
+            "items": {
+              "additionalProperties": {
+                "$ref": "#/components/schemas/JsonData-Output"
+              },
+              "type": "object"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "total_rows": {
+            "minimum": 0.0,
+            "title": "Total Rows",
+            "type": "integer"
+          },
+          "variant": {
+            "const": "queried",
+            "title": "Variant",
+            "type": "string"
+          }
+        },
+        "required": [
+          "variant",
+          "node_id",
+          "page",
+          "page_size",
+          "total_rows",
+          "rows",
+          "labels",
+          "query"
+        ],
+        "title": "AnnotationQueriedResult",
+        "type": "object"
+      },
       "AnnotationResult": {
         "additionalProperties": false,
         "properties": {
@@ -1248,104 +1326,32 @@
             "title": "Kind",
             "type": "string"
           },
-          "labels": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/AnnotationPreviewLabel"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Labels"
-          },
-          "node_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Node Id"
-          },
-          "page": {
-            "anyOf": [
-              {
-                "minimum": 1.0,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Page"
-          },
-          "page_size": {
-            "anyOf": [
-              {
-                "minimum": 1.0,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Page Size"
-          },
-          "query": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/AnnotationResultQuery"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "ready": {
-            "const": true,
-            "default": true,
-            "title": "Ready",
-            "type": "boolean"
-          },
-          "rows": {
-            "anyOf": [
-              {
-                "items": {
-                  "additionalProperties": {
-                    "$ref": "#/components/schemas/JsonData-Output"
-                  },
-                  "type": "object"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Rows"
-          },
-          "total_rows": {
-            "anyOf": [
-              {
-                "minimum": 0.0,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Total Rows"
+          "result": {
+            "$ref": "#/components/schemas/AnnotationResultProjection"
           }
         },
+        "required": [
+          "result"
+        ],
         "title": "AnnotationResult",
         "type": "object"
+      },
+      "AnnotationResultProjection": {
+        "discriminator": {
+          "mapping": {
+            "queried": "#/components/schemas/AnnotationQueriedResult",
+            "ready": "#/components/schemas/PreviewReadyResult"
+          },
+          "propertyName": "variant"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/PreviewReadyResult"
+          },
+          {
+            "$ref": "#/components/schemas/AnnotationQueriedResult"
+          }
+        ]
       },
       "AnnotationResultQuery": {
         "additionalProperties": false,
@@ -1537,6 +1543,81 @@
           "source"
         ],
         "title": "AnnotationRunAllSubmission",
+        "type": "object"
+      },
+      "AnnotationTabSettings": {
+        "additionalProperties": false,
+        "properties": {
+          "correction_columns": {
+            "additionalProperties": {
+              "maxLength": 500,
+              "minLength": 1,
+              "type": "string"
+            },
+            "propertyNames": {
+              "format": "uuid"
+            },
+            "title": "Correction Columns",
+            "type": "object"
+          },
+          "kind": {
+            "const": "annotation",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "correction_columns"
+        ],
+        "title": "AnnotationTabSettings",
+        "type": "object"
+      },
+      "AnnotationTabUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "correction_columns": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "maxLength": 500,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "propertyNames": {
+                  "format": "uuid"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correction Columns"
+          },
+          "kind": {
+            "const": "annotation",
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "AnnotationTabUpdate",
         "type": "object"
       },
       "ApiError": {
@@ -3261,6 +3342,35 @@
         "title": "ConcordancePage",
         "type": "object"
       },
+      "ConcordanceQueriedResult": {
+        "additionalProperties": false,
+        "properties": {
+          "query": {
+            "$ref": "#/components/schemas/ConcordanceResultQuery"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/ConcordanceSourceResult"
+            },
+            "maxItems": 2,
+            "minItems": 1,
+            "title": "Sources",
+            "type": "array"
+          },
+          "variant": {
+            "const": "queried",
+            "title": "Variant",
+            "type": "string"
+          }
+        },
+        "required": [
+          "variant",
+          "sources",
+          "query"
+        ],
+        "title": "ConcordanceQueriedResult",
+        "type": "object"
+      },
       "ConcordanceResult": {
         "additionalProperties": false,
         "properties": {
@@ -3270,41 +3380,32 @@
             "title": "Kind",
             "type": "string"
           },
-          "query": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ConcordanceResultQuery"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "ready": {
-            "const": true,
-            "default": true,
-            "title": "Ready",
-            "type": "boolean"
-          },
-          "sources": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/ConcordanceSourceResult"
-                },
-                "maxItems": 2,
-                "minItems": 1,
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Sources"
+          "result": {
+            "$ref": "#/components/schemas/ConcordanceResultProjection"
           }
         },
+        "required": [
+          "result"
+        ],
         "title": "ConcordanceResult",
         "type": "object"
+      },
+      "ConcordanceResultProjection": {
+        "discriminator": {
+          "mapping": {
+            "queried": "#/components/schemas/ConcordanceQueriedResult",
+            "ready": "#/components/schemas/PreviewReadyResult"
+          },
+          "propertyName": "variant"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/PreviewReadyResult"
+          },
+          {
+            "$ref": "#/components/schemas/ConcordanceQueriedResult"
+          }
+        ]
       },
       "ConcordanceResultQuery": {
         "additionalProperties": false,
@@ -3379,6 +3480,30 @@
         "title": "ConcordanceRunAllAnalysisRequest",
         "type": "object"
       },
+      "ConcordanceRunAllGroupResult": {
+        "additionalProperties": false,
+        "properties": {
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/ConcordanceRunAllGroupSource"
+            },
+            "minItems": 1,
+            "title": "Sources",
+            "type": "array"
+          },
+          "variant": {
+            "const": "group",
+            "title": "Variant",
+            "type": "string"
+          }
+        },
+        "required": [
+          "variant",
+          "sources"
+        ],
+        "title": "ConcordanceRunAllGroupResult",
+        "type": "object"
+      },
       "ConcordanceRunAllGroupSource": {
         "additionalProperties": false,
         "properties": {
@@ -3447,16 +3572,9 @@
             "type": "string"
           },
           "source_document_count": {
-            "anyOf": [
-              {
-                "minimum": 0.0,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Source Document Count"
+            "minimum": 0.0,
+            "title": "Source Document Count",
+            "type": "integer"
           }
         },
         "required": [
@@ -3467,12 +3585,30 @@
           "metadata_columns",
           "analysis_columns",
           "internal_columns",
+          "source_document_count",
           "document_count",
           "match_count",
           "analysis_id"
         ],
         "title": "ConcordanceRunAllGroupSource",
         "type": "object"
+      },
+      "ConcordanceRunAllProjection": {
+        "discriminator": {
+          "mapping": {
+            "group": "#/components/schemas/ConcordanceRunAllGroupResult",
+            "source": "#/components/schemas/ConcordanceRunAllSourceResult"
+          },
+          "propertyName": "variant"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/ConcordanceRunAllSourceResult"
+          },
+          {
+            "$ref": "#/components/schemas/ConcordanceRunAllGroupResult"
+          }
+        ]
       },
       "ConcordanceRunAllResult": {
         "additionalProperties": false,
@@ -3483,43 +3619,33 @@
             "title": "Kind",
             "type": "string"
           },
-          "result_type": {
-            "enum": [
-              "source",
-              "group"
-            ],
-            "title": "Result Type",
-            "type": "string"
-          },
-          "source": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/RunAllSourceTableResource"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "sources": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/ConcordanceRunAllGroupSource"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Sources"
+          "result": {
+            "$ref": "#/components/schemas/ConcordanceRunAllProjection"
           }
         },
         "required": [
-          "result_type"
+          "result"
         ],
         "title": "ConcordanceRunAllResult",
+        "type": "object"
+      },
+      "ConcordanceRunAllSourceResult": {
+        "additionalProperties": false,
+        "properties": {
+          "source": {
+            "$ref": "#/components/schemas/RunAllSourceTableResource"
+          },
+          "variant": {
+            "const": "source",
+            "title": "Variant",
+            "type": "string"
+          }
+        },
+        "required": [
+          "variant",
+          "source"
+        ],
+        "title": "ConcordanceRunAllSourceResult",
         "type": "object"
       },
       "ConcordanceSourceResult": {
@@ -3548,38 +3674,47 @@
         "title": "ConcordanceSourceResult",
         "type": "object"
       },
-      "CorruptAnalysis": {
+      "ConcordanceTabSettings": {
         "additionalProperties": false,
-        "description": "Minimal collection item for a root record that cannot be parsed.",
         "properties": {
-          "code": {
-            "const": "analysis_corrupt",
-            "default": "analysis_corrupt",
-            "title": "Code",
-            "type": "string"
-          },
-          "id": {
-            "format": "uuid",
-            "title": "Id",
-            "type": "string"
-          },
-          "tab_id": {
-            "format": "uuid",
-            "title": "Tab Id",
-            "type": "string"
-          },
-          "type": {
-            "const": "corrupt_analysis",
-            "default": "corrupt_analysis",
-            "title": "Type",
+          "kind": {
+            "const": "concordance",
+            "title": "Kind",
             "type": "string"
           }
         },
         "required": [
-          "id",
-          "tab_id"
+          "kind"
         ],
-        "title": "CorruptAnalysis",
+        "title": "ConcordanceTabSettings",
+        "type": "object"
+      },
+      "ConcordanceTabUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "concordance",
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "ConcordanceTabUpdate",
         "type": "object"
       },
       "CreateFolderRequest": {
@@ -4944,52 +5079,7 @@
             "type": "boolean"
           },
           "value": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "integer"
-              },
-              {
-                "type": "number"
-              },
-              {
-                "type": "boolean"
-              },
-              {
-                "items": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "integer"
-                    },
-                    {
-                      "type": "number"
-                    },
-                    {
-                      "type": "boolean"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "type": "array"
-              },
-              {
-                "additionalProperties": {
-                  "$ref": "#/components/schemas/JsonData-Input"
-                },
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Value"
+            "$ref": "#/components/schemas/FilterValue-Input"
           }
         },
         "required": [
@@ -5043,52 +5133,7 @@
             "type": "boolean"
           },
           "value": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "integer"
-              },
-              {
-                "type": "number"
-              },
-              {
-                "type": "boolean"
-              },
-              {
-                "items": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "integer"
-                    },
-                    {
-                      "type": "number"
-                    },
-                    {
-                      "type": "boolean"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "type": "array"
-              },
-              {
-                "additionalProperties": {
-                  "$ref": "#/components/schemas/JsonData-Output"
-                },
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Value"
+            "$ref": "#/components/schemas/FilterValue-Output"
           }
         },
         "required": [
@@ -5217,6 +5262,63 @@
         ],
         "title": "FilterNodeEditRequest",
         "type": "object"
+      },
+      "FilterScalar": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "integer"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "FilterValue-Input": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/FilterScalar"
+          },
+          {
+            "items": {
+              "$ref": "#/components/schemas/FilterScalar"
+            },
+            "type": "array"
+          },
+          {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonData-Input"
+            },
+            "type": "object"
+          }
+        ]
+      },
+      "FilterValue-Output": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/FilterScalar"
+          },
+          {
+            "items": {
+              "$ref": "#/components/schemas/FilterScalar"
+            },
+            "type": "array"
+          },
+          {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonData-Output"
+            },
+            "type": "object"
+          }
+        ]
       },
       "InvalidAnalysisIntegrity": {
         "additionalProperties": false,
@@ -5447,41 +5549,13 @@
           "value": {
             "anyOf": [
               {
-                "type": "string"
-              },
-              {
-                "type": "integer"
-              },
-              {
-                "type": "number"
-              },
-              {
-                "type": "boolean"
+                "$ref": "#/components/schemas/FilterScalar"
               },
               {
                 "items": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "integer"
-                    },
-                    {
-                      "type": "number"
-                    },
-                    {
-                      "type": "boolean"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
+                  "$ref": "#/components/schemas/FilterScalar"
                 },
                 "type": "array"
-              },
-              {
-                "type": "null"
               }
             ],
             "title": "Value"
@@ -5513,6 +5587,21 @@
           "version"
         ],
         "title": "LivenessResponse",
+        "type": "object"
+      },
+      "LocalQuotationEngineSelection": {
+        "additionalProperties": false,
+        "properties": {
+          "type": {
+            "const": "local",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "title": "LocalQuotationEngineSelection",
         "type": "object"
       },
       "MoveFileRequest": {
@@ -5611,6 +5700,21 @@
           }
         },
         "title": "NodeUpdateRequest",
+        "type": "object"
+      },
+      "PreviewReadyResult": {
+        "additionalProperties": false,
+        "properties": {
+          "variant": {
+            "const": "ready",
+            "title": "Variant",
+            "type": "string"
+          }
+        },
+        "required": [
+          "variant"
+        ],
+        "title": "PreviewReadyResult",
         "type": "object"
       },
       "Progress": {
@@ -5796,41 +5900,28 @@
         },
         "required": [
           "node_id",
-          "column"
+          "column",
+          "engine"
         ],
         "title": "QuotationAnalysisRequest",
         "type": "object"
       },
       "QuotationEngineSelection": {
-        "additionalProperties": false,
-        "properties": {
-          "engine_id": {
-            "anyOf": [
-              {
-                "maxLength": 64,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Engine Id"
+        "discriminator": {
+          "mapping": {
+            "local": "#/components/schemas/LocalQuotationEngineSelection",
+            "remote": "#/components/schemas/RemoteQuotationEngineSelection"
           },
-          "type": {
-            "$ref": "#/components/schemas/QuotationEngineType",
-            "default": "local"
-          }
+          "propertyName": "type"
         },
-        "title": "QuotationEngineSelection",
-        "type": "object"
-      },
-      "QuotationEngineType": {
-        "enum": [
-          "local",
-          "remote"
-        ],
-        "title": "QuotationEngineType",
-        "type": "string"
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/LocalQuotationEngineSelection"
+          },
+          {
+            "$ref": "#/components/schemas/RemoteQuotationEngineSelection"
+          }
+        ]
       },
       "QuotationPreviewQuery": {
         "additionalProperties": false,
@@ -5878,13 +5969,13 @@
             "title": "Kind",
             "type": "string"
           },
-          "ready": {
-            "const": true,
-            "default": true,
-            "title": "Ready",
-            "type": "boolean"
+          "result": {
+            "$ref": "#/components/schemas/PreviewReadyResult"
           }
         },
+        "required": [
+          "result"
+        ],
         "title": "QuotationResult",
         "type": "object"
       },
@@ -5994,6 +6085,49 @@
         "title": "QuotationRunAllResult",
         "type": "object"
       },
+      "QuotationTabSettings": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "quotation",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "QuotationTabSettings",
+        "type": "object"
+      },
+      "QuotationTabUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "quotation",
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "QuotationTabUpdate",
+        "type": "object"
+      },
       "ReadinessResponse": {
         "additionalProperties": false,
         "description": "Public Runtime readiness without component or filesystem details.",
@@ -6020,6 +6154,28 @@
           "version"
         ],
         "title": "ReadinessResponse",
+        "type": "object"
+      },
+      "RemoteQuotationEngineSelection": {
+        "additionalProperties": false,
+        "properties": {
+          "engine_id": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Engine Id",
+            "type": "string"
+          },
+          "type": {
+            "const": "remote",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "engine_id"
+        ],
+        "title": "RemoteQuotationEngineSelection",
         "type": "object"
       },
       "RenameColumnNodeEditRequest": {
@@ -6649,16 +6805,9 @@
             "type": "string"
           },
           "source_document_count": {
-            "anyOf": [
-              {
-                "minimum": 0.0,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Source Document Count"
+            "minimum": 0.0,
+            "title": "Source Document Count",
+            "type": "integer"
           },
           "table": {
             "$ref": "#/components/schemas/ProjectedTableResource"
@@ -6672,6 +6821,7 @@
           "metadata_columns",
           "analysis_columns",
           "internal_columns",
+          "source_document_count",
           "document_count",
           "match_count",
           "table"
@@ -7164,6 +7314,49 @@
         "title": "SequentialSourceDescriptor",
         "type": "object"
       },
+      "SequentialTabSettings": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "sequential",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "SequentialTabSettings",
+        "type": "object"
+      },
+      "SequentialTabUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "sequential",
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "SequentialTabUpdate",
+        "type": "object"
+      },
       "SessionResponse": {
         "additionalProperties": false,
         "description": "No-store bootstrap response for both supported deployment profiles.",
@@ -7542,6 +7735,24 @@
         "title": "SqlDerivation",
         "type": "object"
       },
+      "StopWordSettings": {
+        "additionalProperties": false,
+        "description": "Shared normalized stop-word value object.",
+        "properties": {
+          "words": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Words",
+            "type": "array"
+          }
+        },
+        "required": [
+          "words"
+        ],
+        "title": "StopWordSettings",
+        "type": "object"
+      },
       "StringExpression-Input": {
         "additionalProperties": false,
         "properties": {
@@ -7758,17 +7969,10 @@
             "title": "Analysis Ids",
             "type": "array"
           },
-          "annotation_correction_columns": {
-            "additionalProperties": {
-              "maxLength": 500,
-              "minLength": 1,
-              "type": "string"
-            },
-            "propertyNames": {
-              "format": "uuid"
-            },
-            "title": "Annotation Correction Columns",
-            "type": "object"
+          "availability": {
+            "const": "available",
+            "title": "Availability",
+            "type": "string"
           },
           "created_at": {
             "format": "date-time",
@@ -7799,41 +8003,16 @@
             "title": "Revision",
             "type": "integer"
           },
-          "stop_words": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Stop Words",
-            "type": "array"
-          },
-          "topic_modeling_projection_selection": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TopicModelingProjectionSelection"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "topic_modeling_words_per_topic": {
-            "anyOf": [
-              {
-                "maximum": 100.0,
-                "minimum": 3.0,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Topic Modeling Words Per Topic"
+          "settings": {
+            "$ref": "#/components/schemas/TabSettings"
           }
         },
         "required": [
+          "availability",
           "id",
           "kind",
           "name",
+          "settings",
           "created_at",
           "modified_at",
           "revision"
@@ -7861,81 +8040,55 @@
         "title": "TabCreate",
         "type": "object"
       },
-      "TabUpdate": {
-        "additionalProperties": false,
-        "properties": {
-          "annotation_correction_columns": {
-            "anyOf": [
-              {
-                "additionalProperties": {
-                  "maxLength": 500,
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "propertyNames": {
-                  "format": "uuid"
-                },
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Annotation Correction Columns"
+      "TabResource": {
+        "discriminator": {
+          "mapping": {
+            "available": "#/components/schemas/Tab",
+            "unavailable": "#/components/schemas/UnavailableTab"
           },
-          "name": {
-            "anyOf": [
-              {
-                "maxLength": 500,
-                "minLength": 1,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Name"
-          },
-          "stop_words": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Stop Words"
-          },
-          "topic_modeling_projection_selection": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TopicModelingProjectionSelection"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "topic_modeling_words_per_topic": {
-            "anyOf": [
-              {
-                "maximum": 100.0,
-                "minimum": 3.0,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Topic Modeling Words Per Topic"
-          }
+          "propertyName": "availability"
         },
-        "title": "TabUpdate",
-        "type": "object"
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/Tab"
+          },
+          {
+            "$ref": "#/components/schemas/UnavailableTab"
+          }
+        ]
+      },
+      "TabSettings": {
+        "discriminator": {
+          "mapping": {
+            "annotation": "#/components/schemas/AnnotationTabSettings",
+            "concordance": "#/components/schemas/ConcordanceTabSettings",
+            "quotation": "#/components/schemas/QuotationTabSettings",
+            "sequential": "#/components/schemas/SequentialTabSettings",
+            "token_frequency": "#/components/schemas/TokenFrequencyTabSettings",
+            "topic_modeling": "#/components/schemas/TopicModelingTabSettings"
+          },
+          "propertyName": "kind"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/AnnotationTabSettings"
+          },
+          {
+            "$ref": "#/components/schemas/ConcordanceTabSettings"
+          },
+          {
+            "$ref": "#/components/schemas/QuotationTabSettings"
+          },
+          {
+            "$ref": "#/components/schemas/SequentialTabSettings"
+          },
+          {
+            "$ref": "#/components/schemas/TokenFrequencyTabSettings"
+          },
+          {
+            "$ref": "#/components/schemas/TopicModelingTabSettings"
+          }
+        ]
       },
       "TableProjectionResource": {
         "additionalProperties": false,
@@ -8038,6 +8191,63 @@
         "title": "TokenFrequencyResult",
         "type": "object"
       },
+      "TokenFrequencyTabSettings": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "token_frequency",
+            "title": "Kind",
+            "type": "string"
+          },
+          "stop_words": {
+            "$ref": "#/components/schemas/StopWordSettings"
+          }
+        },
+        "required": [
+          "kind",
+          "stop_words"
+        ],
+        "title": "TokenFrequencyTabSettings",
+        "type": "object"
+      },
+      "TokenFrequencyTabUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "token_frequency",
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "stop_words": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StopWordSettings"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "TokenFrequencyTabUpdate",
+        "type": "object"
+      },
       "TokenResultMetadata": {
         "additionalProperties": false,
         "properties": {
@@ -8045,16 +8255,10 @@
             "minimum": 1.0,
             "title": "Effective Token Limit",
             "type": "integer"
-          },
-          "server_token_limit": {
-            "minimum": 1.0,
-            "title": "Server Token Limit",
-            "type": "integer"
           }
         },
         "required": [
-          "effective_token_limit",
-          "server_token_limit"
+          "effective_token_limit"
         ],
         "title": "TokenResultMetadata",
         "type": "object"
@@ -8233,175 +8437,6 @@
           "words"
         ],
         "title": "TopicMeaningOverride",
-        "type": "object"
-      },
-      "TopicMetadata": {
-        "additionalProperties": false,
-        "properties": {
-          "corpus_sizes_after_sample": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "integer"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Corpus Sizes After Sample"
-          },
-          "corpus_sizes_before_sample": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "integer"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Corpus Sizes Before Sample"
-          },
-          "embedding_backend": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Embedding Backend"
-          },
-          "embedding_model": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Embedding Model"
-          },
-          "embeddings_from_ctfidf": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Embeddings From Ctfidf"
-          },
-          "engine": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Engine"
-          },
-          "n_chunks": {
-            "anyOf": [
-              {
-                "minimum": 0.0,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "N Chunks"
-          },
-          "native": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Native"
-          },
-          "node_names": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Node Names",
-            "type": "array"
-          },
-          "random_state": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Random State"
-          },
-          "stage_timings_ms": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/TopicStageTiming"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Stage Timings Ms"
-          },
-          "total_topics_incl_outlier": {
-            "anyOf": [
-              {
-                "minimum": 0.0,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Total Topics Incl Outlier"
-          },
-          "truncated_segment_count": {
-            "anyOf": [
-              {
-                "minimum": 0.0,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Truncated Segment Count"
-          },
-          "vectorizer_model": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Vectorizer Model"
-          }
-        },
-        "title": "TopicMetadata",
         "type": "object"
       },
       "TopicModelingAnalysisRequest": {
@@ -8734,28 +8769,13 @@
             "title": "Kind",
             "type": "string"
           },
-          "meta": {
-            "$ref": "#/components/schemas/TopicMetadata"
-          },
-          "per_corpus_topic_counts": {
-            "anyOf": [
-              {
-                "items": {
-                  "additionalProperties": {
-                    "type": "integer"
-                  },
-                  "type": "object"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Per Corpus Topic Counts"
-          },
           "query": {
             "$ref": "#/components/schemas/TopicModelingResultQuery"
+          },
+          "segment_count": {
+            "minimum": 0.0,
+            "title": "Segment Count",
+            "type": "integer"
           },
           "sources": {
             "items": {
@@ -8773,15 +8793,21 @@
             },
             "title": "Topics",
             "type": "array"
+          },
+          "truncated_segment_count": {
+            "minimum": 0.0,
+            "title": "Truncated Segment Count",
+            "type": "integer"
           }
         },
         "required": [
           "topics",
           "corpus_sizes",
-          "meta",
           "sources",
           "clustering",
           "topic_inclusion",
+          "segment_count",
+          "truncated_segment_count",
           "query"
         ],
         "title": "TopicModelingResult",
@@ -8854,6 +8880,104 @@
         "title": "TopicModelingResultQuery",
         "type": "object"
       },
+      "TopicModelingTabSettings": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "topic_modeling",
+            "title": "Kind",
+            "type": "string"
+          },
+          "projection_selection": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TopicModelingProjectionSelection"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "stop_words": {
+            "$ref": "#/components/schemas/StopWordSettings"
+          },
+          "words_per_topic": {
+            "maximum": 100.0,
+            "minimum": 3.0,
+            "title": "Words Per Topic",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "kind",
+          "stop_words",
+          "words_per_topic",
+          "projection_selection"
+        ],
+        "title": "TopicModelingTabSettings",
+        "type": "object"
+      },
+      "TopicModelingTabUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "topic_modeling",
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "projection_selection": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TopicModelingProjectionSelection"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "stop_words": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StopWordSettings"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "words_per_topic": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 3.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Words Per Topic"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "TopicModelingTabUpdate",
+        "type": "object"
+      },
       "TopicSegmentationMethod": {
         "enum": [
           "automatic",
@@ -8896,26 +9020,6 @@
           "original_columns"
         ],
         "title": "TopicSource",
-        "type": "object"
-      },
-      "TopicStageTiming": {
-        "additionalProperties": false,
-        "properties": {
-          "elapsed_ms": {
-            "minimum": 0.0,
-            "title": "Elapsed Ms",
-            "type": "number"
-          },
-          "stage": {
-            "title": "Stage",
-            "type": "string"
-          }
-        },
-        "required": [
-          "stage",
-          "elapsed_ms"
-        ],
-        "title": "TopicStageTiming",
         "type": "object"
       },
       "UnaryExpression-Input": {
@@ -9126,6 +9230,166 @@
         "title": "UnaryExpression",
         "type": "object"
       },
+      "UnavailableAnalysis": {
+        "additionalProperties": false,
+        "description": "Minimal safe item for an invalid persisted Analysis record.",
+        "properties": {
+          "availability": {
+            "const": "unavailable",
+            "title": "Availability",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "reason": {
+            "const": "record_invalid",
+            "title": "Reason",
+            "type": "string"
+          },
+          "tab_id": {
+            "format": "uuid",
+            "title": "Tab Id",
+            "type": "string"
+          },
+          "warning": {
+            "const": "This Analysis is unavailable because its stored record is invalid.",
+            "title": "Warning",
+            "type": "string"
+          }
+        },
+        "required": [
+          "availability",
+          "id",
+          "tab_id",
+          "reason",
+          "warning"
+        ],
+        "title": "UnavailableAnalysis",
+        "type": "object"
+      },
+      "UnavailableDataBlock": {
+        "additionalProperties": false,
+        "description": "Minimal safe projection of one isolated current-schema Data Block.",
+        "properties": {
+          "availability": {
+            "const": "unavailable",
+            "default": "unavailable",
+            "title": "Availability",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "reason": {
+            "const": "record_invalid",
+            "default": "record_invalid",
+            "title": "Reason",
+            "type": "string"
+          },
+          "warning": {
+            "title": "Warning",
+            "type": "string"
+          },
+          "workspace_id": {
+            "format": "uuid",
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "workspace_id",
+          "warning"
+        ],
+        "title": "UnavailableDataBlock",
+        "type": "object"
+      },
+      "UnavailableTab": {
+        "additionalProperties": false,
+        "description": "Minimal safe item for an invalid persisted Tab record.",
+        "properties": {
+          "availability": {
+            "const": "unavailable",
+            "title": "Availability",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "reason": {
+            "const": "record_invalid",
+            "title": "Reason",
+            "type": "string"
+          },
+          "warning": {
+            "const": "This Tab is unavailable because its stored record is invalid.",
+            "title": "Warning",
+            "type": "string"
+          },
+          "workspace_id": {
+            "format": "uuid",
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "availability",
+          "id",
+          "workspace_id",
+          "reason",
+          "warning"
+        ],
+        "title": "UnavailableTab",
+        "type": "object"
+      },
+      "UnavailableUserFileImport": {
+        "additionalProperties": false,
+        "description": "Small safe projection for one invalid persisted import record.",
+        "properties": {
+          "availability": {
+            "const": "unavailable",
+            "title": "Availability",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "reason": {
+            "const": "record_invalid",
+            "default": "record_invalid",
+            "title": "Reason",
+            "type": "string"
+          },
+          "user_id": {
+            "minLength": 1,
+            "title": "User Id",
+            "type": "string"
+          },
+          "warning": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Warning",
+            "type": "string"
+          }
+        },
+        "required": [
+          "availability",
+          "id",
+          "user_id",
+          "warning"
+        ],
+        "title": "UnavailableUserFileImport",
+        "type": "object"
+      },
       "UnavailableWorkspaceListItem": {
         "additionalProperties": false,
         "description": "Catalogue entry for an owned Workspace that cannot open.",
@@ -9247,6 +9511,11 @@
         "additionalProperties": false,
         "description": "One complete public and persisted import resource.",
         "properties": {
+          "availability": {
+            "const": "available",
+            "title": "Availability",
+            "type": "string"
+          },
           "cancellation_requested_at": {
             "anyOf": [
               {
@@ -9359,6 +9628,7 @@
           }
         },
         "required": [
+          "availability",
           "id",
           "request",
           "state",
@@ -9379,7 +9649,21 @@
         "properties": {
           "items": {
             "items": {
-              "$ref": "#/components/schemas/UserFileImport"
+              "discriminator": {
+                "mapping": {
+                  "available": "#/components/schemas/UserFileImport",
+                  "unavailable": "#/components/schemas/UnavailableUserFileImport"
+                },
+                "propertyName": "availability"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/UserFileImport"
+                },
+                {
+                  "$ref": "#/components/schemas/UnavailableUserFileImport"
+                }
+              ]
             },
             "title": "Items",
             "type": "array"
@@ -9537,6 +9821,12 @@
         "additionalProperties": false,
         "description": "Complete addressable node metadata returned by node routes.",
         "properties": {
+          "availability": {
+            "const": "available",
+            "default": "available",
+            "title": "Availability",
+            "type": "string"
+          },
           "can_redo": {
             "title": "Can Redo",
             "type": "boolean"
@@ -11877,7 +12167,22 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/UserFileImport"
+                  "discriminator": {
+                    "mapping": {
+                      "available": "#/components/schemas/UserFileImport",
+                      "unavailable": "#/components/schemas/UnavailableUserFileImport"
+                    },
+                    "propertyName": "availability"
+                  },
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/UserFileImport"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UnavailableUserFileImport"
+                    }
+                  ],
+                  "title": "Response Get User File Import"
                 }
               }
             },
@@ -15569,333 +15874,6 @@
         ]
       }
     },
-    "/api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}/rows": {
-      "get": {
-        "description": "Return one page of an open-ended Result table as Arrow IPC.",
-        "operationId": "get_analysis_table_rows",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "workspace_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "Workspace Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "path",
-            "name": "analysis_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "Analysis Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "path",
-            "name": "table_id",
-            "required": true,
-            "schema": {
-              "title": "Table Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "page",
-            "required": false,
-            "schema": {
-              "default": 1,
-              "minimum": 1,
-              "title": "Page",
-              "type": "integer"
-            }
-          },
-          {
-            "in": "query",
-            "name": "page_size",
-            "required": false,
-            "schema": {
-              "default": 50,
-              "maximum": 500,
-              "minimum": 1,
-              "title": "Page Size",
-              "type": "integer"
-            }
-          },
-          {
-            "in": "query",
-            "name": "sort_by",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Sort By"
-            }
-          },
-          {
-            "in": "query",
-            "name": "descending",
-            "required": false,
-            "schema": {
-              "default": false,
-              "title": "Descending",
-              "type": "boolean"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/vnd.apache.arrow.stream": {
-                "schema": {
-                  "format": "binary",
-                  "type": "string"
-                }
-              }
-            },
-            "description": "Arrow IPC stream"
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            },
-            "description": "Authentication required"
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            },
-            "description": "Origin, CSRF, or access check failed"
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            },
-            "description": "Resource not found"
-          },
-          "409": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            },
-            "description": "Resource state conflict"
-          },
-          "410": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            },
-            "description": "Retained artifact is no longer available"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            },
-            "description": "Request validation failed"
-          },
-          "500": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            },
-            "description": "Stored resource is corrupt"
-          },
-          "507": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            },
-            "description": "Storage capacity is exhausted"
-          }
-        },
-        "security": [
-          {
-            "WordflowSession": []
-          }
-        ],
-        "summary": "Get Analysis Table Rows",
-        "tags": [
-          "analyses"
-        ]
-      }
-    },
-    "/api/workspaces/{workspace_id}/analyses/{analysis_id}/result/tables/{table_id}/schema": {
-      "get": {
-        "description": "Return a paged Result table schema as a zero-row Arrow stream.",
-        "operationId": "get_analysis_table_schema",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "workspace_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "Workspace Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "path",
-            "name": "analysis_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "Analysis Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "path",
-            "name": "table_id",
-            "required": true,
-            "schema": {
-              "title": "Table Id",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/vnd.apache.arrow.stream": {
-                "schema": {
-                  "format": "binary",
-                  "type": "string"
-                }
-              }
-            },
-            "description": "Arrow IPC stream"
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            },
-            "description": "Authentication required"
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            },
-            "description": "Origin, CSRF, or access check failed"
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            },
-            "description": "Resource not found"
-          },
-          "409": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            },
-            "description": "Resource state conflict"
-          },
-          "410": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            },
-            "description": "Retained artifact is no longer available"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            },
-            "description": "Request validation failed"
-          },
-          "500": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            },
-            "description": "Stored resource is corrupt"
-          },
-          "507": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            },
-            "description": "Storage capacity is exhausted"
-          }
-        },
-        "security": [
-          {
-            "WordflowSession": []
-          }
-        ],
-        "summary": "Get Analysis Table Schema",
-        "tags": [
-          "analyses"
-        ]
-      }
-    },
     "/api/workspaces/{workspace_id}/archive": {
       "get": {
         "description": "Return a portable ZIP, or a raw archival copy for an incompatible Workspace.",
@@ -16008,7 +15986,21 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/WorkspaceNodeInfo"
+                    "discriminator": {
+                      "mapping": {
+                        "available": "#/components/schemas/WorkspaceNodeInfo",
+                        "unavailable": "#/components/schemas/UnavailableDataBlock"
+                      },
+                      "propertyName": "availability"
+                    },
+                    "oneOf": [
+                      {
+                        "$ref": "#/components/schemas/WorkspaceNodeInfo"
+                      },
+                      {
+                        "$ref": "#/components/schemas/UnavailableDataBlock"
+                      }
+                    ]
                   },
                   "title": "Response List Nodes",
                   "type": "array"
@@ -16823,7 +16815,22 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/WorkspaceNodeInfo"
+                  "discriminator": {
+                    "mapping": {
+                      "available": "#/components/schemas/WorkspaceNodeInfo",
+                      "unavailable": "#/components/schemas/UnavailableDataBlock"
+                    },
+                    "propertyName": "availability"
+                  },
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/WorkspaceNodeInfo"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UnavailableDataBlock"
+                    }
+                  ],
+                  "title": "Response Get Node"
                 }
               }
             },
@@ -17830,7 +17837,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/Tab"
+                    "$ref": "#/components/schemas/TabResource"
                   },
                   "title": "Response List Tabs",
                   "type": "array"
@@ -18169,7 +18176,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Tab"
+                  "$ref": "#/components/schemas/TabResource"
                 }
               }
             },
@@ -18275,7 +18282,38 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/TabUpdate"
+                "discriminator": {
+                  "mapping": {
+                    "annotation": "#/components/schemas/AnnotationTabUpdate",
+                    "concordance": "#/components/schemas/ConcordanceTabUpdate",
+                    "quotation": "#/components/schemas/QuotationTabUpdate",
+                    "sequential": "#/components/schemas/SequentialTabUpdate",
+                    "token_frequency": "#/components/schemas/TokenFrequencyTabUpdate",
+                    "topic_modeling": "#/components/schemas/TopicModelingTabUpdate"
+                  },
+                  "propertyName": "kind"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/AnnotationTabUpdate"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ConcordanceTabUpdate"
+                  },
+                  {
+                    "$ref": "#/components/schemas/QuotationTabUpdate"
+                  },
+                  {
+                    "$ref": "#/components/schemas/SequentialTabUpdate"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TokenFrequencyTabUpdate"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TopicModelingTabUpdate"
+                  }
+                ],
+                "title": "Body"
               }
             }
           },
@@ -18516,14 +18554,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "anyOf": [
-                      {
-                        "$ref": "#/components/schemas/Analysis"
-                      },
-                      {
-                        "$ref": "#/components/schemas/CorruptAnalysis"
-                      }
-                    ]
+                    "$ref": "#/components/schemas/AnalysisResource"
                   },
                   "title": "Response List Tab Analyses",
                   "type": "array"

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import uuid
 from collections.abc import Callable
 from typing import Any, TypeVar
 
@@ -48,7 +49,7 @@ class WorkspaceSqlService:
     async def query(
         self,
         user_id: str,
-        workspace_id: str,
+        workspace_id: uuid.UUID,
         request: WorkspaceSqlQueryRequest,
     ) -> tuple[IpcTablePage, int]:
         async with self._workspaces.read_context(user_id, workspace_id) as lease:
@@ -65,7 +66,7 @@ class WorkspaceSqlService:
     async def create(
         self,
         user_id: str,
-        workspace_id: str,
+        workspace_id: uuid.UUID,
         request: WorkspaceSqlCreateRequest,
     ) -> tuple[WorkspaceNodeInfo, int]:
         async with self._workspaces.mutation_context(
@@ -98,11 +99,10 @@ class WorkspaceSqlService:
 
 def _resolve_inputs(
     workspace: Workspace,
-    node_ids: list[Any],
+    node_ids: list[uuid.UUID],
 ) -> list[Node]:
     inputs: list[Node] = []
-    for raw_node_id in node_ids:
-        node_id = str(raw_node_id)
+    for node_id in node_ids:
         node = workspace.nodes.get(node_id)
         if node is None:
             raise NodeNotFoundError("Node not found")
@@ -165,7 +165,7 @@ def _execute_sql(inputs: list[Node], sql: str) -> pl.LazyFrame:
     try:
         with pl.SQLContext(eager=False) as context:
             for node in inputs:
-                context.register(node.id, node.data)
+                context.register(str(node.id), node.data)
             result = context.execute(sql)
         return result
     except pl.exceptions.PolarsError as exc:

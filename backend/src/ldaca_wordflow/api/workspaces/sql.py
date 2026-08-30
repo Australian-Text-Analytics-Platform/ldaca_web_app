@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+
 from fastapi import APIRouter, Request, Response, status
 from fastapi.responses import JSONResponse
 
@@ -49,7 +50,7 @@ async def execute_workspace_sql(
     if isinstance(command, WorkspaceSqlQueryRequest):
         page, revision = await runtime.workspace_sql_service.query(
             principal.user.id,
-            str(workspace_id),
+            workspace_id,
             command,
         )
         result = arrow_page_response(page)
@@ -59,7 +60,7 @@ async def execute_workspace_sql(
     assert isinstance(command, WorkspaceSqlCreateRequest)
     node, revision = await runtime.workspace_sql_service.create(
         principal.user.id,
-        str(workspace_id),
+        workspace_id,
         command,
     )
     return JSONResponse(

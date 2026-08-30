@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import uuid
 from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -21,7 +22,9 @@ from ldaca_wordflow.runtime import Runtime, runtime_context
 from ldaca_wordflow.api.security import SESSION_COOKIE_NAME
 from ldaca_wordflow.services import quota as quota_module
 from ldaca_wordflow.settings import Settings
-from ldaca_wordflow.workers.input_snapshots import create_worker_input_snapshot
+from ldaca_wordflow.infrastructure.storage.input_snapshots import (
+    create_worker_input_snapshot,
+)
 
 
 @pytest.fixture(scope="session")
@@ -134,18 +137,19 @@ def worker_snapshot(tmp_path: Path):
     """Create one canonical task-input snapshot from in-memory test columns."""
 
     def create(*, node_id: str, columns: dict[str, list[object]]) -> Path:
-        workspace = Workspace(name="Worker fixture", workspace_id="fixture")
+        canonical_node_id = uuid.UUID(node_id)
+        workspace = Workspace(name="Worker fixture", workspace_id=uuid.uuid4())
         workspace.add_node(
             Node(
                 data=pl.DataFrame(columns).lazy(),
                 name="Source",
-                id=node_id,
+                id=canonical_node_id,
                 document="document" if "document" in columns else None,
             )
         )
         return create_worker_input_snapshot(
             workspace_id=workspace.id,
-            node_ids=[node_id],
+            node_ids=[canonical_node_id],
             workspace=workspace,
             workspace_data_dir=tmp_path,
             snapshot_dir=tmp_path / f"snapshot-{node_id}",

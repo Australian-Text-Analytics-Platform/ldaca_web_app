@@ -329,9 +329,12 @@ vi.mock('../../common/hooks/useAnalysisFeature', () => ({
       config.hydrationTaskId && mockInitialResult
         ? {
             kind: 'concordance',
-            sources: [],
+            result: {
+              variant: 'queried',
+              sources: [],
+              query: { kind: 'concordance' },
+            },
             metadata: {},
-            query: { kind: 'concordance' },
             ...mockInitialResult,
           }
         : null;
@@ -672,29 +675,31 @@ describe('ConcordanceFeature', () => {
     getAnalysisResultMock.mockResolvedValue({
       data: {
         kind: 'concordance_run_all',
-        result_type: 'source',
-        source: {
-          node_id: 'node-1',
-          node_name: 'Node 1',
-          document_column: 'text',
-          metadata_columns: [],
-          analysis_columns: ['CONC_matched_text', 'CONC_extraction'],
-          internal_columns: ['__wordflow_source_row_id'],
-          source_document_count: 80,
-          document_count: 1,
-          match_count: 25,
-          table: {
-            delivery: 'projected',
-            table_id: 'concordance-run-all',
-            documents: {
-              rows_url: '/analysis-document-rows',
-              schema_url: '/analysis-document-schema',
+        result: {
+          variant: 'source',
+          source: {
+            node_id: 'node-1',
+            node_name: 'Node 1',
+            document_column: 'text',
+            metadata_columns: [],
+            analysis_columns: ['CONC_matched_text', 'CONC_extraction'],
+            internal_columns: ['__wordflow_source_row_id'],
+            source_document_count: 80,
+            document_count: 1,
+            match_count: 25,
+            table: {
+              delivery: 'projected',
+              table_id: 'concordance-run-all',
+              documents: {
+                rows_url: '/analysis-document-rows',
+                schema_url: '/analysis-document-schema',
+              },
+              matches: {
+                rows_url: '/analysis-match-rows',
+                schema_url: '/analysis-match-schema',
+              },
+              density_url: '/analysis-density',
             },
-            matches: {
-              rows_url: '/analysis-match-rows',
-              schema_url: '/analysis-match-schema',
-            },
-            density_url: '/analysis-density',
           },
         },
       },
@@ -797,29 +802,31 @@ describe('ConcordanceFeature', () => {
       return Promise.resolve({
         data: {
           kind: 'concordance_run_all',
-          result_type: 'source',
-          source: {
-            node_id: nodeId,
-            node_name: second ? 'Node 2' : 'Node 1',
-            document_column: 'text',
-            metadata_columns: [],
-            analysis_columns: ['CONC_matched_text', 'CONC_extraction'],
-            internal_columns: ['__wordflow_source_row_id'],
-            source_document_count: 20,
-            document_count: 10,
-            match_count: 20,
-            table: {
-              delivery: 'projected',
-              table_id: `concordance-${nodeId}`,
-              documents: {
-                rows_url: `/analysis-${nodeId}-document-rows`,
-                schema_url: `/analysis-${nodeId}-document-schema`,
+          result: {
+            variant: 'source',
+            source: {
+              node_id: nodeId,
+              node_name: second ? 'Node 2' : 'Node 1',
+              document_column: 'text',
+              metadata_columns: [],
+              analysis_columns: ['CONC_matched_text', 'CONC_extraction'],
+              internal_columns: ['__wordflow_source_row_id'],
+              source_document_count: 20,
+              document_count: 10,
+              match_count: 20,
+              table: {
+                delivery: 'projected',
+                table_id: `concordance-${nodeId}`,
+                documents: {
+                  rows_url: `/analysis-${nodeId}-document-rows`,
+                  schema_url: `/analysis-${nodeId}-document-schema`,
+                },
+                matches: {
+                  rows_url: `/analysis-${nodeId}-match-rows`,
+                  schema_url: `/analysis-${nodeId}-match-schema`,
+                },
+                density_url: `/analysis-${nodeId}-density`,
               },
-              matches: {
-                rows_url: `/analysis-${nodeId}-match-rows`,
-                schema_url: `/analysis-${nodeId}-match-schema`,
-              },
-              density_url: `/analysis-${nodeId}-density`,
             },
           },
         },

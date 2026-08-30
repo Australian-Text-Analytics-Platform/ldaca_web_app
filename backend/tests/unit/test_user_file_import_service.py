@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import shutil
+import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
@@ -20,6 +21,7 @@ from ldaca_wordflow.infrastructure.storage.user_file_import_store import (
     UserFileImportStore,
 )
 from ldaca_wordflow.models.data_sources import SampleCollection
+from ldaca_wordflow.models.user_file_imports import UnavailableUserFileImport
 from ldaca_wordflow.services.sample_data import SampleImportExecution
 from ldaca_wordflow.services.events import EventHub
 from ldaca_wordflow.services.user_file_import_executor import (
@@ -84,6 +86,15 @@ class _Samples:
         del user_id, result
         self.published.append(import_id)
 
+    async def is_import_published(
+        self,
+        user_id: str,
+        import_id: str,
+        result: SampleUserFileImportResult,
+    ) -> bool:
+        del user_id, result
+        return import_id in self.published
+
     async def cleanup_import(self, user_id: str, import_id: str) -> None:
         del user_id
         self.cleaned.append(import_id)
@@ -137,6 +148,7 @@ async def _wait_for_state(
     with anyio.fail_after(2):
         while True:
             current = await service.get(user_id, resource.id)
+            assert isinstance(current, UserFileImport)
             if current.state is state:
                 return current
             await anyio.sleep(0)
@@ -234,9 +246,110 @@ async def test_restart_fails_nonterminal_import_instead_of_resuming_it(
         await service.start(tasks)
 
         interrupted = await service.get("alice", queued.id)
+        assert isinstance(interrupted, UserFileImport)
         assert interrupted.state is BackgroundState.FAILED
         assert interrupted.error is not None
         assert interrupted.error.code == "user_file_import_interrupted"
+        await service.close(anyio.current_time() + 1)
+
+
+async def test_restart_completes_a_prepared_publication_that_is_visible(
+    tmp_path: Path,
+) -> None:
+    samples = _Samples(tmp_path / "staging")
+    service, store = _service(tmp_path, samples)
+    timestamp = datetime.now(UTC)
+    running = UserFileImport.create(
+        SampleUserFileImportRequest(collection_id="demo"),
+        timestamp=timestamp,
+    ).start(timestamp)
+    succeeded = running.succeed(
+        timestamp,
+        result=SampleUserFileImportResult(
+            collection_id="demo",
+            destination_path="sample_data/demo",
+            file_count=1,
+            bytes_written=10,
+        ),
+    )
+    await store.save("alice", running)
+    await store.prepare_publication("alice", succeeded)
+    samples.published.append(str(running.id))
+
+    async with anyio.create_task_group() as tasks:
+        await service.start(tasks)
+
+        recovered = await service.get("alice", running.id)
+        assert recovered == succeeded
+        snapshot = await store.load_all()
+        assert snapshot.records[0].resource == succeeded
+        assert snapshot.prepared_publications == []
+        await service.close(anyio.current_time() + 1)
+
+
+async def test_restart_rolls_back_a_prepared_publication_that_is_not_visible(
+    tmp_path: Path,
+) -> None:
+    samples = _Samples(tmp_path / "staging")
+    service, store = _service(tmp_path, samples)
+    timestamp = datetime.now(UTC)
+    running = UserFileImport.create(
+        SampleUserFileImportRequest(collection_id="demo"),
+        timestamp=timestamp,
+    ).start(timestamp)
+    succeeded = running.succeed(
+        timestamp,
+        result=SampleUserFileImportResult(
+            collection_id="demo",
+            destination_path="sample_data/demo",
+            file_count=1,
+            bytes_written=10,
+        ),
+    )
+    (samples.root / str(running.id)).mkdir(parents=True)
+    await store.save("alice", running)
+    await store.prepare_publication("alice", succeeded)
+
+    async with anyio.create_task_group() as tasks:
+        await service.start(tasks)
+
+        recovered = await service.get("alice", running.id)
+        assert isinstance(recovered, UserFileImport)
+        assert recovered.state is BackgroundState.FAILED
+        assert str(running.id) in samples.cleaned
+        assert (await store.load_all()).prepared_publications == []
+        await service.close(anyio.current_time() + 1)
+
+
+async def test_restart_lists_and_deletes_one_unavailable_import_record(
+    tmp_path: Path,
+) -> None:
+    samples = _Samples(tmp_path / "staging")
+    service, store = _service(tmp_path, samples)
+    healthy = UserFileImport.create(
+        SampleUserFileImportRequest(collection_id="healthy"),
+        timestamp=datetime.now(UTC),
+    )
+    await store.save("alice", healthy)
+    unavailable_id = uuid.uuid4()
+    unavailable_path = (
+        tmp_path / "users" / "alice" / "imports" / f"{unavailable_id}.json"
+    )
+    unavailable_path.write_text("not json", encoding="utf-8")
+
+    async with anyio.create_task_group() as tasks:
+        await service.start(tasks)
+
+        page = await service.list("alice", page=1, page_size=10)
+        assert len(page.items) == 2
+        unavailable = await service.get("alice", unavailable_id)
+        assert isinstance(unavailable, UnavailableUserFileImport)
+        assert unavailable.user_id == "alice"
+        assert unavailable.reason == "record_invalid"
+
+        await service.delete("alice", unavailable_id)
+        assert not unavailable_path.exists()
+        assert len((await service.list("alice", page=1, page_size=10)).items) == 1
         await service.close(anyio.current_time() + 1)
 
 

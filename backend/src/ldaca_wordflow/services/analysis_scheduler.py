@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime
+import uuid
 
 from anyio.abc import TaskGroup
 
@@ -85,7 +86,9 @@ class AnalysisScheduler(AnalysisExecutionControl):
         if target == "running":
             await self._cancel_running(key)
 
-    async def has_workspace_work(self, user_id: str, workspace_id: str) -> bool:
+    async def has_workspace_work(
+        self, user_id: str, workspace_id: uuid.UUID
+    ) -> bool:
         """Return whether one Workspace still owns queued or active execution."""
 
         if any(
@@ -98,7 +101,7 @@ class AnalysisScheduler(AnalysisExecutionControl):
             for key in await self._kernel.active_keys()
         )
 
-    async def cancel_workspace(self, user_id: str, workspace_id: str) -> None:
+    async def cancel_workspace(self, user_id: str, workspace_id: uuid.UUID) -> None:
         """Remove queued work and signal active work before Workspace deletion."""
 
         await self._kernel.remove_where(

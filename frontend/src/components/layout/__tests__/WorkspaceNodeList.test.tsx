@@ -40,6 +40,25 @@ const getRenderedRowNames = () =>
     .map((row) => row.getAttribute('aria-label')?.replace(/^(Select|Deselect) /u, ''));
 
 describe('WorkspaceNodeList', () => {
+  it('renders unavailable Data Block warnings without making them selectable', () => {
+    render(
+      <WorkspaceNodeList
+        workspaceId="workspace-1"
+        nodes={[]}
+        unavailableWarnings={['This Data Block is unavailable because its stored data is invalid.']}
+        selectedNodeIds={[]}
+        onToggleNodeSelection={vi.fn()}
+        renderPinnedRowAction={() => null}
+        renderRowActions={() => null}
+      />,
+    );
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'This Data Block is unavailable because its stored data is invalid.',
+    );
+    expect(screen.getByText('No data blocks')).toBeInTheDocument();
+  });
+
   it('uses a non-button row wrapper and supports click and keyboard toggling', async () => {
     const user = userEvent.setup();
     const onToggleNodeSelection = vi.fn();

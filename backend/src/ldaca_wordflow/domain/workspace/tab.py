@@ -6,12 +6,13 @@ import unicodedata
 import uuid
 from datetime import datetime
 from enum import StrEnum
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import (
     AfterValidator,
     AwareDatetime,
     BaseModel,
+    BeforeValidator,
     ConfigDict,
     Field,
     StringConstraints,
@@ -52,44 +53,92 @@ class TopicModelingProjectionSelection(BaseModel):
     top_n_topics: int = Field(ge=0)
 
 
+def _normalize_stop_words(value: object) -> object:
+    if not isinstance(value, list):
+        return value
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for candidate in value:
+        if not isinstance(candidate, str):
+            return value
+        word = candidate.strip().lower()
+        if word and word not in seen:
+            seen.add(word)
+            normalized.append(word)
+    return normalized
+
+
+class StopWordSettings(BaseModel):
+    """Shared normalized stop-word value object."""
+
+    model_config = ConfigDict(extra="forbid", validate_assignment=True)
+
+    words: Annotated[list[str], BeforeValidator(_normalize_stop_words)]
+
+
+class _TabSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid", validate_assignment=True)
+
+
+class AnnotationTabSettings(_TabSettings):
+    kind: Literal[AnalysisKind.ANNOTATION]
+    correction_columns: dict[uuid.UUID, TabName]
+
+
+class ConcordanceTabSettings(_TabSettings):
+    kind: Literal[AnalysisKind.CONCORDANCE]
+
+
+class QuotationTabSettings(_TabSettings):
+    kind: Literal[AnalysisKind.QUOTATION]
+
+
+class SequentialTabSettings(_TabSettings):
+    kind: Literal[AnalysisKind.SEQUENTIAL]
+
+
+class TokenFrequencyTabSettings(_TabSettings):
+    kind: Literal[AnalysisKind.TOKEN_FREQUENCY]
+    stop_words: StopWordSettings
+
+
+class TopicModelingTabSettings(_TabSettings):
+    kind: Literal[AnalysisKind.TOPIC_MODELING]
+    stop_words: StopWordSettings
+    words_per_topic: int = Field(ge=3, le=100)
+    projection_selection: TopicModelingProjectionSelection | None
+
+
+type TabSettings = Annotated[
+    AnnotationTabSettings
+    | ConcordanceTabSettings
+    | QuotationTabSettings
+    | SequentialTabSettings
+    | TokenFrequencyTabSettings
+    | TopicModelingTabSettings,
+    Field(discriminator="kind"),
+]
+
+
 class Tab(BaseModel):
     """Complete strict public and persisted Tab representation."""
 
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
 
+    availability: Literal["available"]
     id: uuid.UUID
     kind: AnalysisKind
     name: TabName
     analysis_ids: list[uuid.UUID] = Field(default_factory=list)
-    annotation_correction_columns: dict[uuid.UUID, TabName] = Field(
-        default_factory=dict
-    )
-    stop_words: list[str] = Field(default_factory=list)
-    topic_modeling_words_per_topic: int | None = Field(default=None, ge=3, le=100)
-    topic_modeling_projection_selection: TopicModelingProjectionSelection | None = None
+    settings: TabSettings
     created_at: AwareDatetime
     modified_at: AwareDatetime
     revision: int = Field(ge=1)
 
     @model_validator(mode="after")
-    def validate_presentation_settings(self) -> Tab:
-        if self.stop_words and self.kind not in {
-            AnalysisKind.TOKEN_FREQUENCY,
-            AnalysisKind.TOPIC_MODELING,
-        }:
-            raise ValueError(
-                "Stop words belong only to Token Frequency and Topic Modelling Tabs"
-            )
-        if self.kind is AnalysisKind.TOPIC_MODELING:
-            if self.topic_modeling_words_per_topic is None:
-                raise ValueError("Topic Modelling Tabs require a word display count")
-        elif self.topic_modeling_words_per_topic is not None:
-            raise ValueError("Words per topic belongs only to Topic Modelling Tabs")
-        if (
-            self.topic_modeling_projection_selection is not None
-            and self.kind is not AnalysisKind.TOPIC_MODELING
-        ):
-            raise ValueError("Topic projection selection belongs only to Topic Modelling Tabs")
+    def validate_settings_kind(self) -> Tab:
+        if self.settings.kind is not self.kind:
+            raise ValueError("Tab settings kind must match the Tab kind")
         return self
 
     @classmethod
@@ -100,21 +149,84 @@ class Tab(BaseModel):
         name: str,
         timestamp: datetime,
     ) -> Tab:
+        settings_by_kind: dict[AnalysisKind, TabSettings] = {
+            AnalysisKind.ANNOTATION: AnnotationTabSettings(
+                kind=AnalysisKind.ANNOTATION,
+                correction_columns={},
+            ),
+            AnalysisKind.CONCORDANCE: ConcordanceTabSettings(
+                kind=AnalysisKind.CONCORDANCE
+            ),
+            AnalysisKind.QUOTATION: QuotationTabSettings(
+                kind=AnalysisKind.QUOTATION
+            ),
+            AnalysisKind.SEQUENTIAL: SequentialTabSettings(
+                kind=AnalysisKind.SEQUENTIAL
+            ),
+            AnalysisKind.TOKEN_FREQUENCY: TokenFrequencyTabSettings(
+                kind=AnalysisKind.TOKEN_FREQUENCY,
+                stop_words=StopWordSettings(words=[]),
+            ),
+            AnalysisKind.TOPIC_MODELING: TopicModelingTabSettings(
+                kind=AnalysisKind.TOPIC_MODELING,
+                stop_words=StopWordSettings(words=[]),
+                words_per_topic=15,
+                projection_selection=None,
+            ),
+        }
         return cls(
+            availability="available",
             id=uuid.uuid4(),
             kind=kind,
             name=name,
             analysis_ids=[],
-            annotation_correction_columns={},
-            stop_words=[],
-            topic_modeling_words_per_topic=(
-                15 if kind is AnalysisKind.TOPIC_MODELING else None
-            ),
-            topic_modeling_projection_selection=None,
+            settings=settings_by_kind[kind],
             created_at=timestamp,
             modified_at=timestamp,
             revision=1,
         )
 
 
-__all__ = ["AnalysisKind", "Tab", "TabName", "TopicModelingProjectionSelection"]
+class UnavailableTab(BaseModel):
+    """Minimal safe item for an invalid persisted Tab record."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    availability: Literal["unavailable"]
+    id: uuid.UUID
+    workspace_id: uuid.UUID
+    reason: Literal["record_invalid"]
+    warning: Literal[
+        "This Tab is unavailable because its stored record is invalid."
+    ]
+
+    @classmethod
+    def create(cls, *, tab_id: uuid.UUID, workspace_id: uuid.UUID) -> UnavailableTab:
+        return cls(
+            availability="unavailable",
+            id=tab_id,
+            workspace_id=workspace_id,
+            reason="record_invalid",
+            warning="This Tab is unavailable because its stored record is invalid.",
+        )
+
+
+type TabResource = Annotated[Tab | UnavailableTab, Field(discriminator="availability")]
+
+
+__all__ = [
+    "AnalysisKind",
+    "AnnotationTabSettings",
+    "ConcordanceTabSettings",
+    "QuotationTabSettings",
+    "SequentialTabSettings",
+    "StopWordSettings",
+    "Tab",
+    "TabName",
+    "TabResource",
+    "TabSettings",
+    "TokenFrequencyTabSettings",
+    "TopicModelingProjectionSelection",
+    "TopicModelingTabSettings",
+    "UnavailableTab",
+]

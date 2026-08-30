@@ -18,12 +18,25 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class RemoteQuotationEngineSetting(BaseModel):
-    """One operator-owned remote quotation endpoint."""
+    """One operator-owned remote quotation v2 origin."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
     url: AnyHttpUrl
+
+    @field_validator("url")
+    @classmethod
+    def validate_origin(cls, value: AnyHttpUrl) -> AnyHttpUrl:
+        if (
+            value.path not in {"", "/"}
+            or value.query is not None
+            or value.fragment is not None
+            or value.username is not None
+            or value.password is not None
+        ):
+            raise ValueError("Remote quotation engine URL must be an exact origin")
+        return value
 
 
 class Settings(BaseSettings):

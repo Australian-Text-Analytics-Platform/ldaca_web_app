@@ -279,13 +279,10 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
       ? resultSources.map((source) => source.node_id)
       : (serverRequest?.node_ids ?? panelNodeIds);
   const resultNodeNames =
-    result?.data.meta.node_names && result.data.meta.node_names.length > 0
-      ? result.data.meta.node_names
-      : resultSources.length > 0
-        ? resultSources.map((source) => source.node_name)
-        : panelSelectedNodes.map((node) => node.name);
-  const resultRandomSeed =
-    result?.data.meta.random_state ?? serverRequest?.random_seed ?? randomSeed;
+    resultSources.length > 0
+      ? resultSources.map((source) => source.node_name)
+      : panelSelectedNodes.map((node) => node.name);
+  const resultRandomSeed = serverRequest?.random_seed ?? randomSeed;
   const resultMaxSegmentTokens = serverRequest?.max_segment_tokens ?? maxSegmentTokens;
   const firstResultNodeId = resultNodeIds[0] ?? null;
   const firstResultColumn = firstResultNodeId
@@ -396,7 +393,7 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
       setAddToWorkspaceDialogOpen(false);
     },
     persistSelection: (selection) =>
-      host.setPresentationSettings({ topic_modeling_projection_selection: selection }),
+      host.setPresentationSettings({ projectionSelection: selection }),
     onPersistenceError: (cause) => {
       toast.error('Topics updated, but these projection settings were not remembered.', {
         description: cause instanceof Error ? cause.message : String(cause),
@@ -508,7 +505,7 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
           projectionControlResetKey={controlResetKey}
           wordsPerTopic={representativeWordsCount}
           onWordsPerTopicChange={(value) => {
-            void host.setPresentationSettings({ topic_modeling_words_per_topic: value });
+            void host.setPresentationSettings({ wordsPerTopic: value });
           }}
           stopWordsEnabled={stopWordsEnabled}
           onStopWordsEnabledChange={(enabled) => {
@@ -522,7 +519,7 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
             column: firstResultColumn,
           }}
           onStopWordsChange={(words) => {
-            return host.setPresentationSettings({ stop_words: words });
+            return host.setPresentationSettings({ stopWords: words });
           }}
         />
       )}

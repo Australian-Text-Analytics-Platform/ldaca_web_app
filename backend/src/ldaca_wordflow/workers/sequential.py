@@ -11,6 +11,7 @@ import logging
 from pathlib import Path
 from typing import Any
 from collections.abc import Callable
+import uuid
 
 from .utils import process_entrypoint
 
@@ -19,10 +20,8 @@ logger = logging.getLogger(__name__)
 
 @process_entrypoint
 def run_sequential_analysis(
-    user_id: str,
-    workspace_id: str,
     input_snapshot_dir: str,
-    node_id: str,
+    node_id: uuid.UUID,
     artifact_dir: str,
     request_payload: dict[str, Any],
     progress_callback: Callable[[float, str], None] | None = None,
@@ -42,7 +41,7 @@ def run_sequential_analysis(
         if progress_callback:
             progress_callback(0.05, "Loading sequential analysis input...")
 
-        from .input_snapshots import load_snapshot_node
+        from ..infrastructure.storage.input_snapshots import load_snapshot_node
         from ..analysis.sequential_core import (
             SEQUENTIAL_GROUP_INDEX_COLUMN,
             SEQUENTIAL_PERIOD_INDEX_COLUMN,
@@ -113,9 +112,7 @@ def run_sequential_analysis(
         }
     except Exception:
         logger.exception(
-            "Sequential Analysis failed for user=%s workspace=%s node=%s",
-            user_id,
-            workspace_id,
+            "Sequential Analysis failed for node=%s",
             node_id,
         )
         raise

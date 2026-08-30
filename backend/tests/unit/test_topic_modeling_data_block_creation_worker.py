@@ -13,7 +13,9 @@ from ldaca_wordflow.analysis.generated_columns import (
     TOPIC_TOP1_COLUMN,
 )
 from ldaca_wordflow.domain.workspace import Node, SourceProvenance, Workspace
-from ldaca_wordflow.workers.input_snapshots import create_worker_input_snapshot
+from ldaca_wordflow.infrastructure.storage.input_snapshots import (
+    create_worker_input_snapshot,
+)
 from ldaca_wordflow.workers.topic_modeling import run_topic_modeling_data_block_creation
 
 
@@ -27,7 +29,7 @@ def test_topic_modeling_data_block_creation_publishes_ordered_data_and_meanings(
     for node_id, name in ((first_id, "First"), (second_id, "Second")):
         workspace.add_node(
             Node(
-                id=str(node_id),
+                id=node_id,
                 name=name,
                 data=pl.DataFrame(
                     {"text": ["zero", "one", "two"], "ignored": [0, 1, 2]}
@@ -42,7 +44,7 @@ def test_topic_modeling_data_block_creation_publishes_ordered_data_and_meanings(
     snapshot_dir = tmp_path / "input"
     create_worker_input_snapshot(
         workspace_id=workspace.id,
-        node_ids=[str(first_id), str(second_id)],
+        node_ids=[first_id, second_id],
         workspace=workspace,
         workspace_data_dir=data_dir,
         snapshot_dir=snapshot_dir,
@@ -108,8 +110,8 @@ def test_topic_modeling_data_block_creation_publishes_ordered_data_and_meanings(
         },
         clustering_context_path=str(context_path),
         source_projection={
-            str(first_id): {"row_indices": [0, 1, 2], "offset": 0, "size": 3},
-            str(second_id): {"row_indices": [0, 1, 2], "offset": 3, "size": 3},
+            first_id: {"row_indices": [0, 1, 2], "offset": 0, "size": 3},
+            second_id: {"row_indices": [0, 1, 2], "offset": 3, "size": 3},
         },
         progress_callback=lambda progress, message: progress_updates.append(
             (progress, message)
@@ -117,8 +119,8 @@ def test_topic_modeling_data_block_creation_publishes_ordered_data_and_meanings(
     )
 
     assert [item["source_node_id"] for item in result["outputs"]] == [
-        str(first_id),
-        str(second_id),
+        first_id,
+        second_id,
     ]
     first = result["outputs"][0]
     data = pl.read_parquet(first["topic_data"]["parquet_path"])

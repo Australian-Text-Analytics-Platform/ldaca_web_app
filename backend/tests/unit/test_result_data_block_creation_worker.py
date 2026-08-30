@@ -40,8 +40,8 @@ def test_sequential_data_block_creation_filters_original_rows_and_columns(
                 "excluded_group_indices": [1],
             },
         },
-        result_paths={str(source_id): str(source_path)},
-        document_columns={str(source_id): "text"},
+        result_paths={source_id: str(source_path)},
+        document_columns={source_id: "text"},
     )
     output = result["outputs"][0]["data"]
     frame = pl.read_parquet(output_dir / output["parquet_path"])
@@ -79,8 +79,8 @@ def test_sequential_data_block_creation_uses_all_periods_when_selection_is_null(
                 "excluded_group_indices": [],
             },
         },
-        result_paths={str(source_id): str(source_path)},
-        document_columns={str(source_id): None},
+        result_paths={source_id: str(source_path)},
+        document_columns={source_id: None},
     )
     output = result["outputs"][0]["data"]
     frame = pl.read_parquet(output_dir / output["parquet_path"])
@@ -140,8 +140,8 @@ def test_document_data_block_creation_keeps_source_rows_and_joins_filtered_extra
                 }
             ],
         },
-        result_paths={str(source_id): str(source_path)},
-        document_columns={str(source_id): "text"},
+        result_paths={source_id: str(source_path)},
+        document_columns={source_id: "text"},
     )
     output = result["outputs"][0]["data"]
     frame = pl.read_parquet(output_dir / output["parquet_path"])
@@ -192,8 +192,8 @@ def test_document_data_block_creation_allows_schema_only_output(tmp_path: Path) 
                 }
             ],
         },
-        result_paths={str(source_id): str(source_path)},
-        document_columns={str(source_id): "text"},
+        result_paths={source_id: str(source_path)},
+        document_columns={source_id: "text"},
     )
     output = result["outputs"][0]["data"]
     frame = pl.read_parquet(output_dir / output["parquet_path"])

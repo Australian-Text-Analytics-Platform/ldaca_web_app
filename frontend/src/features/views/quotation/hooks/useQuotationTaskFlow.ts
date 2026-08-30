@@ -1,10 +1,9 @@
-import type { QuotationAnalysisRequest, Analysis } from '@/api';
+import type { Analysis, QuotationAnalysisRequest, QuotationEngineConfig } from '@/api';
 import { submitTabAnalysis } from '@/api';
 import type { RunAnalysis } from '../../common/hooks/useAnalysisFeature';
 import type { NodeDataRequest } from '@/lib/queryKeys';
 import type { NodeColumnSelection } from '../../common/nodeSelectionTypes';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
-import type { QuotationEngineRequestPayload } from './useQuotationEngineSettings';
 
 /** Extracts the most useful backend error detail for quotation dialogs. */
 /**
@@ -39,7 +38,7 @@ interface QuotationState {
   activeSelections: NodeColumnSelection[];
   previewRequest: NodeDataRequest;
   originalColumnsByNode: Record<string, string[]>;
-  buildEngineRequest: () => QuotationEngineRequestPayload | null;
+  buildEngineRequest: () => QuotationEngineConfig | null;
   supersedesAnalysisIds: string[];
 }
 

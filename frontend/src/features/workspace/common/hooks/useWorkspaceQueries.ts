@@ -3,6 +3,7 @@ import { listNodes, listWorkspaces } from '@/api';
 import type { WorkspaceCatalogueItem, WorkspaceGraphResponse, WorkspaceSummary } from '@/api';
 import { queryKeys } from '@/lib/queryKeys';
 import type { WorkspaceNodeInfo as GraphNode } from '@/api';
+import type { UnavailableDataBlock } from '@/api';
 
 interface WorkspaceQueriesParams {
   isAuthenticated: boolean;
@@ -71,14 +72,18 @@ export const useWorkspaceQueries = ({
         path: { workspace_id: currentWorkspaceId },
         throwOnError: true,
       });
-      const edges = data.flatMap((node) =>
+      const nodes = data.filter((node): node is GraphNode => node.availability === 'available');
+      const unavailableNodes = data.filter(
+        (node): node is UnavailableDataBlock => node.availability === 'unavailable',
+      );
+      const edges = nodes.flatMap((node) =>
         (node.child_ids ?? []).map((childId) => ({
           id: `${node.id}:${childId}`,
           source: node.id,
           target: childId,
         })),
       );
-      return { nodes: data, edges } satisfies WorkspaceGraphResponse;
+      return { nodes, edges, unavailableNodes } satisfies WorkspaceGraphResponse;
     },
     enabled: isAuthenticated && !!currentWorkspaceId,
     refetchOnWindowFocus: false,

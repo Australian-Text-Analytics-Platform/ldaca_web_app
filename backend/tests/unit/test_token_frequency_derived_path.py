@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+import uuid
 from pathlib import Path
 from types import ModuleType
 from typing import Any, cast
@@ -10,8 +11,17 @@ from typing import Any, cast
 import polars as pl
 import pytest
 from ldaca_wordflow.domain.workspace import Node, Workspace
-from ldaca_wordflow.workers.input_snapshots import create_worker_input_snapshot
-from ldaca_wordflow.workers.token_frequency import _compute_token_frequencies
+from ldaca_wordflow.infrastructure.storage.input_snapshots import (
+    create_worker_input_snapshot,
+)
+from ldaca_wordflow.workers.token_frequency import (
+    _compute_token_frequencies,
+    run_token_frequency_analysis,
+)
+
+
+def _id(label: str) -> uuid.UUID:
+    return uuid.uuid5(uuid.NAMESPACE_URL, f"token-frequency:{label}")
 
 
 def _stub_polars_text(monkeypatch) -> list[str | None]:
@@ -38,13 +48,10 @@ def test_worker_raw_text_path_unchanged_when_no_tokens(tmp_path, monkeypatch):
     requested_models = _stub_polars_text(monkeypatch)
 
     result = _compute_token_frequencies(
-        workspace_id="ws-1",
-        node_corpora={"node-1": ["alpha beta alpha", "alpha"]},
-        node_display_names={"node-1": "EN Corpus"},
+        node_corpora={_id("node-1"): ["alpha beta alpha", "alpha"]},
+        node_display_names={_id("node-1"): "EN Corpus"},
         artifact_dir=str(tmp_path / "output"),
-        scratch_dir=str(tmp_path / "scratch"),
-        artifact_prefix="token_freq_text",
-        node_tokenizer_models={"node-1": "native:plain_words_en"},
+        node_tokenizer_models={_id("node-1"): "native:plain_words_en"},
     )
 
     assert result["state"] == "successful"
@@ -63,14 +70,11 @@ def test_worker_mixes_token_stream_and_text_paths(tmp_path, monkeypatch):
     pl.DataFrame({"token": ["beta", "gamma", "gamma"]}).write_parquet(stream_path)
 
     result = _compute_token_frequencies(
-        workspace_id="ws-1",
-        node_corpora={"text-side": ["alpha beta alpha"]},
-        node_token_streams={"tokens-side": str(stream_path)},
-        node_display_names={"text-side": "EN", "tokens-side": "ZH"},
+        node_corpora={_id("text-side"): ["alpha beta alpha"]},
+        node_token_streams={_id("tokens-side"): str(stream_path)},
+        node_display_names={_id("text-side"): "EN", _id("tokens-side"): "ZH"},
         artifact_dir=str(tmp_path / "output"),
-        scratch_dir=str(tmp_path / "scratch"),
-        artifact_prefix="token_freq_mixed",
-        node_tokenizer_models={"text-side": "native:plain_words_en"},
+        node_tokenizer_models={_id("text-side"): "native:plain_words_en"},
     )
 
     assert result["state"] == "successful"
@@ -81,11 +85,11 @@ def test_worker_mixes_token_stream_and_text_paths(tmp_path, monkeypatch):
     }
     text_counts = {
         row["token"]: row["frequency"]
-        for row in pl.read_ipc_stream(node_paths["text-side"]).to_dicts()
+        for row in pl.read_ipc_stream(node_paths[_id("text-side")]).to_dicts()
     }
     tokens_counts = {
         row["token"]: row["frequency"]
-        for row in pl.read_ipc_stream(node_paths["tokens-side"]).to_dicts()
+        for row in pl.read_ipc_stream(node_paths[_id("tokens-side")]).to_dicts()
     }
     assert text_counts == {"alpha": 2, "beta": 1}
     assert tokens_counts == {"beta": 1, "gamma": 2}
@@ -99,14 +103,14 @@ def test_worker_plain_request_uses_raw_text_even_if_node_preference_differs(
     node = Node(
         data=pl.DataFrame({"document": ["alpha beta alpha", "beta"]}).lazy(),
         name="EN Corpus",
-        id="node-1",
+        id=_id("node-1"),
         tokenizer_model="lindera:jieba",
     )
-    workspace = Workspace(name="tokens", workspace_id="ws-1")
+    workspace = Workspace(name="tokens", workspace_id=_id("ws-1"))
     workspace.add_node(node)
     snapshot_dir = create_worker_input_snapshot(
         workspace_id=workspace.id,
-        node_ids=["node-1"],
+        node_ids=[_id("node-1")],
         workspace=workspace,
         workspace_data_dir=tmp_path,
         snapshot_dir=tmp_path / "snapshots" / "input",
@@ -120,17 +124,15 @@ def test_worker_plain_request_uses_raw_text_even_if_node_preference_differs(
 
     monkeypatch.setattr(tokens_cache, "tokenize_lazyframe", _fail_tokenize)
 
-    result = _compute_token_frequencies(
-        workspace_id="ws-1",
-        node_corpora={},
-        node_display_names={},
+    result = run_token_frequency_analysis(
         artifact_dir=str(tmp_path / "output"),
         scratch_dir=str(tmp_path / "scratch"),
-        artifact_prefix="token_freq_plain_preference",
         input_snapshot_dir=str(snapshot_dir),
-        node_ids=["node-1"],
-        node_columns={"node-1": "document"},
-        node_tokenizer_models={"node-1": "native:plain_words_en"},
+        node_ids=[_id("node-1")],
+        node_columns={_id("node-1"): "document"},
+        token_limit=10,
+        node_tokenizer_models={_id("node-1"): "native:plain_words_en"},
+        token_cache_path=str(tmp_path / "tokens.duckdb"),
     )
 
     assert result["state"] == "successful"
@@ -146,12 +148,9 @@ def test_worker_raw_text_path_requires_tokenizer_model(tmp_path, monkeypatch):
 
     with pytest.raises(ValueError, match="node_tokenizer_models must include"):
         _compute_token_frequencies(
-            workspace_id="ws-1",
-            node_corpora={"node-1": ["alpha beta"]},
-            node_display_names={"node-1": "EN Corpus"},
+            node_corpora={_id("node-1"): ["alpha beta"]},
+            node_display_names={_id("node-1"): "EN Corpus"},
             artifact_dir=str(tmp_path / "output"),
-            scratch_dir=str(tmp_path / "scratch"),
-            artifact_prefix="token_freq_text",
         )
 
 
@@ -170,13 +169,10 @@ def test_worker_uses_node_token_streams_when_provided(tmp_path, monkeypatch):
     ).write_parquet(stream_path)
 
     result = _compute_token_frequencies(
-        workspace_id="ws-1",
         node_corpora={},
-        node_token_streams={"node-1": str(stream_path)},
-        node_display_names={"node-1": "ZH Corpus"},
+        node_token_streams={_id("node-1"): str(stream_path)},
+        node_display_names={_id("node-1"): "ZH Corpus"},
         artifact_dir=str(tmp_path / "output"),
-        scratch_dir=str(tmp_path / "scratch"),
-        artifact_prefix="token_freq_stream",
     )
 
     assert result["state"] == "successful"
@@ -204,13 +200,10 @@ def test_worker_token_stream_matches_manual_explode(tmp_path, monkeypatch):
     exploded_df.rename({"tokens": "token"}).select("token").write_parquet(stream_path)
 
     result = _compute_token_frequencies(
-        workspace_id="ws-1",
         node_corpora={},
-        node_token_streams={"node-1": str(stream_path)},
-        node_display_names={"node-1": "Corpus"},
+        node_token_streams={_id("node-1"): str(stream_path)},
+        node_display_names={_id("node-1"): "Corpus"},
         artifact_dir=str(tmp_path / "output"),
-        scratch_dir=str(tmp_path / "scratch"),
-        artifact_prefix="token_freq_consistency",
     )
 
     table_path = Path(result["tables"]["nodes"][0]["table"]["artifact"])

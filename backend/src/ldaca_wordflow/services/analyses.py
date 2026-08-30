@@ -12,8 +12,10 @@ from datetime import UTC, datetime
 from typing import Protocol, cast
 
 import anyio
+from anyio.to_thread import run_sync as run_sync_in_worker_thread
 from pydantic import ValidationError
 
+from ..analysis.result_integrity import validate_analysis_result_integrity
 from ..domain.workspace import (
     Analysis,
     AnalysisArtifactRecord,
@@ -29,7 +31,8 @@ from ..domain.workspace import (
     ConcordanceDocumentDataBlockCreationAnalysisRequest,
     ConcordanceMatchDataBlockCreationAnalysisRequest,
     ConcordanceRunAllAnalysisRequest,
-    CorruptAnalysis,
+    AnalysisResource,
+    UnavailableAnalysis,
     Failure,
     InvalidAnalysisIntegrity,
     Progress,
@@ -110,11 +113,15 @@ class AnalysisService:
         self._artifacts = artifacts
         self._credentials = credentials
         self._clock = clock or (lambda: datetime.now(UTC))
-        self._live_progress: dict[tuple[str, str], Progress] = {}
+        self._live_progress: dict[tuple[uuid.UUID, uuid.UUID], Progress] = {}
         self._accepting = True
 
     @staticmethod
-    def _key(user_id: str, workspace_id: str, analysis_id: str) -> AnalysisExecutionKey:
+    def _key(
+        user_id: str,
+        workspace_id: uuid.UUID,
+        analysis_id: uuid.UUID,
+    ) -> AnalysisExecutionKey:
         return AnalysisExecutionKey(user_id, workspace_id, analysis_id)
 
     @staticmethod
@@ -125,7 +132,7 @@ class AnalysisService:
         return [
             node_id
             for node_id in analysis_input_ids(record.request)
-            if str(node_id) not in lease.workspace.nodes
+            if node_id not in lease.workspace.nodes
         ]
 
     def _project(self, lease: WorkspaceLease, record: AnalysisRecord) -> Analysis:
@@ -135,15 +142,15 @@ class AnalysisService:
             if missing
             else ValidAnalysisIntegrity()
         )
-        progress = self._live_progress.get((lease.workspace.id, str(record.id)))
+        progress = self._live_progress.get((lease.workspace.id, record.id))
         return public_analysis(record, integrity=integrity, progress=progress)
 
     def _current_progress(
         self,
-        workspace_id: str,
+        workspace_id: uuid.UUID,
         record: AnalysisRecord,
     ) -> Progress:
-        return self._live_progress.get((workspace_id, str(record.id)), record.progress)
+        return self._live_progress.get((workspace_id, record.id), record.progress)
 
     def _apply_success_supersession(
         self,
@@ -151,27 +158,29 @@ class AnalysisService:
         record: AnalysisRecord,
     ) -> None:
         for superseded_id in record.supersedes_analysis_ids:
-            lease.workspace.remove_analysis(str(superseded_id))
-        tab = lease.workspace.tabs.get(str(record.tab_id))
+            lease.workspace.remove_analysis(superseded_id)
+        tab = lease.workspace.tabs.get(record.tab_id)
         if tab is not None and record.supersedes_analysis_ids:
             tab.modified_at = self._clock()
             tab.revision += 1
 
     @staticmethod
-    def _detached_root_id(lease: WorkspaceLease, record: AnalysisRecord) -> str | None:
+    def _detached_root_id(
+        lease: WorkspaceLease, record: AnalysisRecord
+    ) -> uuid.UUID | None:
         root = record
         while root.parent_analysis_id is not None:
-            parent = lease.workspace.analyses.get(str(root.parent_analysis_id))
+            parent = lease.workspace.analyses.get(root.parent_analysis_id)
             if parent is None:
                 break
             root = parent
-        root_id = str(root.id)
+        root_id = root.id
         return root_id if lease.workspace.analysis_tab_id(root_id) is None else None
 
     @staticmethod
     def _remove_terminal_detached_tree(
         lease: WorkspaceLease,
-        root_id: str | None,
+        root_id: uuid.UUID | None,
     ) -> None:
         if root_id is None:
             return
@@ -193,7 +202,7 @@ class AnalysisService:
     @staticmethod
     def _require_live_record(
         lease: WorkspaceLease,
-        analysis_id: str,
+        analysis_id: uuid.UUID,
     ) -> AnalysisRecord:
         if analysis_id not in lease.workspace.live_analysis_ids():
             raise AnalysisNotFoundError("Analysis not found")
@@ -221,8 +230,8 @@ class AnalysisService:
     async def submit(
         self,
         user_id: str,
-        workspace_id: str,
-        tab_id: str,
+        workspace_id: uuid.UUID,
+        tab_id: uuid.UUID,
         command: AnalysisCreate,
     ) -> Analysis:
         """Create one complete immutable Analysis in a Tab-owned forest."""
@@ -279,7 +288,7 @@ class AnalysisService:
             tab_records = [
                 record
                 for record in lease.workspace.analyses.values()
-                if str(record.tab_id) == tab_id
+                if record.tab_id == tab_id
             ]
             if command.execution_scope is not AnalysisExecutionScope.SUPPORTING and any(
                 record.execution_scope is not AnalysisExecutionScope.SUPPORTING
@@ -290,10 +299,8 @@ class AnalysisService:
             parent = None
             parent_lineage: set[uuid.UUID] = set()
             if command.parent_analysis_id is not None:
-                parent = self._require_live_record(
-                    lease, str(command.parent_analysis_id)
-                )
-                if str(parent.tab_id) != tab_id:
+                parent = self._require_live_record(lease, command.parent_analysis_id)
+                if parent.tab_id != tab_id:
                     raise AnalysisParentInvalidError(
                         "Parent Analysis belongs to another Tab"
                     )
@@ -303,7 +310,7 @@ class AnalysisService:
                     if ancestor.parent_analysis_id is None:
                         break
                     next_ancestor = lease.workspace.analyses.get(
-                        str(ancestor.parent_analysis_id)
+                        ancestor.parent_analysis_id
                     )
                     if next_ancestor is None:
                         raise AnalysisParentInvalidError(
@@ -347,8 +354,8 @@ class AnalysisService:
                     )
             supersedes = []
             for analysis_id in command.supersedes_analysis_ids:
-                candidate = self._require_live_record(lease, str(analysis_id))
-                if str(candidate.tab_id) != tab_id or candidate.state in {
+                candidate = self._require_live_record(lease, analysis_id)
+                if candidate.tab_id != tab_id or candidate.state in {
                     AnalysisState.QUEUED,
                     AnalysisState.RUNNING,
                 }:
@@ -363,7 +370,7 @@ class AnalysisService:
             missing = [
                 node_id
                 for node_id in analysis_input_ids(request)
-                if str(node_id) not in lease.workspace.nodes
+                if node_id not in lease.workspace.nodes
             ]
             if missing:
                 raise AnalysisInputMissingError(
@@ -374,7 +381,7 @@ class AnalysisService:
                 )
             if linear_annotation:
                 for analysis_id in list(tab.analysis_ids):
-                    lease.workspace.remove_analysis(str(analysis_id))
+                    lease.workspace.remove_analysis(analysis_id)
             record = AnalysisRecord.create(
                 request,
                 tab_id=tab.id,
@@ -422,7 +429,7 @@ class AnalysisService:
         try:
             for scheduled in records_to_schedule:
                 await self._schedule_created(
-                    self._key(user_id, workspace_id, str(scheduled.id)),
+                    self._key(user_id, workspace_id, scheduled.id),
                     created_at=scheduled.created_at,
                     credential=credential,
                 )
@@ -432,7 +439,7 @@ class AnalysisService:
                     await self.cancel(
                         user_id,
                         workspace_id,
-                        str(record.id),
+                        record.id,
                     )
             raise
         return resource
@@ -473,7 +480,7 @@ class AnalysisService:
             if record is None or record.state is not AnalysisState.QUEUED:
                 lease.commit_requested = False
                 return
-            tab = lease.workspace.tabs.get(str(record.tab_id))
+            tab = lease.workspace.tabs.get(record.tab_id)
             if tab is not None:
                 tab.modified_at = self._clock()
                 tab.revision += 1
@@ -483,30 +490,40 @@ class AnalysisService:
     async def for_tab(
         self,
         user_id: str,
-        workspace_id: str,
-        tab_id: str,
-    ) -> list[Analysis | CorruptAnalysis]:
+        workspace_id: uuid.UUID,
+        tab_id: uuid.UUID,
+    ) -> list[AnalysisResource]:
         """Return a Tab's complete Analysis forest in creation order."""
 
         async with self._workspaces.read_context(user_id, workspace_id) as lease:
             tab = lease.workspace.tabs.get(tab_id)
             if tab is None:
                 raise TabNotFoundError("Tab not found")
-            items: list[Analysis | CorruptAnalysis] = []
+            items: list[AnalysisResource] = []
             for analysis_id in tab.analysis_ids:
-                key = str(analysis_id)
-                record = lease.workspace.analyses.get(key)
+                record = lease.workspace.analyses.get(analysis_id)
                 if record is not None:
                     items.append(self._project(lease, record))
-                elif key in lease.workspace.corrupt_analysis_ids:
-                    items.append(CorruptAnalysis(id=analysis_id, tab_id=tab.id))
+                elif analysis_id in lease.workspace.corrupt_analysis_ids:
+                    items.append(
+                        UnavailableAnalysis(
+                            availability="unavailable",
+                            id=analysis_id,
+                            tab_id=tab.id,
+                            reason="record_invalid",
+                            warning=(
+                                "This Analysis is unavailable because its stored "
+                                "record is invalid."
+                            ),
+                        )
+                    )
             return items
 
     async def get(
         self,
         user_id: str,
-        workspace_id: str,
-        analysis_id: str,
+        workspace_id: uuid.UUID,
+        analysis_id: uuid.UUID,
     ) -> Analysis:
         """Return one live valid Analysis without mutating integrity state."""
 
@@ -518,8 +535,8 @@ class AnalysisService:
     async def successful_record_context(
         self,
         user_id: str,
-        workspace_id: str,
-        analysis_id: str,
+        workspace_id: uuid.UUID,
+        analysis_id: uuid.UUID,
         *,
         allow_closing: bool,
     ) -> AsyncIterator[tuple[WorkspaceLease, AnalysisRecord]]:
@@ -550,7 +567,7 @@ class AnalysisService:
     async def list_analyses(
         self,
         user_id: str,
-        workspace_id: str,
+        workspace_id: uuid.UUID,
         *,
         page: int,
         page_size: int,
@@ -564,18 +581,24 @@ class AnalysisService:
                 for analysis_id, record in lease.workspace.analyses.items()
                 if analysis_id in live_ids
             ]
-            records.sort(key=lambda record: str(record.id))
+            records.sort(key=lambda record: record.id.int)
             records.sort(key=lambda record: record.created_at, reverse=True)
-            items: list[Analysis | CorruptAnalysis] = [
+            items: list[AnalysisResource] = [
                 self._project(lease, record) for record in records
             ]
             for analysis_id in sorted(lease.workspace.corrupt_analysis_ids & live_ids):
                 tab_id = lease.workspace.analysis_tab_id(analysis_id)
                 if tab_id is not None:
                     items.append(
-                        CorruptAnalysis(
-                            id=uuid.UUID(analysis_id),
-                            tab_id=uuid.UUID(tab_id),
+                        UnavailableAnalysis(
+                            availability="unavailable",
+                            id=analysis_id,
+                            tab_id=tab_id,
+                            reason="record_invalid",
+                            warning=(
+                                "This Analysis is unavailable because its stored "
+                                "record is invalid."
+                            ),
                         )
                     )
 
@@ -592,8 +615,8 @@ class AnalysisService:
     async def cancel(
         self,
         user_id: str,
-        workspace_id: str,
-        analysis_id: str,
+        workspace_id: uuid.UUID,
+        analysis_id: uuid.UUID,
     ) -> tuple[Analysis, bool]:
         """Cancel one Analysis execution head and every active descendant."""
 
@@ -641,7 +664,7 @@ class AnalysisService:
                     )
                     if should_signal and not is_unscheduled_group_root:
                         keys_to_signal.append(
-                            self._key(user_id, workspace_id, str(member.id))
+                            self._key(user_id, workspace_id, member.id)
                         )
                     if member.id == record.id:
                         record = updated
@@ -656,8 +679,8 @@ class AnalysisService:
     async def clear_tab(
         self,
         user_id: str,
-        workspace_id: str,
-        tab_id: str,
+        workspace_id: uuid.UUID,
+        tab_id: uuid.UUID,
     ) -> None:
         """Detach a Tab's complete forest and cancel all active work."""
 
@@ -669,14 +692,14 @@ class AnalysisService:
             if not tab.analysis_ids:
                 lease.commit_requested = False
                 return
-            owned_ids = {str(item) for item in tab.analysis_ids}
+            owned_ids = set(tab.analysis_ids)
             root_ids = [
                 analysis_id
                 for analysis_id in owned_ids
                 if (
                     (record := lease.workspace.analyses.get(analysis_id)) is None
                     or record.parent_analysis_id is None
-                    or str(record.parent_analysis_id) not in owned_ids
+                    or record.parent_analysis_id not in owned_ids
                 )
             ]
             timestamp = self._clock()
@@ -700,8 +723,8 @@ class AnalysisService:
     async def delete_tab(
         self,
         user_id: str,
-        workspace_id: str,
-        tab_id: str,
+        workspace_id: uuid.UUID,
+        tab_id: uuid.UUID,
     ) -> None:
         """Delete one Tab and detach its Analysis tree through one mutation."""
 
@@ -710,14 +733,14 @@ class AnalysisService:
             tab = lease.workspace.remove_tab(tab_id)
             if tab is None:
                 raise TabNotFoundError("Tab not found")
-            owned_ids = {str(item) for item in tab.analysis_ids}
+            owned_ids = set(tab.analysis_ids)
             root_ids = [
                 analysis_id
                 for analysis_id in owned_ids
                 if (
                     (record := lease.workspace.analyses.get(analysis_id)) is None
                     or record.parent_analysis_id is None
-                    or str(record.parent_analysis_id) not in owned_ids
+                    or record.parent_analysis_id not in owned_ids
                 )
             ]
             timestamp = self._clock()
@@ -739,8 +762,8 @@ class AnalysisService:
         self,
         lease: WorkspaceLease,
         user_id: str,
-        workspace_id: str,
-        root_id: str,
+        workspace_id: uuid.UUID,
+        root_id: uuid.UUID,
         timestamp: datetime,
     ) -> list[AnalysisExecutionKey]:
         if root_id in lease.workspace.corrupt_analysis_ids:
@@ -757,13 +780,13 @@ class AnalysisService:
             if record.state is AnalysisState.QUEUED:
                 updated = record.cancel_queued(timestamp)
                 lease.workspace.replace_analysis(updated)
-                keys_to_cancel.append(self._key(user_id, workspace_id, str(record.id)))
+                keys_to_cancel.append(self._key(user_id, workspace_id, record.id))
             elif record.state is AnalysisState.RUNNING:
                 has_running = True
                 if record.cancellation_requested_at is None:
                     updated = record.request_running_cancellation(timestamp)
                     lease.workspace.replace_analysis(updated)
-                keys_to_cancel.append(self._key(user_id, workspace_id, str(record.id)))
+                keys_to_cancel.append(self._key(user_id, workspace_id, record.id))
         if not has_running:
             lease.workspace.remove_analysis(root_id)
         return keys_to_cancel
@@ -863,7 +886,7 @@ class AnalysisService:
 
         should_terminate = False
         live_progress: Progress | None = None
-        group_progress: tuple[str, Progress] | None = None
+        group_progress: tuple[uuid.UUID, Progress] | None = None
         async with self._workspaces.mutation_context(
             key.user_id,
             key.workspace_id,
@@ -919,9 +942,7 @@ class AnalysisService:
                 self._live_progress[progress_key] = progress
                 live_progress = progress
                 if record.parent_analysis_id is not None:
-                    parent = lease.workspace.analyses.get(
-                        str(record.parent_analysis_id)
-                    )
+                    parent = lease.workspace.analyses.get(record.parent_analysis_id)
                     if (
                         parent is not None
                         and parent.state is AnalysisState.RUNNING
@@ -930,7 +951,7 @@ class AnalysisService:
                             ConcordanceRunAllAnalysisRequest,
                         )
                     ):
-                        children = lease.workspace.analysis_children(str(parent.id))
+                        children = lease.workspace.analysis_children(parent.id)
                         fractions = [
                             self._current_progress(key.workspace_id, item).fraction
                             for item in children
@@ -941,10 +962,10 @@ class AnalysisService:
                                 / len(fractions),
                                 message="Processing Concordance sources",
                             )
-                            self._live_progress[(key.workspace_id, str(parent.id))] = (
+                            self._live_progress[(key.workspace_id, parent.id)] = (
                                 aggregate
                             )
-                            group_progress = (str(parent.id), aggregate)
+                            group_progress = (parent.id, aggregate)
                 lease.commit_requested = False
         if live_progress is not None:
             await self._workspaces.publish_analysis_progress(
@@ -971,7 +992,7 @@ class AnalysisService:
     ) -> None:
         if child.parent_analysis_id is None:
             return
-        parent = lease.workspace.analyses.get(str(child.parent_analysis_id))
+        parent = lease.workspace.analyses.get(child.parent_analysis_id)
         if (
             parent is None
             or parent.state is not AnalysisState.RUNNING
@@ -979,7 +1000,7 @@ class AnalysisService:
             or not isinstance(parent.request, ConcordanceRunAllAnalysisRequest)
         ):
             return
-        children = lease.workspace.analysis_children(str(parent.id))
+        children = lease.workspace.analysis_children(parent.id)
         terminal_states = {
             AnalysisState.SUCCEEDED,
             AnalysisState.FAILED,
@@ -1028,9 +1049,10 @@ class AnalysisService:
                 result_payload=cast(
                     dict[str, JsonData],
                     {
-                        "result_type": "group",
-                        "source": None,
-                        "sources": sources,
+                        "result": {
+                            "variant": "group",
+                            "sources": sources,
+                        },
                     },
                 ),
             )
@@ -1038,7 +1060,7 @@ class AnalysisService:
         if terminal.state is AnalysisState.SUCCEEDED:
             self._apply_success_supersession(lease, terminal)
         self._live_progress.pop(
-            (lease.workspace.id, str(parent.id)),
+            (lease.workspace.id, parent.id),
             None,
         )
 
@@ -1088,6 +1110,13 @@ class AnalysisService:
                         artifact_references=publication.artifacts,
                         output_node_ids=publication.output_node_ids,
                         query_snapshot=publication.query_snapshot,
+                    )
+                    await run_sync_in_worker_thread(
+                        validate_analysis_result_integrity,
+                        lease.path,
+                        terminal,
+                        set(lease.workspace.nodes),
+                        abandon_on_cancel=False,
                     )
                 except OSError, TypeError, ValidationError, ValueError:
                     logger.exception(

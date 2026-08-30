@@ -460,6 +460,9 @@ function Sidebar() {
                               <WorkspaceNodeList
                                 workspaceId={currentWorkspaceId}
                                 nodes={nodes}
+                                unavailableWarnings={(workspaceGraph?.unavailableNodes ?? []).map(
+                                  (node) => node.warning,
+                                )}
                                 selectedNodeIds={selectedNodeIds}
                                 onToggleNodeSelection={toggleNode}
                                 renderPinnedRowAction={(node: WorkspaceGraphNode) => (

@@ -1,3 +1,5 @@
+import uuid
+
 import polars as pl
 from ldaca_wordflow.analysis.generated_columns import (
     CONCORDANCE_DATA_BLOCK_CREATION_COLUMNS,
@@ -21,7 +23,7 @@ def test_concordance_run_all_writes_complete_analysis_table_artifact(
                 },
             )
         ),
-        parent_node_id="11111111-1111-4111-8111-111111111111",
+        parent_node_id=uuid.UUID("11111111-1111-4111-8111-111111111111"),
         document_column="document",
         search_word="alpha",
         num_left_tokens=1,
@@ -39,7 +41,7 @@ def test_concordance_run_all_writes_complete_analysis_table_artifact(
 
     assert result["state"] == "successful"
     source = result["source"]
-    assert source["node_id"] == "11111111-1111-4111-8111-111111111111"
+    assert source["node_id"] == uuid.UUID("11111111-1111-4111-8111-111111111111")
     assert source["document_column"] == "document"
     assert source["metadata_columns"] == ["metadata"]
     assert source["analysis_columns"] == [
@@ -90,7 +92,7 @@ def test_concordance_run_all_retains_extraction_in_canonical_result(
                 columns={"document": ["alpha beta gamma", "beta gamma alpha"]},
             )
         ),
-        parent_node_id="11111111-1111-4111-8111-111111111111",
+        parent_node_id=uuid.UUID("11111111-1111-4111-8111-111111111111"),
         document_column="document",
         search_word="alpha",
         num_left_tokens=1,
@@ -135,7 +137,7 @@ def test_concordance_run_all_ignores_punctuation_but_preserves_raw_context(
                 },
             )
         ),
-        parent_node_id="11111111-1111-4111-8111-111111111111",
+        parent_node_id=uuid.UUID("11111111-1111-4111-8111-111111111111"),
         document_column="document",
         search_word="target",
         num_left_tokens=2,

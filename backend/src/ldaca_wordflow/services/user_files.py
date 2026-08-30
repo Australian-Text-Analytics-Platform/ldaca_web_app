@@ -492,6 +492,31 @@ class UserFileStore:
             staging = staging_root / import_id
             await self._run_sync(_cleanup_import_staging, staging_root, staging)
 
+    async def is_import_published(
+        self,
+        user_id: str,
+        import_id: str,
+        destination_path: str,
+    ) -> bool:
+        """Return whether the exact import owns its visible destination."""
+
+        _require_public_path(destination_path)
+        try:
+            import_id = str(uuid.UUID(import_id))
+        except ValueError as exc:
+            raise InvalidInputError("Invalid User File Import identifier") from exc
+        async with self._lock_for(user_id):
+            resolver = await self._resolver_for(user_id)
+            destination = resolver.resolve(destination_path)
+            if not await self._run_sync(destination.exists):
+                return False
+            owner = await self._run_sync(_read_import_owner, destination)
+            if owner != import_id:
+                raise ResourceConflictError(
+                    f"Destination {destination_path} is not owned by this import"
+                )
+            return True
+
     async def reconcile_transient_storage(self, active_import_ids: set[str]) -> None:
         """Remove orphan import stages and interrupted upload temp files."""
 
