@@ -2,8 +2,12 @@ import { ArrowLeft, ArrowRight, Search } from 'lucide-react';
 import { type KeyboardEvent, useEffect, useRef, useState } from 'react';
 import type { Tab } from '@/api';
 import { Button } from '@/components/ui/button';
+import InfoIcon from '@/components/help/InfoIcon';
+import ReferenceIcon from '@/components/help/ReferenceIcon';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { SettingsButton } from '@/components/layout/SettingsButton';
 import {
   analysisNavigationForKind,
   analysisNavigationForView,
@@ -17,8 +21,10 @@ import {
 import { useWorkspaceTabResources } from '@/features/views/common/tabs/workspaceTabsQuery';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
 import { isMacOSDesktop } from '@/lib/isMacOSDesktop';
+import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/authStore';
 import { useUIStore } from '@/stores/uiStore';
+import logo from '@/logo.png';
 import {
   createDesktopNavigationHistory,
   type DesktopNavigationLocation,
@@ -36,6 +42,7 @@ interface DesktopNavigationHeaderViewProps {
   isError: boolean;
   canGoBack: boolean;
   canGoForward: boolean;
+  hasNativeTrafficLights: boolean;
   onBack: () => void;
   onForward: () => void;
   onSelectTab: (tab: Tab) => void;
@@ -54,6 +61,7 @@ export function DesktopNavigationHeaderView({
   isError,
   canGoBack,
   canGoForward,
+  hasNativeTrafficLights,
   onBack,
   onForward,
   onSelectTab,
@@ -112,9 +120,48 @@ export function DesktopNavigationHeaderView({
     <header
       data-testid="desktop-navigation-header"
       data-tauri-drag-region="deep"
-      className="fixed inset-x-0 top-0 z-30 flex h-(--desktop-titlebar-height) select-none items-center bg-[var(--vscode-titleBar-activeBackground)] text-[var(--vscode-titleBar-activeForeground)]"
+      className={cn(
+        'fixed inset-x-0 top-0 z-30 grid h-(--desktop-titlebar-height) select-none grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 bg-[var(--vscode-titleBar-activeBackground)] pr-2 text-[var(--vscode-titleBar-activeForeground)]',
+        hasNativeTrafficLights ? 'pl-[78px]' : 'pl-2',
+      )}
     >
-      <div className="absolute left-1/2 flex -translate-x-1/2 items-center">
+      <div className="flex min-w-0 items-center gap-0.5 overflow-hidden whitespace-nowrap">
+        <span className="truncate text-[15px] leading-none font-semibold">Wordflow</span>
+        <span
+          data-testid="desktop-header-about-control"
+          data-tauri-drag-region="false"
+          className="flex shrink-0"
+        >
+          <InfoIcon
+            targetKey="general.overview"
+            label="About Wordflow"
+            className="size-[22px] text-link"
+            iconClassName="!size-[18px]"
+          />
+        </span>
+        <span
+          data-testid="desktop-header-citation-control"
+          data-tauri-drag-region="false"
+          className="flex shrink-0"
+        >
+          <ReferenceIcon
+            targetKey="general.platform"
+            label="Cite LDaCA Wordflow"
+            className="size-[22px] text-[var(--vscode-charts-green)]"
+            iconClassName="!size-[18px]"
+          />
+        </span>
+        <span className="ml-1 text-[13px] leading-none text-description max-[700px]:hidden">
+          by
+        </span>
+        <img
+          src={logo}
+          alt="LDaCA Logo"
+          className="ml-1.5 h-[28px] w-auto shrink-0 object-contain max-[700px]:hidden"
+        />
+      </div>
+
+      <div className="flex items-center">
         <nav
           aria-label="Navigation history"
           data-tauri-drag-region="false"
@@ -130,7 +177,7 @@ export function DesktopNavigationHeaderView({
             disabled={!canGoBack}
             onClick={onBack}
           >
-            <ArrowLeft className="size-4" />
+            <ArrowLeft data-testid="desktop-header-back-icon" className="!size-[18px]" />
           </Button>
           <Button
             type="button"
@@ -142,7 +189,7 @@ export function DesktopNavigationHeaderView({
             disabled={!canGoForward}
             onClick={onForward}
           >
-            <ArrowRight className="size-4" />
+            <ArrowRight data-testid="desktop-header-forward-icon" className="!size-[18px]" />
           </Button>
         </nav>
 
@@ -151,10 +198,13 @@ export function DesktopNavigationHeaderView({
             <button
               type="button"
               data-tauri-drag-region="false"
-              className="ml-1.5 flex h-[22px] w-[38vw] max-w-[600px] min-w-48 items-center justify-center gap-1.5 overflow-hidden rounded-md border border-[var(--vscode-commandCenter-border)] bg-[var(--vscode-commandCenter-background)] px-2 text-label text-[var(--vscode-commandCenter-foreground)] outline-hidden hover:border-[var(--vscode-commandCenter-activeBorder)] hover:bg-[var(--vscode-commandCenter-activeBackground)] hover:text-[var(--vscode-commandCenter-activeForeground)] focus-visible:border-[var(--vscode-commandCenter-activeBorder)]"
+              className="ml-1.5 flex h-[22px] w-[38vw] max-w-[600px] min-w-32 items-center justify-center gap-1.5 overflow-hidden rounded-md border border-[var(--vscode-commandCenter-border)] bg-[var(--vscode-commandCenter-background)] px-2 text-[13px] text-[var(--vscode-commandCenter-foreground)] outline-hidden hover:border-[var(--vscode-commandCenter-activeBorder)] hover:bg-[var(--vscode-commandCenter-activeBackground)] hover:text-[var(--vscode-commandCenter-activeForeground)] focus-visible:border-[var(--vscode-commandCenter-activeBorder)] sm:min-w-48"
               aria-label="Open quick access"
             >
-              <Search className="size-3.5 shrink-0 opacity-80" />
+              <Search
+                data-testid="desktop-header-search-icon"
+                className="size-[18px] shrink-0 opacity-80"
+              />
               <span className="min-w-0 truncate">{workspaceName}</span>
             </button>
           </PopoverTrigger>
@@ -245,14 +295,25 @@ export function DesktopNavigationHeaderView({
           </PopoverContent>
         </Popover>
       </div>
+
+      <div className="flex min-w-0 justify-end">
+        <SettingsButton
+          tooltipSide="bottom"
+          className="size-[22px] rounded-md text-[var(--vscode-titleBar-activeForeground)] hover:bg-[var(--vscode-toolbar-hoverBackground)]"
+          iconClassName="!size-[18px]"
+        />
+      </div>
     </header>
   );
 }
 
 /** Connects desktop title-bar controls to Workspace Tabs and session navigation history. */
 export function DesktopNavigationHeader() {
-  if (!isMacOSDesktop()) return null;
-  return <DesktopNavigationHeaderController />;
+  return (
+    <TooltipProvider>
+      <DesktopNavigationHeaderController />
+    </TooltipProvider>
+  );
 }
 
 function DesktopNavigationHeaderController() {
@@ -326,14 +387,15 @@ function DesktopNavigationHeaderController() {
     <DesktopNavigationHeaderView
       workspaceName={currentWorkspace?.name ?? 'No workspace'}
       tabs={tabs}
-      currentTabId={currentTabId}
       unavailableTabWarnings={unavailableTabWarnings}
+      currentTabId={currentTabId}
       isLoading={Boolean(currentWorkspaceId) && tabsQuery.isLoading}
       isError={tabsQuery.isError}
       canGoBack={history.workspaceId === currentWorkspaceId && history.index > 0}
       canGoForward={
         history.workspaceId === currentWorkspaceId && history.index < history.entries.length - 1
       }
+      hasNativeTrafficLights={isMacOSDesktop()}
       onBack={() => {
         moveHistory(-1);
       }}

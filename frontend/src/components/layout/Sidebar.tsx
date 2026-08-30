@@ -1,4 +1,3 @@
-import React from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useShallow } from 'zustand/react/shallow';
 import {
@@ -10,7 +9,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
-  SidebarTrigger,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import {
@@ -40,15 +38,12 @@ import { usePinnedNodesStore } from '@/stores/pinnedNodesStore';
 import type { WorkspaceGraphNode } from '@/api';
 import { useStackedSplits } from '@/components/layout/sidebar/useStackedSplits';
 import HelpIcon from '@/components/help/HelpIcon';
-import InfoIcon from '@/components/help/InfoIcon';
-import ReferenceIcon from '@/components/help/ReferenceIcon';
 import {
   BookOpen,
   ChevronDown,
   ChevronRight,
   Circle,
   CircleOff,
-  Cog,
   MessageSquare,
   Pencil,
 } from 'lucide-react';
@@ -59,14 +54,7 @@ import {
   useUpdateUserPreferences,
   useUserPreferences,
 } from '@/features/preferences/useUserPreferences';
-import logo from '@/logo.png';
 import { ResizeHandle } from '@/components/layout/ResizeHandle';
-
-const SettingsDialog = React.lazy(() =>
-  import('@/components/dialogs/SettingsDialog').then(({ SettingsDialog }) => ({
-    default: SettingsDialog,
-  })),
-);
 
 type SectionKey = 'views' | 'nodes' | 'tasks';
 
@@ -146,8 +134,6 @@ function Sidebar() {
     stoppingImportId,
     clearingImportId,
   } = useWorkspaceTaskInbox(currentWorkspaceId);
-  const [isSettingsDialogOpen, setIsSettingsDialogOpen] = React.useState(false);
-
   const { workspaceGraph } = useWorkspaceData();
   const { selectedNodeIds } = useWorkspaceSelection();
   const { toggleNode, clearSelection, deleteNode, copyNode, renameNode } = useWorkspaceActions();
@@ -235,61 +221,25 @@ function Sidebar() {
       className="@container/sidebar pt-0! pr-0! [&_[data-slot=sidebar-inner]]:overflow-hidden [&_[data-slot=sidebar-inner]]:rounded-lg [&_[data-slot=sidebar-inner]]:border [&_[data-slot=sidebar-inner]]:border-sidebar-border [&_[data-slot=sidebar-inner]]:bg-sidebar"
     >
       <div className="flex h-full min-h-0 w-full flex-col">
-        <SidebarHeader data-testid="sidebar-title" className="shrink-0 overflow-hidden px-3 py-2">
-          <div className="flex min-w-0 flex-col gap-2 w-full">
-            <div className="flex items-center gap-2 w-full">
-              <SidebarTrigger className="md:hidden" />
-              <img src={logo} alt="LDaCA Logo" className="w-full h-auto object-contain" />
+        {isMultiUserMode ? (
+          <SidebarHeader data-testid="sidebar-title" className="shrink-0 overflow-hidden px-3 py-2">
+            <div className="flex items-center justify-between w-full">
+              <p className="text-[11px] text-description truncate" title={user?.name ?? 'Guest'}>
+                Welcome, {user?.name ?? 'Guest'}
+              </p>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-label-secondary text-error hover:text-error shrink-0 h-auto py-0 px-1"
+                onClick={() => {
+                  void handleLogout();
+                }}
+              >
+                Logout
+              </Button>
             </div>
-            <div className="flex items-center w-full">
-              <p className="text-heading-2 font-semibold flex-1">Wordflow</p>
-              <InfoIcon
-                targetKey="general.overview"
-                label="About Wordflow"
-                className="h-5 w-5 text-link"
-              />
-              <ReferenceIcon
-                targetKey="general.platform"
-                label="Cite LDaCA Wordflow"
-                className="h-5 w-5 text-[var(--vscode-charts-green)]"
-              />
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-description"
-                    aria-label="Open settings"
-                    onClick={() => {
-                      setIsSettingsDialogOpen(true);
-                    }}
-                  >
-                    <Cog className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="right">Settings</TooltipContent>
-              </Tooltip>
-            </div>
-            {isMultiUserMode && (
-              <div className="flex items-center justify-between w-full">
-                <p className="text-[11px] text-description truncate" title={user?.name ?? 'Guest'}>
-                  Welcome, {user?.name ?? 'Guest'}
-                </p>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-label-secondary text-error hover:text-error shrink-0 h-auto py-0 px-1"
-                  onClick={() => {
-                    void handleLogout();
-                  }}
-                >
-                  Logout
-                </Button>
-              </div>
-            )}
-          </div>
-        </SidebarHeader>
+          </SidebarHeader>
+        ) : null}
         <SidebarContent className="flex-1 overflow-hidden border-y border-surface-border/60">
           <div ref={sectionsContainerRef} className="flex h-full flex-col overflow-hidden">
             {SECTION_KEYS.map((key, index) => {
@@ -546,11 +496,6 @@ function Sidebar() {
         </SidebarFooter>
       </div>
 
-      {isSettingsDialogOpen ? (
-        <React.Suspense fallback={null}>
-          <SettingsDialog open onOpenChange={setIsSettingsDialogOpen} />
-        </React.Suspense>
-      ) : null}
       <SidebarRail />
     </SidebarRoot>
   );

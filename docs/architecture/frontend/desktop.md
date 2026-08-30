@@ -128,16 +128,18 @@ zoom controls or persist zoom state.
 
 The main macOS window keeps native decorations and traffic-light controls while
 using Tauri's overlay title-bar style with the native title hidden. The main
-React entry reserves a 35-pixel, theme-owned draggable strip above every
-bootstrap, authentication, and Workspace state, allowing the webview background
-to form continuous application chrome without recreating native window buttons.
-Within an active Workspace, the strip presents session-only view and analysis
-Tab history plus a 22-pixel VS Code command-center control backed by the shared
-Workspace Tabs query. Blank chrome starts native dragging through the narrow
-`core:window:allow-start-dragging` capability, while the navigation and quick
-access controls opt out. The strip has no visual divider from the application
-shell. It is absent from browser and non-macOS builds, and the separate updater
-entry retains its own utility-window layout.
+React entry reserves a shared 35-pixel, theme-owned header above every
+bootstrap, authentication, and Workspace state. Browser deployments render the
+same application chrome; only macOS Tauri adds left clearance for its native
+traffic lights. Within an active Workspace, the header presents session-only
+view and analysis Tab history plus a 22-pixel VS Code command-center control
+backed by the shared Workspace Tabs query. Compact Wordflow information and
+citation controls occupy the left side, Settings occupies the far-right edge,
+and the sidebar does not duplicate those controls. Blank macOS chrome starts
+native dragging through the narrow `core:window:allow-start-dragging`
+capability, while the navigation, quick access, and application controls opt
+out. The header has no visual divider from the application shell. The separate
+updater entry retains its own utility-window layout.
 
 Debug desktop builds allow both the fixed Vite development origin and the
 platform's packaged Tauri origin through backend CORS, so `tauri dev` and a

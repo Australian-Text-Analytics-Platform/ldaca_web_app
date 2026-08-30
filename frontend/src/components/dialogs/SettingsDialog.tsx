@@ -52,7 +52,7 @@ const SETTINGS_TABS = [
  * Unified preferences window opened from the header settings cog. It presents
  * backend-synced preferences and browser-local settings in one vertical-tab
  * surface while preserving workflow-local quick entry points elsewhere.
- * Used by: Sidebar because the app shell owns the persistent header action for user preferences.
+ * Used by: the shared application header because the app shell owns the persistent action for user preferences.
  * Flow: route account controls through the preference API, keep guidance
  * acknowledgments device-local, and reuse the working-directory backend config
  * panel in single-user mode.

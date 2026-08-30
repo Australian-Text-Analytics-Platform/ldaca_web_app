@@ -6,6 +6,7 @@ interface ReferenceIconProps {
   label?: string;
   tooltip?: string;
   className?: string;
+  iconClassName?: string;
 }
 
 /**

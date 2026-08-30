@@ -45,6 +45,7 @@ export interface DocLinkIconProps<Kind extends DocLinkKind> {
   label?: string;
   tooltip?: string;
   className?: string;
+  iconClassName?: string;
 }
 
 /**
@@ -60,6 +61,7 @@ export function DocLinkIcon<Kind extends DocLinkKind>({
   label,
   tooltip,
   className,
+  iconClassName,
 }: DocLinkIconProps<Kind>) {
   const config = CONFIG[kind];
   const resolvedLabel = label ?? config.defaultLabel;
@@ -87,7 +89,7 @@ export function DocLinkIcon<Kind extends DocLinkKind>({
           aria-label={resolvedLabel}
           onClick={handleClick}
         >
-          <Icon className="h-4 w-4" />
+          <Icon className={iconClassName ?? 'h-4 w-4'} />
         </Button>
       </TooltipTrigger>
       <TooltipContent side="top">{tooltipText}</TooltipContent>

@@ -27,7 +27,7 @@ const frequencyTab: Tab = {
   settings: { kind: 'token_frequency', stop_words: { words: [] } },
 };
 
-vi.mock('@/lib/isMacOSDesktop', () => ({ isMacOSDesktop: () => true }));
+vi.mock('@/lib/isMacOSDesktop', () => ({ isMacOSDesktop: () => false }));
 vi.mock('@/features/workspace/common/hooks/useWorkspaceData', () => ({
   useWorkspaceData: () => ({
     currentWorkspace: { id: 'workspace-1', name: 'Election analysis' },

@@ -3,6 +3,7 @@ import { render, screen, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import userEvent from '@testing-library/user-event';
 import Sidebar from '../Sidebar';
+import { SettingsButton } from '../SettingsButton';
 import { SidebarProvider, SidebarTrigger } from '../../ui/sidebar';
 import { useUIStore } from '@/stores/uiStore';
 import { useGuidanceAcknowledgmentsStore } from '@/features/guidance/acknowledgmentsStore';
@@ -18,7 +19,6 @@ const workspaceFixture = vi.hoisted(() => ({
   selectedNodeIds: [] as string[],
   clearSelection: vi.fn(),
 }));
-
 vi.mock('sonner', () => ({
   /** Used by: sidebar menu tests to assert toast feedback. */
   toast: (...args: unknown[]) => toastMock(...args),
@@ -101,6 +101,20 @@ const renderSidebar = () => {
   );
 };
 
+/** Renders the Settings header action with the providers used by its dialog. */
+const renderSettingsButton = () => {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <SidebarProvider>
+        <SettingsButton />
+      </SidebarProvider>
+    </QueryClientProvider>,
+  );
+};
+
 /** Renders the responsive Sheet branch and exposes an external opener for the test. */
 const renderMobileSidebar = () => {
   Object.defineProperty(window, 'matchMedia', {
@@ -178,7 +192,7 @@ describe('Sidebar view visibility menu', () => {
       '[&_[data-slot=sidebar-inner]]:border',
       '[&_[data-slot=sidebar-inner]]:bg-sidebar',
     );
-    expect(screen.getByTestId('sidebar-title')).toBeInTheDocument();
+    expect(screen.queryByTestId('sidebar-title')).not.toBeInTheDocument();
     expect(screen.getByTestId('sidebar-section-views')).toBeInTheDocument();
     expect(screen.getByTestId('sidebar-section-nodes')).toBeInTheDocument();
     expect(screen.getByTestId('sidebar-section-tasks')).toBeInTheDocument();
@@ -215,11 +229,21 @@ describe('Sidebar view visibility menu', () => {
     await user.click(screen.getByRole('button', { name: 'Open mobile sidebar' }));
 
     expect(screen.queryAllByTestId(/^sidebar-card-/)).toHaveLength(0);
-    expect(screen.getByTestId('sidebar-title')).toBeInTheDocument();
+    expect(screen.queryByTestId('sidebar-title')).not.toBeInTheDocument();
     expect(screen.getByTestId('sidebar-section-views')).toBeInTheDocument();
     expect(screen.getByTestId('sidebar-section-nodes')).toBeInTheDocument();
     expect(screen.getByTestId('sidebar-section-tasks')).toBeInTheDocument();
     expect(screen.getByTestId('sidebar-help-feedback')).toBeInTheDocument();
+  });
+
+  it('keeps shared application branding and Settings out of the sidebar', () => {
+    renderSidebar();
+
+    expect(screen.queryByTestId('sidebar-title')).not.toBeInTheDocument();
+    expect(screen.queryByRole('img', { name: 'LDaCA Logo' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'About Wordflow' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Cite LDaCA Wordflow' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Open settings' })).not.toBeInTheDocument();
   });
 
   it('clears the Data Blocks selection from the control before the selected count', async () => {
@@ -289,14 +313,14 @@ describe('Sidebar view visibility menu', () => {
     expect(screen.getAllByRole('button', { name: 'Data Loader' }).length).toBeGreaterThan(0);
   });
 
-  it('opens Settings from the header cog and resets Contextual Hint history there', async () => {
+  it('opens Settings from the shared header control and resets Contextual Hint history there', async () => {
     const user = userEvent.setup();
 
     useGuidanceAcknowledgmentsStore.setState({
       byUser: { 'user-1': { 'preprocessing.filter.select-node': 1 } },
     });
 
-    renderSidebar();
+    renderSettingsButton();
 
     await user.click(screen.getByRole('button', { name: /open settings/i }));
     expect(
