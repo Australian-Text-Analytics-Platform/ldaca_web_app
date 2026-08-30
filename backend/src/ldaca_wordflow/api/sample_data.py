@@ -2,16 +2,14 @@
 
 from __future__ import annotations
 
-from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request, Response, Security, status
+from fastapi import APIRouter, Request, Response, status
 
 from ..domain import UserFileImport
 from ..models.data_sources import SampleCatalogueResource
-from ..runtime import Runtime, get_runtime
-from ..services.sessions import SessionPrincipal
+from .dependencies import RuntimeDep
 from .responses import api_errors, route_path
-from .security import get_current_session
+from .security import CurrentSessionSecurityDep
 
 router = APIRouter(
     prefix="/sample-collections",
@@ -26,8 +24,8 @@ router = APIRouter(
     responses=api_errors(502),
 )
 async def list_sample_collections(
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
 ) -> SampleCatalogueResource:
     """Return the validated catalogue with current-user installation state."""
 
@@ -44,8 +42,8 @@ async def submit_sample_import(
     collection_id: str,
     request: Request,
     response: Response,
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
 ) -> UserFileImport:
     """Queue one retained import of a complete sample collection."""
 

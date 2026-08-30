@@ -85,7 +85,7 @@ def test_sample_corpus_reduces_length_and_is_reproducible():
 def test_sample_corpus_indices_are_original_sorted_positions():
     docs = [f"doc {i}" for i in range(20)]
     sampled_docs, sampled_idx = _sample_corpus(docs, 0.5, seed=7)
-    for doc, idx in zip(sampled_docs, sampled_idx):
+    for doc, idx in zip(sampled_docs, sampled_idx, strict=False):
         assert doc == docs[idx]
     assert sampled_idx == sorted(sampled_idx)
 

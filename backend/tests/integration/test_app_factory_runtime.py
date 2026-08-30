@@ -18,7 +18,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, cast
+from typing import Annotated, Any, cast
 
 import anyio
 import pytest
@@ -26,7 +26,9 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
-from ldaca_wordflow.runtime import RuntimeReadiness, _RuntimeTaskGroupOwner
+from ldaca_wordflow.runtime import RuntimeReadiness, _RuntimeTaskGroupOwner, get_runtime
+
+RuntimeProbeDep = Annotated[Any, Depends(get_runtime)]
 
 
 @dataclass(frozen=True, slots=True)
@@ -135,7 +137,6 @@ def test_runtime_factory_is_deferred_until_lifespan_and_unwinds(tmp_path: Path) 
     """OpenAPI/app construction is side-effect free; lifespan owns resources."""
 
     from ldaca_wordflow.main import RuntimeContextFactory, create_app
-    from ldaca_wordflow.runtime import get_runtime
     from ldaca_wordflow.settings import load_settings
 
     events: list[str] = []
@@ -161,7 +162,7 @@ def test_runtime_factory_is_deferred_until_lifespan_and_unwinds(tmp_path: Path) 
     probe = APIRouter()
 
     @probe.get("/__runtime-probe", include_in_schema=False)
-    async def runtime_probe(runtime: Any = Depends(get_runtime)) -> dict[str, str]:
+    async def runtime_probe(runtime: RuntimeProbeDep) -> dict[str, str]:
         return {"name": runtime.name}
 
     app.include_router(probe)
@@ -245,7 +246,6 @@ def test_two_app_instances_keep_settings_runtime_and_overrides_isolated(
     """App-local lifespan state prevents cross-instance test/runtime leakage."""
 
     from ldaca_wordflow.main import RuntimeContextFactory, create_app
-    from ldaca_wordflow.runtime import get_runtime
     from ldaca_wordflow.settings import load_settings
 
     def make_runtime(name: str):
@@ -271,7 +271,7 @@ def test_two_app_instances_keep_settings_runtime_and_overrides_isolated(
     probe = APIRouter()
 
     @probe.get("/__runtime-name", include_in_schema=False)
-    async def runtime_name(runtime: Any = Depends(get_runtime)) -> dict[str, str]:
+    async def runtime_name(runtime: RuntimeProbeDep) -> dict[str, str]:
         return {"name": runtime.name}
 
     app_a.include_router(probe)

@@ -1,24 +1,21 @@
 """Thin HTTP adapters for safe, bounded file reads."""
 
 from pathlib import Path
-from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, Security
+from fastapi import APIRouter, Query
 from fastapi.responses import FileResponse, Response
 from starlette.background import BackgroundTask
 
 from ...models.files import FileWorksheetsResource
-from ...runtime import Runtime, get_runtime
-from ...services.sessions import SessionPrincipal
-from ...services.user_files import UserFileStore
+from ..dependencies import RuntimeDep
 from ..responses import api_errors
-from ..security import get_current_session
+from ..security import CurrentSessionSecurityDep
 from ..table_responses import (
     ARROW_STREAM_RESPONSE,
     arrow_page_response,
     arrow_stream_response,
 )
-from .dependencies import get_user_file_store
+from .dependencies import UserFileStoreDep
 
 router = APIRouter()
 TEXT_RESPONSE_SCHEMA = {"schema": {"type": "string"}}
@@ -31,12 +28,12 @@ BINARY_RESPONSE_SCHEMA = {"schema": {"type": "string", "format": "binary"}}
     responses={**api_errors(400, 403, 404, 413, 422), **ARROW_STREAM_RESPONSE},
 )
 async def preview_file(
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
     path: str = Query(..., min_length=1),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=500),
     sheet_name: str | None = Query(None),
-    runtime: Runtime = Depends(get_runtime),
 ) -> Response:
     """Return one self-contained Arrow IPC preview page."""
 
@@ -56,10 +53,10 @@ async def preview_file(
     responses={**api_errors(400, 403, 404, 413, 422), **ARROW_STREAM_RESPONSE},
 )
 async def preview_file_schema(
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
     path: str = Query(..., min_length=1),
     sheet_name: str | None = Query(None),
-    runtime: Runtime = Depends(get_runtime),
 ) -> Response:
     """Return one file preview schema as a zero-row Arrow IPC stream."""
 
@@ -77,9 +74,9 @@ async def preview_file_schema(
     responses=api_errors(400, 403, 404, 413, 422),
 )
 async def list_file_worksheets(
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
     path: str = Query(..., min_length=1),
-    runtime: Runtime = Depends(get_runtime),
 ) -> FileWorksheetsResource:
     """Return worksheet names for one Excel workbook."""
 
@@ -101,9 +98,9 @@ async def list_file_worksheets(
     },
 )
 async def get_raw_file(
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
     path: str = Query(..., description="Path relative to the user's data directory"),
-    runtime: Runtime = Depends(get_runtime),
 ) -> Response:
     content, media_type = await runtime.file_read_service.read_text(
         principal.user.id,
@@ -124,9 +121,9 @@ async def get_raw_file(
     },
 )
 async def download_file(
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
+    principal: CurrentSessionSecurityDep,
+    file_store: UserFileStoreDep,
     path: str = Query(..., description="Path relative to the user's data directory"),
-    file_store: UserFileStore = Depends(get_user_file_store),
 ) -> FileResponse:
     snapshot = await file_store.response_snapshot(principal.user.id, path)
     return FileResponse(

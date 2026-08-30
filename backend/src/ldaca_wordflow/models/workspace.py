@@ -95,7 +95,7 @@ class UnavailableWorkspaceListItem(_StrictModel):
     supported_schema_version: int | None = None
 
     @model_validator(mode="after")
-    def validate_schema_versions(self) -> "UnavailableWorkspaceListItem":
+    def validate_schema_versions(self) -> UnavailableWorkspaceListItem:
         versions = (self.stored_schema_version, self.supported_schema_version)
         if self.reason == "incompatible_format":
             if any(version is None for version in versions):
@@ -131,7 +131,7 @@ class WorkspaceUpdateRequest(_StrictModel):
     description: str | None = Field(default=None, max_length=10_000)
 
     @model_validator(mode="after")
-    def validate_patch(self) -> "WorkspaceUpdateRequest":
+    def validate_patch(self) -> WorkspaceUpdateRequest:
         if not self.model_fields_set:
             raise ValueError("Workspace patch must contain at least one field")
         if "name" in self.model_fields_set and self.name is None:
@@ -149,7 +149,7 @@ class WorkspaceArchiveMetadata(_StrictModel):
     modified_at: AwareDatetime | None = None
 
     @model_validator(mode="after")
-    def validate_timestamp_order(self) -> "WorkspaceArchiveMetadata":
+    def validate_timestamp_order(self) -> WorkspaceArchiveMetadata:
         if (
             self.created_at is not None
             and self.modified_at is not None
@@ -195,7 +195,7 @@ class WorkspaceArchiveAnalysis(_StrictModel):
     query_inputs: list[WorkspaceArchiveAnalysisInput] = Field(default_factory=list)
 
     @model_validator(mode="after")
-    def validate_query_inputs(self) -> "WorkspaceArchiveAnalysis":
+    def validate_query_inputs(self) -> WorkspaceArchiveAnalysis:
         expected_ids = list(analysis_snapshot_input_ids(self.record.request))
         actual_ids = [item.id for item in self.query_inputs]
         if self.record.query_snapshot is None:
@@ -223,7 +223,7 @@ class WorkspaceArchiveManifest(_StrictModel):
     analyses: list[WorkspaceArchiveAnalysis]
 
     @model_validator(mode="after")
-    def validate_analysis_ownership(self) -> "WorkspaceArchiveManifest":
+    def validate_analysis_ownership(self) -> WorkspaceArchiveManifest:
         analysis_ids = [str(item.record.id) for item in self.analyses]
         if len(analysis_ids) != len(set(analysis_ids)):
             raise ValueError("Workspace archive has duplicate Analysis IDs")

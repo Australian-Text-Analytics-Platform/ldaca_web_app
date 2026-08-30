@@ -15,16 +15,22 @@ from ldaca_wordflow.infrastructure.providers.annotation_ai import (
     AnnotationContextLimitError,
     AnnotationResponseError,
     InferenceConfig,
-    _completion_error,
-    _complete_openai,
-    _complete_google,
     align_labels,
     annotate_all,
     annotate_preview,
     build_annotation_system_prompt,
-    _reasoning_budget_tokens,
-    list_models,
-    resolve_provider_wire,
+    resolve_provider_adapter,
+)
+from ldaca_wordflow.infrastructure.providers.annotation_adapter import (
+    completion_error,
+    reasoning_budget_tokens,
+)
+from ldaca_wordflow.infrastructure.providers.annotation_google import (
+    GoogleAnnotationAdapter,
+)
+from ldaca_wordflow.infrastructure.providers.annotation_openai import (
+    CustomOpenAICompatibleAnnotationAdapter,
+    OpenAIAnnotationAdapter,
 )
 
 
@@ -51,7 +57,7 @@ def test_provider_sdk_errors_have_stable_safe_categories(
     code: str,
     retryable: bool,
 ) -> None:
-    classified = _completion_error(error, "fallback")
+    classified = completion_error(error, "fallback")
 
     assert classified.code == code
     assert classified.retryable is retryable
@@ -61,7 +67,7 @@ def test_provider_sdk_errors_have_stable_safe_categories(
 def test_provider_context_errors_are_classified_before_http_status() -> None:
     error = _ProviderStatusError(400, "maximum context length exceeded: private")
 
-    classified = _completion_error(error, "fallback")
+    classified = completion_error(error, "fallback")
 
     assert classified.code == "annotation_provider_context_limit"
     assert classified.retryable is False
@@ -99,9 +105,9 @@ def _run_all_request(*, batch_size: int = 20) -> AnnotationRunAllAnalysisRequest
 
 
 def test_reasoning_budget_tokens_orders_low_below_high():
-    low = _reasoning_budget_tokens("low")
-    medium = _reasoning_budget_tokens("medium")
-    high = _reasoning_budget_tokens("high")
+    low = reasoning_budget_tokens("low")
+    medium = reasoning_budget_tokens("medium")
+    high = reasoning_budget_tokens("high")
     assert low < medium < high
 
 
@@ -125,12 +131,11 @@ def test_system_prompt_makes_the_batch_contract_authoritative() -> None:
     ) in prompt
 
 
-def test_custom_provider_wire_uses_the_immutable_openai_compatible_base_url():
-    wire = resolve_provider_wire("custom", "http://127.0.0.1:8080/v1")
+def test_custom_provider_uses_the_immutable_openai_compatible_base_url():
+    adapter = resolve_provider_adapter("custom", "http://127.0.0.1:8080/v1")
 
-    assert wire.chat_style == "openai"
-    assert wire.base_url == "http://127.0.0.1:8080/v1"
-    assert wire.supports_json_response_format is False
+    assert isinstance(adapter, CustomOpenAICompatibleAnnotationAdapter)
+    assert adapter.base_url == "http://127.0.0.1:8080/v1"
 
 
 # --- OpenAI SDK dispatch probes -------------------------------------------------
@@ -211,9 +216,9 @@ def _install_fake_openai(monkeypatch, *, model_ids: list[str] | None = None) -> 
 async def test_complete_openai_always_disables_streaming(monkeypatch):
     # Pin stream=False so a server cannot hand back an SSE body unexpectedly.
     create_kwargs = _install_fake_openai(monkeypatch)
-    wire = resolve_provider_wire("openai")
-    result = await _complete_openai(
-        wire, "some-model", "key", "system", "user", _inference_config()
+    adapter = OpenAIAnnotationAdapter()
+    result = await adapter.complete(
+        "some-model", "key", "system", "user", _inference_config()
     )
     assert result == "positive"
     assert create_kwargs["stream"] is False
@@ -235,8 +240,7 @@ async def test_complete_openai_classifies_context_limit_errors(monkeypatch):
     monkeypatch.setattr("openai.AsyncOpenAI", _FakeAsyncOpenAI)
 
     with pytest.raises(AnnotationContextLimitError):
-        await _complete_openai(
-            resolve_provider_wire("openai"),
+        await OpenAIAnnotationAdapter().complete(
             "some-model",
             "key",
             "system",
@@ -260,9 +264,9 @@ async def test_custom_model_discovery_uses_its_base_url_and_allows_no_key(
             self.models = _FakeModels()
 
     monkeypatch.setattr("openai.AsyncOpenAI", _FakeAsyncOpenAI)
-    wire = resolve_provider_wire("custom", "http://localhost:8080/v1")
+    adapter = CustomOpenAICompatibleAnnotationAdapter("http://localhost:8080/v1")
 
-    models = await list_models(wire, None)
+    models = await adapter.list_models(None)
 
     assert models == ["local-model"]
     assert constructor_kwargs["base_url"] == "http://localhost:8080/v1"
@@ -290,7 +294,7 @@ async def test_google_model_discovery_has_bounded_timeout_and_retry(monkeypatch)
 
     monkeypatch.setattr("google.genai.Client", _Client)
 
-    models = await list_models(resolve_provider_wire("google"), "key")
+    models = await GoogleAnnotationAdapter().list_models("key")
 
     assert models == ["gemini-test"]
     http_options = constructor_kwargs["http_options"]
@@ -319,10 +323,10 @@ async def test_custom_chat_completion_uses_its_base_url_and_allows_no_key(
             self.chat = _FakeChat()
 
     monkeypatch.setattr("openai.AsyncOpenAI", _FakeAsyncOpenAI)
-    wire = resolve_provider_wire("custom", "http://localhost:8080/v1")
+    adapter = CustomOpenAICompatibleAnnotationAdapter("http://localhost:8080/v1")
 
-    result = await _complete_openai(
-        wire, "local-model", None, "system", "user", _inference_config()
+    result = await adapter.complete(
+        "local-model", None, "system", "user", _inference_config()
     )
 
     assert result == '{"labels": ["positive"]}'
@@ -424,7 +428,7 @@ async def test_google_completion_disables_sdk_retries_and_bounds_output(monkeypa
 
     monkeypatch.setattr("google.genai.Client", _FakeClient)
 
-    await _complete_google(
+    await GoogleAnnotationAdapter().complete(
         "some-model",
         "key",
         "system",

@@ -56,7 +56,7 @@ class InvalidAnalysisIntegrity(_StrictModel):
     missing_input_ids: list[uuid.UUID]
 
     @model_validator(mode="after")
-    def require_distinct_missing_inputs(self) -> "InvalidAnalysisIntegrity":
+    def require_distinct_missing_inputs(self) -> InvalidAnalysisIntegrity:
         if not self.missing_input_ids or len(self.missing_input_ids) != len(
             set(self.missing_input_ids)
         ):
@@ -80,7 +80,7 @@ class QuotationEngineSelection(_StrictModel):
     engine_id: str | None = Field(default=None, max_length=64)
 
     @model_validator(mode="after")
-    def validate_selection(self) -> "QuotationEngineSelection":
+    def validate_selection(self) -> QuotationEngineSelection:
         if self.type is QuotationEngineType.LOCAL:
             if self.engine_id is not None:
                 raise ValueError("A local quotation engine has no engine_id")
@@ -109,7 +109,7 @@ class TokenFrequencyAnalysisRequest(_StrictModel):
     node_tokenizer_models: dict[uuid.UUID, NonEmptyText]
 
     @model_validator(mode="after")
-    def validate_nodes(self) -> "TokenFrequencyAnalysisRequest":
+    def validate_nodes(self) -> TokenFrequencyAnalysisRequest:
         _validate_node_columns(self.node_ids, self.node_columns)
         if set(self.node_tokenizer_models) != set(self.node_ids):
             raise ValueError("Tokenizer models must exactly match requested inputs")
@@ -133,7 +133,7 @@ class TopicModelingAnalysisRequest(_StrictModel):
     max_segment_tokens: int = Field(default=256, ge=32, le=510)
 
     @model_validator(mode="after")
-    def validate_nodes_and_sampling(self) -> "TopicModelingAnalysisRequest":
+    def validate_nodes_and_sampling(self) -> TopicModelingAnalysisRequest:
         _validate_node_columns(self.node_ids, self.node_columns)
         if self.sample_fractions is not None:
             if len(self.sample_fractions) != len(self.node_ids):
@@ -162,7 +162,7 @@ class ConcordanceAnalysisRequest(_StrictModel):
     node_tokenizer_models: dict[uuid.UUID, NonEmptyText] = Field(default_factory=dict)
 
     @model_validator(mode="after")
-    def validate_nodes(self) -> "ConcordanceAnalysisRequest":
+    def validate_nodes(self) -> ConcordanceAnalysisRequest:
         _validate_node_columns(self.node_ids, self.node_columns)
         tokenizer_ids = set(self.node_tokenizer_models)
         requested_ids = set(self.node_ids)
@@ -207,7 +207,7 @@ class SequentialAnalysisRequest(_StrictModel):
         Literal["seconds", "minutes", "hours", "days", "weeks"] | None
     ) = None
     @model_validator(mode="after")
-    def validate_interval(self) -> "SequentialAnalysisRequest":
+    def validate_interval(self) -> SequentialAnalysisRequest:
         if self.column_type == "numeric" and (
             self.numeric_interval is None or self.numeric_interval <= 0
         ):
@@ -247,7 +247,7 @@ class _AnnotationInferenceFields(AnnotationProviderSnapshot):
     reasoning_effort: Literal["low", "medium", "high"] = "medium"
 
     @model_validator(mode="after")
-    def validate_annotation_fields(self) -> "_AnnotationInferenceFields":
+    def validate_annotation_fields(self) -> _AnnotationInferenceFields:
         normalized = [item.name.casefold() for item in self.classes]
         if len(normalized) != len(set(normalized)):
             raise ValueError("Annotation class names must be unique")
@@ -326,7 +326,7 @@ class DataBlockCreationSource(_StrictModel):
     new_node_name: NonEmptyText = Field(max_length=500)
 
     @model_validator(mode="after")
-    def validate_columns(self) -> "DataBlockCreationSource":
+    def validate_columns(self) -> DataBlockCreationSource:
         if len(self.selected_columns) != len(set(self.selected_columns)):
             raise ValueError("Data Block Creation columns must be unique")
         return self
@@ -339,7 +339,7 @@ class SequentialDataBlockCreationSource(DataBlockCreationSource):
     excluded_group_indices: list[int] = Field(default_factory=list)
 
     @model_validator(mode="after")
-    def validate_filter(self) -> "SequentialDataBlockCreationSource":
+    def validate_filter(self) -> SequentialDataBlockCreationSource:
         if self.selected_period_indices is not None:
             if len(self.selected_period_indices) != len(
                 set(self.selected_period_indices)
@@ -367,7 +367,7 @@ class ConcordanceDocumentDataBlockCreationSource(_StrictModel):
     selected_bins: list[int] | None = Field(default=None, min_length=1, max_length=100)
 
     @model_validator(mode="after")
-    def validate_filter(self) -> "ConcordanceDocumentDataBlockCreationSource":
+    def validate_filter(self) -> ConcordanceDocumentDataBlockCreationSource:
         if len(self.selected_metadata_columns) != len(
             set(self.selected_metadata_columns)
         ):
@@ -392,7 +392,7 @@ class ConcordanceMatchDataBlockCreationAnalysisRequest(_StrictModel):
     sources: list[DataBlockCreationSource] = Field(min_length=1, max_length=2)
 
     @model_validator(mode="after")
-    def validate_sources(self) -> "ConcordanceMatchDataBlockCreationAnalysisRequest":
+    def validate_sources(self) -> ConcordanceMatchDataBlockCreationAnalysisRequest:
         source_ids = [source.source_node_id for source in self.sources]
         if len(source_ids) != len(set(source_ids)):
             raise ValueError("Data Block Creation source IDs must be unique")
@@ -408,7 +408,7 @@ class ConcordanceDocumentDataBlockCreationAnalysisRequest(_StrictModel):
     )
 
     @model_validator(mode="after")
-    def validate_sources(self) -> "ConcordanceDocumentDataBlockCreationAnalysisRequest":
+    def validate_sources(self) -> ConcordanceDocumentDataBlockCreationAnalysisRequest:
         source_ids = [source.source_node_id for source in self.sources]
         if len(source_ids) != len(set(source_ids)):
             raise ValueError("Document Data Block Creation source IDs must be unique")
@@ -468,7 +468,7 @@ class TopicModelingDataBlockCreationAnalysisRequest(_StrictModel):
     topic_meanings_override: list[TopicMeaningOverride] = Field(default_factory=list)
 
     @model_validator(mode="after")
-    def validate_sources_and_topics(self) -> "TopicModelingDataBlockCreationAnalysisRequest":
+    def validate_sources_and_topics(self) -> TopicModelingDataBlockCreationAnalysisRequest:
         if len(self.node_ids) != len(set(self.node_ids)):
             raise ValueError("Topic Modeling Data Block Creation Data Block IDs must be unique")
         expected = set(self.node_ids)
@@ -638,7 +638,7 @@ class _AnalysisLifecycle(_StrictModel):
     output_node_ids: list[uuid.UUID]
 
     @model_validator(mode="after")
-    def validate_lifecycle(self) -> "_AnalysisLifecycle":
+    def validate_lifecycle(self) -> _AnalysisLifecycle:
         if self.parent_analysis_id == self.id:
             raise ValueError("An Analysis cannot parent itself")
         if self.id in self.supersedes_analysis_ids or len(
@@ -690,7 +690,7 @@ class AnalysisRecord(_AnalysisLifecycle):
     query_snapshot: AnalysisQuerySnapshotRecord | None = None
 
     @model_validator(mode="after")
-    def validate_result(self) -> "AnalysisRecord":
+    def validate_result(self) -> AnalysisRecord:
         succeeded = self.state is AnalysisState.SUCCEEDED
         if succeeded != (self.result_payload is not None):
             raise ValueError("Only a successful Analysis has a Result")
@@ -714,13 +714,13 @@ class AnalysisRecord(_AnalysisLifecycle):
             raise ValueError("Only a successful Analysis may publish Data Blocks")
         return self
 
-    def _transition(self, **changes: object) -> "AnalysisRecord":
+    def _transition(self, **changes: object) -> AnalysisRecord:
         payload = self.model_dump()
         payload.update(changes)
         payload["revision"] = self.revision + 1
         return AnalysisRecord.model_validate(payload)
 
-    def start(self, timestamp: datetime) -> "AnalysisRecord":
+    def start(self, timestamp: datetime) -> AnalysisRecord:
         if self.state is not AnalysisState.QUEUED:
             raise ValueError("Only a queued Analysis can start")
         return self._transition(
@@ -728,7 +728,7 @@ class AnalysisRecord(_AnalysisLifecycle):
             started_at=timestamp,
         )
 
-    def cancel_queued(self, timestamp: datetime) -> "AnalysisRecord":
+    def cancel_queued(self, timestamp: datetime) -> AnalysisRecord:
         if self.state is not AnalysisState.QUEUED:
             raise ValueError("Only a queued Analysis can be cancelled immediately")
         return self._transition(
@@ -737,7 +737,7 @@ class AnalysisRecord(_AnalysisLifecycle):
             finished_at=timestamp,
         )
 
-    def request_running_cancellation(self, timestamp: datetime) -> "AnalysisRecord":
+    def request_running_cancellation(self, timestamp: datetime) -> AnalysisRecord:
         if self.state is not AnalysisState.RUNNING:
             raise ValueError("Only a running Analysis can request cancellation")
         if self.cancellation_requested_at is not None:
@@ -749,7 +749,7 @@ class AnalysisRecord(_AnalysisLifecycle):
         timestamp: datetime,
         *,
         progress: Progress,
-    ) -> "AnalysisRecord":
+    ) -> AnalysisRecord:
         if (
             self.state is not AnalysisState.RUNNING
             or self.cancellation_requested_at is None
@@ -767,7 +767,7 @@ class AnalysisRecord(_AnalysisLifecycle):
         *,
         failure: Failure,
         progress: Progress,
-    ) -> "AnalysisRecord":
+    ) -> AnalysisRecord:
         if self.state not in {AnalysisState.QUEUED, AnalysisState.RUNNING}:
             raise ValueError("Only a non-terminal Analysis can fail")
         return self._transition(
@@ -785,7 +785,7 @@ class AnalysisRecord(_AnalysisLifecycle):
         artifact_references: list[AnalysisArtifactRecord] | None = None,
         output_node_ids: list[uuid.UUID] | None = None,
         query_snapshot: AnalysisQuerySnapshotRecord | None = None,
-    ) -> "AnalysisRecord":
+    ) -> AnalysisRecord:
         if self.state is not AnalysisState.RUNNING:
             raise ValueError("Only a running Analysis can succeed")
         return self._transition(
@@ -809,7 +809,7 @@ class AnalysisRecord(_AnalysisLifecycle):
         parent_analysis_id: uuid.UUID | None = None,
         supersedes_analysis_ids: list[uuid.UUID] | None = None,
         analysis_id: uuid.UUID | None = None,
-    ) -> "AnalysisRecord":
+    ) -> AnalysisRecord:
         return cls(
             id=analysis_id or uuid.uuid4(),
             tab_id=tab_id,

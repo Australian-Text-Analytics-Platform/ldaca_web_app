@@ -22,7 +22,7 @@ T = TypeVar("T")
 class StorageReservation:
     """Idempotently releasable quota plus physical-capacity reservation."""
 
-    _service: "StorageAdmissionService"
+    _service: StorageAdmissionService
     _quota: QuotaReservation | None
     physical_bytes: int
     _released: bool = False

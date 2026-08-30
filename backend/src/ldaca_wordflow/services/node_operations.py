@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import re
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from typing import Any, cast
 
 import polars as pl
@@ -856,7 +856,7 @@ def _temporal_literal(value: datetime, dtype: pl.DataType) -> pl.Expr:
         if timezone_name is None and value.tzinfo is not None:
             value = value.replace(tzinfo=None)
         elif timezone_name is not None and value.tzinfo is None:
-            value = value.replace(tzinfo=timezone.utc)
+            value = value.replace(tzinfo=UTC)
         return pl.lit(value).cast(dtype)
     if dtype == pl.Date:
         return pl.lit(value.date()).cast(dtype)

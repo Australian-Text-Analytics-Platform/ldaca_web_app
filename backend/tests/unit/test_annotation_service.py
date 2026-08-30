@@ -38,12 +38,16 @@ async def test_model_discovery_maps_each_provider_category_to_safe_502(
     monkeypatch,
     code,
 ) -> None:
-    async def fail_models(_wire, _api_key):
-        raise AnnotationAiError("private SDK body https://secret.invalid", code=code)
+    class _FailingAdapter:
+        async def complete(self, *_args, **_kwargs):
+            raise AssertionError("model discovery must not run completion")
+
+        async def list_models(self, _api_key):
+            raise AnnotationAiError("private SDK body https://secret.invalid", code=code)
 
     monkeypatch.setattr(
-        "ldaca_wordflow.services.annotations.list_models",
-        fail_models,
+        "ldaca_wordflow.services.annotations.resolve_provider_adapter",
+        lambda *_args: _FailingAdapter(),
     )
     service = AnnotationService(
         credentials=cast("ProviderCredentialStore", _Credentials())

@@ -61,7 +61,7 @@ def test_delimited_preview_pages_and_schema_preserve_raw_text(
     for extension, separator in (("csv", ","), ("tsv", "\t")):
         path = user_root / f"raw.{extension}"
         path.write_text(
-            "identifier{0}value\n".format(separator)
+            f"identifier{separator}value\n"
             + "".join(f"{identifier}{separator}{value}\n" for identifier, value in rows),
             encoding="utf-8",
         )

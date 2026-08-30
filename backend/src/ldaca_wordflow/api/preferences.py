@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Annotated
 
-from fastapi import APIRouter, Depends, Security
+from fastapi import APIRouter
 
 from ..models.user_preferences import UserPreferences, UserPreferencesPatch
-from ..runtime import Runtime, get_runtime
-from ..services.sessions import SessionPrincipal
+from .dependencies import RuntimeDep
 from .responses import api_errors
-from .security import get_current_session
+from .security import CurrentSessionSecurityDep
 
 router = APIRouter(
     prefix="/preferences",
@@ -21,8 +19,8 @@ router = APIRouter(
 
 @router.get("", response_model=UserPreferences, responses=api_errors(500))
 async def get_preferences(
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
 ) -> UserPreferences:
     return await runtime.user_preference_store.get(principal.user.id)
 
@@ -34,8 +32,8 @@ async def get_preferences(
 )
 async def update_preferences(
     patch: UserPreferencesPatch,
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
 ) -> UserPreferences:
     return await runtime.user_preference_store.update(principal.user.id, patch)
 

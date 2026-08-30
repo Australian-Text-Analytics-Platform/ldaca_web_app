@@ -27,7 +27,7 @@ import logging
 import math
 import re
 from collections.abc import Sequence
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import polars as pl
 
@@ -169,9 +169,9 @@ def compute_tokens_concordance_page(
     request: dict[str, Any],
     page: int,
     page_size: int,
-    sort_by: Optional[str],
+    sort_by: str | None,
     descending: bool,
-    node_label: Optional[str] = None,
+    node_label: str | None = None,
 ) -> dict[str, Any]:
     """Page payload for the tokens-mode concordance path.
 
@@ -190,7 +190,7 @@ def compute_tokens_concordance_page(
     total_source_rows = base_lf.select(pl.len()).collect().item()
     total_source_rows = int(total_source_rows or 0)
 
-    effective_sort_by: Optional[str] = None
+    effective_sort_by: str | None = None
     if sort_by:
         schema = base_lf.collect_schema()
         if sort_by not in schema or sort_by in CORE_CONCORDANCE_COLUMNS:

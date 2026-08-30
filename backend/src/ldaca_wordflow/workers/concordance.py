@@ -12,7 +12,8 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any, Callable, cast
+from typing import Any, cast
+from collections.abc import Callable
 
 from ..analysis.concordance_core import build_concordance_search_pattern
 from ..analysis.concordance_tokens import (
@@ -204,11 +205,11 @@ def _build_concordance_occurrence_dataframe(
 
     corpus = [str(v) if v is not None else "" for v in node_corpus]
     non_empty_mask = [bool(v.strip()) for v in corpus]
-    corpus = [v for v, keep in zip(corpus, non_empty_mask) if keep]
+    corpus = [v for v, keep in zip(corpus, non_empty_mask, strict=False) if keep]
 
     source_column_name = "__concordance_source__"
     filtered_source_row_ids = [
-        value for value, keep in zip(source_row_ids, non_empty_mask) if keep
+        value for value, keep in zip(source_row_ids, non_empty_mask, strict=False) if keep
     ]
     data: dict[str, list] = {
         source_column_name: corpus,
@@ -224,7 +225,7 @@ def _build_concordance_occurrence_dataframe(
 
     if extra_columns_data:
         for col_name, col_values in extra_columns_data.items():
-            filtered = [v for v, keep in zip(col_values, non_empty_mask) if keep]
+            filtered = [v for v, keep in zip(col_values, non_empty_mask, strict=False) if keep]
             data[col_name] = filtered
             base_columns.append(pl.col(col_name))
             output_columns.append(col_name)
@@ -320,21 +321,21 @@ def _build_tokens_concordance_occurrence_dataframe(
     # Mirror the regex builder's empty-row filter so the document index
     # stays aligned with extra columns.
     keep_mask = [bool(text.strip()) for text in corpus]
-    corpus = [text for text, keep in zip(corpus, keep_mask) if keep]
-    tokens_per_row = [tokens for tokens, keep in zip(tokens_per_row, keep_mask) if keep]
+    corpus = [text for text, keep in zip(corpus, keep_mask, strict=False) if keep]
+    tokens_per_row = [tokens for tokens, keep in zip(tokens_per_row, keep_mask, strict=False) if keep]
     filtered_source_row_ids = [
-        value for value, keep in zip(source_row_ids, keep_mask) if keep
+        value for value, keep in zip(source_row_ids, keep_mask, strict=False) if keep
     ]
 
     filtered_extras: dict[str, list] = {}
     if extra_columns_data:
         for col_name, col_values in extra_columns_data.items():
             filtered_extras[col_name] = [
-                v for v, keep in zip(col_values, keep_mask) if keep
+                v for v, keep in zip(col_values, keep_mask, strict=False) if keep
             ]
 
     hits: list[dict[str, Any]] = []
-    for row_index, (raw_text, tokens) in enumerate(zip(corpus, tokens_per_row)):
+    for row_index, (raw_text, tokens) in enumerate(zip(corpus, tokens_per_row, strict=False)):
         if not isinstance(tokens, list) or not tokens:
             continue
         # ``tokens`` may include None entries (polars struct nulls). The

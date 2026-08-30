@@ -22,7 +22,8 @@ import re
 import secrets
 import time
 from collections.abc import Mapping
-from typing import Any, Callable, MutableMapping
+from typing import Any
+from collections.abc import Callable, MutableMapping
 
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send

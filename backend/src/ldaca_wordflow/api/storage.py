@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Annotated
 
-from fastapi import APIRouter, Request, Response, Security
+from fastapi import APIRouter, Request, Response
 
 from ..models.storage import (
     QuotaStorageResource,
@@ -13,9 +12,8 @@ from ..models.storage import (
 )
 from ..runtime import get_runtime
 from ..services.quota import QuotaStorageStatus
-from ..services.sessions import SessionPrincipal
 from .responses import api_errors
-from .security import get_current_session
+from .security import CurrentSessionSecurityDep
 
 router = APIRouter(
     tags=["storage"],
@@ -30,7 +28,7 @@ router = APIRouter(
 async def get_storage(
     request: Request,
     response: Response,
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
+    principal: CurrentSessionSecurityDep,
 ) -> StorageResource:
     """Return a fresh quota snapshot or the exact unlimited policy."""
 

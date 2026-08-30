@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from typing import Any, cast
 
 import pytest
 from pydantic import ValidationError
@@ -37,7 +38,7 @@ def test_annotation_class_is_one_shared_strict_value_contract() -> None:
     with pytest.raises(ValidationError):
         DomainAnnotationClass.model_validate({"name": "Relevant", "unknown": True})
     with pytest.raises(ValidationError):
-        setattr(annotation_class, "name", "Changed")
+        cast(Any, annotation_class).name = "Changed"
 
 
 def test_analysis_request_rejects_duplicate_class_names() -> None:

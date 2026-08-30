@@ -5,14 +5,13 @@ from __future__ import annotations
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, Request, Response, Security, status
+from fastapi import APIRouter, Query, Request, Response, status
 
 from ..domain import UserFileImport
 from ..models.user_file_imports import UserFileImportPage
-from ..runtime import Runtime, get_runtime
-from ..services.sessions import SessionPrincipal
+from .dependencies import RuntimeDep
 from .responses import api_errors, route_path
-from .security import get_current_session
+from .security import CurrentSessionSecurityDep
 
 router = APIRouter(
     prefix="/user-file-imports",
@@ -27,10 +26,10 @@ router = APIRouter(
     responses=api_errors(422, 500),
 )
 async def list_user_file_imports(
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=100)] = 50,
-    runtime: Runtime = Depends(get_runtime),
 ) -> UserFileImportPage:
     """Return retained import history in stable newest-first order."""
 
@@ -48,8 +47,8 @@ async def list_user_file_imports(
 )
 async def get_user_file_import(
     import_id: uuid.UUID,
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
 ) -> UserFileImport:
     """Return one import while concealing cross-user identities."""
 
@@ -71,8 +70,8 @@ async def cancel_user_file_import(
     import_id: uuid.UUID,
     request: Request,
     response: Response,
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
 ) -> UserFileImport:
     """Cancel queued work now or request confirmed running cancellation."""
 
@@ -98,8 +97,8 @@ async def cancel_user_file_import(
 )
 async def delete_user_file_import(
     import_id: uuid.UUID,
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
 ) -> Response:
     """Delete one terminal history record without deleting published files."""
 

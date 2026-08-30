@@ -48,7 +48,7 @@ class SampleCollection(BaseModel):
     installed: bool = False
 
     @model_validator(mode="after")
-    def validate_manifest(self) -> "SampleCollection":
+    def validate_manifest(self) -> SampleCollection:
         """Require an internally consistent, platform-unambiguous manifest."""
 
         try:
@@ -83,7 +83,7 @@ class SampleCatalogueResource(BaseModel):
     collections: list[SampleCollection] = Field(max_length=500)
 
     @model_validator(mode="after")
-    def validate_collection_ids(self) -> "SampleCatalogueResource":
+    def validate_collection_ids(self) -> SampleCatalogueResource:
         ids = [portable_collision_key(collection.id) for collection in self.collections]
         if len(ids) != len(set(ids)):
             raise ValueError("Sample collection IDs must be distinct")

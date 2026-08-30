@@ -259,7 +259,7 @@ class WorkspaceArchiveService:
                     )
                     return snapshot, f"{_safe_export_name(workspace_name)}.zip", None
                 except (WorkspaceCapacityError, WorkspaceSnapshotInvalidError):
-                    raise not_open
+                    raise not_open from None
                 raise not_open
         finally:
             if source_snapshot is not None:

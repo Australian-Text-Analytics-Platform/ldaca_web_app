@@ -1,6 +1,6 @@
 """Canonical process contract for Sequential Analysis."""
 
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from pathlib import Path
 
 import polars as pl
@@ -32,8 +32,8 @@ def _snapshot(tmp_path: Path) -> Path:
             data=pl.DataFrame(
                 {
                     "occurred_at": [
-                        datetime(2026, 1, 1, tzinfo=timezone.utc),
-                        datetime(2026, 1, 15, tzinfo=timezone.utc),
+                        datetime(2026, 1, 1, tzinfo=UTC),
+                        datetime(2026, 1, 15, tzinfo=UTC),
                     ],
                     "text": ["first", "second"],
                     "group": ["A", "a"],
@@ -135,9 +135,9 @@ def test_sequential_frames_keep_case_variants_as_exact_multi_column_groups() -> 
         pl.DataFrame(
             {
                 "occurred_at": [
-                    datetime(2026, 1, 1, tzinfo=timezone.utc),
-                    datetime(2026, 1, 2, tzinfo=timezone.utc),
-                    datetime(2026, 1, 3, tzinfo=timezone.utc),
+                    datetime(2026, 1, 1, tzinfo=UTC),
+                    datetime(2026, 1, 2, tzinfo=UTC),
+                    datetime(2026, 1, 3, tzinfo=UTC),
                 ],
                 "region": ["au", "AU", "au"],
                 "party": ["jobs", "Jobs", None],

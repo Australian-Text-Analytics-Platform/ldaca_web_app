@@ -4,14 +4,15 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Header
 
 from ..models.data_root import (
     DataRootErrorResource,
     DataRootResource,
     DataRootUpdateRequest,
 )
-from ..runtime import RuntimeManager, RuntimeManagerSnapshot, get_runtime_manager
+from ..runtime import RuntimeManagerSnapshot
+from .dependencies import RuntimeManagerDep
 from .responses import api_errors
 
 router = APIRouter(tags=["data-root"])
@@ -43,7 +44,7 @@ def _resource(snapshot: RuntimeManagerSnapshot) -> DataRootResource:
 
 @router.get("/data-root", response_model=DataRootResource, name="get_data_root")
 async def get_data_root(
-    manager: RuntimeManager = Depends(get_runtime_manager),
+    manager: RuntimeManagerDep,
 ) -> DataRootResource:
     """Return the bootstrap state without exposing multi-user filesystem paths."""
 
@@ -59,7 +60,7 @@ async def get_data_root(
 async def update_data_root(
     body: DataRootUpdateRequest,
     _change_token: Annotated[str, Header(alias="X-Data-Root-Token")],
-    manager: RuntimeManager = Depends(get_runtime_manager),
+    manager: RuntimeManagerDep,
 ) -> DataRootResource:
     """Configure or switch the complete single-user Runtime synchronously."""
 

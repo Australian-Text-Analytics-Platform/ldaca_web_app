@@ -23,10 +23,10 @@ import secrets
 import sys
 import tempfile
 from collections.abc import AsyncIterator, Awaitable, Callable
-from contextlib import AsyncExitStack, asynccontextmanager
+from contextlib import AbstractAsyncContextManager, AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import AsyncContextManager, Literal, TypedDict, cast
+from typing import Literal, TypedDict, cast
 
 import anyio
 from anyio.abc import ObjectReceiveStream, ObjectSendStream, TaskGroup, TaskStatus
@@ -105,7 +105,7 @@ RuntimeManagerState = Literal[
 ]
 DataRootSource = Literal["environment", "config", "none"]
 ExecutionShutdown = Callable[[float], Awaitable[None]]
-ManagedRuntimeFactory = Callable[[Settings], AsyncContextManager["Runtime"]]
+ManagedRuntimeFactory = Callable[[Settings], AbstractAsyncContextManager["Runtime"]]
 
 
 @dataclass(slots=True)
@@ -477,8 +477,8 @@ class RuntimeManager:
             raise DataRootManagedByOperatorError()
         try:
             self._transition_lock.acquire_nowait()
-        except (anyio.WouldBlock, RuntimeError):
-            raise DataRootTransitionError()
+        except (anyio.WouldBlock, RuntimeError) as exc:
+            raise DataRootTransitionError() from exc
         try:
             with anyio.CancelScope(shield=True):
                 result = await self._submit_owner(

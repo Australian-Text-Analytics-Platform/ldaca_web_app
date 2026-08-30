@@ -3,16 +3,13 @@
 from __future__ import annotations
 
 import uuid
-from typing import Annotated
-
-from fastapi import APIRouter, Depends, Request, Response, Security, status
+from fastapi import APIRouter, Request, Response, status
 
 from ...domain.workspace import Tab
 from ...models.tabs import TabCreate, TabUpdate
-from ...runtime import Runtime, get_runtime
-from ...services.sessions import SessionPrincipal
+from ..dependencies import RuntimeDep
 from ..responses import api_errors, route_path
-from ..security import get_current_session
+from ..security import CurrentSessionSecurityDep
 
 router = APIRouter(
     prefix="/workspaces/{workspace_id}/tabs",
@@ -28,8 +25,8 @@ router = APIRouter(
 )
 async def list_tabs(
     workspace_id: uuid.UUID,
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
 ) -> list[Tab]:
     """Return every Tab in immutable creation order."""
 
@@ -50,8 +47,8 @@ async def create_tab(
     body: TabCreate,
     request: Request,
     response: Response,
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
 ) -> Tab:
     """Create a durable empty Tab immediately."""
 
@@ -77,8 +74,8 @@ async def create_tab(
 async def get_tab(
     workspace_id: uuid.UUID,
     tab_id: uuid.UUID,
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
 ) -> Tab:
     """Read one Tab by its sole UUID identity."""
 
@@ -98,8 +95,8 @@ async def update_tab(
     workspace_id: uuid.UUID,
     tab_id: uuid.UUID,
     body: TabUpdate,
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
 ) -> Tab:
     """Update one Tab without changing its immutable function kind."""
 
@@ -119,8 +116,8 @@ async def update_tab(
 async def delete_tab(
     workspace_id: uuid.UUID,
     tab_id: uuid.UUID,
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
 ) -> Response:
     """Delete one existing Tab; repeated deletion is ordinary absence."""
 

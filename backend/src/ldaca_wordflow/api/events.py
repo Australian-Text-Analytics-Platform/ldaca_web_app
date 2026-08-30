@@ -4,17 +4,16 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
-from typing import Annotated
 
 import anyio
-from fastapi import APIRouter, Depends, Request, Security
+from fastapi import APIRouter, Request
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 
-from ..runtime import Runtime, get_runtime
 from ..services.events import EventHub
 from ..services.sessions import SessionPrincipal, SessionService
+from .dependencies import RuntimeDep
 from .responses import api_errors
-from .security import SESSION_COOKIE_NAME, get_current_session
+from .security import SESSION_COOKIE_NAME, CurrentSessionSecurityDep
 
 router = APIRouter(tags=["events"], responses=api_errors(401))
 
@@ -84,8 +83,8 @@ async def _events(
 @router.get("/events", response_class=EventSourceResponse)
 async def backend_events(
     request: Request,
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
 ) -> AsyncIterator[ServerSentEvent]:
     """Open one bounded stream and refresh authoritative resources after ready."""
 

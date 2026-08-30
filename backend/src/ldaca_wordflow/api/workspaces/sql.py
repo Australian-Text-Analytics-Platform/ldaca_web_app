@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Annotated
-
-from fastapi import APIRouter, Depends, Request, Response, Security, status
+from fastapi import APIRouter, Request, Response, status
 from fastapi.responses import JSONResponse
 
 from ...models.workspace import WorkspaceNodeInfo
@@ -14,10 +12,9 @@ from ...models.workspace_sql import (
     WorkspaceSqlQueryRequest,
     WorkspaceSqlRequest,
 )
-from ...runtime import Runtime, get_runtime
-from ...services.sessions import SessionPrincipal
+from ..dependencies import RuntimeDep
 from ..responses import api_errors, route_path, workspace_etag
-from ..security import get_current_session
+from ..security import CurrentSessionSecurityDep
 from ..table_responses import ARROW_STREAM_RESPONSE, arrow_page_response
 
 router = APIRouter(
@@ -44,8 +41,8 @@ async def execute_workspace_sql(
     workspace_id: uuid.UUID,
     command: WorkspaceSqlRequest,
     http_request: Request,
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
 ) -> Response:
     """Query declared Data Blocks or create one SQL-derived Data Block."""
 

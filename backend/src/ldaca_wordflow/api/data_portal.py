@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request, Response, Security, status
+from fastapi import APIRouter, Request, Response, status
 
 from ..domain import UserFileImport
 from ..models.data_sources import (
@@ -13,10 +12,9 @@ from ..models.data_sources import (
     DataPortalSearchRequest,
     DataPortalSearchResource,
 )
-from ..runtime import Runtime, get_runtime
-from ..services.sessions import SessionPrincipal
+from .dependencies import RuntimeDep
 from .responses import api_errors, route_path
-from .security import get_current_session
+from .security import CurrentSessionSecurityDep
 
 router = APIRouter(
     prefix="/data-portal",
@@ -32,8 +30,8 @@ router = APIRouter(
 )
 async def search_data_portal(
     request: DataPortalSearchRequest,
-    _principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    _principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
 ) -> DataPortalSearchResource:
     """Search the configured portal without holding file or workspace gates."""
 
@@ -47,8 +45,8 @@ async def search_data_portal(
 )
 async def list_featured_data_portal_collections(
     request: DataPortalFeaturedRequest,
-    _principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    _principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
 ) -> DataPortalSearchResource:
     """Return configured featured collections through the same typed resource."""
 
@@ -65,8 +63,8 @@ async def submit_data_portal_import(
     request: DataPortalImportSubmitRequest,
     http_request: Request,
     response: Response,
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
 ) -> UserFileImport:
     """Queue a process import while keeping the portal token out of persistence."""
 

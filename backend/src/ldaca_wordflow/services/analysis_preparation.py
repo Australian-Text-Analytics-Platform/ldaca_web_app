@@ -36,6 +36,7 @@ from ..models.quotation import QuotationEngineType, ResolvedQuotationEngine
 from ..models.analysis_results import (
     ConcordanceRunAllStoredResult,
     QuotationRunAllStoredResult,
+    RunAllSourceDescriptor,
     SequentialStoredResult,
     TopicModelingStoredResult,
 )
@@ -552,11 +553,11 @@ def _analysis_artifact_path(
 
 def _validate_data_block_creation_columns(
     selected_columns: list[str],
-    source: object,
+    source: RunAllSourceDescriptor,
 ) -> None:
-    document_column = getattr(source, "document_column")
-    metadata_columns = getattr(source, "metadata_columns")
-    analysis_columns = getattr(source, "analysis_columns")
+    document_column = source.document_column
+    metadata_columns = source.metadata_columns
+    analysis_columns = source.analysis_columns
     allowed = {document_column, *metadata_columns, *analysis_columns}
     if document_column not in selected_columns:
         raise InvalidInputError("Data Block Creation requires the document column")
@@ -566,9 +567,9 @@ def _validate_data_block_creation_columns(
 
 def _validate_document_data_block_creation_columns(
     selected_metadata_columns: list[str],
-    source: object,
+    source: RunAllSourceDescriptor,
 ) -> None:
-    metadata_columns = set(getattr(source, "metadata_columns"))
+    metadata_columns = set(source.metadata_columns)
     if any(column not in metadata_columns for column in selected_metadata_columns):
         raise InvalidInputError("Document Data Block Creation metadata column is unavailable")
 

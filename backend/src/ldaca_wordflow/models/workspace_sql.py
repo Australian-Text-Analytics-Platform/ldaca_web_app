@@ -17,7 +17,7 @@ class _WorkspaceSqlRequest(BaseModel):
     sql: str = Field(min_length=1)
 
     @model_validator(mode="after")
-    def validate_command(self) -> "_WorkspaceSqlRequest":
+    def validate_command(self) -> _WorkspaceSqlRequest:
         if not self.sql.strip():
             raise ValueError("SQL must not be blank")
         if len(self.node_ids) != len(set(self.node_ids)):

@@ -3,16 +3,14 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, Request, Response, Security, status
+from fastapi import APIRouter, Query, Request, Response, status
 from fastapi.responses import FileResponse
 from starlette.background import BackgroundTask
 
 from ...shared.errors import UnsupportedMediaTypeError
-from ...services.workspace_archives import WorkspaceArchiveService
 from ...models.workspace import WorkspaceResource
-from ...runtime import get_workspace_archive_service
-from ...services.sessions import SessionPrincipal
-from ..security import get_current_session
+from ..dependencies import WorkspaceArchiveServiceDep
+from ..security import CurrentSessionSecurityDep
 from ..responses import api_errors, route_path, workspace_etag
 from ..request_stream import RequestByteStream
 
@@ -42,9 +40,9 @@ router = APIRouter(
 async def import_workspace_archive(
     request: Request,
     response: Response,
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
+    principal: CurrentSessionSecurityDep,
     filename: Annotated[str, Query(min_length=1)],
-    archive_service: WorkspaceArchiveService = Depends(get_workspace_archive_service),
+    archive_service: WorkspaceArchiveServiceDep,
 ) -> WorkspaceResource:
     """Validate, stage, and atomically install one workspace ZIP."""
 
@@ -85,8 +83,8 @@ async def import_workspace_archive(
 )
 async def export_workspace_archive(
     workspace_id: uuid.UUID,
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    archive_service: WorkspaceArchiveService = Depends(get_workspace_archive_service),
+    principal: CurrentSessionSecurityDep,
+    archive_service: WorkspaceArchiveServiceDep,
 ) -> FileResponse:
     """Return a portable ZIP, or a raw archival copy for an incompatible Workspace."""
 

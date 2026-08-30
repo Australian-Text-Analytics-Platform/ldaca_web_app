@@ -5,9 +5,8 @@ from __future__ import annotations
 import uuid
 from dataclasses import asdict
 
-from fastapi import APIRouter, Depends, Request, Response, status
+from fastapi import APIRouter, Request, Response, status
 
-from ...models.session import SessionUser
 from ...models.workspace import (
     AvailableWorkspaceListItem,
     UnavailableWorkspaceListItem,
@@ -17,14 +16,13 @@ from ...models.workspace import (
     WorkspaceResource,
     WorkspaceUpdateRequest,
 )
-from ...runtime import Runtime, get_runtime, get_workspace_service
 from ...services.workspace import (
     UnavailableWorkspaceRecord,
     WorkspaceRecord,
-    WorkspaceService,
 )
+from ..dependencies import RuntimeDep, WorkspaceServiceDep
 from ..responses import api_errors, route_path, workspace_etag
-from ..security import get_current_user
+from ..security import CurrentUserDep
 
 router = APIRouter(
     prefix="/workspaces",
@@ -45,8 +43,8 @@ def _list_item(record: WorkspaceRecord | UnavailableWorkspaceRecord) -> Workspac
 
 @router.get("", response_model=list[WorkspaceListItem])
 async def list_workspaces(
-    current_user: SessionUser = Depends(get_current_user),
-    workspace_service: WorkspaceService = Depends(get_workspace_service),
+    current_user: CurrentUserDep,
+    workspace_service: WorkspaceServiceDep,
 ) -> list[WorkspaceListItem]:
     """List fresh persisted metadata without opening any Workspace."""
 
@@ -64,8 +62,8 @@ async def create_workspace(
     request: WorkspaceCreateRequest,
     http_request: Request,
     response: Response,
-    current_user: SessionUser = Depends(get_current_user),
-    workspace_service: WorkspaceService = Depends(get_workspace_service),
+    current_user: CurrentUserDep,
+    workspace_service: WorkspaceServiceDep,
 ) -> WorkspaceResource:
     """Create one durable closed Workspace."""
 
@@ -91,8 +89,8 @@ async def create_workspace(
 async def get_workspace_by_id(
     workspace_id: uuid.UUID,
     response: Response,
-    current_user: SessionUser = Depends(get_current_user),
-    workspace_service: WorkspaceService = Depends(get_workspace_service),
+    current_user: CurrentUserDep,
+    workspace_service: WorkspaceServiceDep,
 ) -> WorkspaceResource:
     """Read the same lightweight resource returned by the collection."""
 
@@ -112,8 +110,8 @@ async def get_workspace_by_id(
 async def open_workspace_by_id(
     workspace_id: uuid.UUID,
     response: Response,
-    current_user: SessionUser = Depends(get_current_user),
-    runtime: Runtime = Depends(get_runtime),
+    current_user: CurrentUserDep,
+    runtime: RuntimeDep,
 ) -> WorkspaceResource:
     """Make one Workspace the user's sole open process-local aggregate."""
 
@@ -136,8 +134,8 @@ async def open_workspace_by_id(
 )
 async def close_workspace_by_id(
     workspace_id: uuid.UUID,
-    current_user: SessionUser = Depends(get_current_user),
-    runtime: Runtime = Depends(get_runtime),
+    current_user: CurrentUserDep,
+    runtime: RuntimeDep,
 ) -> WorkspaceResource | Response:
     """Close immediately or report that admitted work is still draining."""
 
@@ -159,8 +157,8 @@ async def update_workspace_by_id(
     workspace_id: uuid.UUID,
     request: WorkspaceUpdateRequest,
     response: Response,
-    current_user: SessionUser = Depends(get_current_user),
-    workspace_service: WorkspaceService = Depends(get_workspace_service),
+    current_user: CurrentUserDep,
+    workspace_service: WorkspaceServiceDep,
 ) -> WorkspaceResource:
     """Apply one narrow metadata command to the current open aggregate."""
 
@@ -182,8 +180,8 @@ async def reorder_workspace_nodes_by_id(
     workspace_id: uuid.UUID,
     request: WorkspaceNodeReorderRequest,
     response: Response,
-    current_user: SessionUser = Depends(get_current_user),
-    workspace_service: WorkspaceService = Depends(get_workspace_service),
+    current_user: CurrentUserDep,
+    workspace_service: WorkspaceServiceDep,
 ) -> WorkspaceResource:
     """Persist one exact Data Block order under the Workspace gate."""
 
@@ -203,8 +201,8 @@ async def reorder_workspace_nodes_by_id(
 )
 async def delete_workspace_by_id(
     workspace_id: uuid.UUID,
-    current_user: SessionUser = Depends(get_current_user),
-    runtime: Runtime = Depends(get_runtime),
+    current_user: CurrentUserDep,
+    runtime: RuntimeDep,
 ) -> Response:
     """Atomically remove a Workspace and return an empty body."""
 

@@ -3,17 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Annotated
-
-from fastapi import (
-    APIRouter,
-    Depends,
-    Query,
-    Request,
-    Response,
-    Security,
-    status,
-)
+from fastapi import APIRouter, Query, Request, Response, status
 from fastapi.responses import FileResponse
 from starlette.background import BackgroundTask
 
@@ -25,9 +15,8 @@ from ...models.node_resources import (
     NodeUpdateRequest,
 )
 from ...models.workspace import WorkspaceNodeInfo
-from ...runtime import Runtime, get_runtime
-from ...services.sessions import SessionPrincipal
-from ..security import get_current_session
+from ..dependencies import RuntimeDep
+from ..security import CurrentSessionSecurityDep
 from ..responses import api_errors, route_path, workspace_etag
 from ..table_responses import (
     ARROW_STREAM_RESPONSE,
@@ -50,8 +39,8 @@ router = APIRouter(
 async def list_nodes(
     workspace_id: uuid.UUID,
     response: Response,
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
 ) -> list[WorkspaceNodeInfo]:
     """Return every Data Block in the persisted graph order."""
 
@@ -90,8 +79,8 @@ async def list_nodes(
 async def export_data_blocks(
     workspace_id: uuid.UUID,
     request: DataBlockExportRequest,
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
 ) -> FileResponse:
     """Return selected Data Blocks as one file or a server-built ZIP."""
 
@@ -125,8 +114,8 @@ async def create_node(
     request: NodeCreateRequest,
     http_request: Request,
     response: Response,
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
 ) -> WorkspaceNodeInfo:
     """Create one file-backed source or immutable derived Data Block."""
 
@@ -153,10 +142,10 @@ async def create_node(
 async def preview_node_creation(
     workspace_id: uuid.UUID,
     request: NodeDerivationRequest,
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=500),
-    runtime: Runtime = Depends(get_runtime),
 ) -> Response:
     """Preview a derived-node plan without changing workspace state."""
 
@@ -181,8 +170,8 @@ async def get_node(
     workspace_id: uuid.UUID,
     node_id: uuid.UUID,
     response: Response,
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
 ) -> WorkspaceNodeInfo:
     """Return one node's schema and topology metadata."""
 
@@ -205,8 +194,8 @@ async def update_node(
     node_id: uuid.UUID,
     request: NodeUpdateRequest,
     response: Response,
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
 ) -> WorkspaceNodeInfo:
     """Update one node's public metadata and return the committed resource."""
 
@@ -230,8 +219,8 @@ async def edit_node(
     node_id: uuid.UUID,
     request: NodeEditRequest,
     response: Response,
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
 ) -> WorkspaceNodeInfo:
     """Apply one identity-preserving Data Block Edit."""
 
@@ -254,8 +243,8 @@ async def undo_node(
     workspace_id: uuid.UUID,
     node_id: uuid.UUID,
     response: Response,
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
 ) -> WorkspaceNodeInfo:
     """Restore the Data Block's previous session plan."""
 
@@ -277,8 +266,8 @@ async def redo_node(
     workspace_id: uuid.UUID,
     node_id: uuid.UUID,
     response: Response,
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
 ) -> WorkspaceNodeInfo:
     """Restore the Data Block's next session plan."""
 
@@ -299,8 +288,8 @@ async def redo_node(
 async def delete_node(
     workspace_id: uuid.UUID,
     node_id: uuid.UUID,
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
 ) -> Response:
     """Delete one node under the workspace gate and return an empty body."""
 
@@ -323,8 +312,8 @@ async def delete_node(
 async def get_node_schema(
     workspace_id: uuid.UUID,
     node_id: uuid.UUID,
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
 ) -> Response:
     """Return the Data Block schema as a zero-row Arrow IPC stream."""
 

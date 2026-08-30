@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import cast
+from typing import Any, cast
 
 import anyio
 
@@ -62,8 +62,9 @@ class _Service:
 
 async def test_safe_worker_failure_is_persisted_without_publication() -> None:
     runtime = object.__new__(AnalysisExecutionRuntime)
-    runtime._executor = _Executor()
-    runtime._preparer = object()
+    uninitialized_runtime = cast(Any, runtime)
+    uninitialized_runtime._executor = _Executor()
+    uninitialized_runtime._preparer = object()
     runtime._limiter = anyio.CapacityLimiter(1)
     key = AnalysisExecutionKey("user", "workspace", "analysis")
     item = ScheduledAnalysis(key, datetime.now(UTC), "captured-key")

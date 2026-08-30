@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from collections import deque
 from collections.abc import Callable, Iterable
-from typing import Any, Generic, TypeVar
+from typing import Any, TypeVar
 
 T = TypeVar("T")
 
 
-class FairUserQueue(Generic[T]):
+class FairUserQueue[T]:
     """Select per-user FIFO work while rotating users under contention."""
 
     def __init__(self) -> None:

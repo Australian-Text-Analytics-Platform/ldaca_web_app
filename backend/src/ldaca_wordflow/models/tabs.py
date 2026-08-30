@@ -42,7 +42,7 @@ class TabUpdate(_StrictModel):
     topic_modeling_projection_selection: TopicModelingProjectionSelection | None = None
 
     @model_validator(mode="after")
-    def require_update(self) -> "TabUpdate":
+    def require_update(self) -> TabUpdate:
         if not self.model_fields_set:
             raise ValueError("At least one Tab field must be provided")
         return self

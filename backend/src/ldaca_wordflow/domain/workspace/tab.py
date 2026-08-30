@@ -72,7 +72,7 @@ class Tab(BaseModel):
     revision: int = Field(ge=1)
 
     @model_validator(mode="after")
-    def validate_presentation_settings(self) -> "Tab":
+    def validate_presentation_settings(self) -> Tab:
         if self.stop_words and self.kind not in {
             AnalysisKind.TOKEN_FREQUENCY,
             AnalysisKind.TOPIC_MODELING,
@@ -99,7 +99,7 @@ class Tab(BaseModel):
         kind: AnalysisKind,
         name: str,
         timestamp: datetime,
-    ) -> "Tab":
+    ) -> Tab:
         return cls(
             id=uuid.uuid4(),
             kind=kind,

@@ -12,7 +12,8 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
+from collections.abc import Callable
 
 from .utils import process_entrypoint
 
@@ -126,7 +127,10 @@ def _compute_token_frequencies(
                         f"Missing tokenizer model for Data Block {node_id}"
                     )
 
-                def collect_source_corpus() -> list[str]:
+                def collect_source_corpus(
+                    snapshot_node=snapshot_node,
+                    source_column=source_column,
+                ) -> list[str]:
                     """Collect raw source text for direct token-frequency counting.
 
                     Called by:

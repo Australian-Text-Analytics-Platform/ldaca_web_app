@@ -2,20 +2,18 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, Request, Response, Security, status
+from fastapi import APIRouter, Query, Request, Response, status
 
 from ...models.files import (
     CreateFolderRequest,
     FileResource,
     MoveFileRequest,
 )
-from ...services.sessions import SessionPrincipal
-from ...services.user_files import UserFileStore
 from ...shared.errors import UnsupportedMediaTypeError
 from ..request_stream import RequestByteStream
 from ..responses import api_errors, route_path_with_query
-from ..security import get_current_session
-from .dependencies import get_user_file_store
+from ..security import CurrentSessionSecurityDep
+from .dependencies import UserFileStoreDep
 
 router = APIRouter()
 
@@ -26,8 +24,8 @@ router = APIRouter()
     responses=api_errors(403, 413, 422),
 )
 async def list_user_files(
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    file_store: UserFileStore = Depends(get_user_file_store),
+    principal: CurrentSessionSecurityDep,
+    file_store: UserFileStoreDep,
 ) -> list[FileResource]:
     """Return the complete deterministic User File tree."""
 
@@ -43,9 +41,9 @@ async def list_user_files(
     responses=api_errors(400, 403, 404, 422),
 )
 async def get_user_file_resource(
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
+    principal: CurrentSessionSecurityDep,
     path: Annotated[str, Query(min_length=1)],
-    file_store: UserFileStore = Depends(get_user_file_store),
+    file_store: UserFileStoreDep,
 ) -> FileResource:
     """Return one direct file-or-directory resource."""
 
@@ -64,8 +62,8 @@ async def create_folder(
     request: CreateFolderRequest,
     http_request: Request,
     response: Response,
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    file_store: UserFileStore = Depends(get_user_file_store),
+    principal: CurrentSessionSecurityDep,
+    file_store: UserFileStoreDep,
 ) -> FileResource:
     """Create one addressable directory and return its direct resource."""
 
@@ -93,8 +91,8 @@ async def move_file(
     request: MoveFileRequest,
     http_request: Request,
     response: Response,
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    file_store: UserFileStore = Depends(get_user_file_store),
+    principal: CurrentSessionSecurityDep,
+    file_store: UserFileStoreDep,
 ) -> FileResource:
     """Move one existing file without replacement."""
 
@@ -132,9 +130,9 @@ async def move_file(
 async def upload_file(
     request: Request,
     response: Response,
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
+    principal: CurrentSessionSecurityDep,
     path: Annotated[str, Query(min_length=1)],
-    file_store: UserFileStore = Depends(get_user_file_store),
+    file_store: UserFileStoreDep,
 ) -> FileResource:
     """Admit and stream one raw body before any framework multipart spooling."""
 
@@ -163,9 +161,9 @@ async def upload_file(
     responses=api_errors(400, 403, 404, 422),
 )
 async def delete_file(
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
+    principal: CurrentSessionSecurityDep,
+    file_store: UserFileStoreDep,
     path: str = Query(..., description="Path relative to the user's data directory"),
-    file_store: UserFileStore = Depends(get_user_file_store),
 ) -> Response:
     """Delete one file/directory and return an empty body."""
 

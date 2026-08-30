@@ -360,7 +360,7 @@ class Settings(BaseSettings):
                     not (part and part.replace("-", "a").isalnum())
                     for part in candidate.split(".")
                 ):
-                    raise ValueError("Trusted hosts must be exact host names")
+                    raise ValueError("Trusted hosts must be exact host names") from None
             normalized.append(candidate)
         if len(normalized) != len(set(normalized)):
             raise ValueError("Trusted hosts must be unique")
@@ -433,7 +433,7 @@ class Settings(BaseSettings):
         )
 
     @model_validator(mode="after")
-    def validate_deployment_profile(self) -> "Settings":
+    def validate_deployment_profile(self) -> Settings:
         """Reject unsupported provider and multi-user desktop combinations."""
 
         if not self.multi_user:

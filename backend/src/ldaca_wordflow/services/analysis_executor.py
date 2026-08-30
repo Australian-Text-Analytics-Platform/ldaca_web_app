@@ -64,7 +64,7 @@ class _LaunchEntry:
     cancellation_requested: bool = False
 
 
-def _run_analysis_process(
+def _run_analysis_process[T](
     function: Callable[..., T],
     kwargs: Mapping[str, object],
     progress_queue: Queue[Any],

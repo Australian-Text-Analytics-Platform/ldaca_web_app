@@ -51,7 +51,7 @@ class DataBlockExportRequest(_StrictRequest):
     format: DataBlockExportFormat = DataBlockExportFormat.CSV
 
     @model_validator(mode="after")
-    def validate_node_ids(self) -> "DataBlockExportRequest":
+    def validate_node_ids(self) -> DataBlockExportRequest:
         if len(self.node_ids) != len(set(self.node_ids)):
             raise ValueError("Data Block export IDs must be unique")
         return self
@@ -207,7 +207,7 @@ class AnnotationClassesNodeEditRequest(_StrictRequest):
     rows: list[AnnotationClassRow] = Field(default_factory=list, max_length=200)
 
     @model_validator(mode="after")
-    def validate_columns_and_rows(self) -> "AnnotationClassesNodeEditRequest":
+    def validate_columns_and_rows(self) -> AnnotationClassesNodeEditRequest:
         if self.class_column == self.description_column:
             raise ValueError("Class and description columns must be different")
         normalized = [row.class_name.casefold() for row in self.rows]
@@ -245,7 +245,7 @@ class NodeUpdateRequest(_StrictRequest):
         return value.strip() or None
 
     @model_validator(mode="after")
-    def validate_patch(self) -> "NodeUpdateRequest":
+    def validate_patch(self) -> NodeUpdateRequest:
         if not self.model_fields_set:
             raise ValueError("Node patch must contain at least one field")
         if "name" in self.model_fields_set and self.name is None:

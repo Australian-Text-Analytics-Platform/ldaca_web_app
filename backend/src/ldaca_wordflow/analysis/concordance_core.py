@@ -16,7 +16,7 @@ import logging
 import math
 import re
 from functools import partial
-from typing import Any, Optional
+from typing import Any
 
 import polars as pl
 
@@ -139,7 +139,7 @@ def build_concordance_search_pattern(
 def _project_concordance_hit(
     raw_hit: dict[str, Any],
     *,
-    document_text: Optional[str] = None,
+    document_text: str | None = None,
     contexts_include_separators: bool = False,
 ) -> dict[str, Any]:
     """Project one raw concordance struct into canonical response columns.
@@ -201,8 +201,8 @@ def _column_metadata(
 def _serialize_grouped_concordance_rows(
     result_df: pl.DataFrame,
     *,
-    node_label: Optional[str] = None,
-    text_column: Optional[str] = None,
+    node_label: str | None = None,
+    text_column: str | None = None,
     contexts_include_separators: bool = False,
 ) -> tuple[list[list[dict[str, Any]]], list[str]]:
     """Serialize collected concordance rows into grouped per-document hit lists.
@@ -235,7 +235,7 @@ def _serialize_grouped_concordance_rows(
             continue
 
         base_row = {key: value for key, value in row.items() if key != "concordance"}
-        document_text: Optional[str] = None
+        document_text: str | None = None
         if has_extraction:
             raw_doc = base_row.get(text_column)
             document_text = str(raw_doc) if raw_doc is not None else ""
@@ -268,10 +268,10 @@ def compute_concordance_page(
     request: dict[str, Any],
     *,
     page: int,
-    page_size: Optional[int],
-    sort_by: Optional[str],
+    page_size: int | None,
+    sort_by: str | None,
     descending: bool,
-    node_label: Optional[str] = None,
+    node_label: str | None = None,
 ) -> dict[str, Any]:
     """Compute one concordance page for a single node source.
 
@@ -289,7 +289,7 @@ def compute_concordance_page(
 
     resolved_page_size = _resolve_page_size(base_lf, column, request, page_size)
 
-    effective_sort_by: Optional[str] = None
+    effective_sort_by: str | None = None
     if sort_by:
         schema = base_lf.collect_schema()
         if sort_by not in schema or sort_by in CORE_CONCORDANCE_COLUMNS:
@@ -347,8 +347,8 @@ def compute_node_concordance_page(
     request: dict[str, Any],
     *,
     page: int,
-    page_size: Optional[int],
-    sort_by: Optional[str],
+    page_size: int | None,
+    sort_by: str | None,
     descending: bool,
 ) -> dict[str, Any]:
     """Route a node to either regex-mode or tokens-mode page computation.
@@ -450,9 +450,9 @@ def _resolve_page_size(
     base_lf: pl.LazyFrame,
     column: str,
     request: dict[str, Any],
-    requested: Optional[int],
+    requested: int | None,
     *,
-    tokenization_column: Optional[str] = None,
+    tokenization_column: str | None = None,
 ) -> int:
     """Return an effective page size, estimating when the client omitted one.
 

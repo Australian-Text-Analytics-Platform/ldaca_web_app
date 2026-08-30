@@ -13,7 +13,8 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
+from collections.abc import Callable
 
 from ..analysis.generated_columns import (
     QUOTE_COLUMN_NAMES,
@@ -144,7 +145,7 @@ def _build_quotation_occurrence_dataframe(
 
     corpus = [str(v) if v is not None else "" for v in node_corpus]
     non_empty_mask = [bool(value.strip()) for value in corpus]
-    filtered_corpus = [value for value, keep in zip(corpus, non_empty_mask) if keep]
+    filtered_corpus = [value for value, keep in zip(corpus, non_empty_mask, strict=False) if keep]
 
     source_column_name = "__quotation_source__"
     data: dict[str, list] = {source_column_name: filtered_corpus}
@@ -165,7 +166,7 @@ def _build_quotation_occurrence_dataframe(
     if extra_columns_data:
         for col_name, col_values in extra_columns_data.items():
             filtered_values = [
-                value for value, keep in zip(col_values, non_empty_mask) if keep
+                value for value, keep in zip(col_values, non_empty_mask, strict=False) if keep
             ]
             data[col_name] = filtered_values
             selected_columns.append(col_name)

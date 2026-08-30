@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import Annotated, cast
 from urllib.parse import urlsplit
 
-from fastapi import Request, Security
+from fastapi import Depends, Request, Security
 from fastapi.security import APIKeyCookie
 from starlette.datastructures import Headers
 from starlette.requests import Request as StarletteRequest
@@ -30,19 +30,26 @@ session_cookie = APIKeyCookie(
     description="HttpOnly hosted-browser session cookie",
     auto_error=False,
 )
+SessionCookieDep = Annotated[str | None, Security(session_cookie)]
 
 
 async def get_optional_session(
     request: Request,
-    token: Annotated[str | None, Security(session_cookie)] = None,
+    token: SessionCookieDep = None,
 ) -> SessionPrincipal | None:
     """Resolve the current cookie/process identity without requiring login."""
 
     return await get_runtime(request).session_service.current_principal(token)
 
 
+OptionalSessionSecurityDep = Annotated[
+    SessionPrincipal | None,
+    Security(get_optional_session),
+]
+
+
 async def get_current_session(
-    principal: Annotated[SessionPrincipal | None, Security(get_optional_session)],
+    principal: OptionalSessionSecurityDep,
 ) -> SessionPrincipal:
     """Require an authenticated hosted session or desktop process identity."""
 
@@ -51,12 +58,25 @@ async def get_current_session(
     return principal
 
 
+CurrentSessionSecurityDep = Annotated[
+    SessionPrincipal,
+    Security(get_current_session),
+]
+
+
 async def get_current_user(
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
+    principal: CurrentSessionSecurityDep,
 ) -> SessionUser:
     """Return the typed identity consumed by protected route adapters."""
 
     return principal.user
+
+
+OptionalSessionDep = Annotated[
+    SessionPrincipal | None,
+    Depends(get_optional_session),
+]
+CurrentUserDep = Annotated[SessionUser, Depends(get_current_user)]
 
 
 class CsrfOriginMiddleware:

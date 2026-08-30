@@ -24,7 +24,8 @@ import logging
 import os
 import uuid
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
+from collections.abc import Callable
 
 from ..analysis.topic_inclusion import topic_inclusion_descriptor
 from .topic_pipeline import (

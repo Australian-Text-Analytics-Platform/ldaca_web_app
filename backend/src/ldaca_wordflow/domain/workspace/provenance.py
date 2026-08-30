@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Callable
-from typing import Annotated, Literal, TypeAlias
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, model_validator
 
@@ -16,8 +16,8 @@ class _StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
 
-FilterScalar: TypeAlias = str | int | float | bool | None
-FilterValue: TypeAlias = FilterScalar | list[FilterScalar] | dict[str, JsonData]
+type FilterScalar = str | int | float | bool | None
+type FilterValue = FilterScalar | list[FilterScalar] | dict[str, JsonData]
 
 
 class FilterCondition(_StrictModel):
@@ -73,11 +73,11 @@ class BinaryExpression(_StrictModel):
         "is_in",
         "fill_null",
     ]
-    left: "ExpressionSpec"
-    right: "ExpressionSpec"
+    left: ExpressionSpec
+    right: ExpressionSpec
 
     @model_validator(mode="after")
-    def validate_membership_values(self) -> "BinaryExpression":
+    def validate_membership_values(self) -> BinaryExpression:
         if self.op == "is_in" and not (
             isinstance(self.right, LiteralExpression)
             and isinstance(self.right.value, list)
@@ -104,32 +104,32 @@ class UnaryExpression(_StrictModel):
         "count",
         "n_unique",
     ]
-    operand: "ExpressionSpec"
+    operand: ExpressionSpec
 
 
 class StringExpression(_StrictModel):
     op: Literal["contains", "starts_with", "ends_with"]
-    operand: "ExpressionSpec"
+    operand: ExpressionSpec
     value: str
     literal: bool = True
 
 
 class CastExpression(_StrictModel):
     op: Literal["cast"]
-    operand: "ExpressionSpec"
+    operand: ExpressionSpec
     dtype: Literal["string", "integer", "float", "boolean", "datetime", "date"]
     strict: bool = False
 
 
 class RoundExpression(_StrictModel):
     op: Literal["round"]
-    operand: "ExpressionSpec"
+    operand: ExpressionSpec
     decimals: int = Field(default=0, ge=0, le=15)
 
 
 class ConcatStringExpression(_StrictModel):
     op: Literal["concat_string"]
-    operands: list["ExpressionSpec"] = Field(min_length=2, max_length=100)
+    operands: list[ExpressionSpec] = Field(min_length=2, max_length=100)
     separator: str = Field(default="", max_length=100)
 
 
@@ -175,7 +175,7 @@ class SliceDerivation(_StrictModel):
     random_seed: int | None = Field(default=None, ge=0)
 
     @model_validator(mode="after")
-    def validate_sampling(self) -> "SliceDerivation":
+    def validate_sampling(self) -> SliceDerivation:
         if self.mode == "random_sample":
             if self.sample_size is None:
                 raise ValueError("sample_size is required for random_sample")
@@ -209,7 +209,7 @@ class ExpressionDerivation(_StrictModel):
     group_by: list[ExpressionItem] = Field(default_factory=list)
 
     @model_validator(mode="after")
-    def validate_context(self) -> "ExpressionDerivation":
+    def validate_context(self) -> ExpressionDerivation:
         if self.context == "filter" and len(self.expressions) != 1:
             raise ValueError("filter expressions require exactly one item")
         if self.context == "group_by_agg" and not self.group_by:
@@ -229,7 +229,7 @@ class JoinDerivation(_StrictModel):
     how: Literal["inner", "left", "right", "full", "semi", "anti", "cross"] = "inner"
 
     @model_validator(mode="after")
-    def validate_keys(self) -> "JoinDerivation":
+    def validate_keys(self) -> JoinDerivation:
         if self.how != "cross" and (not self.left_on or not self.right_on):
             raise ValueError("left_on and right_on are required for non-cross joins")
         return self
@@ -341,7 +341,7 @@ class DerivationInput(_StrictModel):
 
     role: Literal["source", "left", "right", "member", "input"]
     value: Annotated[
-        SourceProvenance | NodeReference | "DerivationProvenance",
+        SourceProvenance | NodeReference | DerivationProvenance,
         Field(discriminator="type"),
     ]
 
@@ -354,7 +354,7 @@ class DerivationProvenance(_StrictModel):
     inputs: list[DerivationInput]
 
     @model_validator(mode="after")
-    def validate_input_roles(self) -> "DerivationProvenance":
+    def validate_input_roles(self) -> DerivationProvenance:
         roles = [item.role for item in self.inputs]
         if isinstance(self.operation, JoinDerivation):
             if roles != ["left", "right"]:

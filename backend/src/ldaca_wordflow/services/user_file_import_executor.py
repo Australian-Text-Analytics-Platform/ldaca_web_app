@@ -37,7 +37,7 @@ class UserFileImportProcessError(RuntimeError):
     """A Data Portal child failed or exited without a valid result."""
 
 
-def _run_import_process(
+def _run_import_process[T](
     function: Callable[..., T],
     kwargs: Mapping[str, object],
     progress_queue: Queue[Any],

@@ -2,16 +2,15 @@
 
 from __future__ import annotations
 
-from typing import Annotated, cast
+from typing import cast
 
-from fastapi import APIRouter, Security
+from fastapi import APIRouter
 
 from polars_text.models import predefined_model_records
 
 from ..models.tokenizer import TokenizerModelResource
-from ..services.sessions import SessionPrincipal
 from .responses import api_errors
-from .security import get_current_session
+from .security import CurrentSessionSecurityDep
 
 router = APIRouter(
     prefix="/tokenizer-models",
@@ -26,7 +25,7 @@ router = APIRouter(
     responses=api_errors(500),
 )
 async def list_tokenizer_models(
-    _principal: Annotated[SessionPrincipal, Security(get_current_session)],
+    _principal: CurrentSessionSecurityDep,
 ) -> list[TokenizerModelResource]:
     return [
         TokenizerModelResource(

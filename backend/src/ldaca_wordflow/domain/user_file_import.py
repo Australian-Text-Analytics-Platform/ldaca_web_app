@@ -82,7 +82,7 @@ class SampleUserFileImportResult(_StrictModel):
         return _validate_collection_id(value)
 
     @model_validator(mode="after")
-    def validate_path(self) -> "SampleUserFileImportResult":
+    def validate_path(self) -> SampleUserFileImportResult:
         if _validate_public_path(self.destination_path) != self.destination_path:
             raise ValueError("User File import paths must be canonical")
         return self
@@ -95,7 +95,7 @@ class DataPortalUserFileImportResult(_StrictModel):
     bytes_written: int = Field(ge=0)
 
     @model_validator(mode="after")
-    def validate_path(self) -> "DataPortalUserFileImportResult":
+    def validate_path(self) -> DataPortalUserFileImportResult:
         if _validate_public_path(self.destination_path) != self.destination_path:
             raise ValueError("User File import paths must be canonical")
         return self
@@ -123,7 +123,7 @@ class UserFileImport(_StrictModel):
     revision: int = Field(ge=1)
 
     @model_validator(mode="after")
-    def validate_lifecycle(self) -> "UserFileImport":
+    def validate_lifecycle(self) -> UserFileImport:
         terminal = self.state in {
             BackgroundState.SUCCEEDED,
             BackgroundState.FAILED,
@@ -166,13 +166,13 @@ class UserFileImport(_StrictModel):
                 raise ValueError("finished_at precedes the import lifecycle")
         return self
 
-    def _transition(self, **changes: object) -> "UserFileImport":
+    def _transition(self, **changes: object) -> UserFileImport:
         payload = self.model_dump()
         payload.update(changes)
         payload["revision"] = self.revision + 1
         return UserFileImport.model_validate(payload)
 
-    def start(self, timestamp: datetime) -> "UserFileImport":
+    def start(self, timestamp: datetime) -> UserFileImport:
         if self.state is not BackgroundState.QUEUED:
             raise ValueError("Only a queued import can start")
         return self._transition(
@@ -180,7 +180,7 @@ class UserFileImport(_StrictModel):
             started_at=timestamp,
         )
 
-    def cancel_queued(self, timestamp: datetime) -> "UserFileImport":
+    def cancel_queued(self, timestamp: datetime) -> UserFileImport:
         if self.state is not BackgroundState.QUEUED:
             raise ValueError("Only a queued import can be cancelled immediately")
         return self._transition(
@@ -189,7 +189,7 @@ class UserFileImport(_StrictModel):
             finished_at=timestamp,
         )
 
-    def request_running_cancellation(self, timestamp: datetime) -> "UserFileImport":
+    def request_running_cancellation(self, timestamp: datetime) -> UserFileImport:
         if self.state is not BackgroundState.RUNNING:
             raise ValueError("Only a running import can request cancellation")
         if self.cancellation_requested_at is not None:
@@ -201,7 +201,7 @@ class UserFileImport(_StrictModel):
         timestamp: datetime,
         *,
         progress: Progress,
-    ) -> "UserFileImport":
+    ) -> UserFileImport:
         if (
             self.state is not BackgroundState.RUNNING
             or self.cancellation_requested_at is None
@@ -219,7 +219,7 @@ class UserFileImport(_StrictModel):
         *,
         failure: Failure,
         progress: Progress,
-    ) -> "UserFileImport":
+    ) -> UserFileImport:
         if self.state not in {BackgroundState.QUEUED, BackgroundState.RUNNING}:
             raise ValueError("Only a non-terminal import can fail")
         return self._transition(
@@ -234,7 +234,7 @@ class UserFileImport(_StrictModel):
         timestamp: datetime,
         *,
         result: UserFileImportResult,
-    ) -> "UserFileImport":
+    ) -> UserFileImport:
         if self.state is not BackgroundState.RUNNING:
             raise ValueError("Only a running import can succeed")
         return self._transition(
@@ -251,7 +251,7 @@ class UserFileImport(_StrictModel):
         *,
         timestamp: datetime,
         import_id: uuid.UUID | None = None,
-    ) -> "UserFileImport":
+    ) -> UserFileImport:
         return cls(
             id=import_id or uuid.uuid4(),
             request=request,

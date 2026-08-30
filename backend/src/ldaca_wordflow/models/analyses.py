@@ -25,7 +25,7 @@ class AnalysisCreate(BaseModel):
     supersedes_analysis_ids: list[uuid.UUID] = Field(default_factory=list)
 
     @model_validator(mode="after")
-    def validate_ids(self) -> "AnalysisCreate":
+    def validate_ids(self) -> AnalysisCreate:
         if len(self.supersedes_analysis_ids) != len(
             set(self.supersedes_analysis_ids)
         ):

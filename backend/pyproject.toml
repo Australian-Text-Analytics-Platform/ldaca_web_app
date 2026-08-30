@@ -24,29 +24,30 @@ classifiers = [
 ]
 dependencies = [
     "aiosqlite>=0.21.0",
-    "duckdb>=1.4.0",
-    "fastapi>=0.138.0",
-    "fastexcel>=0.18.0",
-    "google-auth[requests]>=2.38.0",            # Google ID-token verification
+    "duckdb>=1.5.5,<2",
+    "fastapi>=0.141.1,<1",
+    "fastexcel>=0.21.0,<1",
+    "google-auth[requests]>=2.57.0,<3",         # Google ID-token verification
     "httpx>=0.27.0",
-    "pydantic-settings>=2.0.0",
-    "platformdirs>=4.3.0",
+    "pydantic-settings>=2.15.0,<3",
+    "platformdirs>=4.11.5,<5",
     "python-multipart>=0.0.20",                 # OAuth form callbacks
     "psutil>=6.1.0",                            # Process management for proper cleanup of child processes
     "polars-text>=0.5.1",
     "polars-source-utils>=0.2.0",
     "tbb>=2022.3.1 ; sys_platform != 'darwin'",
     "tzdata>=2025.2 ; sys_platform == 'win32'",
-    "openai>=2.26.0",                           # AsyncOpenAI: OpenAI/OpenRouter/OpenAI-compatible custom annotation calls
-    "anthropic>=0.40.0",                        # AsyncAnthropic: server-side Claude annotation calls
-    "google-genai>=1.0.0",                      # google-genai aio: server-side Gemini annotation calls
-    "spacy>=3.7.0",
+    "openai>=3.6.0,<4",                         # AsyncOpenAI: OpenAI/OpenRouter/OpenAI-compatible custom annotation calls
+    "anthropic>=1.2.0,<2",                      # AsyncAnthropic: server-side Claude annotation calls
+    "google-genai>=2.20.0,<3",                  # google-genai aio: server-side Gemini annotation calls
+    "spacy>=3.8.16,<3.9",
+    "en-core-web-md @ https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.8.0/en_core_web_md-3.8.0-py3-none-any.whl",
     "rtoml>=0.12.0",
-    "uvicorn[standard]>=0.35.0",
+    "uvicorn[standard]>=0.52.4,<1",
 ]
 
 [project.optional-dependencies]
-deploy = ["jupyter-server-proxy>=4.4.0", "ipython>=9.5.0"]
+deploy = ["jupyter-server-proxy>=4.4.0", "ipython>=9.17.0,<10"]
 
 [project.scripts]
 ldaca-wordflow = "ldaca_wordflow.cli:main"
@@ -74,13 +75,14 @@ build-backend = "hatchling.build"
 [tool.hatch.build.hooks.custom]
 path = "scripts/hatch_build.py"
 
+[tool.hatch.metadata]
+allow-direct-references = true
+
 [dependency-groups]
 dev = [
-    "twine>=6.2.0",
     "pytest-asyncio>=0.23.0",
-    "httpx2>=2.0.0",
-    "ruff>=0.15.1",
-    "ty>=0.0.59",
+    "ruff>=0.16.5,<1",
+    "ty==0.0.75",
 ]
 
 [tool.ty.src]
@@ -92,6 +94,13 @@ allowed-unresolved-imports = [
     "pytest",
     "_pytest.**",
 ]
+
+[tool.ruff]
+target-version = "py314"
+extend-exclude = ["src/ldaca_wordflow/_vendor"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "UP", "B"]
 
 [tool.hatch.build]
 # The generated build/ dir is ignored; force-include its ready-to-serve SPA in

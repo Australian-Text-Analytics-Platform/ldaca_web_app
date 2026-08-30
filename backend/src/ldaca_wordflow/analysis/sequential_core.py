@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
 
 import polars as pl
 
@@ -238,7 +237,7 @@ def _build_sequential_result_frames(
             ]
         )
 
-        def _format_numeric(value: Optional[float]) -> Optional[str]:
+        def _format_numeric(value: float | None) -> str | None:
             """Format one numeric interval boundary for the result label."""
 
             if value is None:

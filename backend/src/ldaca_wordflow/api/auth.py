@@ -16,15 +16,19 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated
 from urllib.parse import unquote, urlencode, urlsplit
 
-from fastapi import APIRouter, Depends, Form, Query, Request, Response, Security, status
+from fastapi import APIRouter, Form, Query, Request, Response, status
 from starlette.responses import RedirectResponse
 
 from ..shared.errors import AccessDeniedError, InvalidInputError, UnauthenticatedError
 from ..models.session import AuthProvider, SessionResponse
-from ..runtime import Runtime, get_runtime
-from ..services.sessions import IssuedSession, SessionPrincipal, SessionService
+from ..services.sessions import IssuedSession, SessionService
+from .dependencies import RuntimeDep
 from .responses import api_errors, route_path
-from .security import SESSION_COOKIE_NAME, get_optional_session, session_cookie
+from .security import (
+    SESSION_COOKIE_NAME,
+    OptionalSessionDep,
+    SessionCookieDep,
+)
 
 router = APIRouter(tags=["session"])
 
@@ -150,7 +154,7 @@ def _providers(request: Request, sessions: SessionService) -> list[AuthProvider]
 async def get_session(
     request: Request,
     response: Response,
-    runtime: Runtime = Depends(get_runtime),
+    runtime: RuntimeDep,
 ) -> SessionResponse:
     """Return the complete no-store client bootstrap and session-bound CSRF token."""
 
@@ -187,9 +191,9 @@ async def get_session(
 )
 async def delete_session(
     request: Request,
-    runtime: Runtime = Depends(get_runtime),
-    token: Annotated[str | None, Security(session_cookie)] = None,
-    principal: SessionPrincipal | None = Depends(get_optional_session),
+    runtime: RuntimeDep,
+    principal: OptionalSessionDep,
+    token: SessionCookieDep = None,
 ) -> Response:
     """Revoke exactly the presented session, close its streams, and clear its cookie."""
 
@@ -213,8 +217,8 @@ async def google_callback(
     request: Request,
     credential: Annotated[str, Form()],
     g_csrf_token: Annotated[str, Form()],
+    runtime: RuntimeDep,
     return_to: Annotated[str | None, Form()] = None,
-    runtime: Runtime = Depends(get_runtime),
 ) -> RedirectResponse:
     """Validate Google's double-submit callback and issue an HttpOnly session."""
 
@@ -250,8 +254,8 @@ def _cilogon_redirect_uri(sessions: SessionService) -> str:
 )
 async def cilogon_login(
     request: Request,
+    runtime: RuntimeDep,
     return_to: str | None = Query(None),
-    runtime: Runtime = Depends(get_runtime),
 ) -> RedirectResponse:
     """Start CILogon with an opaque one-use persisted state transaction."""
 
@@ -297,10 +301,10 @@ async def cilogon_login(
 )
 async def cilogon_callback(
     request: Request,
+    runtime: RuntimeDep,
     code: str | None = Query(None),
     state: str | None = Query(None),
     error: str | None = Query(None),
-    runtime: Runtime = Depends(get_runtime),
 ) -> RedirectResponse:
     """Validate state, complete the provider exchange, and issue a cookie."""
 

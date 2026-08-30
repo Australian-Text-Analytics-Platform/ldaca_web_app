@@ -16,7 +16,7 @@ class ResolvedQuotationEngine(BaseModel):
     url: AnyHttpUrl | None = None
 
     @model_validator(mode="after")
-    def validate_location(self) -> "ResolvedQuotationEngine":
+    def validate_location(self) -> ResolvedQuotationEngine:
         if self.type is QuotationEngineType.LOCAL and self.url is not None:
             raise ValueError("A local quotation engine has no URL")
         if self.type is QuotationEngineType.REMOTE and self.url is None:

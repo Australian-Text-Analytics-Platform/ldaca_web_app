@@ -4,13 +4,18 @@ from typing import Annotated
 
 from fastapi import Depends
 
-from ...runtime import Runtime, get_runtime
 from ...services.user_files import UserFileStore
+from ..dependencies import RuntimeDep
 
 
 def get_user_file_store(
-    runtime: Annotated[Runtime, Depends(get_runtime)],
+    runtime: RuntimeDep,
 ) -> UserFileStore:
     """Return the current application's configured user-file service."""
 
     return runtime.user_file_store
+
+
+UserFileStoreDep = Annotated[UserFileStore, Depends(get_user_file_store)]
+
+__all__ = ["UserFileStoreDep"]

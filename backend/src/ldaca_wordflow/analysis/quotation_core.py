@@ -17,7 +17,8 @@ import math
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from functools import partial
-from typing import Any, Dict, Iterable, List, Optional, Tuple, cast
+from typing import Any, cast
+from collections.abc import Iterable
 
 import polars as pl
 from polars.exceptions import ColumnNotFoundError
@@ -103,7 +104,7 @@ def to_polars_dataframe(data: Any) -> pl.DataFrame:
 
 def prepare_documents_payload(
     base_df: pl.DataFrame, column: str
-) -> Dict[str, Dict[str, Any]]:
+) -> dict[str, dict[str, Any]]:
     """Build remote-extraction payload documents from a source text column.
 
 
@@ -118,7 +119,7 @@ def prepare_documents_payload(
     except ColumnNotFoundError as exc:  # pragma: no cover
         raise ValueError(str(exc)) from exc
 
-    docs: Dict[str, Dict[str, Any]] = {}
+    docs: dict[str, dict[str, Any]] = {}
     for idx, value in enumerate(series.to_list()):
         if value is None:
             text_value = ""
@@ -131,8 +132,8 @@ def prepare_documents_payload(
 
 
 def stable_document_items(
-    documents: Dict[str, Dict[str, Any]],
-) -> List[Tuple[str, Dict[str, Any]]]:
+    documents: dict[str, dict[str, Any]],
+) -> list[tuple[str, dict[str, Any]]]:
     """Return deterministically ordered document items for batching.
 
 
@@ -142,9 +143,9 @@ def stable_document_items(
     Why:
     - Keeps batch ordering reproducible for pagination and debugging.
     """
-    items: List[Tuple[str, Dict[str, Any]]] = list(documents.items())
+    items: list[tuple[str, dict[str, Any]]] = list(documents.items())
 
-    def _key(pair: Tuple[str, Dict[str, Any]]) -> Tuple[int, Any]:
+    def _key(pair: tuple[str, dict[str, Any]]) -> tuple[int, Any]:
         """Support quotation computation helpers with a key helper."""
 
         identifier = pair[0]
@@ -159,9 +160,9 @@ def stable_document_items(
 
 
 def batched_documents(
-    documents: Dict[str, Dict[str, Any]],
+    documents: dict[str, dict[str, Any]],
     batch_size: int,
-) -> Iterable[Dict[str, Dict[str, Any]]]:
+) -> Iterable[dict[str, dict[str, Any]]]:
     """Yield deterministic document chunks for remote extraction.
 
 
@@ -182,12 +183,12 @@ def batched_documents(
 
 async def extract_remote_paginated(
     engine: ResolvedQuotationEngine,
-    documents: Dict[str, Dict[str, Any]],
+    documents: dict[str, dict[str, Any]],
     *,
     batch_size: int,
     timeout: float,
     extract_remote_fn: RemoteQuotationExtractor,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Call remote quotation extraction in batches and merge responses.
 
 
@@ -197,9 +198,9 @@ async def extract_remote_paginated(
     Why:
     - Avoids oversized single requests while preserving one combined payload.
     """
-    combined_payload: Dict[str, Any] = {"results": []}
-    combined_errors: List[Any] = []
-    combined_warnings: List[Any] = []
+    combined_payload: dict[str, Any] = {"results": []}
+    combined_errors: list[Any] = []
+    combined_warnings: list[Any] = []
     meta_captured = False
 
     for chunk in batched_documents(documents, batch_size):
@@ -249,7 +250,7 @@ def quotation_groups_via_quote_extractor(df: pl.DataFrame, column: str) -> pl.Da
 
 def remote_payload_to_grouped_dataframe(
     base_df: pl.DataFrame,
-    payload: Dict[str, Any],
+    payload: dict[str, Any],
 ) -> pl.DataFrame:
     """Attach remote quotation lists to their source rows without exploding."""
     results = payload.get("results", []) if isinstance(payload, dict) else []
@@ -464,8 +465,8 @@ async def compute_on_demand_page(
     engine: ResolvedQuotationEngine,
     *,
     page: int,
-    page_size: Optional[int],
-    sort_by: Optional[str],
+    page_size: int | None,
+    sort_by: str | None,
     descending: bool,
     compute_quote_dataframe_fn,
     run_blocking: BlockingRunner,
@@ -542,8 +543,8 @@ async def compute_quotation_page(
     engine: ResolvedQuotationEngine,
     *,
     page: int,
-    page_size: Optional[int],
-    sort_by: Optional[str],
+    page_size: int | None,
+    sort_by: str | None,
     descending: bool,
     quotation_service_max_batch_size: int,
     quotation_service_timeout: float,
@@ -583,7 +584,7 @@ async def _resolve_quotation_page_size(
     node: Node,
     column: str,
     engine: ResolvedQuotationEngine,
-    requested: Optional[int],
+    requested: int | None,
     compute_quote_dataframe_fn,
     run_blocking: BlockingRunner,
 ) -> int:

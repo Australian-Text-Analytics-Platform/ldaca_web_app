@@ -58,7 +58,7 @@ StorageStatus = UnlimitedStorageStatus | QuotaStorageStatus
 class QuotaReservation:
     """One releasable finite-policy growth reservation."""
 
-    _service: "QuotaService"
+    _service: QuotaService
     user_id: str
     reserved_bytes: int
     _released: bool = False

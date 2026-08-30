@@ -4,8 +4,7 @@ from __future__ import annotations
 
 from ..infrastructure.providers.annotation_ai import (
     AnnotationAiError,
-    list_models,
-    resolve_provider_wire,
+    resolve_provider_adapter,
 )
 from ..shared.errors import (
     AnnotationProviderError,
@@ -38,10 +37,10 @@ class AnnotationService:
             supplied=request.api_key,
         )
         try:
-            discovered = await list_models(
-                resolve_provider_wire(request.provider, request.provider_base_url),
-                api_key,
-            )
+            discovered = await resolve_provider_adapter(
+                request.provider,
+                request.provider_base_url,
+            ).list_models(api_key)
         except AnnotationAiError as exc:
             raise AnnotationProviderError(exc.code, exc.safe_message) from exc
         return AnnotationModelsResource(

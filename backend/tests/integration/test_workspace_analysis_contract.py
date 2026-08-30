@@ -49,7 +49,7 @@ def test_quotation_preview_page_is_native_arrow_ipc(tmp_path: Path) -> None:
         upload = client.post(
             "/api/user-files/uploads",
             params={"path": "quotes.csv"},
-            content='text,created_at\n"Alice said hello.",2020-10-16T22:02:13Z\n'.encode(),
+            content=b'text,created_at\n"Alice said hello.",2020-10-16T22:02:13Z\n',
             headers={**unsafe, "Content-Type": "application/octet-stream"},
         )
         assert upload.status_code == 201

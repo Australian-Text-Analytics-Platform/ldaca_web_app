@@ -68,7 +68,7 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          uvx twine check --strict backend/dist/*
+          uvx --from twine==6.2.0 twine check --strict backend/dist/*
           python scripts/verify_backend_distribution.py backend/dist
 
       - name: Smoke-install using published dependencies

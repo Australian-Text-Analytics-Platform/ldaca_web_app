@@ -13,7 +13,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Iterable
+from typing import TYPE_CHECKING, Any
+from collections.abc import Iterable
 
 from polars_source_utils import list_source_paths, replace_source_paths
 import polars as pl
@@ -132,7 +133,7 @@ class WorkspaceSnapshotInfo:
 class LoadedWorkspace:
     """A reconstructed graph paired with the snapshot it was loaded from."""
 
-    workspace: "Workspace"
+    workspace: Workspace
     snapshot: WorkspaceSnapshotInfo
 
 
@@ -459,7 +460,7 @@ def _analysis_private_owner_ids(
 
 
 def _add_workspace_analyses(
-    workspace: "Workspace",
+    workspace: Workspace,
     records: list[tuple[AnalysisRecord, bytes]],
     corrupt: dict[str, bytes],
 ) -> None:
@@ -622,7 +623,7 @@ def _discard_uncommitted_files(paths: Iterable[Path], workspace_root: Path) -> N
 
 
 def _write_workspace(
-    workspace: "Workspace",
+    workspace: Workspace,
     path: str | Path,
     *,
     revision: int,
@@ -855,7 +856,7 @@ def _read_workspace(
     tabs: list[Tab],
     analyses: list[tuple[AnalysisRecord, bytes]],
     corrupt_analyses: dict[str, bytes],
-) -> "Workspace":
+) -> Workspace:
     """Strictly reconstruct a committed graph without unresolved live parents.
 
     Metadata is validated in full before any node is published into the
@@ -1386,7 +1387,7 @@ class WorkspaceStore:
     def stage_snapshot(
         self,
         path: str | Path,
-        workspace: "Workspace",
+        workspace: Workspace,
         *,
         revision: int,
     ) -> WorkspaceSnapshotInfo:
@@ -1508,7 +1509,7 @@ class WorkspaceStore:
     def commit(
         self,
         path: str | Path,
-        workspace: "Workspace",
+        workspace: Workspace,
         *,
         expected_revision: int | None,
     ) -> WorkspaceSnapshotInfo:

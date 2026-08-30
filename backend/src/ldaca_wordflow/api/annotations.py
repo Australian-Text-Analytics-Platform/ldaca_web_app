@@ -2,18 +2,16 @@
 
 from __future__ import annotations
 
-from typing import Annotated
 
-from fastapi import APIRouter, Depends, Security
+from fastapi import APIRouter
 
 from ..models.annotations import (
     AnnotationModelsRequest,
     AnnotationModelsResource,
 )
-from ..runtime import Runtime, get_runtime
-from ..services.sessions import SessionPrincipal
+from .dependencies import RuntimeDep
 from .responses import api_errors
-from .security import get_current_session
+from .security import CurrentSessionSecurityDep
 
 router = APIRouter(
     prefix="/annotation-providers",
@@ -29,8 +27,8 @@ router = APIRouter(
 )
 async def list_annotation_models(
     request: AnnotationModelsRequest,
-    _principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    _principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
 ) -> AnnotationModelsResource:
     """Discover models using the mode-appropriate request boundary."""
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Callable, Sequence
+from collections.abc import Callable, Sequence
 
 # A search yielding fewer than ten hits in the first 100 documents is sparse
 # enough to use the largest candidate. Larger probes add latency without

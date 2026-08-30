@@ -60,7 +60,7 @@ class _AnnotationProviderConfigurationFields(_StrictModel):
         return normalize_annotation_provider_base_url(value)
 
     @model_validator(mode="after")
-    def validate_locator(self) -> "_AnnotationProviderConfigurationFields":
+    def validate_locator(self) -> _AnnotationProviderConfigurationFields:
         if self.provider == "custom" and self.base_url is None:
             raise ValueError("Custom providers require a base URL")
         if self.provider != "custom" and self.base_url is not None:
@@ -92,7 +92,7 @@ class AnnotationProviderConfigurationUpdate(_StrictModel):
     api_key: CredentialValue | None = None
 
     @model_validator(mode="after")
-    def validate_patch(self) -> "AnnotationProviderConfigurationUpdate":
+    def validate_patch(self) -> AnnotationProviderConfigurationUpdate:
         if not self.model_fields_set:
             raise ValueError("At least one provider configuration field is required")
         if "name" in self.model_fields_set and self.name is None:
@@ -136,7 +136,7 @@ class StoredProviderCredentials(_StrictModel):
     @model_validator(mode="after")
     def unique_annotation_provider_configuration_ids(
         self,
-    ) -> "StoredProviderCredentials":
+    ) -> StoredProviderCredentials:
         seen_ids: set[uuid.UUID] = set()
         for configuration in self.annotation_providers:
             if configuration.id in seen_ids:

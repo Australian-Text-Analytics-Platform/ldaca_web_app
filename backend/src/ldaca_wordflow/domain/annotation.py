@@ -109,7 +109,7 @@ class AnnotationProviderSnapshot(BaseModel):
         return normalize_annotation_provider_base_url(value)
 
     @model_validator(mode="after")
-    def validate_locator(self) -> "AnnotationProviderSnapshot":
+    def validate_locator(self) -> AnnotationProviderSnapshot:
         if self.provider == "custom" and self.provider_base_url is None:
             raise ValueError("Custom providers require a base URL")
         if self.provider != "custom" and self.provider_base_url is not None:

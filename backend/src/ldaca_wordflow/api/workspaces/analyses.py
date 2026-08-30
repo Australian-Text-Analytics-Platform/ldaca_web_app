@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, Query, Request, Response, Security, status
+from fastapi import APIRouter, Query, Request, Response, status
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, TypeAdapter
 from starlette.background import BackgroundTask
@@ -30,13 +30,12 @@ from ...models.tables import (
     TableProjectionResource,
 )
 from ...models.analyses import AnalysisCreate, AnalysisPage
-from ...runtime import Runtime, get_runtime
+from ..dependencies import RuntimeDep
 from ...services.analysis_results import ResultMaterialization
-from ...services.sessions import SessionPrincipal
 from ...shared.errors import InternalServiceError
 from ...shared.json_data import JsonData
 from ..responses import api_errors, route_path
-from ..security import get_current_session
+from ..security import CurrentSessionSecurityDep
 from ..table_responses import (
     ARROW_STREAM_RESPONSE,
     arrow_page_response,
@@ -206,8 +205,8 @@ async def submit_tab_analysis(
     body: AnalysisCreate,
     request: Request,
     response: Response,
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
 ) -> Analysis:
     """Create one complete immutable Analysis in a Tab-owned forest."""
 
@@ -234,8 +233,8 @@ async def submit_tab_analysis(
 async def list_tab_analyses(
     workspace_id: uuid.UUID,
     tab_id: uuid.UUID,
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
 ) -> list[Analysis | CorruptAnalysis]:
     """Return a Tab's complete Analysis forest in creation order."""
 
@@ -254,8 +253,8 @@ async def list_tab_analyses(
 async def clear_tab_analysis(
     workspace_id: uuid.UUID,
     tab_id: uuid.UUID,
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
 ) -> Response:
     """Clear the Tab's complete Analysis forest."""
 
@@ -274,10 +273,10 @@ async def clear_tab_analysis(
 )
 async def list_analyses(
     workspace_id: uuid.UUID,
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=500),
-    runtime: Runtime = Depends(get_runtime),
 ) -> AnalysisPage:
     """Return one stable page of live valid and corrupt Analyses."""
 
@@ -297,8 +296,8 @@ async def list_analyses(
 async def get_analysis(
     workspace_id: uuid.UUID,
     analysis_id: uuid.UUID,
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
 ) -> Analysis:
     """Return one valid live Analysis by its Workspace-local identity."""
 
@@ -324,8 +323,8 @@ async def cancel_analysis(
     workspace_id: uuid.UUID,
     analysis_id: uuid.UUID,
     response: Response,
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
 ) -> Analysis:
     """Cancel queued work or request termination of one running Analysis."""
 
@@ -348,8 +347,8 @@ async def get_analysis_result(
     workspace_id: uuid.UUID,
     analysis_id: uuid.UUID,
     request: Request,
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
 ) -> AnalysisResult:
     """Return the canonical first page of one successful Analysis Result."""
 
@@ -373,8 +372,8 @@ async def query_analysis_result(
     analysis_id: uuid.UUID,
     body: AnalysisResultQuery,
     request: Request,
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
 ) -> AnalysisResult:
     """Apply one complete typed, side-effect-free Result projection."""
 
@@ -400,8 +399,8 @@ async def query_quotation_preview_table(
     workspace_id: uuid.UUID,
     analysis_id: uuid.UUID,
     body: QuotationPreviewQuery,
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
 ) -> Response:
     """Compute one Quotation Preview document page as Arrow IPC."""
 
@@ -433,8 +432,8 @@ async def download_analysis_table(
     workspace_id: uuid.UUID,
     analysis_id: uuid.UUID,
     table_id: str,
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
 ) -> FileResponse:
     """Return one complete immutable Result table as an Arrow IPC stream."""
 
@@ -464,8 +463,8 @@ async def get_analysis_table_rows(
     workspace_id: uuid.UUID,
     analysis_id: uuid.UUID,
     table_id: str,
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=500)] = 50,
     sort_by: str | None = None,
@@ -498,8 +497,8 @@ async def get_analysis_table_schema(
     workspace_id: uuid.UUID,
     analysis_id: uuid.UUID,
     table_id: str,
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
 ) -> Response:
     """Return a paged Result table schema as a zero-row Arrow stream."""
 
@@ -525,8 +524,8 @@ async def get_analysis_table_projection_rows(
     analysis_id: uuid.UUID,
     table_id: str,
     row_unit: Literal["documents", "matches"],
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=500)] = 50,
     sort_by: str | None = None,
@@ -559,8 +558,8 @@ async def query_concordance_document_projection(
     analysis_id: uuid.UUID,
     table_id: str,
     body: ConcordanceDocumentProjectionQuery,
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
 ) -> Response:
     """Filter and page document rows from one immutable Concordance Result."""
 
@@ -587,8 +586,8 @@ async def get_analysis_table_projection_schema(
     analysis_id: uuid.UUID,
     table_id: str,
     row_unit: Literal["documents", "matches"],
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
 ) -> Response:
     content = await runtime.analysis_result_service.projected_table_schema(
         principal.user.id,
@@ -609,8 +608,8 @@ async def get_concordance_table_density(
     workspace_id: uuid.UUID,
     analysis_id: uuid.UUID,
     table_id: str,
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
 ) -> ConcordanceDensityResult:
     return await runtime.analysis_result_service.concordance_density(
         principal.user.id,
@@ -639,8 +638,8 @@ async def download_analysis_artifact(
     workspace_id: uuid.UUID,
     analysis_id: uuid.UUID,
     artifact_name: str,
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
 ) -> FileResponse:
     """Download one declared Artifact through a response-lifetime snapshot."""
 

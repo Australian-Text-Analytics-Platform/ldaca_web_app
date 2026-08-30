@@ -5,8 +5,8 @@ from __future__ import annotations
 import uuid
 from typing import (
     TYPE_CHECKING,
-    Sequence,
 )
+from collections.abc import Sequence
 
 import polars as pl
 
@@ -39,7 +39,7 @@ class Node:
         self,
         data: pl.LazyFrame,
         name: str,
-        parents: Sequence["Node"] = (),
+        parents: Sequence[Node] = (),
         provenance: NodeProvenance | None = None,
         id: str | None = None,
         document: str | None = None,
@@ -149,7 +149,7 @@ class Node:
         self._redo_stack = list(redo_stack[-PLAN_HISTORY_LIMIT:])
 
     @property
-    def children(self) -> list["Node"]:
+    def children(self) -> list[Node]:
         if self.workspace is None:
             return []
         return self.workspace.children_of(self.id)

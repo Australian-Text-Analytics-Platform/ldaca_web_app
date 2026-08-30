@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Annotated, Generic, Literal, TypeVar, cast
+from typing import Annotated, Literal, TypeVar, cast
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
 
@@ -50,7 +50,7 @@ class ConcordanceDocumentProjectionQuery(_PagedQuery):
     selected_bins: list[int] | None = Field(default=None, min_length=1, max_length=100)
 
     @model_validator(mode="after")
-    def validate_filter(self) -> "ConcordanceDocumentProjectionQuery":
+    def validate_filter(self) -> ConcordanceDocumentProjectionQuery:
         if any(not value for value in self.excluded_matched_texts) or len(
             self.excluded_matched_texts
         ) != len(set(self.excluded_matched_texts)):
@@ -134,17 +134,17 @@ ArtifactValueT = TypeVar("ArtifactValueT")
 PrivateArtifactPath = Annotated[str, Field(min_length=1)]
 
 
-class CompleteTableIdentity(_StrictModel, Generic[ArtifactValueT]):
+class CompleteTableIdentity[ArtifactValueT](_StrictModel):
     table_id: str = Field(min_length=1, max_length=200)
     artifact: ArtifactValueT
 
 
-class PagedTableIdentity(_StrictModel, Generic[ArtifactValueT]):
+class PagedTableIdentity[ArtifactValueT](_StrictModel):
     table_id: str = Field(min_length=1, max_length=200)
     artifact: ArtifactValueT
 
 
-class ProjectedTableIdentity(_StrictModel, Generic[ArtifactValueT]):
+class ProjectedTableIdentity[ArtifactValueT](_StrictModel):
     table_id: str = Field(min_length=1, max_length=200)
     artifact: ArtifactValueT
     supports_density: bool
@@ -162,13 +162,13 @@ class ConcordanceDensityResult(_StrictModel):
     series: list[ConcordanceDensitySeries]
 
 
-class _TokenNodeTable(_StrictModel, Generic[ArtifactValueT]):
+class _TokenNodeTable[ArtifactValueT](_StrictModel):
     node_id: uuid.UUID
     node_name: NodeName
     table: CompleteTableIdentity[ArtifactValueT]
 
 
-class _TokenTables(_StrictModel, Generic[ArtifactValueT]):
+class _TokenTables[ArtifactValueT](_StrictModel):
     version: Literal[1]
     nodes: list[_TokenNodeTable[ArtifactValueT]]
     statistics: CompleteTableIdentity[ArtifactValueT] | None = None
@@ -231,7 +231,7 @@ class TopicSource(_StrictModel):
     original_columns: list[str]
 
 
-class _TopicClusteringContext(_StrictModel, Generic[ArtifactValueT]):
+class _TopicClusteringContext[ArtifactValueT](_StrictModel):
     version: Literal[1]
     artifact: ArtifactValueT | None
     source_row_indices: list[list[int]]
@@ -265,8 +265,8 @@ class _TopicModelingBody(_StrictModel):
     per_corpus_topic_counts: list[dict[int, int]] | None = None
     meta: TopicMetadata
     sources: list[TopicSource]
-    clustering: "TopicClustering"
-    topic_inclusion: "TopicInclusion"
+    clustering: TopicClustering
+    topic_inclusion: TopicInclusion
 
 
 class TopicClustering(_StrictModel):
@@ -345,7 +345,7 @@ class SequentialSourceDescriptor(_StrictModel):
     group_count: int = Field(ge=0)
 
     @model_validator(mode="after")
-    def validate_columns(self) -> "SequentialSourceDescriptor":
+    def validate_columns(self) -> SequentialSourceDescriptor:
         if len(self.columns) != len(set(self.columns)):
             raise ValueError("Sequential source columns must be unique")
         if self.document_column is not None and self.document_column not in self.columns:
@@ -408,7 +408,7 @@ class RunAllSourceDescriptor(_StrictModel):
     match_count: int = Field(ge=0)
 
     @model_validator(mode="after")
-    def validate_columns(self) -> "RunAllSourceDescriptor":
+    def validate_columns(self) -> RunAllSourceDescriptor:
         groups = (
             [self.document_column],
             self.metadata_columns,
@@ -421,7 +421,7 @@ class RunAllSourceDescriptor(_StrictModel):
         return self
 
 
-class RunAllSourceTable(RunAllSourceDescriptor, Generic[ArtifactValueT]):
+class RunAllSourceTable[ArtifactValueT](RunAllSourceDescriptor):
     table: ProjectedTableIdentity[ArtifactValueT]
 
 
@@ -445,7 +445,7 @@ class _AnnotationRunAllCounts(_StrictModel):
     failed_row_count: int = Field(ge=0)
 
     @model_validator(mode="after")
-    def validate_counts(self) -> "_AnnotationRunAllCounts":
+    def validate_counts(self) -> _AnnotationRunAllCounts:
         if self.attempted_count > self.record_count:
             raise ValueError("Annotation attempted count exceeds its row count")
         if self.failed_row_count > self.attempted_count:
@@ -473,7 +473,7 @@ class AnalysisWorkerFailureData(_StrictModel):
     message: str = Field(min_length=1, max_length=500)
 
     @model_validator(mode="after")
-    def validate_safe_message(self) -> "AnalysisWorkerFailureData":
+    def validate_safe_message(self) -> AnalysisWorkerFailureData:
         if self.message != ANNOTATION_PROVIDER_SAFE_MESSAGES[self.code]:
             raise ValueError("Worker failure message does not match its safe code")
         return self
@@ -503,7 +503,7 @@ class TopicModelingDataBlockCreationWorkerResult(_StrictModel):
     message: str
 
     @model_validator(mode="after")
-    def validate_outputs(self) -> "TopicModelingDataBlockCreationWorkerResult":
+    def validate_outputs(self) -> TopicModelingDataBlockCreationWorkerResult:
         source_ids = [item.source_node_id for item in self.outputs]
         output_ids = [
             data.data_block.id
@@ -528,7 +528,7 @@ class DataBlockCreationWorkerResult(_StrictModel):
     message: str
 
     @model_validator(mode="after")
-    def validate_outputs(self) -> "DataBlockCreationWorkerResult":
+    def validate_outputs(self) -> DataBlockCreationWorkerResult:
         source_ids = [item.source_node_id for item in self.outputs]
         output_ids = [item.data.data_block.id for item in self.outputs]
         if len(source_ids) != len(set(source_ids)):
@@ -554,7 +554,7 @@ class ConcordanceRunAllStoredResult(_StrictModel):
     sources: list[ConcordanceRunAllGroupSource] | None = None
 
     @model_validator(mode="after")
-    def validate_shape(self) -> "ConcordanceRunAllStoredResult":
+    def validate_shape(self) -> ConcordanceRunAllStoredResult:
         if self.result_type == "source":
             if self.source is None or self.sources is not None:
                 raise ValueError("A source Result requires exactly one source table")
@@ -596,7 +596,7 @@ class AnnotationResult(PreviewReadyStoredResult):
     page_size: int | None = Field(default=None, ge=1)
     total_rows: int | None = Field(default=None, ge=0)
     rows: list[dict[str, JsonData]] | None = None
-    labels: list["AnnotationPreviewLabel"] | None = None
+    labels: list[AnnotationPreviewLabel] | None = None
     query: AnnotationResultQuery | None = None
 
 
@@ -612,7 +612,7 @@ class AnnotationRunAllStoredResult(_AnnotationRunAllCounts):
     annotated_count: int = Field(ge=0)
 
     @model_validator(mode="after")
-    def validate_annotated_count(self) -> "AnnotationRunAllStoredResult":
+    def validate_annotated_count(self) -> AnnotationRunAllStoredResult:
         if self.annotated_count > self.record_count:
             raise ValueError("Annotation annotated count exceeds its row count")
         return self
@@ -636,7 +636,7 @@ class TopicModelingDataBlockCreationStoredResult(_StrictModel):
     outputs: list[TopicModelingDataBlockCreationOutput] = Field(min_length=1)
 
     @model_validator(mode="after")
-    def validate_output_identity(self) -> "TopicModelingDataBlockCreationStoredResult":
+    def validate_output_identity(self) -> TopicModelingDataBlockCreationStoredResult:
         expected = [
             node_id
             for output in self.outputs
@@ -668,7 +668,7 @@ class DataBlockCreationStoredResult(_StrictModel):
     outputs: list[DataBlockCreationOutput] = Field(min_length=1, max_length=2)
 
     @model_validator(mode="after")
-    def validate_output_identity(self) -> "DataBlockCreationStoredResult":
+    def validate_output_identity(self) -> DataBlockCreationStoredResult:
         expected = [output.output_node_id for output in self.outputs]
         if self.output_node_ids != expected:
             raise ValueError("Data Block Creation output order is invalid")

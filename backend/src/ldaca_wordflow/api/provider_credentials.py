@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 import uuid
-from typing import Annotated
 
-from fastapi import APIRouter, Depends, Response, Security, status
+from fastapi import APIRouter, Response, status
 
 from ..models.provider_credentials import (
     AnnotationProviderConfigurationCreate,
@@ -14,10 +13,9 @@ from ..models.provider_credentials import (
     DataPortalCredentialPatch,
     ProviderCredentialSummary,
 )
-from ..runtime import Runtime, get_runtime
-from ..services.sessions import SessionPrincipal
+from .dependencies import RuntimeDep
 from .responses import api_errors
-from .security import get_current_session
+from .security import CurrentSessionSecurityDep
 
 router = APIRouter(
     prefix="/provider-credentials",
@@ -32,8 +30,8 @@ router = APIRouter(
     responses=api_errors(500),
 )
 async def get_provider_credentials(
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
 ) -> ProviderCredentialSummary:
     return await runtime.provider_credential_store.summary()
 
@@ -45,8 +43,8 @@ async def get_provider_credentials(
 )
 async def update_data_portal_credential(
     patch: DataPortalCredentialPatch,
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
 ) -> ProviderCredentialSummary:
     return await runtime.provider_credential_store.update_data_portal_credential(patch)
 
@@ -59,8 +57,8 @@ async def update_data_portal_credential(
 )
 async def create_annotation_provider_configuration(
     command: AnnotationProviderConfigurationCreate,
-    _principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    _principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
 ) -> AnnotationProviderConfigurationResource:
     return await runtime.provider_credential_store.create_annotation_provider(command)
 
@@ -71,8 +69,8 @@ async def create_annotation_provider_configuration(
     responses=api_errors(400, 403, 500),
 )
 async def clear_annotation_provider_configurations(
-    _principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    _principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
 ) -> Response:
     await runtime.provider_credential_store.clear_annotation_providers()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -86,8 +84,8 @@ async def clear_annotation_provider_configurations(
 async def update_annotation_provider_configuration(
     configuration_id: uuid.UUID,
     command: AnnotationProviderConfigurationUpdate,
-    _principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    _principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
 ) -> AnnotationProviderConfigurationResource:
     return await runtime.provider_credential_store.update_annotation_provider(
         configuration_id,
@@ -102,8 +100,8 @@ async def update_annotation_provider_configuration(
 )
 async def delete_annotation_provider_configuration(
     configuration_id: uuid.UUID,
-    _principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    _principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
 ) -> Response:
     await runtime.provider_credential_store.delete_annotation_provider(
         configuration_id
@@ -117,8 +115,8 @@ async def delete_annotation_provider_configuration(
     responses=api_errors(400, 403, 500),
 )
 async def clear_provider_credentials(
-    principal: Annotated[SessionPrincipal, Security(get_current_session)],
-    runtime: Runtime = Depends(get_runtime),
+    principal: CurrentSessionSecurityDep,
+    runtime: RuntimeDep,
 ) -> Response:
     await runtime.provider_credential_store.clear()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
