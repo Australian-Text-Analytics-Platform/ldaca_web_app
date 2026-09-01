@@ -11,9 +11,9 @@ export function Toaster({ ...props }: ToasterProps) {
         duration: 3500,
         classNames: {
           toast:
-            'rounded-md border border-[var(--vscode-widget-border)] bg-widget text-widget-foreground shadow-[var(--vscode-shadow-lg)]',
-          title: 'text-body font-semibold',
-          description: 'text-body-secondary text-description',
+            'rounded-md border border-[var(--vscode-widget-border)] bg-widget text-widget-foreground shadow-[var(--vscode-shadow-lg)] whitespace-pre-wrap wrap-break-word',
+          title: 'whitespace-pre-wrap wrap-break-word text-body font-semibold',
+          description: 'whitespace-pre-wrap wrap-break-word text-body-secondary text-description',
           actionButton: 'bg-button text-button-foreground',
           cancelButton: 'bg-panel text-description',
         },

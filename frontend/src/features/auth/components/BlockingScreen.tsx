@@ -42,12 +42,16 @@ function BlockingScreen({
         <div className="flex flex-col items-center space-y-3">
           <div className="size-8 animate-spin rounded-full border-2 border-surface-border border-t-primary" />
           <p className="font-semibold">{status}</p>
-          {hint && <p className="mx-auto max-w-sm text-body-secondary text-description">{hint}</p>}
+          {hint && (
+            <p className="mx-auto max-w-sm whitespace-pre-wrap wrap-break-word text-body-secondary text-description">
+              {hint}
+            </p>
+          )}
         </div>
         {error && (
           <div className="rounded-md border border-error bg-error-background px-3 py-2 text-left">
             <p className="mb-1 text-body font-semibold text-error">Still waiting…</p>
-            <p className="text-body text-error">{error}</p>
+            <p className="whitespace-pre-wrap wrap-break-word text-body text-error">{error}</p>
           </div>
         )}
         {actions && <div className="flex flex-wrap justify-center gap-3">{actions}</div>}

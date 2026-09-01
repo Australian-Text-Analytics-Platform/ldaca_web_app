@@ -1,4 +1,4 @@
-"""Reusable safe error documentation scoped to individual API routers."""
+"""Reusable error documentation scoped to individual API routers."""
 
 from __future__ import annotations
 

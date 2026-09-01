@@ -163,15 +163,18 @@ pages, and retained-import collections, strong Workspace ETags, and typed
 media for downloads and SSE. User Files return one complete deterministic tree
 rather than a paginated directory protocol.
 
-Framework-neutral errors are mapped to `ApiError` with a stable code, safe
-message/details, and request ID. Validation never echoes Pydantic inputs,
-bodies, credentials, host paths, or internal exception text.
-Expected Polars operation failures are translated at the owning service
-boundary; unclassified exceptions are logged in full and rendered as a
-sanitized `500 ApiError` inside the same CORS, private-cache, and request-ID
-middleware as ordinary responses. Browser clients therefore distinguish
-backend failures from genuine network failures without receiving internal
-execution plans or storage paths.
+Framework-neutral errors are mapped to `ApiError` with a stable code, details,
+and request ID. Validation never echoes Pydantic inputs or request bodies, and
+expected 4xx failures retain their product messages. Every 5xx failure exposes
+the deepest Python exception type and complete message in all deployment modes.
+The same diagnostic is retained by Data Root state and failed background
+resources. Exception messages are unbounded and may themselves contain host
+paths, SQL, provider text, or credentials.
+
+Complete tracebacks remain in correlated backend logs. HTTP responses and
+durable resources never add stack frames, Python source filenames, line
+numbers, or code snippets. The policy and accepted disclosure risk are recorded
+in [ADR 0029](../../adr/0029-propagate-backend-diagnostics.md).
 
 Blocking filesystem and Polars work uses the runtime AnyIO limiter with
 non-abandoned cancellation. Workspace gates are released before remote calls,

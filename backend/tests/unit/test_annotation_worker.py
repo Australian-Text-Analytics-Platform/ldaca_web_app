@@ -79,7 +79,7 @@ def test_row_failure_mask_preserves_failed_rows_but_successful_null_clears(
     assert frame["annotation"].to_list() == [None, "old-two", "positive"]
 
 
-def test_fatal_provider_failure_returns_safe_envelope_without_artifact(
+def test_fatal_provider_failure_returns_diagnostic_envelope_without_artifact(
     tmp_path,
     worker_snapshot,
     monkeypatch,
@@ -114,10 +114,8 @@ def test_fatal_provider_failure_returns_safe_envelope_without_artifact(
         "state": "failed",
         "failure": {
             "code": "annotation_provider_authentication_failed",
-            "message": (
-                "Annotation provider authentication failed. Check the saved API key."
-            ),
+            "message": "AnnotationAiError: private SDK response containing secret material",
         },
     }
     assert list(output.iterdir()) == []
-    assert "private" not in str(result)
+    assert "Traceback" not in str(result)

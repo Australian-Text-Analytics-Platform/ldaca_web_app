@@ -52,7 +52,7 @@ class _ProviderStatusError(Exception):
         (RuntimeError("private unknown"), "annotation_provider_failed", False),
     ],
 )
-def test_provider_sdk_errors_have_stable_safe_categories(
+def test_provider_sdk_errors_keep_stable_categories_and_complete_messages(
     error: Exception,
     code: str,
     retryable: bool,
@@ -61,7 +61,7 @@ def test_provider_sdk_errors_have_stable_safe_categories(
 
     assert classified.code == code
     assert classified.retryable is retryable
-    assert "private" not in classified.safe_message
+    assert str(classified) == str(error)
 
 
 def test_provider_context_errors_are_classified_before_http_status() -> None:

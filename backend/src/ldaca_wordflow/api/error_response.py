@@ -1,4 +1,4 @@
-"""Single safe error-envelope encoder for handlers and ASGI middleware."""
+"""Single error-envelope encoder for handlers and ASGI middleware."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ def api_error_response(
     """Encode the canonical public error without inspecting request content.
 
     Used by FastAPI exception handlers and low-level Host/CSRF middleware. The
-    caller supplies the already-sanitized message and correlation ID, keeping
+    caller supplies the selected message and correlation ID, keeping
     all HTTP failure paths structurally identical without coupling domain errors
     to FastAPI.
     """

@@ -27,6 +27,7 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from ldaca_wordflow.runtime import RuntimeReadiness, _RuntimeTaskGroupOwner, get_runtime
+from ldaca_wordflow.shared.errors import InternalServiceError
 
 RuntimeProbeDep = Annotated[Any, Depends(get_runtime)]
 
@@ -393,7 +394,7 @@ def test_request_id_and_sanitized_validation_error_contract(tmp_path: Path) -> N
 
 
 def test_unexpected_api_errors_cross_the_complete_http_boundary(tmp_path: Path) -> None:
-    """Unhandled failures remain structured, private, and browser-readable."""
+    """Unhandled failures retain diagnostics across the browser HTTP boundary."""
 
     from ldaca_wordflow.main import create_app
     from ldaca_wordflow.settings import load_settings
@@ -412,6 +413,13 @@ def test_unexpected_api_errors_cross_the_complete_http_boundary(tmp_path: Path) 
     async def unexpected_probe() -> None:
         raise RuntimeError("private backend details")
 
+    @router.get("/api/__chained-probe", include_in_schema=False)
+    async def chained_probe() -> None:
+        try:
+            raise OSError("disk full")
+        except OSError as exc:
+            raise InternalServiceError("Workspace save failed") from exc
+
     app.include_router(router)
 
     with TestClient(
@@ -426,16 +434,27 @@ def test_unexpected_api_errors_cross_the_complete_http_boundary(tmp_path: Path) 
                 "X-Request-ID": "unexpected-probe",
             },
         )
+        chained = client.get(
+            "/api/__chained-probe",
+            headers={"X-Request-ID": "chained-probe"},
+        )
 
     assert response.status_code == 500
     assert response.headers["access-control-allow-origin"] == "http://frontend.test"
     assert response.headers["cache-control"] == "private, no-store"
     assert response.json() == {
         "code": "internal_server_error",
-        "message": "Internal server error",
+        "message": "RuntimeError: private backend details",
         "request_id": "unexpected-probe",
     }
-    assert "private backend details" not in response.text
+    assert "Traceback" not in response.text
+    assert __file__ not in response.text
+    assert chained.status_code == 500
+    assert chained.json() == {
+        "code": "internal_service_error",
+        "message": "OSError: disk full",
+        "request_id": "chained-probe",
+    }
 
 
 def test_request_body_limit_counts_actual_bytes(tmp_path: Path) -> None:

@@ -238,6 +238,29 @@ describe('Arrow table transport', () => {
     );
   });
 
+  it('propagates backend diagnostics from direct Arrow requests', async () => {
+    window.__BACKEND_URL__ = 'http://127.0.0.1:49152';
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          code: 'internal_server_error',
+          message: 'PolarsError: failed to read parquet metadata',
+          request_id: 'arrow-request',
+        }),
+        {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        },
+      ),
+    );
+
+    await expect(fetchArrowTable('/api/result/table')).rejects.toMatchObject({
+      code: 'internal_server_error',
+      status: 500,
+      message: 'PolarsError: failed to read parquet metadata (Request ID: arrow-request)',
+    });
+  });
+
   it('adds table context to decoder errors and preserves the Arrow cause', async () => {
     const validStream = stream(tableFromArrays({ value: ['one'] }));
     const truncatedStream = validStream.slice(0, 16).buffer as ArrayBuffer;

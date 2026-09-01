@@ -4,13 +4,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { DataRootSetupForm } from '../DataRootSetupForm';
 
-const mocks = vi.hoisted(() => ({ open: vi.fn() }));
+const mocks = vi.hoisted(() => ({ isTauri: vi.fn(), open: vi.fn() }));
 
-vi.mock('@/lib/isTauri', () => ({ isTauri: () => true }));
+vi.mock('@/lib/isTauri', () => ({ isTauri: mocks.isTauri }));
 vi.mock('@tauri-apps/plugin-dialog', () => ({ open: mocks.open }));
 
-describe('DataRootSetupForm in Tauri', () => {
+describe('DataRootSetupForm', () => {
   beforeEach(() => {
+    mocks.isTauri.mockReturnValue(true);
     mocks.open.mockReset();
   });
 
@@ -37,5 +38,26 @@ describe('DataRootSetupForm in Tauri', () => {
       expect(mocks.open).toHaveBeenCalledOnce();
     });
     expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('shows the recommended browser path as a placeholder and submits it in one click', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    mocks.isTauri.mockReturnValue(false);
+    render(<DataRootSetupForm suggestedPath="/srv/recommended" onSubmit={onSubmit} />);
+
+    const input = screen.getByRole('textbox', { name: 'Folder on the server' });
+    expect(input.tagName).toBe('TEXTAREA');
+    expect(input).toHaveValue('');
+    expect(input).toHaveAttribute('placeholder', '/srv/recommended');
+    expect(input).toHaveAttribute('wrap', 'soft');
+    expect(input).toHaveClass('break-all', 'resize-none');
+    expect(screen.getByRole('button', { name: 'Use this folder' })).toBeDisabled();
+
+    await user.click(screen.getByRole('button', { name: 'Use recommended location' }));
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledOnce();
+    });
+    expect(onSubmit).toHaveBeenCalledWith('/srv/recommended');
   });
 });

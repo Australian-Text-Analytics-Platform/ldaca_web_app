@@ -239,7 +239,11 @@ function SidebarTasksSection({
                         <p className="text-badge text-description">{progressPercent}%</p>
                       </div>
                     )}
-                    {task.message && <p className="text-[11px] text-description">{task.message}</p>}
+                    {task.message && (
+                      <p className="whitespace-pre-wrap wrap-break-word text-[11px] text-description">
+                        {task.message}
+                      </p>
+                    )}
                     {(task.state === 'queued' || task.state === 'running') &&
                       task.progress_message &&
                       task.progress_message !== task.message && (

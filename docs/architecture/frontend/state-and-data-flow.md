@@ -56,6 +56,10 @@ Raw network calls are limited to boundaries the generator cannot express
 conveniently, such as complete table URLs, native downloads, or SSE, and still
 follow the backend's cookie, CSRF, Origin, and typed resource contracts. There
 is no JSON table decoder, backend compatibility rewrite, or alternate decoder.
+Generated requests, bootstrap probes, and direct Arrow fetches share one error
+envelope parser. It preserves validation details and complete backend
+diagnostics, adds request IDs to 5xx messages, and falls back to transport status
+only when no structured backend message is readable.
 
 Annotation Provider Configurations are an intentional separate boundary. In
 multi-user mode, a non-devtools Zustand store persists the ordered, user-named

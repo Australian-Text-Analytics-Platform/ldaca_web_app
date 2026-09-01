@@ -92,13 +92,14 @@ describe('generatedClientConfig', () => {
   });
 
   it('includes the backend request id in server-error messages', async () => {
+    const diagnostic = `RuntimeError: ${'x'.repeat(1_000)}`;
     const config = createClientConfig({
       baseUrl: 'http://api.test/api',
       fetch: vi.fn().mockResolvedValue(
         new Response(
           JSON.stringify({
             code: 'internal_server_error',
-            message: 'Internal server error',
+            message: diagnostic,
             request_id: 'request-500',
           }),
           {
@@ -117,7 +118,34 @@ describe('generatedClientConfig', () => {
     ).rejects.toMatchObject({
       status: 500,
       code: 'internal_server_error',
-      message: 'Internal server error (Request ID: request-500)',
+      message: `${diagnostic} (Request ID: request-500)`,
+    } satisfies Partial<ApiError>);
+  });
+
+  it('prefers canonical validation details over the summary message', async () => {
+    const config = createClientConfig({
+      baseUrl: 'http://api.test/api',
+      fetch: vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            code: 'request_validation_failed',
+            message: 'Request validation failed',
+            details: [
+              { location: ['body', 'path'], message: 'Path must be absolute' },
+              { location: ['body', 'path'], message: 'Path must be writable' },
+            ],
+          }),
+          { status: 422, headers: { 'Content-Type': 'application/json' } },
+        ),
+      ),
+    });
+
+    await expect(
+      requireFetch(config.fetch)(new Request(`${String(config.baseUrl)}/session`)),
+    ).rejects.toMatchObject({
+      status: 422,
+      code: 'request_validation_failed',
+      message: 'Path must be absolute; Path must be writable',
     } satisfies Partial<ApiError>);
   });
 });

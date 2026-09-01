@@ -15,7 +15,7 @@ from anyio.to_thread import run_sync as run_sync_in_worker_thread
 from pydantic import ValidationError
 
 from ..models.analysis_results import AnalysisWorkerFailure
-from ..shared.errors import AppError
+from ..shared.errors import AppError, format_exception_diagnostic
 from .analyses import AnalysisService
 from .analysis_execution_types import (
     AnalysisExecutionControl,
@@ -176,15 +176,22 @@ class AnalysisExecutionRuntime(AnalysisExecutionControl):
             await service.fail_execution(
                 item.key,
                 code=exc.code,
-                message=exc.message,
+                message=(
+                    format_exception_diagnostic(exc)
+                    if exc.status_code >= 500
+                    else exc.message
+                ),
             )
-        except Exception:
+        except Exception as exc:
             logger.exception(
                 "Analysis admission failed analysis_id=%s user_id=%s",
                 item.key.analysis_id,
                 item.key.user_id,
             )
-            await service.fail_execution(item.key)
+            await service.fail_execution(
+                item.key,
+                message=format_exception_diagnostic(exc),
+            )
 
     async def _run_admitted(
         self,
@@ -218,7 +225,7 @@ class AnalysisExecutionRuntime(AnalysisExecutionControl):
             )
         except AnalysisProcessCancelled:
             await service.confirm_cancellation(item.key)
-        except AnalysisProcessStartError:
+        except AnalysisProcessStartError as exc:
             logger.exception(
                 "Analysis process launch failed analysis_id=%s user_id=%s",
                 item.key.analysis_id,
@@ -227,22 +234,28 @@ class AnalysisExecutionRuntime(AnalysisExecutionControl):
             await service.fail_execution(
                 item.key,
                 code="analysis_start_failed",
-                message="Analysis could not start",
+                message=format_exception_diagnostic(exc),
             )
-        except AnalysisProcessError:
+        except AnalysisProcessError as exc:
             logger.exception(
                 "Analysis process failed analysis_id=%s user_id=%s",
                 item.key.analysis_id,
                 item.key.user_id,
             )
-            await service.fail_execution(item.key)
-        except Exception:
+            await service.fail_execution(
+                item.key,
+                message=format_exception_diagnostic(exc),
+            )
+        except Exception as exc:
             logger.exception(
                 "Analysis execution failed analysis_id=%s user_id=%s",
                 item.key.analysis_id,
                 item.key.user_id,
             )
-            await service.fail_execution(item.key)
+            await service.fail_execution(
+                item.key,
+                message=format_exception_diagnostic(exc),
+            )
         else:
             result_mapping = (
                 cast(dict[str, object], result)
@@ -252,14 +265,17 @@ class AnalysisExecutionRuntime(AnalysisExecutionControl):
             if result_mapping is not None and result_mapping.get("state") == "failed":
                 try:
                     failure = AnalysisWorkerFailure.model_validate(result_mapping)
-                except ValidationError:
+                except ValidationError as exc:
                     logger.error(
                         "Analysis returned an invalid failure envelope "
                         "analysis_id=%s user_id=%s",
                         item.key.analysis_id,
                         item.key.user_id,
                     )
-                    await service.fail_execution(item.key)
+                    await service.fail_execution(
+                        item.key,
+                        message=format_exception_diagnostic(exc),
+                    )
                 else:
                     await service.fail_execution(
                         item.key,

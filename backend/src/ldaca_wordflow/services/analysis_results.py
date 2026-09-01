@@ -1164,7 +1164,7 @@ async def _query_annotation_snapshot(
             examples,
         )
     except AnnotationAiError as exc:
-        raise AnnotationProviderError(exc.code, exc.safe_message) from exc
+        raise AnnotationProviderError(exc.code, str(exc)) from exc
     rows = cast(list[dict[str, JsonData]], page.to_dicts())
     return cast(
         dict[str, JsonData],

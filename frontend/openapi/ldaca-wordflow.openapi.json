@@ -1622,7 +1622,7 @@
       },
       "ApiError": {
         "additionalProperties": false,
-        "description": "Safe error body returned by every JSON HTTP error handler.",
+        "description": "Request-correlated error body returned by every JSON HTTP error handler.",
         "properties": {
           "code": {
             "title": "Code",
@@ -4214,7 +4214,7 @@
       },
       "DataRootErrorResource": {
         "additionalProperties": false,
-        "description": "Safe failure detail suitable for an unauthenticated loading screen.",
+        "description": "Runtime diagnostic shown by the unauthenticated loading screen.",
         "properties": {
           "code": {
             "title": "Code",
@@ -4880,7 +4880,7 @@
       },
       "Failure": {
         "additionalProperties": false,
-        "description": "Safe durable terminal failure with no internal diagnostics.",
+        "description": "Durable terminal failure containing a complete backend diagnostic.",
         "properties": {
           "code": {
             "maxLength": 100,
@@ -4889,7 +4889,6 @@
             "type": "string"
           },
           "message": {
-            "maxLength": 500,
             "minLength": 1,
             "title": "Message",
             "type": "string"

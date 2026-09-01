@@ -86,9 +86,11 @@ from .infrastructure.storage.workspace_store import WorkspaceStore
 from .services.workspace_lifecycle import WorkspaceLifecycleService
 from .shared.errors import (
     DataRootBusyError,
+    DataRootInitializationError,
     DataRootInvalidError,
     DataRootManagedByOperatorError,
     DataRootTransitionError,
+    format_exception_diagnostic,
     InternalServiceError,
     RuntimeUnavailableError,
 )
@@ -438,12 +440,12 @@ class RuntimeManager:
                     self._config_store.read,
                     abandon_on_cancel=False,
                 )
-            except DataRootConfigError:
+            except DataRootConfigError as exc:
                 self._source = "config"
                 self._state = "configuration_error"
                 self._error = RuntimeManagerError(
                     "data_root_config_invalid",
-                    "The saved Data Root configuration is invalid",
+                    format_exception_diagnostic(exc),
                 )
                 return
             self._source = "config" if selected is not None else "none"
@@ -552,12 +554,12 @@ class RuntimeManager:
         self._state = "initializing"
         try:
             runtime, canonical = await slot.open(selected)
-        except Exception:
+        except Exception as exc:
             logger.exception("Configured Data Root could not initialize")
             self._state = "configuration_error"
             self._error = RuntimeManagerError(
                 "data_root_unavailable",
-                "The configured Data Root could not be opened",
+                format_exception_diagnostic(exc),
             )
             return
         self._runtime = runtime
@@ -597,8 +599,14 @@ class RuntimeManager:
             runtime, canonical = await slot.open(canonical)
         except Exception as exc:
             logger.exception("Candidate Data Root could not initialize")
-            await self._restore_or_fail(slot, old_root, old_source)
-            raise InternalServiceError("Data Root initialization failed") from exc
+            await self._restore_or_fail(
+                slot,
+                old_root,
+                old_source,
+                failure=exc,
+                error_code="data_root_initialization_failed",
+            )
+            raise DataRootInitializationError("Data Root initialization failed") from exc
 
         self._runtime = runtime
         try:
@@ -610,7 +618,13 @@ class RuntimeManager:
         except Exception as exc:
             logger.exception("Data Root configuration could not be persisted")
             await self._close_active_runtime(slot)
-            await self._restore_or_fail(slot, old_root, old_source)
+            await self._restore_or_fail(
+                slot,
+                old_root,
+                old_source,
+                failure=exc,
+                error_code="data_root_persistence_failed",
+            )
             raise InternalServiceError("Data Root persistence failed") from exc
 
         self._data_root = canonical
@@ -626,6 +640,9 @@ class RuntimeManager:
         slot: _RuntimeSlot,
         old_root: Path | None,
         old_source: DataRootSource,
+        *,
+        failure: Exception,
+        error_code: str,
     ) -> None:
         if old_root is None:
             self._runtime = None
@@ -633,13 +650,13 @@ class RuntimeManager:
             self._source = "none"
             self._state = "configuration_error"
             self._error = RuntimeManagerError(
-                "data_root_initialization_failed",
-                "The selected Data Root could not be initialized",
+                error_code,
+                format_exception_diagnostic(failure),
             )
             return
         try:
             runtime, canonical = await slot.open(old_root)
-        except Exception:
+        except Exception as exc:
             logger.exception("Previous Data Root could not be restored")
             self._runtime = None
             self._data_root = old_root
@@ -647,7 +664,7 @@ class RuntimeManager:
             self._state = "configuration_error"
             self._error = RuntimeManagerError(
                 "data_root_rollback_failed",
-                "Neither the selected nor previous Data Root could be initialized",
+                format_exception_diagnostic(exc),
             )
             return
         self._runtime = runtime

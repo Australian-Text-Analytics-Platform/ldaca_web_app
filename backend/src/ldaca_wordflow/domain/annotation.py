@@ -34,31 +34,6 @@ AnnotationProviderFailureCode = Literal[
     "annotation_provider_failed",
 ]
 
-ANNOTATION_PROVIDER_SAFE_MESSAGES: dict[AnnotationProviderFailureCode, str] = {
-    "annotation_provider_authentication_failed": (
-        "Annotation provider authentication failed. Check the saved API key."
-    ),
-    "annotation_provider_access_denied": (
-        "Annotation provider denied access. Check the account and model permissions."
-    ),
-    "annotation_provider_rate_limited": (
-        "Annotation provider rate limit was exceeded. Try again later."
-    ),
-    "annotation_provider_request_rejected": (
-        "Annotation provider rejected the request. Check the selected model and settings."
-    ),
-    "annotation_provider_unavailable": (
-        "Annotation provider is unavailable. Try again later."
-    ),
-    "annotation_provider_context_limit": (
-        "Annotation input exceeds the provider context limit."
-    ),
-    "annotation_provider_invalid_response": (
-        "Annotation provider returned an invalid response."
-    ),
-    "annotation_provider_failed": "Annotation provider request failed.",
-}
-
 AnnotationExampleSamplingMethod = Literal["random", "first_n", "last_n"]
 
 AnnotationClassName = Annotated[
@@ -118,7 +93,6 @@ class AnnotationProviderSnapshot(BaseModel):
 
 
 __all__ = [
-    "ANNOTATION_PROVIDER_SAFE_MESSAGES",
     "AnnotationClass",
     "AnnotationExampleSamplingMethod",
     "AnnotationProvider",

@@ -66,14 +66,14 @@ Custom bases must be absolute HTTP(S) URLs with a host and no user information,
 query, or fragment. Public, private, loopback, `localhost`, and `127.0.0.1`
 destinations are deliberately accepted for trusted authenticated users.
 
-Model-list and Preview provider failures return HTTP 502 with a fixed safe
-message and one of `annotation_provider_authentication_failed`,
+Model-list and Preview provider failures return HTTP 502 with the deepest
+provider exception type and complete message plus one of `annotation_provider_authentication_failed`,
 `annotation_provider_access_denied`, `annotation_provider_rate_limited`,
 `annotation_provider_request_rejected`, `annotation_provider_unavailable`,
 `annotation_provider_context_limit`, `annotation_provider_invalid_response`,
-or fallback `annotation_provider_failed`. Raw SDK messages, bodies, provider
-URLs, and credentials are never returned. A missing built-in credential remains
-HTTP 409 `provider_credential_missing`.
+or fallback `annotation_provider_failed`. The message may contain SDK response
+text, provider URLs, or credentials; no traceback is returned. A missing
+built-in credential remains HTTP 409 `provider_credential_missing`.
 
 ## User Files And External Data
 
@@ -379,6 +379,9 @@ path or `~`/`~/...` resolved for the account running the backend, and requires
 `X-Data-Root-Token`. It returns `403` for operator-managed roots, `409` for
 active work or another transition, and `422` for other relative, invalid, or
 inaccessible paths. There is no legacy `/health` route or Data Root alias.
+Data Root startup, construction, persistence, or rollback failures place the
+deepest Python exception type and complete message in both the failed mutation
+and the public typed Data Root error resource, without a traceback.
 
 - Addressable creation returns `201` and relative `Location`; accepted import
   submission or running cancellation returns `202`; empty deletion returns
@@ -398,6 +401,9 @@ inaccessible paths. There is no legacy `/health` route or Data Root alias.
   `stored_schema_version`, and `supported_schema_version`. Healthy siblings
   remain usable; stored bytes are not rewritten or quarantined.
 - Validation uses sanitized `422 ApiError` responses with `X-Request-ID`.
+- Every 5xx `ApiError` uses the deepest Python exception type and complete,
+  unbounded message. Analysis and User File Import failure resources retain the
+  same diagnostic. Stack frames and source-code locations remain backend-only.
 - Analysis, Workspace SQL, Arrow row-page, and User File Import pagination is one-based and rejects zero.
   Workspace, Tab, Data Block, and User File collections return complete
   deterministic lists; User File tree size is guarded by a response-byte limit.

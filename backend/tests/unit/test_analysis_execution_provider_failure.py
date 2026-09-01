@@ -1,4 +1,4 @@
-"""Structured worker failures bypass Analysis artifact publication."""
+"""Structured worker diagnostics bypass Analysis artifact publication."""
 
 from __future__ import annotations
 
@@ -30,10 +30,7 @@ class _Executor:
             "state": "failed",
             "failure": {
                 "code": "annotation_provider_access_denied",
-                "message": (
-                    "Annotation provider denied access. Check the account and model "
-                    "permissions."
-                ),
+                "message": "ProviderError: account lacks model access",
             },
         }
 
@@ -61,7 +58,7 @@ class _Service:
         self.completed = True
 
 
-async def test_safe_worker_failure_is_persisted_without_publication() -> None:
+async def test_worker_diagnostic_is_persisted_without_publication() -> None:
     runtime = object.__new__(AnalysisExecutionRuntime)
     uninitialized_runtime = cast(Any, runtime)
     uninitialized_runtime._executor = _Executor()
@@ -76,10 +73,7 @@ async def test_safe_worker_failure_is_persisted_without_publication() -> None:
     assert service.failures == [
         (
             "annotation_provider_access_denied",
-            (
-                "Annotation provider denied access. Check the account and model "
-                "permissions."
-            ),
+            "ProviderError: account lacks model access",
         )
     ]
     assert service.completed is False

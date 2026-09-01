@@ -1,5 +1,5 @@
 import { getApiBase } from '@/lib/backend/env';
-import { ApiError, formatErrorDetail } from '@/lib/apiError';
+import { ApiError, parseApiErrorResponse } from '@/lib/apiError';
 import { getCsrfToken } from '@/lib/backend/csrfToken';
 
 import type { CreateClientConfig } from '@/api';
@@ -119,44 +119,6 @@ const createRequest = (
   return new Request(input, { ...init, headers, signal });
 };
 
-/** Converts non-2xx generated SDK responses into the shared `ApiError` shape. */
-/**
- * Called by: `createGeneratedApiFetch` for non-success responses.
- * Flow: prefer structured JSON details, fall back to response text/status,
- * and preserve status plus raw detail on the shared error.
- */
-const parseErrorResponse = async (response: Response): Promise<ApiError> => {
-  let detail: unknown;
-  try {
-    detail = await response.clone().json();
-  } catch {
-    try {
-      detail = await response.clone().text();
-    } catch {
-      detail = null;
-    }
-  }
-
-  const parsed = detail && typeof detail === 'object' ? (detail as Record<string, unknown>) : null;
-  const backendMessage =
-    /* eslint-disable @typescript-eslint/prefer-nullish-coalescing -- fall through empty-string messages to the next candidate, not only null/undefined */
-    (typeof parsed?.message === 'string' && parsed.message) ||
-    formatErrorDetail(parsed?.detail) ||
-    formatErrorDetail(detail) ||
-    `HTTP ${String(response.status)}`;
-  /* eslint-enable @typescript-eslint/prefer-nullish-coalescing */
-
-  const code = typeof parsed?.code === 'string' ? parsed.code : undefined;
-  const requestId =
-    (typeof parsed?.request_id === 'string' && parsed.request_id) ||
-    response.headers.get('X-Request-ID');
-  const message =
-    response.status >= 500 && requestId
-      ? `${backendMessage} (Request ID: ${requestId})`
-      : backendMessage;
-  return new ApiError(message, { status: response.status, code, detail });
-};
-
 /**
  * Builds the fetch implementation passed to hey-api so generated calls inherit
  * auth, timeouts, network error shaping, and MSW-test fetch substitution.
@@ -172,7 +134,7 @@ const createGeneratedApiFetch = (fetchImpl?: typeof fetch): typeof fetch => {
       const request = createRequest(input, cleanedInit, timeout.signal);
       const response = await (fetchImpl ?? globalThis.fetch)(request);
       if (!response.ok) {
-        throw await parseErrorResponse(response);
+        throw await parseApiErrorResponse(response);
       }
       return response;
     } catch (error) {

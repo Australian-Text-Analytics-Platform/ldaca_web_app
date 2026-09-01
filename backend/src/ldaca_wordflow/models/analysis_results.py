@@ -7,10 +7,7 @@ from typing import Annotated, Literal, cast
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
 
-from ..domain.annotation import (
-    ANNOTATION_PROVIDER_SAFE_MESSAGES,
-    AnnotationProviderFailureCode,
-)
+from ..domain.annotation import AnnotationProviderFailureCode
 from ..domain.workspace import NodeProvenance
 from ..shared.json_data import JsonData
 from .names import NodeName
@@ -451,24 +448,18 @@ class AnnotationRunAllWorkerResult(_StrictModel):
 
 
 class AnalysisWorkerFailureData(_StrictModel):
-    """Safe terminal failure returned privately by a child worker process."""
+    """Terminal diagnostic returned privately by a child worker process."""
 
     code: AnnotationProviderFailureCode
-    message: str = Field(min_length=1, max_length=500)
-
-    @model_validator(mode="after")
-    def validate_safe_message(self) -> AnalysisWorkerFailureData:
-        if self.message != ANNOTATION_PROVIDER_SAFE_MESSAGES[self.code]:
-            raise ValueError("Worker failure message does not match its safe code")
-        return self
+    message: str = Field(min_length=1)
 
 
 class AnalysisWorkerFailure(_StrictModel):
     """Discriminated worker envelope consumed before artifact publication.
 
     Used by ``AnalysisExecutionRuntime`` when a worker can classify a failure
-    more precisely than a process crash. It deliberately carries no provider
-    payload, SDK details, or artifact declaration.
+    more precisely than a process crash. It carries no artifact declaration or
+    traceback.
     """
 
     state: Literal["failed"]

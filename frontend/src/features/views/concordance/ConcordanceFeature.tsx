@@ -943,7 +943,7 @@ function ConcordanceFeature({ host }: AnalysisTabFeatureProps) {
       {analysisError && (
         <Card>
           <CardContent>
-            <div className="rounded-md border border-error/30 bg-error/10 px-4 py-3 text-body text-error">
+            <div className="whitespace-pre-wrap wrap-break-word rounded-md border border-error/30 bg-error/10 px-4 py-3 text-body text-error">
               {analysisError}
             </div>
           </CardContent>

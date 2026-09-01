@@ -31,6 +31,7 @@ from ..models.user_file_imports import (
 from ..shared.errors import (
     AppError,
     BackendStoppingError,
+    format_exception_diagnostic,
     UserFileImportCorruptError,
     UserFileImportNotCancellableError,
     UserFileImportNotFoundError,
@@ -548,10 +549,12 @@ class UserFileImportService:
             failure = Failure(
                 code=exc.code,
                 message=(
-                    exc.message if exc.expose_message else "User File import failed"
+                    format_exception_diagnostic(exc)
+                    if exc.status_code >= 500
+                    else exc.message
                 ),
             )
-        except UserFileImportProcessError:
+        except UserFileImportProcessError as exc:
             logger.exception(
                 "Data Portal import failed import_id=%s user_id=%s",
                 key.import_id,
@@ -559,9 +562,9 @@ class UserFileImportService:
             )
             failure = Failure(
                 code="user_file_import_execution_failed",
-                message="User File import failed",
+                message=format_exception_diagnostic(exc),
             )
-        except Exception:
+        except Exception as exc:
             logger.exception(
                 "User File Import failed import_id=%s user_id=%s",
                 key.import_id,
@@ -569,7 +572,7 @@ class UserFileImportService:
             )
             failure = Failure(
                 code="user_file_import_execution_failed",
-                message="User File import failed",
+                message=format_exception_diagnostic(exc),
             )
         finally:
             if execution is not None:
@@ -628,7 +631,7 @@ class UserFileImportService:
                             and progress.fraction < previous_fraction
                         ):
                             raise ValueError("Progress cannot decrease")
-                except (ValidationError, ValueError):
+                except (ValidationError, ValueError) as exc:
                     logger.warning(
                         "Invalid User File Import progress import_id=%s user_id=%s",
                         key.import_id,
@@ -639,7 +642,7 @@ class UserFileImportService:
                         self._clock(),
                         failure=Failure(
                             code="progress_invalid",
-                            message="User File import reported invalid progress",
+                            message=format_exception_diagnostic(exc),
                         ),
                         progress=self._current_progress(key, record),
                     )

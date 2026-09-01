@@ -7,6 +7,7 @@ import {
   type TypeMap,
 } from 'apache-arrow';
 import { getApiBase } from '@/lib/backend/env';
+import { parseApiErrorResponse } from '@/lib/apiError';
 
 const ARROW_STREAM_MEDIA_TYPE = 'application/vnd.apache.arrow.stream';
 const ARROW_EXTENSION_NAME = 'ARROW:extension:name';
@@ -167,7 +168,9 @@ export const fetchArrowTable = async (url: string): Promise<ArrowTableData> => {
   const requestUrl = new URL(url, `${getApiBase()}/`).toString();
   const response = await fetch(requestUrl, { credentials: 'include' });
   if (!response.ok) {
-    throw new Error(`Arrow table request failed (${String(response.status)})`);
+    throw await parseApiErrorResponse(response, {
+      fallbackMessage: `Arrow table request failed (${String(response.status)})`,
+    });
   }
   const contentType = response.headers.get('Content-Type')?.split(';', 1)[0];
   if (contentType !== ARROW_STREAM_MEDIA_TYPE) {
@@ -197,7 +200,9 @@ export const fetchArrowTablePage = async (
   requestUrl.searchParams.set('descending', String(request.descending));
   const response = await fetch(requestUrl, { credentials: 'include' });
   if (!response.ok) {
-    throw new Error(`Arrow table page request failed (${String(response.status)})`);
+    throw await parseApiErrorResponse(response, {
+      fallbackMessage: `Arrow table page request failed (${String(response.status)})`,
+    });
   }
   const contentType = response.headers.get('Content-Type')?.split(';', 1)[0];
   if (contentType !== ARROW_STREAM_MEDIA_TYPE) {

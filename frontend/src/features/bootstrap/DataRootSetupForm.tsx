@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { FolderOpen } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { isTauri } from '@/lib/isTauri';
 
 interface DataRootSetupFormProps {
@@ -78,11 +78,13 @@ export function DataRootSetupForm({
         >
           <div className="space-y-2">
             <Label htmlFor="data-root-path">Folder on the server</Label>
-            <Input
+            <Textarea
               id="data-root-path"
               value={path}
               disabled={submitting}
-              placeholder="/absolute/server/path"
+              placeholder={suggestedPath ?? '/absolute/server/path'}
+              wrap="soft"
+              className="resize-none break-all"
               onChange={(event) => {
                 setPath(event.target.value);
               }}

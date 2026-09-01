@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class DataRootErrorResource(BaseModel):
-    """Safe failure detail suitable for an unauthenticated loading screen."""
+    """Runtime diagnostic shown by the unauthenticated loading screen."""
 
     model_config = ConfigDict(extra="forbid")
 

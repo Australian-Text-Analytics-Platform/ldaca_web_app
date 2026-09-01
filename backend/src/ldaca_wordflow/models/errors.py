@@ -8,7 +8,7 @@ from ..shared.json_data import JsonData
 
 
 class ApiError(BaseModel):
-    """Safe error body returned by every JSON HTTP error handler."""
+    """Request-correlated error body returned by every JSON HTTP error handler."""
 
     model_config = ConfigDict(extra="forbid")
 

@@ -59,6 +59,7 @@ from ..shared.errors import (
     AnalysisNotSucceededError,
     AnalysisParentInvalidError,
     BackendStoppingError,
+    format_exception_diagnostic,
     TabAnalysisExistsError,
     TabNotFoundError,
 )
@@ -859,9 +860,9 @@ class AnalysisService:
                         failure = Failure(
                             code=exc.code,
                             message=(
-                                exc.message
-                                if exc.status_code < 500 or exc.expose_message
-                                else "Analysis failed"
+                                format_exception_diagnostic(exc)
+                                if exc.status_code >= 500
+                                else exc.message
                             ),
                         )
                     else:
@@ -872,7 +873,7 @@ class AnalysisService:
                         )
                         failure = Failure(
                             code="analysis_start_failed",
-                            message="Analysis could not start",
+                            message=format_exception_diagnostic(exc),
                         )
                     if reserved:
                         await discard_launch(key)
@@ -939,7 +940,7 @@ class AnalysisService:
                         and progress.fraction < previous_fraction
                     ):
                         raise ValueError("Progress cannot decrease")
-            except ValidationError, ValueError:
+            except (ValidationError, ValueError) as exc:
                 logger.warning(
                     "Invalid Analysis progress analysis_id=%s user_id=%s",
                     key.analysis_id,
@@ -950,7 +951,7 @@ class AnalysisService:
                     self._clock(),
                     failure=Failure(
                         code="progress_invalid",
-                        message="Analysis reported invalid progress",
+                        message=format_exception_diagnostic(exc),
                     ),
                     progress=self._current_progress(key.workspace_id, record),
                 )
@@ -1039,11 +1040,15 @@ class AnalysisService:
                 progress=parent.progress,
             )
         elif any(item.state is AnalysisState.FAILED for item in children):
+            failed_child = next(
+                item for item in children if item.state is AnalysisState.FAILED
+            )
+            assert failed_child.error is not None
             terminal = parent.fail(
                 timestamp,
                 failure=Failure(
                     code="analysis_execution_failed",
-                    message="A Concordance source failed",
+                    message=failed_child.error.message,
                 ),
                 progress=parent.progress,
             )
@@ -1137,7 +1142,7 @@ class AnalysisService:
                         set(lease.workspace.nodes),
                         abandon_on_cancel=False,
                     )
-                except OSError, TypeError, ValidationError, ValueError:
+                except (OSError, TypeError, ValidationError, ValueError) as exc:
                     logger.exception(
                         "Analysis result validation failed analysis_id=%s user_id=%s",
                         key.analysis_id,
@@ -1147,7 +1152,7 @@ class AnalysisService:
                         self._clock(),
                         failure=Failure(
                             code="analysis_execution_failed",
-                            message="Analysis failed",
+                            message=format_exception_diagnostic(exc),
                         ),
                         progress=progress,
                     )
@@ -1170,10 +1175,10 @@ class AnalysisService:
         self,
         key: AnalysisExecutionKey,
         *,
+        message: str,
         code: str = "analysis_execution_failed",
-        message: str = "Analysis failed",
     ) -> None:
-        """Persist one safe isolated failure when execution cannot complete."""
+        """Persist one isolated failure when execution cannot complete."""
 
         async with self._workspaces.mutation_context(
             key.user_id,

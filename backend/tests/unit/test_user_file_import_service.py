@@ -34,9 +34,16 @@ from ._storage import unlimited_storage_admission
 
 
 class _Samples:
-    def __init__(self, root: Path, *, block: bool = False) -> None:
+    def __init__(
+        self,
+        root: Path,
+        *,
+        block: bool = False,
+        failure: Exception | None = None,
+    ) -> None:
         self.root = root
         self.block = block
+        self.failure = failure
         self.started = anyio.Event()
         self.release = anyio.Event()
         self.cleaned: list[str] = []
@@ -70,6 +77,8 @@ class _Samples:
         await report_progress(Progress(fraction=0.5, message="Halfway"))
         if self.block:
             await self.release.wait()
+        if self.failure is not None:
+            raise self.failure
         return SampleUserFileImportResult(
             collection_id=execution.collection.id,
             destination_path=f"sample_data/{execution.collection.id}",
@@ -228,6 +237,29 @@ async def test_running_cancellation_becomes_terminal_only_after_cleanup(
         )
         assert str(created.id) in samples.cleaned
         assert cancelled.finished_at is not None
+        await service.close(anyio.current_time() + 1)
+
+
+async def test_execution_failure_persists_the_complete_python_diagnostic(
+    tmp_path: Path,
+) -> None:
+    message = "sample import failed: " + ("x" * 1_000)
+    samples = _Samples(tmp_path / "staging", failure=RuntimeError(message))
+    service, _store = _service(tmp_path, samples)
+
+    async with anyio.create_task_group() as tasks:
+        await service.start(tasks)
+        created = await service.submit_sample("alice", "demo")
+        failed = await _wait_for_state(
+            service,
+            "alice",
+            created,
+            BackgroundState.FAILED,
+        )
+
+        assert failed.error is not None
+        assert failed.error.code == "user_file_import_execution_failed"
+        assert failed.error.message == f"RuntimeError: {message}"
         await service.close(anyio.current_time() + 1)
 
 

@@ -23,7 +23,6 @@ class AppError(Exception):
 
     status_code: int = 500
     code: str = "internal_error"
-    expose_message: bool = False
 
     def __init__(
         self,
@@ -50,6 +49,32 @@ class AppError(Exception):
         super().__init__(self.message)
 
 
+def format_exception_diagnostic(exc: BaseException) -> str:
+    """Return the deepest exception type and message without traceback text."""
+
+    current = exc
+    seen: set[int] = set()
+    while id(current) not in seen:
+        seen.add(id(current))
+        cause = current.__cause__
+        if cause is None and not current.__suppress_context__:
+            cause = current.__context__
+        if cause is None or id(cause) in seen:
+            break
+        current = cause
+    diagnostic_type = getattr(current, "diagnostic_type", None)
+    diagnostic_message = getattr(current, "diagnostic_message", None)
+    error_type = (
+        diagnostic_type if isinstance(diagnostic_type, str) else type(current).__name__
+    )
+    message = (
+        diagnostic_message
+        if isinstance(diagnostic_message, str)
+        else str(current)
+    )
+    return f"{error_type}: {message}" if message else error_type
+
+
 # ── 400 Bad Request ──────────────────────────────────────────────────────────
 
 
@@ -61,13 +86,11 @@ class InvalidInputError(AppError):
 class InvalidClusterCountError(AppError):
     status_code = 422
     code = "invalid_topic_cluster_count"
-    expose_message = True
 
 
 class InvalidTopicTopNError(AppError):
     status_code = 422
     code = "invalid_topic_top_n"
-    expose_message = True
 
 
 class UnsafePathError(InvalidInputError):
@@ -118,7 +141,6 @@ class StorageQuotaExceededError(AppError):
 
     status_code = 507
     code = "storage_quota_exceeded"
-    expose_message = True
 
     def __init__(
         self,
@@ -144,7 +166,6 @@ class StorageCapacityExceededError(AppError):
 
     status_code = 507
     code = "storage_capacity_exceeded"
-    expose_message = True
 
     def __init__(self) -> None:
         super().__init__("Storage capacity is unavailable")
@@ -155,7 +176,6 @@ class BackendCapacityExceededError(AppError):
 
     status_code = 503
     code = "backend_capacity_exceeded"
-    expose_message = True
 
     def __init__(self) -> None:
         super().__init__("Backend capacity is unavailable")
@@ -166,7 +186,6 @@ class BackendStoppingError(AppError):
 
     status_code = 503
     code = "backend_stopping"
-    expose_message = True
 
     def __init__(self) -> None:
         super().__init__("Backend is stopping")
@@ -177,7 +196,6 @@ class RuntimeUnavailableError(AppError):
 
     status_code = 503
     code = "runtime_unavailable"
-    expose_message = True
 
     def __init__(self) -> None:
         super().__init__("The Data Root runtime is not ready")
@@ -188,7 +206,6 @@ class DataRootInvalidError(AppError):
 
     status_code = 422
     code = "data_root_invalid"
-    expose_message = True
 
     def __init__(self) -> None:
         super().__init__("Data Root must be an accessible absolute directory")
@@ -220,7 +237,6 @@ class DataRootManagedByOperatorError(AccessDeniedError):
     """The current deployment profile does not permit browser mutation."""
 
     code = "data_root_managed_by_operator"
-    expose_message = True
 
     def __init__(self) -> None:
         super().__init__("Data Root is managed by the deployment operator")
@@ -276,7 +292,6 @@ class DataRootBusyError(ResourceConflictError):
     """A root switch would interrupt retained background work."""
 
     code = "data_root_busy"
-    expose_message = True
 
     def __init__(self) -> None:
         super().__init__("Wait for analyses and imports to finish before switching")
@@ -286,7 +301,6 @@ class DataRootTransitionError(ResourceConflictError):
     """Another root transition already owns the process-wide boundary."""
 
     code = "data_root_transition_in_progress"
-    expose_message = True
 
     def __init__(self) -> None:
         super().__init__("A Data Root change is already in progress")
@@ -329,7 +343,6 @@ class WorkspaceCorruptError(AppError):
 
     status_code = 500
     code = "workspace_corrupt"
-    expose_message = True
 
 
 class TabCorruptError(AppError):
@@ -337,7 +350,6 @@ class TabCorruptError(AppError):
 
     status_code = 500
     code = "tab_corrupt"
-    expose_message = True
 
 
 class AnalysisCorruptError(AppError):
@@ -345,7 +357,6 @@ class AnalysisCorruptError(AppError):
 
     status_code = 500
     code = "analysis_corrupt"
-    expose_message = True
 
 
 class UserFileImportCorruptError(AppError):
@@ -353,7 +364,6 @@ class UserFileImportCorruptError(AppError):
 
     status_code = 500
     code = "user_file_import_corrupt"
-    expose_message = True
 
 
 class AnalysisKindMismatchError(ResourceConflictError):
@@ -428,12 +438,17 @@ class InternalServiceError(AppError):
     code = "internal_service_error"
 
 
+class DataRootInitializationError(InternalServiceError):
+    """A user-selected Data Root failed while constructing its Runtime."""
+
+    code = "data_root_initialization_failed"
+
+
 class WorkspaceLockUnavailableError(AppError):
     """The backend cannot safely establish Workspace process ownership."""
 
     status_code = 500
     code = "workspace_lock_unavailable"
-    expose_message = True
 
     def __init__(self) -> None:
         super().__init__("Workspace locking is unavailable")
@@ -448,15 +463,12 @@ class BadGatewayError(AppError):
 
 
 class AnnotationProviderError(BadGatewayError):
-    """Expose one fixed provider-failure category without leaking SDK details.
+    """Expose one stable provider-failure category with its diagnostic.
 
     Used by synchronous model discovery and Preview services after the provider
     adapter has classified an SDK exception. The original exception remains in
-    the cause chain for correlated backend logging, while only this stable code
-    and safe message cross the HTTP boundary.
+    the cause chain so the HTTP boundary can expose its deepest type and message.
     """
-
-    expose_message = True
 
     def __init__(self, code: str, message: str) -> None:
         self.code = code
@@ -468,7 +480,6 @@ class UserPreferencesCorruptError(AppError):
 
     status_code = 500
     code = "user_preferences_corrupt"
-    expose_message = True
 
     def __init__(self) -> None:
         super().__init__(
@@ -481,7 +492,6 @@ class ProviderCredentialsCorruptError(AppError):
 
     status_code = 500
     code = "provider_credentials_corrupt"
-    expose_message = True
 
     def __init__(self) -> None:
         super().__init__(

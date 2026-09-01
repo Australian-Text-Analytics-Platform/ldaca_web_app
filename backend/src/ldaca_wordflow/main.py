@@ -9,7 +9,7 @@ Flow:
 - application construction registers only routes, middleware, and handlers;
 - FastAPI lifespan invokes the runtime factory, copies its value into typed
   request state, and guarantees teardown; and
-- HTTP-only concerns (request IDs, safe errors, CORS, status codes, and optional
+- HTTP-only concerns (request IDs, diagnostic errors, CORS, status codes, and optional
   frontend mounting) stay at this boundary.
 """
 
@@ -50,7 +50,7 @@ from .api.storage import router as storage_router
 from .api.tokenizers import router as tokenizers_router
 from .api.user_file_imports import router as user_file_imports_router
 from .api.workspaces import router as workspaces_router
-from .shared.errors import AppError
+from .shared.errors import AppError, format_exception_diagnostic
 from .shared.json_data import JsonData
 from .runtime import (
     LifespanState,
@@ -106,28 +106,22 @@ def _request_id(request: Request) -> str:
 async def _app_error_handler(request: Request, exc: AppError) -> JSONResponse:
     """Map framework-neutral domain failures into the public error contract."""
 
-    if exc.status_code >= 500 and not exc.expose_message:
+    if exc.status_code >= 500:
         logger.error(
             "Domain service failure code=%s request_id=%s",
             exc.code,
             _request_id(request),
             exc_info=exc,
         )
-        message = (
-            "Internal server error"
-            if exc.status_code == 500
-            else "Upstream service error"
-        )
-        details = None
+        message = format_exception_diagnostic(exc)
     else:
         message = exc.message
-        details = exc.details
     return api_error_response(
         request_id=_request_id(request),
         status_code=exc.status_code,
         code=exc.code,
         message=message,
-        details=details,
+        details=exc.details,
         headers=exc.headers,
     )
 
@@ -160,7 +154,7 @@ async def _validation_error_handler(
 
 
 async def _unexpected_error_handler(request: Request, exc: Exception) -> JSONResponse:
-    """Log unexpected exceptions and expose no internal implementation text."""
+    """Log unexpected exceptions and expose their type and message."""
 
     logger.exception(
         "Unhandled request failure request_id=%s",
@@ -171,7 +165,7 @@ async def _unexpected_error_handler(request: Request, exc: Exception) -> JSONRes
         request_id=_request_id(request),
         status_code=500,
         code="internal_server_error",
-        message="Internal server error",
+        message=format_exception_diagnostic(exc),
     )
 
 
@@ -259,7 +253,7 @@ async def _http_error_handler(
     request: Request,
     exc: StarletteHTTPException,
 ) -> JSONResponse:
-    """Normalize every framework-generated status without leaking its detail."""
+    """Normalize framework statuses while retaining diagnostics for 5xx errors."""
 
     code, message = {
         400: ("bad_request", "Bad request"),
@@ -270,6 +264,8 @@ async def _http_error_handler(
         413: ("request_body_too_large", "Request body is too large"),
         415: ("unsupported_media_type", "Unsupported media type"),
     }.get(exc.status_code, ("http_error", "Request failed"))
+    if exc.status_code >= 500:
+        message = format_exception_diagnostic(exc)
     return api_error_response(
         request_id=_request_id(request),
         status_code=exc.status_code,

@@ -802,7 +802,7 @@ export type AnnotationTabUpdate = {
 /**
  * ApiError
  *
- * Safe error body returned by every JSON HTTP error handler.
+ * Request-correlated error body returned by every JSON HTTP error handler.
  */
 export type ApiError = {
     /**
@@ -2135,7 +2135,7 @@ export type DataPortalUserFileImportResult = {
 /**
  * DataRootErrorResource
  *
- * Safe failure detail suitable for an unauthenticated loading screen.
+ * Runtime diagnostic shown by the unauthenticated loading screen.
  */
 export type DataRootErrorResource = {
     /**
@@ -2458,7 +2458,7 @@ export type ExpressionNodeEditRequest = {
 /**
  * Failure
  *
- * Safe durable terminal failure with no internal diagnostics.
+ * Durable terminal failure containing a complete backend diagnostic.
  */
 export type Failure = {
     /**

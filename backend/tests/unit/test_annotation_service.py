@@ -1,4 +1,4 @@
-"""Provider discovery preserves only safe classified failures at its boundary."""
+"""Provider discovery preserves classified failures and diagnostics."""
 
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ class _Credentials:
         "annotation_provider_failed",
     ],
 )
-async def test_model_discovery_maps_each_provider_category_to_safe_502(
+async def test_model_discovery_maps_each_provider_category_to_diagnostic_502(
     monkeypatch,
     code,
 ) -> None:
@@ -62,5 +62,4 @@ async def test_model_discovery_maps_each_provider_category_to_safe_502(
 
     assert exc_info.value.status_code == 502
     assert exc_info.value.code == code
-    assert "private" not in exc_info.value.message
-    assert "secret.invalid" not in exc_info.value.message
+    assert exc_info.value.message == "private SDK body https://secret.invalid"

@@ -251,14 +251,14 @@ or running Run All retains the credential captured when submitted. Names and
 credentials do not enter Workspaces, Tabs, Results, provenance, query keys, or
 telemetry.
 
-Provider adapters normalize failures to a fixed safe code and message. Model
-discovery and Preview return those failures as safe 502 responses. Run All
-passes fatal failures through a private structured worker envelope and publishes
-no artifact or Data Block mutation. Only irreducible single-row context-limit
+Provider adapters normalize failures to a stable code while preserving the
+deepest exception type and complete message. Model discovery and Preview return
+those diagnostics as 502 responses. Run All passes the same diagnostic through
+a private structured worker envelope and publishes no artifact or Data Block
+mutation. The child traceback remains backend-only. Only irreducible single-row context-limit
 or invalid-response failures may publish partial output. Their separate failed
 row mask preserves prior values during reprocessing, leaves fill-missing rows
-blank, and remains distinct from successful explicit-null predictions. Raw SDK
-causes are retained only in request- or Analysis-correlated logs.
+blank, and remains distinct from successful explicit-null predictions.
 
 ## Persistence
 

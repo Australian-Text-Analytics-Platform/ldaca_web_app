@@ -16,9 +16,11 @@ from ldaca_wordflow.services.analysis_executor import (
 )
 from ldaca_wordflow.services.supervised_process import (
     SupervisedProcessCancelled,
+    SupervisedProcessError,
     SupervisedProcessRunner,
     poll_result_connection,
 )
+from ldaca_wordflow.shared.errors import format_exception_diagnostic
 from ldaca_wordflow.workers.entrypoints import _progress_callback
 from ldaca_wordflow.workers.invocations import PreviewReadyInput
 
@@ -44,6 +46,11 @@ def _report_then_write(*, destination: str, progress_queue: Any) -> str:
     time.sleep(0.5)
     Path(destination).write_text("orphaned", encoding="utf-8")
     return "result"
+
+
+def _failing_worker(*, message: str, progress_queue: Any) -> str:
+    del progress_queue
+    raise ValueError(message)
 
 
 def test_broken_result_pipe_has_no_available_envelope() -> None:
@@ -154,6 +161,31 @@ async def test_result_cannot_overtake_a_flushed_progress_report() -> None:
 
     assert reports == [{"fraction": 1.0, "message": "Premature completion"}]
     assert result == "result"
+    await runner.close(anyio.current_time() + 1)
+
+
+@pytest.mark.anyio
+async def test_child_failure_separates_complete_diagnostic_from_traceback() -> None:
+    runner = SupervisedProcessRunner[str]("test worker")
+    message = "diagnostic-" + ("x" * 1_000)
+
+    with pytest.raises(SupervisedProcessError) as captured:
+        await runner.execute(
+            "failure",
+            _failing_worker,
+            {"message": message},
+            _ignore,
+            storage_roots=(),
+            max_storage_bytes=1024 * 1024,
+            max_storage_files=10,
+        )
+
+    assert format_exception_diagnostic(captured.value) == f"ValueError: {message}"
+    assert "test_analysis_executor.py" not in str(captured.value)
+    assert any(
+        "test_analysis_executor.py" in note
+        for note in getattr(captured.value, "__notes__", ())
+    )
     await runner.close(anyio.current_time() + 1)
 
 

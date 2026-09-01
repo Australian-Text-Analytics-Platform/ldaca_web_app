@@ -5,10 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal, Protocol
 
-from ...domain.annotation import (
-    ANNOTATION_PROVIDER_SAFE_MESSAGES,
-    AnnotationProviderFailureCode,
-)
+from ...domain.annotation import AnnotationProviderFailureCode
 
 REQUEST_TIMEOUT_SECONDS = 90.0
 MODEL_DISCOVERY_MAX_RETRIES = 1
@@ -31,7 +28,7 @@ _REASONING_BUDGET_TOKENS: dict[str, int] = {
 
 
 class AnnotationAiError(Exception):
-    """One classified provider failure with private and safe representations."""
+    """One provider failure with a stable classification code."""
 
     def __init__(
         self,
@@ -42,7 +39,6 @@ class AnnotationAiError(Exception):
     ) -> None:
         super().__init__(message)
         self.code = code
-        self.safe_message = ANNOTATION_PROVIDER_SAFE_MESSAGES[code]
         self.retryable = retryable
 
 

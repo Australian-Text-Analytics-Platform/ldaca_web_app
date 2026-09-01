@@ -24,6 +24,7 @@ from ..infrastructure.providers.annotation_ai import (
 )
 from ..infrastructure.storage.durable_fs import atomic_output_path
 from ..infrastructure.storage.input_snapshots import load_snapshot_node
+from ..shared.errors import format_exception_diagnostic
 from .utils import process_entrypoint
 
 logger = logging.getLogger(__name__)
@@ -112,7 +113,7 @@ def run_annotation_analysis(
                 "state": "failed",
                 "failure": {
                     "code": error.code,
-                    "message": error.safe_message,
+                    "message": format_exception_diagnostic(error),
                 },
             }
         if len(outcome.labels) != len(target_indices) or len(

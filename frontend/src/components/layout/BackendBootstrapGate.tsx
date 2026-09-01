@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { DataRootContext, type DataRootResource } from '@/features/bootstrap/DataRootContext';
 import { DataRootSetupForm } from '@/features/bootstrap/DataRootSetupForm';
 import BlockingScreen from '@/features/auth/components/BlockingScreen';
+import { parseApiErrorResponse } from '@/lib/apiError';
 import {
   resolveBackendConnection,
   type ResolvedBackendConnection,
@@ -25,21 +26,6 @@ function isDataRootResource(value: unknown): value is DataRootResource {
   );
 }
 
-async function readError(response: Response): Promise<string> {
-  try {
-    const payload: unknown = await response.json();
-    if (typeof payload === 'object' && payload !== null && 'error' in payload) {
-      const error = payload.error;
-      if (typeof error === 'object' && error !== null && 'message' in error) {
-        return String(error.message);
-      }
-    }
-  } catch {
-    // The HTTP status below is still useful when the response is not JSON.
-  }
-  return `Backend request failed (HTTP ${String(response.status)})`;
-}
-
 /** Keeps the HTTP control plane mounted while bootstrapping the complete Runtime. */
 export function BackendBootstrapGate({ children }: { children: ReactNode }) {
   const [connection, setConnection] = useState<ResolvedBackendConnection | null>(null);
@@ -55,8 +41,12 @@ export function BackendBootstrapGate({ children }: { children: ReactNode }) {
       try {
         const resolved = await resolveBackendConnection();
         const liveResponse = await fetch(resolved.liveUrl, { cache: 'no-store' });
-        if (!liveResponse.ok)
-          throw new Error(`Liveness check returned HTTP ${String(liveResponse.status)}`);
+        if (!liveResponse.ok) {
+          throw await parseApiErrorResponse(liveResponse, {
+            fallbackMessage: `Liveness check returned HTTP ${String(liveResponse.status)}`,
+            includeResponseText: false,
+          });
+        }
         const livePayload: unknown = await liveResponse.json();
         if (
           typeof livePayload !== 'object' ||
@@ -68,7 +58,12 @@ export function BackendBootstrapGate({ children }: { children: ReactNode }) {
         }
 
         const rootResponse = await fetch(resolved.dataRootUrl, { cache: 'no-store' });
-        if (!rootResponse.ok) throw new Error(await readError(rootResponse));
+        if (!rootResponse.ok) {
+          throw await parseApiErrorResponse(rootResponse, {
+            fallbackMessage: `Backend request failed (HTTP ${String(rootResponse.status)})`,
+            includeResponseText: false,
+          });
+        }
         const nextResource: unknown = await rootResponse.json();
         if (!isDataRootResource(nextResource)) {
           throw new Error('Data Root status returned an unexpected response');
@@ -76,7 +71,10 @@ export function BackendBootstrapGate({ children }: { children: ReactNode }) {
         if (nextResource.state === 'ready') {
           const readyResponse = await fetch(resolved.readyUrl, { cache: 'no-store' });
           if (!readyResponse.ok) {
-            throw new Error(`Readiness check returned HTTP ${String(readyResponse.status)}`);
+            throw await parseApiErrorResponse(readyResponse, {
+              fallbackMessage: `Readiness check returned HTTP ${String(readyResponse.status)}`,
+              includeResponseText: false,
+            });
           }
         }
         if (cancelled) return;
@@ -122,13 +120,26 @@ export function BackendBootstrapGate({ children }: { children: ReactNode }) {
       body: JSON.stringify({ data_root: dataRoot }),
     });
     if (!response.ok) {
-      const message = await readError(response);
+      const failure = await parseApiErrorResponse(response, {
+        fallbackMessage: `Backend request failed (HTTP ${String(response.status)})`,
+        includeResponseText: false,
+      });
+      let message = failure.message;
+      const preferRefreshedError =
+        message.startsWith('Internal server error') ||
+        message.startsWith(`Backend request failed (HTTP ${String(response.status)})`);
       const refreshed = await fetch(connection.dataRootUrl, { cache: 'no-store' });
       if (refreshed.ok) {
         const payload: unknown = await refreshed.json();
-        if (isDataRootResource(payload)) setResource(payload);
+        if (isDataRootResource(payload)) {
+          setResource(payload);
+          const resourceMessage =
+            typeof payload.error?.message === 'string' ? payload.error.message.trim() : '';
+          if (preferRefreshedError && resourceMessage) message = resourceMessage;
+        }
       }
-      throw new Error(message);
+      if (message !== failure.message) failure.message = message;
+      throw failure;
     }
     const payload: unknown = await response.json();
     if (!isDataRootResource(payload))

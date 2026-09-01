@@ -48,6 +48,12 @@ const rootResponse = (overrides: Record<string, unknown> = {}) =>
     { status: 200, headers: { 'Content-Type': 'application/json' } },
   );
 
+const errorResponse = (status: number, payload: Record<string, unknown>) =>
+  new Response(JSON.stringify(payload), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+
 function GenerationProbe({ onMount }: { onMount: () => void }) {
   const { configureDataRoot } = useDataRoot();
   useEffect(onMount, [onMount]);
@@ -141,6 +147,136 @@ describe('BackendBootstrapGate', () => {
         body: JSON.stringify({ data_root: '/srv/recommended' }),
       }),
     );
+  });
+
+  it('shows backend validation detail messages when a Data Root is rejected', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(liveResponse())
+      .mockResolvedValueOnce(rootResponse())
+      .mockResolvedValueOnce(
+        errorResponse(422, {
+          code: 'request_validation_failed',
+          message: 'Request validation failed',
+          details: [
+            { location: ['body', 'data_root'], message: 'Data Root must be an absolute path' },
+            { location: ['body', 'data_root'], message: 'Choose a server directory' },
+          ],
+          request_id: 'validation-request',
+        }),
+      )
+      .mockResolvedValueOnce(rootResponse());
+
+    render(
+      <BackendBootstrapGate>
+        <p>Application ready</p>
+      </BackendBootstrapGate>,
+    );
+    const input = await screen.findByRole('textbox', { name: 'Folder on the server' });
+    await user.type(input, 'relative/path');
+    await user.click(screen.getByRole('button', { name: 'Use this folder' }));
+
+    expect(
+      await screen.findByText('Data Root must be an absolute path; Choose a server directory', {
+        selector: 'p.text-error',
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it('prefers the refreshed Data Root error after initialization fails', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(liveResponse())
+      .mockResolvedValueOnce(rootResponse())
+      .mockResolvedValueOnce(
+        errorResponse(500, {
+          code: 'internal_server_error',
+          message: 'Internal server error',
+          request_id: 'initialization-request',
+        }),
+      )
+      .mockResolvedValueOnce(
+        rootResponse({
+          state: 'configuration_error',
+          error: {
+            code: 'data_root_initialization_failed',
+            message: 'The selected Data Root could not be initialized',
+          },
+        }),
+      );
+
+    render(
+      <BackendBootstrapGate>
+        <p>Application ready</p>
+      </BackendBootstrapGate>,
+    );
+    await user.click(await screen.findByRole('button', { name: 'Use recommended location' }));
+
+    expect(
+      await screen.findByText('The selected Data Root could not be initialized', {
+        selector: 'p.text-error',
+      }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Backend request failed (HTTP 500)')).not.toBeInTheDocument();
+  });
+
+  it('keeps a Python initialization error instead of replacing it with refreshed status', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(liveResponse())
+      .mockResolvedValueOnce(rootResponse())
+      .mockResolvedValueOnce(
+        errorResponse(500, {
+          code: 'data_root_initialization_failed',
+          message: 'PermissionError: [Errno 13] Permission denied while opening SQLite',
+          request_id: 'initialization-request',
+        }),
+      )
+      .mockResolvedValueOnce(
+        rootResponse({
+          state: 'configuration_error',
+          error: {
+            code: 'data_root_initialization_failed',
+            message: 'The selected Data Root could not be initialized',
+          },
+        }),
+      );
+
+    render(
+      <BackendBootstrapGate>
+        <p>Application ready</p>
+      </BackendBootstrapGate>,
+    );
+    await user.click(await screen.findByRole('button', { name: 'Use recommended location' }));
+
+    expect(
+      await screen.findByText(
+        'PermissionError: [Errno 13] Permission denied while opening SQLite (Request ID: initialization-request)',
+        { selector: 'p.text-error' },
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('falls back to the HTTP status when the backend error is unreadable', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(liveResponse())
+      .mockResolvedValueOnce(rootResponse())
+      .mockResolvedValueOnce(
+        new Response('not-json', { status: 500, headers: { 'Content-Type': 'text/plain' } }),
+      )
+      .mockResolvedValueOnce(rootResponse());
+
+    render(
+      <BackendBootstrapGate>
+        <p>Application ready</p>
+      </BackendBootstrapGate>,
+    );
+    await user.click(await screen.findByRole('button', { name: 'Use recommended location' }));
+
+    expect(
+      await screen.findByText('Backend request failed (HTTP 500)', { selector: 'p.text-error' }),
+    ).toBeInTheDocument();
   });
 
   it('shows operator guidance for an immutable configuration error', async () => {

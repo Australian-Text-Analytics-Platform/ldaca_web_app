@@ -197,7 +197,7 @@ def test_workspace_in_use_preserves_current_open_workspace(tmp_path: Path) -> No
         ] == "closed"
 
 
-def test_unsafe_workspace_lock_entry_has_distinct_safe_error(tmp_path: Path) -> None:
+def test_unsafe_workspace_lock_entry_exposes_storage_diagnostic(tmp_path: Path) -> None:
     with _client(tmp_path) as client:
         unsafe = _unsafe_headers(client)
         workspace_id = client.post(
@@ -221,7 +221,9 @@ def test_unsafe_workspace_lock_entry_has_distinct_safe_error(tmp_path: Path) -> 
 
         assert response.status_code == 500
         assert response.json()["code"] == "workspace_lock_unavailable"
-        assert response.json()["message"] == "Workspace locking is unavailable"
+        assert response.json()["message"].startswith("OSError: ")
+        assert lock_path.name in response.json()["message"]
+        assert "Traceback" not in response.json()["message"]
         assert outside.read_text(encoding="utf-8") == "do not modify"
 
 

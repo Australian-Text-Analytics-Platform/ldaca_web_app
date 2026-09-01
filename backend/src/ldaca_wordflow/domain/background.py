@@ -27,6 +27,8 @@ SafePublicText = Annotated[
     AfterValidator(_safe_text),
 ]
 
+DiagnosticText = Annotated[str, StringConstraints(min_length=1)]
+
 
 class BackgroundState(StrEnum):
     QUEUED = "queued"
@@ -46,12 +48,12 @@ class Progress(BaseModel):
 
 
 class Failure(BaseModel):
-    """Safe durable terminal failure with no internal diagnostics."""
+    """Durable terminal failure containing a complete backend diagnostic."""
 
     model_config = ConfigDict(extra="forbid", strict=True)
 
     code: str = Field(pattern=r"^[a-z][a-z0-9_]*$", max_length=100)
-    message: SafePublicText
+    message: DiagnosticText
 
 
-__all__ = ["BackgroundState", "Failure", "Progress"]
+__all__ = ["BackgroundState", "DiagnosticText", "Failure", "Progress"]

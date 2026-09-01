@@ -694,7 +694,7 @@ async def test_dispatch_preserves_expected_domain_failure(
 
 
 @pytest.mark.anyio
-async def test_dispatch_hides_unexpected_admission_failure(
+async def test_dispatch_preserves_unexpected_admission_diagnostic(
     tmp_path: Path,
 ) -> None:
     workspaces, workspace_id, node_id, tab_id = await _opened_workspace_with_tab(
@@ -723,7 +723,7 @@ async def test_dispatch_hides_unexpected_admission_failure(
     assert failed.state is AnalysisState.FAILED
     assert failed.error is not None
     assert failed.error.code == "analysis_start_failed"
-    assert failed.error.message == "Analysis could not start"
+    assert failed.error.message == "RuntimeError: private diagnostic"
 
 
 @pytest.mark.anyio

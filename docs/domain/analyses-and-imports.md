@@ -56,7 +56,7 @@ without first running Preview, and any Analysis kind may use a Supporting
 Sub-Analysis when orchestration requires it.
 
 The immutable request, execution scope, parent, explicit supersession targets,
-lifecycle, safe Failure, terminal Result, Artifact references, and ordered
+lifecycle, diagnostic Failure, terminal Result, Artifact references, and ordered
 unique `output_node_ids` persist in each strict Analysis record. Draft
 parameters remain client-only. Persisted kind-specific presentation
 preferences belong to the Tab and are never copied into an immutable request

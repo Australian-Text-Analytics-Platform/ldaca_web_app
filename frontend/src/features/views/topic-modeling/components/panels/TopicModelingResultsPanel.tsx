@@ -234,7 +234,7 @@ function ClusterCountControl({
         />
       </div>
       {error ? (
-        <span className="flex items-center gap-2 text-error">
+        <span className="flex items-center gap-2 whitespace-pre-wrap wrap-break-word text-error">
           {error}
           {onRetry ? (
             <button type="button" className="underline" onClick={onRetry}>
@@ -450,7 +450,9 @@ export function TopicModelingResultsPanel({
           />
         ) : null}
 
-        {isErrorState ? <p className="text-body text-description">{error}</p> : null}
+        {isErrorState ? (
+          <p className="whitespace-pre-wrap wrap-break-word text-body text-description">{error}</p>
+        ) : null}
 
         {isSuccessfulState ? (
           <div className="relative" aria-busy={projectionPending}>
@@ -573,7 +575,7 @@ export function TopicModelingResultsPanel({
                               ? 'A Data Block is being added to the workspace'
                               : (clustering?.cluster_count ?? 0) === 0
                                 ? 'No Topics were discovered'
-                              : undefined
+                                : undefined
                           }
                         >
                           <Button

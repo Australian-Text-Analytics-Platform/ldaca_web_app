@@ -23,20 +23,25 @@ export class ApiError extends Error {
  * Collapses FastAPI/HTTP validation detail payloads into compact text for
  * snackbars, banners, and thrown `ApiError` messages.
  */
-/**
- * Used by: src/lib/backend/generatedClientConfig.ts.
- */
-export function formatErrorDetail(detail: unknown): string | null {
+function formatErrorDetail(detail: unknown): string | null {
   if (detail == null) return null;
   if (typeof detail === 'string') return detail;
   if (Array.isArray(detail)) {
     const parts = detail.map((entry) => {
       if (entry && typeof entry === 'object') {
-        const error = entry as { loc?: unknown; msg?: unknown };
-        const loc = Array.isArray(error.loc)
-          ? error.loc.filter((value) => value !== 'body').join('.')
+        const error = entry as {
+          loc?: unknown;
+          location?: unknown;
+          message?: unknown;
+          msg?: unknown;
+        };
+        const canonicalMessage = typeof error.message === 'string' ? error.message : undefined;
+        const rawLocation = canonicalMessage === undefined ? (error.location ?? error.loc) : null;
+        const loc = Array.isArray(rawLocation)
+          ? rawLocation.filter((value) => value !== 'body').join('.')
           : '';
-        const msg = typeof error.msg === 'string' ? error.msg : '';
+        const rawMessage = canonicalMessage ?? error.msg;
+        const msg = typeof rawMessage === 'string' ? rawMessage : '';
         if (loc && msg) return `${loc}: ${msg}`;
         if (msg) return msg;
       }
@@ -60,4 +65,56 @@ export function formatErrorDetail(detail: unknown): string | null {
   }
   // eslint-disable-next-line @typescript-eslint/no-base-to-string -- detail is a non-object primitive here (string/array/object handled above); String() is the safe fallback
   return String(detail);
+}
+
+interface ParseApiErrorOptions {
+  fallbackMessage?: string;
+  includeRequestId?: boolean;
+  includeResponseText?: boolean;
+}
+
+/** Parse one backend error envelope without discarding its diagnostic message. */
+export async function parseApiErrorResponse(
+  response: Response,
+  options: ParseApiErrorOptions = {},
+): Promise<ApiError> {
+  let detail: unknown;
+  let parsedJson = true;
+  try {
+    detail = await response.clone().json();
+  } catch {
+    parsedJson = false;
+    try {
+      detail = await response.clone().text();
+    } catch {
+      detail = null;
+    }
+  }
+
+  const parsed = detail && typeof detail === 'object' ? (detail as Record<string, unknown>) : null;
+  const fallbackDetail = parsedJson || options.includeResponseText !== false ? detail : null;
+  const nestedError =
+    parsed?.error && typeof parsed.error === 'object'
+      ? (parsed.error as Record<string, unknown>)
+      : null;
+  const backendMessage =
+    /* eslint-disable @typescript-eslint/prefer-nullish-coalescing -- empty messages deliberately fall through */
+    formatErrorDetail(parsed?.details) ||
+    (typeof parsed?.message === 'string' && parsed.message) ||
+    (typeof nestedError?.message === 'string' && nestedError.message) ||
+    formatErrorDetail(parsed?.detail) ||
+    formatErrorDetail(fallbackDetail) ||
+    options.fallbackMessage ||
+    `HTTP ${String(response.status)}`;
+  /* eslint-enable @typescript-eslint/prefer-nullish-coalescing */
+
+  const code = typeof parsed?.code === 'string' ? parsed.code : undefined;
+  const requestId =
+    (typeof parsed?.request_id === 'string' && parsed.request_id) ||
+    response.headers.get('X-Request-ID');
+  const message =
+    response.status >= 500 && requestId && options.includeRequestId !== false
+      ? `${backendMessage} (Request ID: ${requestId})`
+      : backendMessage;
+  return new ApiError(message, { status: response.status, code, detail });
 }

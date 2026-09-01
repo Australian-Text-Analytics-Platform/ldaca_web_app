@@ -9,7 +9,7 @@ flowchart TB
     SETTINGS["Immutable Settings"] --> APP["create_app()<br/>side-effect-free FastAPI construction"]
     APP -. "lifespan creates" .-> RUNTIME["Runtime<br/>one application composition root"]
 
-    CLIENT["Browser or desktop client"] --> EDGE["HTTP edge<br/>request identity, Host, CORS, CSRF, safe errors"]
+    CLIENT["Browser or desktop client"] --> EDGE["HTTP edge<br/>request identity, Host, CORS, CSRF, diagnostic errors"]
     EDGE --> API["api/<br/>thin routers and typed HTTP contracts"]
     API --> SERVICES["services/<br/>use cases and coordination authorities"]
 

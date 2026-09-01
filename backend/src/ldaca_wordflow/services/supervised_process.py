@@ -47,6 +47,20 @@ def poll_result_connection(
 class SupervisedProcessError(RuntimeError):
     """A child failed or exited without a valid result envelope."""
 
+    def __init__(
+        self,
+        message: str,
+        *,
+        diagnostic_type: str | None = None,
+        diagnostic_message: str | None = None,
+        child_traceback: list[str] | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.diagnostic_type = diagnostic_type
+        self.diagnostic_message = diagnostic_message
+        if child_traceback:
+            self.add_note(f"Child traceback:\n{''.join(child_traceback)}")
+
 
 class SupervisedProcessStartError(SupervisedProcessError):
     """The operating system could not launch one reserved child process."""
@@ -86,7 +100,12 @@ def _run_process(
         result_connection.send(("ok", result))
     except BaseException as exc:
         result_connection.send(
-            ("error", type(exc).__name__, traceback.format_tb(exc.__traceback__))
+            (
+                "error",
+                type(exc).__name__,
+                str(exc),
+                traceback.format_tb(exc.__traceback__),
+            )
         )
     finally:
         result_connection.close()
@@ -309,8 +328,14 @@ class SupervisedProcessRunner[K: Hashable]:
         )
         if envelope[0] == "ok" and len(envelope) == 2:
             return envelope[1]
-        if envelope[0] == "error" and len(envelope) == 3:
-            traceback_lines = envelope[2]
+        if envelope[0] == "error" and len(envelope) == 4:
+            error_type = envelope[1]
+            error_message = envelope[2]
+            traceback_lines = envelope[3]
+            if not isinstance(error_type, str) or not isinstance(error_message, str):
+                raise SupervisedProcessError(
+                    f"{self._resource_name} returned an invalid error envelope"
+                )
             if not isinstance(traceback_lines, list) or not all(
                 isinstance(line, str) for line in traceback_lines
             ):
@@ -318,7 +343,10 @@ class SupervisedProcessRunner[K: Hashable]:
                     f"{self._resource_name} returned an invalid envelope"
                 )
             raise SupervisedProcessError(
-                f"{envelope[1]}\n{''.join(str(line) for line in traceback_lines)}"
+                f"{error_type}: {error_message}" if error_message else error_type,
+                diagnostic_type=error_type,
+                diagnostic_message=error_message,
+                child_traceback=traceback_lines,
             )
         raise SupervisedProcessError(
             f"{self._resource_name} returned an invalid envelope"
