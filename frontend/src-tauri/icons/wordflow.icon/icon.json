@@ -5,8 +5,8 @@
   ],
   "fill" : {
     "linear-gradient" : [
-      "extended-gray:1.00000,1.00000",
-      "extended-srgb:0.00000,0.75294,0.90980,1.00000"
+      "extended-srgb:0.00000,0.75294,0.90980,1.00000",
+      "extended-gray:1.00000,1.00000"
     ],
     "orientation" : {
       "start" : {
@@ -23,8 +23,11 @@
     {
       "layers" : [
         {
+          "blend-mode" : "normal",
+          "glass" : true,
           "image-name" : "wordflow-patterned-l-tight-rounded.png",
           "name" : "wordflow-patterned-l-tight-rounded",
+          "opacity" : 1,
           "position" : {
             "scale" : 0.75,
             "translation-in-points" : [
