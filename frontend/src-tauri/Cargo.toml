@@ -15,7 +15,7 @@ tauri-build = { version = "2", features = [] }
 dev-runtime = []
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["macos-private-api"] }
 # Used by the `download_to_downloads` Tauri command to fetch large export
 # bodies from the local backend and stream them to disk. Bypassing the JS
 # fetch body path avoids WebView2 + IPC reliability issues on Windows for
@@ -31,6 +31,9 @@ tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-store = "2"
 tauri-plugin-updater = "2"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+tauri-plugin-liquid-glass = "=0.1.6"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

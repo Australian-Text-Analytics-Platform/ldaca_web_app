@@ -14,10 +14,15 @@ describe('DesktopWindowFrame', () => {
     expect(screen.getByTestId('application-window-frame')).toHaveStyle({
       '--desktop-titlebar-height': '35px',
     });
+    expect(screen.getByTestId('application-window-frame')).toHaveClass('app-titlebar-backplane');
+    expect(screen.getByTestId('application-window-frame')).not.toHaveClass(
+      'app-glass-titlebar-foreground',
+    );
     expect(screen.getByTestId('application-header-spacer')).toHaveAttribute(
       'data-tauri-drag-region',
       'deep',
     );
+    expect(screen.getByTestId('application-header-spacer')).toHaveClass('app-titlebar-backplane');
     expect(screen.getByText('Wordflow content')).toBeVisible();
   });
 });

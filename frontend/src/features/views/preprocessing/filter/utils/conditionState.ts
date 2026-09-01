@@ -48,9 +48,7 @@ const getDefaultOperatorForFilterField = (
 
 const isChecklistField = (field: ArrowField | undefined): boolean =>
   field !== undefined &&
-  (isArrowDictionaryField(field) ||
-    isArrowStringListField(field) ||
-    isTopicCoverageField(field));
+  (isArrowDictionaryField(field) || isArrowStringListField(field) || isTopicCoverageField(field));
 
 const getDefaultValueForColumn = (
   field: ArrowField | undefined,

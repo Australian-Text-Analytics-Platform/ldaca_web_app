@@ -1,0 +1,7 @@
+{
+  "identifier": "liquid-glass",
+  "description": "Allow only the macOS main window to initialize its native glass backplane",
+  "windows": ["main"],
+  "platforms": ["macOS"],
+  "permissions": ["liquid-glass:default"]
+}

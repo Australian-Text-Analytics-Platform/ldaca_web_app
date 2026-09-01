@@ -121,7 +121,7 @@ export function DesktopNavigationHeaderView({
       data-testid="desktop-navigation-header"
       data-tauri-drag-region="deep"
       className={cn(
-        'fixed inset-x-0 top-0 z-30 grid h-(--desktop-titlebar-height) select-none grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 bg-[var(--vscode-titleBar-activeBackground)] pr-2 text-[var(--vscode-titleBar-activeForeground)]',
+        'app-glass-titlebar-foreground app-titlebar-backplane fixed inset-x-0 top-0 z-30 grid h-(--desktop-titlebar-height) select-none grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 pr-2 text-[var(--vscode-titleBar-activeForeground)]',
         hasNativeTrafficLights ? 'pl-[78px]' : 'pl-2',
       )}
     >

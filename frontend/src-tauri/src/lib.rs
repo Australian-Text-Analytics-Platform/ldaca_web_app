@@ -59,7 +59,11 @@ fn install_application_menu(app: &tauri::AppHandle) -> Result<(), Box<dyn std::e
 /// behavior, and native downloads live in focused modules; this function owns
 /// Tauri wiring and the ordering between those domains.
 pub fn run() {
-    let app = tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    #[cfg(target_os = "macos")]
+    let builder = builder.plugin(tauri_plugin_liquid_glass::init());
+
+    let app = builder
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::default().build())

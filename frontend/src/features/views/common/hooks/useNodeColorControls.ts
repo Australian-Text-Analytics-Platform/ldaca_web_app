@@ -196,10 +196,7 @@ export function useNodeColorControls({
       }
       used.add(target.toLowerCase());
       // Already persisted or requested by an explicit picker edit — nothing to do.
-      if (
-        (persisted && persisted === target) ||
-        requestedColors.current.get(nodeId) === target
-      ) {
+      if ((persisted && persisted === target) || requestedColors.current.get(nodeId) === target) {
         return;
       }
       const committed = target;

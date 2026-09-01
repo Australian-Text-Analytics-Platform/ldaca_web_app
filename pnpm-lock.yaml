@@ -125,6 +125,9 @@ importers:
       tailwind-merge:
         specifier: ^3.6.0
         version: 3.6.0
+      tauri-plugin-liquid-glass-api:
+        specifier: 0.1.6
+        version: 0.1.6(@tauri-apps/api@2.11.1)
       zustand:
         specifier: ^5.0.15
         version: 5.0.15(@types/react@19.2.18)(immer@11.1.18)(react@19.2.8)(use-sync-external-store@1.6.0(react@19.2.8))
@@ -4005,6 +4008,11 @@ packages:
   tapable@2.3.3:
     resolution: {integrity: sha512-uxc/zpqFg6x7C8vOE7lh6Lbda8eEL9zmVm/PLeTPBRhh1xCgdWaQ+J1CUieGpIfm2HdtsUpRv+HshiasBMcc6A==}
     engines: {node: '>=6'}
+
+  tauri-plugin-liquid-glass-api@0.1.6:
+    resolution: {integrity: sha512-93sppeXhn6WbzUheAFUWhqVICxZS6pNQzPBq2UcNFLdSP2icH94lDXmmHE9DhesxhiJiGITJ4bj8wNjWcQ/zCw==}
+    peerDependencies:
+      '@tauri-apps/api': ^2.0.0
 
   tinybench@2.9.0:
     resolution: {integrity: sha512-0+DUvqWMValLmha6lr4kD8iAMK1HzV0/aKnCtWb9v9641TnP/MFb7Pc2bxoxQjTXAErryXVgUOfv2YqNllqGeg==}
@@ -8401,6 +8409,10 @@ snapshots:
   tailwindcss@4.3.3: {}
 
   tapable@2.3.3: {}
+
+  tauri-plugin-liquid-glass-api@0.1.6(@tauri-apps/api@2.11.1):
+    dependencies:
+      '@tauri-apps/api': 2.11.1
 
   tinybench@2.9.0: {}
 

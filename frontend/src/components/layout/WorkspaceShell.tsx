@@ -60,7 +60,7 @@ function WorkspaceShellContent() {
         <ViewRouteSync />
         <ErrorBoundary>
           <SidebarProvider
-            className="h-full min-h-0 bg-[var(--vscode-titleBar-activeBackground)]"
+            className="app-titlebar-backplane h-full min-h-0"
             style={{ ['--sidebar-width' as string]: `${String(sidebarWidth)}px` }}
           >
             <DocumentModalHost />
@@ -80,7 +80,7 @@ function WorkspaceShellContent() {
               />
 
               <SidebarInset className="@container/workspace-shell flex h-full flex-1 flex-col overflow-hidden bg-transparent md:m-0! md:ml-0! md:rounded-none! md:shadow-none!">
-                <header className="border-b bg-[var(--vscode-titleBar-activeBackground)] px-4 py-2 md:hidden">
+                <header className="app-titlebar-backplane border-b px-4 py-2 md:hidden">
                   <div className="flex items-center justify-between">
                     <SidebarTrigger />
                   </div>

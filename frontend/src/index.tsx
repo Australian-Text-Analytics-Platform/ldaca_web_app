@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import './index.css';
 import { installExternalFileDropGuard } from './lib/externalFileDropGuard';
 import { startThemeStorageSync } from './features/theme/themeRuntime';
+import { initializeDesktopWindowMaterial } from './lib/desktopWindowMaterial';
 
 // Silence the harmless "ResizeObserver loop completed with undelivered
 // notifications" message before any module-level code (and Vite's HMR
@@ -33,6 +34,7 @@ if (!container) {
 }
 
 async function renderApplication(rootContainer: HTMLElement) {
+  await initializeDesktopWindowMaterial();
   const [{ RouterProvider }, { router }, { initSentry }] = await Promise.all([
     import('@tanstack/react-router'),
     import('./router'),

@@ -111,6 +111,13 @@
     color: var(--vscode-foreground);
   }
 
+  html[data-native-glass="active"],
+  html[data-native-glass="active"] body,
+  html[data-native-glass="active"] #root {
+    background: transparent !important;
+    background-color: transparent !important;
+  }
+
   ::selection {
     background: var(--vscode-editor-selectionBackground);
   }
@@ -128,6 +135,37 @@
 }
 
 @layer components {
+  .app-window-backplane {
+    background: var(--vscode-editor-background);
+  }
+
+  .app-titlebar-backplane {
+    background: var(--vscode-titleBar-activeBackground);
+  }
+
+  html[data-native-glass="active"] .app-window-backplane,
+  html[data-native-glass="active"] .app-titlebar-backplane {
+    background: transparent !important;
+    background-color: transparent !important;
+  }
+
+  html[data-native-glass="active"] .app-glass-titlebar-foreground {
+    --vscode-titleBar-activeForeground: var(--vscode-button-foreground);
+    --vscode-descriptionForeground: color-mix(
+      in srgb,
+      var(--vscode-button-foreground) 78%,
+      transparent
+    );
+    --vscode-textLink-foreground: var(--vscode-button-foreground);
+    --vscode-charts-green: var(--vscode-button-foreground);
+    --vscode-toolbar-hoverBackground: color-mix(
+      in srgb,
+      var(--vscode-button-foreground) 16%,
+      transparent
+    );
+    color: var(--vscode-button-foreground);
+  }
+
   section[aria-label="Annotation Review"] tbody > tr:nth-child(odd) {
     background-color: var(--vscode-surface-background) !important;
   }

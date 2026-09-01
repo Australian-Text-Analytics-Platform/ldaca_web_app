@@ -522,5 +522,4 @@ describe('TopicModelingResultsPanel', () => {
     fireEvent.blur(count);
     expect(onWordsPerTopicChange).toHaveBeenCalledWith(100);
   });
-
 });

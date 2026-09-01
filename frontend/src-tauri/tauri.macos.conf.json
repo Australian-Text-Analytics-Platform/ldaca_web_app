@@ -1,0 +1,23 @@
+{
+  "app": {
+    "macOSPrivateApi": true,
+    "windows": [
+      {
+        "title": "LDaCA Wordflow",
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "width": 1400,
+        "height": 900,
+        "minWidth": 1000,
+        "minHeight": 700,
+        "zoomHotkeysEnabled": true,
+        "dragDropEnabled": false,
+        "visible": false,
+        "useHttpsScheme": true,
+        "resizable": true,
+        "fullscreen": false,
+        "transparent": true
+      }
+    ]
+  }
+}
