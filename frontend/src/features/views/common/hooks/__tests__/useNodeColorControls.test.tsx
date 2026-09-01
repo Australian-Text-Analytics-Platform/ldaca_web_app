@@ -115,7 +115,7 @@ describe('useNodeColorControls', () => {
     expect(persistNodeColor).not.toHaveBeenCalled();
   });
 
-  it('setNodeColor edits the preview only (no immediate persistence)', async () => {
+  it('persists an explicit picker colour immediately and does not repeat it on run', async () => {
     const persistNodeColor = vi.fn().mockResolvedValue(undefined);
     const { result } = renderHook(() =>
       useNodeColorControls({
@@ -130,12 +130,72 @@ describe('useNodeColorControls', () => {
     });
 
     expect(result.current.nodeColors['node-1']).toBe('#abcdef');
-    expect(persistNodeColor).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(persistNodeColor).toHaveBeenCalledTimes(1);
+    });
+    expect(persistNodeColor).toHaveBeenCalledWith('node-1', '#abcdef');
 
-    // The manual pick is what gets committed on run.
+    // Running later only commits automatically assigned preview colours.
     await act(async () => {
       await result.current.ensureNodeColors();
     });
-    expect(persistNodeColor).toHaveBeenCalledWith('node-1', '#abcdef');
+    expect(persistNodeColor).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not make analysis preparation wait for an in-flight explicit colour write', async () => {
+    let finishPersistence: (() => void) | undefined;
+    const persistNodeColor = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finishPersistence = resolve;
+        }),
+    );
+    const { result } = renderHook(() =>
+      useNodeColorControls({
+        nodeIds: ['node-1'],
+        nodes: [projectWorkspaceNodeMetadata({ id: 'node-1', name: 'Corpus' })],
+        persistNodeColor,
+      }),
+    );
+
+    act(() => {
+      result.current.setNodeColor('node-1', '#ABCDEF');
+    });
+    await waitFor(() => {
+      expect(persistNodeColor).toHaveBeenCalledWith('node-1', '#abcdef');
+    });
+
+    await act(async () => {
+      await result.current.ensureNodeColors();
+    });
+    expect(persistNodeColor).toHaveBeenCalledTimes(1);
+
+    finishPersistence?.();
+  });
+
+  it('rolls back an explicit picker colour when immediate persistence fails', async () => {
+    const persistNodeColor = vi.fn().mockRejectedValue(new Error('offline'));
+    const { result } = renderHook(() =>
+      useNodeColorControls({
+        nodeIds: ['node-1'],
+        nodes: [
+          projectWorkspaceNodeMetadata({
+            id: 'node-1',
+            name: 'Corpus',
+            color: '#111111',
+          }),
+        ],
+        persistNodeColor,
+      }),
+    );
+
+    act(() => {
+      result.current.setNodeColor('node-1', '#ABCDEF');
+    });
+
+    expect(result.current.nodeColors['node-1']).toBe('#abcdef');
+    await waitFor(() => {
+      expect(result.current.nodeColors['node-1']).toBe('#111111');
+    });
   });
 });

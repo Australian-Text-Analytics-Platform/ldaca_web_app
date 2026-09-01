@@ -150,15 +150,18 @@ reconciles edits made elsewhere.
 Difference filtering never changes those aggregate resources, so reliability
 continues to describe the complete Data Block. Manual and Review header filter
 toggles control only the displayed rows and pagination. Preview, Manual, and
-Review all use the selected Data Block's previewed color as a light difference
+Review all use the selected Data Block's effective color as a light difference
 tint: the annotation or prediction cell is tinted when any revealed comparison
 differs, and a revealed comparison cell is tinted only when that value differs.
 Hidden cells render the uniform `•••` mask without exposing the underlying
 value, emptiness, or tint; the score, matrix, and filter remain available.
 Blank and non-Codebook labels normalize to null and are neither different nor
-included in reliability counts. The shared
-color control commits `Node.color` before
-Preview, Run All, or Manual Start; a failed commit aborts that action.
+included in reliability counts. The shared color control writes `Node.color`
+immediately as an independent Data Block metadata mutation. A failed explicit
+write rolls back that optimistic color without blocking a later Preview, Run
+All, or Manual Start. Selecting an uncolored Data Block still receives a
+temporary palette preview; only that automatic default is committed while
+preparing the first action that uses it.
 
 Frontend-owned Data Block reads use Workspace SQL through a narrow handwritten
 adapter around the generated mixed-response operation. The adapter asserts
