@@ -150,6 +150,12 @@ the webview loads that server for hot module replacement. During `tauri build`,
 Vite produces the static `frontendDist` before Tauri bundles it; an installed
 desktop application requires neither Node.js nor a Vite server.
 
+Desktop packaging treats `frontend/src-tauri/icons/wordflow.icon` as the native
+Icon Composer source. On current macOS toolchains Tauri compiles it into the
+application asset catalog so the system can render its Liquid Glass layers;
+the configured ICNS remains the compatibility fallback. Windows installers and
+browser surfaces use flattened renders of the same composition.
+
 Rust owns the complete desktop Downloads-folder boundary. GET resources accept
 only a relative backend `/api/` path; Data Block exports have a separate typed
 POST command rather than a generic native HTTP proxy. Both reject redirects and

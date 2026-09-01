@@ -1,5 +1,5 @@
 import React from 'react';
-import logo from '../../../logo.png';
+import wordflowIcon from '@/wordflow-icon.png';
 
 interface BlockingScreenProps {
   title: string;
@@ -32,7 +32,7 @@ function BlockingScreen({
       <div className="w-full max-w-xl space-y-4 rounded-lg border bg-surface px-10 py-12 text-center">
         {showLogo && (
           <div className="flex justify-center">
-            <img src={logo} alt="LDaCA Logo" className="h-16 w-auto object-contain" />
+            <img src={wordflowIcon} alt="LDaCA Wordflow icon" className="size-16 object-contain" />
           </div>
         )}
         <div className="space-y-2">

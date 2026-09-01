@@ -1,25 +1,34 @@
 # Tauri App Icons
 
-Pre-generated icon files for the Tauri desktop app.
+The Icon Composer document is the native source for the Wordflow app icon.
+Rendered files provide fallbacks for older macOS versions and the other
+desktop platforms.
 
 ## Contents
 
+- `wordflow.icon` (Icon Composer source and macOS Liquid Glass icon)
 - `32x32.png`
 - `128x128.png`
 - `128x128@2x.png` (256×256)
-- `icon.png` (1024×1024 master)
-- `icon.icns` (macOS)
+- `icon.png` (1024×1024 flattened master)
+- `icon.icns` (macOS fallback)
 - `icon.ico` (Windows)
 
 ## Regenerating Icons
 
-To regenerate from a source image, use the Tauri CLI:
+Export a 1024×1024 macOS image from `wordflow.icon`, save it as `icon.png`,
+then regenerate the platform fallbacks with the repository's Tauri CLI:
 
 ```bash
-cargo install tauri-cli
-cargo tauri icon path/to/source-image.png
+pnpm -C frontend exec tauri icon src-tauri/icons/icon.png --output src-tauri/icons
 ```
 
-## For Development
+The browser favicon and startup icon are rendered from the same flattened
+master. Keep them in sync when the native composition changes.
 
-The current PNG icons are sufficient for development and testing. Platform-specific icons (.icns, .ico) are only required for production builds on macOS and Windows respectively.
+## Packaging
+
+Tauri compiles `wordflow.icon` into the macOS asset catalog when the current
+Apple toolchain supports Icon Composer bundles. `icon.icns` remains configured
+as a compatibility fallback. Windows and development surfaces use the rendered
+PNG or ICO files.
