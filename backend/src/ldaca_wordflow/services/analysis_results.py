@@ -523,7 +523,7 @@ class AnalysisResultService:
             if isinstance(effective_query, TopicModelingResultQuery):
                 topic_stored = TopicModelingStoredResult.model_validate(stored)
                 context_path: Path | None = None
-                context_identity = topic_stored.clustering_context.artifact
+                context_identity = topic_stored.projection_context.artifact
                 if context_identity is not None:
                     reference = next(
                         (
@@ -694,11 +694,18 @@ def _projected_artifact_lazyframe(
     if row_unit == "documents":
         return frame
     if kind == "concordance_run_all":
-        return frame.explode("concordance").unnest("concordance")
+        return frame.explode("concordance", empty_as_null=True).unnest("concordance")
     if kind == "quotation_run_all":
-        return frame.explode("quotation").unnest("quotation").rename(
-            {column.removeprefix("QUOTE_"): column for column in QUOTE_COLUMN_NAMES},
-            strict=False,
+        return (
+            frame.explode("quotation", empty_as_null=True)
+            .unnest("quotation")
+            .rename(
+                {
+                    column.removeprefix("QUOTE_"): column
+                    for column in QUOTE_COLUMN_NAMES
+                },
+                strict=False,
+            )
         )
     raise AnalysisKindMismatchError("Analysis Result table is not projected")
 
@@ -948,14 +955,18 @@ def _query_topics(
         ) from exc
     applied_top_n = int(inclusion["top_n_topics"])
     effective = stored
-    if requested_count is not None or requested_top_n is not None:
+    needs_projection = (
+        applied_count != natural_count
+        or applied_top_n != stored.topic_inclusion.top_n_topics
+    )
+    if needs_projection:
         if context_path is None or not context_path.is_file():
-            raise ArtifactGoneError("Topic clustering context is unavailable")
+            raise ArtifactGoneError("Topic projection context is unavailable")
         try:
             metadata = context_path.stat()
         except OSError as exc:
             raise ArtifactGoneError(
-                "Topic clustering context is unavailable"
+                "Topic projection context is unavailable"
             ) from exc
         try:
             cache_key = TopicProjectionCacheKey(
@@ -974,10 +985,10 @@ def _query_topics(
                     context_bytes = context_path.read_bytes()
                 except OSError as exc:
                     raise ArtifactGoneError(
-                        "Topic clustering context is unavailable"
+                        "Topic projection context is unavailable"
                     ) from exc
                 basis = project_rust_topic_projection_basis(
-                    clustering_context=context_bytes,
+                    projection_context=context_bytes,
                     cluster_count=applied_count,
                     corpus_sizes=stored.corpus_sizes,
                 )
@@ -1016,10 +1027,10 @@ def _query_topics(
         except ArtifactGoneError:
             raise
         except Exception as exc:
-            raise AnalysisCorruptError("Topic clustering context is corrupt") from exc
+            raise AnalysisCorruptError("Topic projection context is corrupt") from exc
     payload = cast(
         dict[str, JsonData],
-        effective.model_dump(mode="json", exclude={"clustering_context"}),
+        effective.model_dump(mode="json", exclude={"projection_context"}),
     )
     rows = [
         cast(dict[str, JsonData], topic.model_dump(mode="json"))

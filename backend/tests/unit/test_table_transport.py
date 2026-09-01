@@ -10,10 +10,10 @@ import polars as pl
 import pytest
 
 from ldaca_wordflow.shared.table_transport import (
-    TOPIC_DISTRIBUTION_EXTENSION,
+    TOPIC_COVERAGE_EXTENSION,
     encode_schema_stream,
     materialize_page,
-    topic_distribution_dtype,
+    topic_coverage_dtype,
 )
 from ldaca_wordflow.shared.errors import InvalidInputError
 
@@ -61,12 +61,12 @@ def test_invalid_sort_column_is_rejected() -> None:
         )
 
 
-def test_topic_distribution_extension_has_stable_identity_and_storage() -> None:
-    dtype = topic_distribution_dtype(2)
+def test_topic_coverage_extension_has_stable_identity_and_storage() -> None:
+    dtype = topic_coverage_dtype(2)
 
-    assert dtype.ext_name() == TOPIC_DISTRIBUTION_EXTENSION
+    assert dtype.ext_name() == TOPIC_COVERAGE_EXTENSION
     assert dtype.ext_storage() == pl.Array(
-        pl.Struct({"topic_id": pl.Int64, "proportion": pl.Float64}), 3
+        pl.Struct({"topic_id": pl.Int64, "coverage": pl.Float64}), 3
     )
 
 

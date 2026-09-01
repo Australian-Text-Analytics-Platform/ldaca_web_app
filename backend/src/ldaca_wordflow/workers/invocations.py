@@ -58,7 +58,7 @@ class TopicDataBlockCreationInput:
     input_snapshot_dir: str
     output_dir: str
     request_payload: dict[str, Any]
-    clustering_context_path: str
+    projection_context_path: str
     source_projection: dict[uuid.UUID, dict[str, Any]]
     kind: Literal["topic_data_block_creation"] = field(
         default="topic_data_block_creation",

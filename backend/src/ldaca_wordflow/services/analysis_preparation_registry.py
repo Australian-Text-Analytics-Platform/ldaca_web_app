@@ -190,15 +190,15 @@ def _prepare_topic_data_block_creation(
         )
         for reference in parent.artifact_references
     }
-    clustering_context = stored.clustering_context.artifact
-    if clustering_context is None or clustering_context.name not in artifact_paths:
-        raise InvalidInputError("Topic clustering context is unavailable")
+    projection_context = stored.projection_context.artifact
+    if projection_context is None or projection_context.name not in artifact_paths:
+        raise InvalidInputError("Topic projection context is unavailable")
     source_projection: dict[uuid.UUID, dict[str, object]] = {}
     offset = 0
     for index, source in enumerate(stored.sources):
         size = stored.corpus_sizes[index]
         source_projection[source.node_id] = {
-            "row_indices": stored.clustering_context.source_row_indices[index],
+            "row_indices": stored.projection_context.source_row_indices[index],
             "offset": offset,
             "size": size,
         }
@@ -207,7 +207,7 @@ def _prepare_topic_data_block_creation(
         input_snapshot_dir=str(context.snapshot_dir),
         output_dir=str(context.artifact_dir),
         request_payload=request.model_dump(mode="json"),
-        clustering_context_path=artifact_paths[clustering_context.name],
+        projection_context_path=artifact_paths[projection_context.name],
         source_projection=source_projection,
     )
 

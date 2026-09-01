@@ -1,4 +1,4 @@
-"""Top-N real-Topic membership derived from complete Topic Distributions."""
+"""Top-N real-Topic membership derived from complete Topic Coverage."""
 
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ def topic_inclusion_descriptor(
 
 
 def topic_activation_thresholds(
-    distribution: Iterable[dict[str, Any]],
+    coverage_entries: Iterable[dict[str, Any]],
     topic_count: int,
 ) -> list[tuple[int, int]]:
     """Return ``(topic_id, minimum_n)`` for every positive real Topic.
@@ -40,35 +40,35 @@ def topic_activation_thresholds(
     member of a tied rank includes the complete tie group.
     """
 
-    proportions: dict[int, float] = {}
-    for entry in distribution:
+    coverage_by_topic: dict[int, float] = {}
+    for entry in coverage_entries:
         try:
             topic_id = int(entry["topic_id"])
-            proportion = float(entry["proportion"])
+            coverage = float(entry["coverage"])
         except (KeyError, TypeError, ValueError) as exc:
-            raise ValueError("Topic Distribution entry is malformed") from exc
+            raise ValueError("Topic Coverage entry is malformed") from exc
         if topic_id < -1 or topic_id >= topic_count:
-            raise ValueError("Topic Distribution contains an unknown topic id")
-        if topic_id in proportions:
-            raise ValueError("Topic Distribution contains a duplicate topic id")
-        if not math.isfinite(proportion) or proportion < 0:
-            raise ValueError("Topic Distribution proportion is invalid")
-        proportions[topic_id] = proportion
+            raise ValueError("Topic Coverage contains an unknown topic id")
+        if topic_id in coverage_by_topic:
+            raise ValueError("Topic Coverage contains a duplicate topic id")
+        if not math.isfinite(coverage) or coverage < 0:
+            raise ValueError("Topic Coverage value is invalid")
+        coverage_by_topic[topic_id] = coverage
 
     ranked = sorted(
         (
-            (topic_id, proportion)
-            for topic_id, proportion in proportions.items()
-            if topic_id >= 0 and proportion > 0
+            (topic_id, coverage)
+            for topic_id, coverage in coverage_by_topic.items()
+            if topic_id >= 0 and coverage > 0
         ),
         key=lambda item: (-item[1], item[0]),
     )
     thresholds: list[tuple[int, int]] = []
     index = 0
     while index < len(ranked):
-        proportion = ranked[index][1]
+        coverage = ranked[index][1]
         group_end = index + 1
-        while group_end < len(ranked) and ranked[group_end][1] == proportion:
+        while group_end < len(ranked) and ranked[group_end][1] == coverage:
             group_end += 1
         minimum_n = index + 1
         thresholds.extend(
@@ -79,7 +79,7 @@ def topic_activation_thresholds(
 
 
 def top_topic_ids(
-    distribution: Iterable[dict[str, Any]],
+    coverage_entries: Iterable[dict[str, Any]],
     topic_count: int,
     top_n_topics: int,
 ) -> set[int]:
@@ -89,7 +89,7 @@ def top_topic_ids(
     return {
         topic_id
         for topic_id, minimum_n in topic_activation_thresholds(
-            distribution,
+            coverage_entries,
             topic_count,
         )
         if minimum_n <= top_n_topics
@@ -125,7 +125,7 @@ def aggregate_topic_activations(
             raise ValueError("Topic projection document index is duplicated")
         seen_indices.add(document_index)
         for topic_id, minimum_n in topic_activation_thresholds(
-            document.get("topic_distribution") or [],
+            document.get("topic_coverage") or [],
             topic_count,
         ):
             counts[(corpus_indices[document_index], topic_id, minimum_n)] += 1

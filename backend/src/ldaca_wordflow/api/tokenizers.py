@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-from typing import cast
-
 from fastapi import APIRouter
 
-from polars_text.models import predefined_model_records
+from polars_text import TOKENIZER_MODELS
 
 from ..models.tokenizer import TokenizerModelResource
 from .responses import api_errors
@@ -29,11 +27,11 @@ async def list_tokenizer_models(
 ) -> list[TokenizerModelResource]:
     return [
         TokenizerModelResource(
-            id=cast(str, record["model"]),
-            label=cast(str, record["label"]),
-            languages=cast(list[str], record["languages"]),
+            id=model.model_id,
+            label=model.label,
+            languages=list(model.languages),
         )
-        for record in predefined_model_records()
+        for model in TOKENIZER_MODELS
     ]
 
 

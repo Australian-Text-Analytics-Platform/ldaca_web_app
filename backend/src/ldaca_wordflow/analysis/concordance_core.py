@@ -16,7 +16,7 @@ import logging
 import math
 import re
 from functools import partial
-from typing import Any
+from typing import Any, cast
 
 import polars as pl
 
@@ -94,10 +94,11 @@ def build_concordance_lazyframe(
 
 
     Why:
-    - Encapsulates `polars_text.concordance` expansion and filtering in one
+    - Encapsulates the ``polars_text`` expression namespace expansion and
+      filtering in one
       reusable transformation step.
     """
-    import polars_text as pt
+    import polars_text  # noqa: F401
 
     search_pattern, use_regex = build_concordance_search_pattern(
         request["search_word"],
@@ -105,14 +106,13 @@ def build_concordance_lazyframe(
         whole_word=bool(request.get("whole_word", False)),
     )
 
-    expr = pt.concordance(
-        pl.col(column),
+    expr = cast(Any, pl.col(column)).text.concordance(
         search_pattern,
-        num_left_tokens=request["num_left_tokens"],
-        num_right_tokens=request["num_right_tokens"],
+        left_tokens=request["num_left_tokens"],
+        right_tokens=request["num_right_tokens"],
         regex=use_regex,
         case_sensitive=request["case_sensitive"],
-        remove_punct=bool(request.get("ignore_punctuation", False)),
+        ignore_punctuation=bool(request.get("ignore_punctuation", False)),
     )
     return node_data.select([pl.all(), expr.alias("concordance")])
 
@@ -140,7 +140,6 @@ def _project_concordance_hit(
     raw_hit: dict[str, Any],
     *,
     document_text: str | None = None,
-    contexts_include_separators: bool = False,
 ) -> dict[str, Any]:
     """Project one raw concordance struct into canonical response columns.
 
@@ -165,7 +164,6 @@ def _project_concordance_hit(
             right_context=raw_hit.get("right_context"),
             start_idx=int(start_idx),
             end_idx=int(end_idx),
-            contexts_include_separators=contexts_include_separators,
         )
     return projected
 
@@ -203,7 +201,6 @@ def _serialize_grouped_concordance_rows(
     *,
     node_label: str | None = None,
     text_column: str | None = None,
-    contexts_include_separators: bool = False,
 ) -> tuple[list[list[dict[str, Any]]], list[str]]:
     """Serialize collected concordance rows into grouped per-document hit lists.
 
@@ -248,7 +245,6 @@ def _serialize_grouped_concordance_rows(
                 **_project_concordance_hit(
                     raw_hit,
                     document_text=document_text,
-                    contexts_include_separators=contexts_include_separators,
                 ),
             }
             if node_label:
@@ -306,9 +302,6 @@ def compute_concordance_page(
         result_df,
         node_label=node_label,
         text_column=column,
-        contexts_include_separators=bool(
-            request.get("ignore_punctuation", False)
-        ),
     )
 
     total_source_pages = (

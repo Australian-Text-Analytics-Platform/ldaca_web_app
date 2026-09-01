@@ -119,7 +119,7 @@ class TokenFrequencyAnalysisRequest(_StrictModel):
 
 class TopicSegmentationMethod(StrEnum):
     AUTOMATIC = "automatic"
-    PARAGRAPH = "paragraph"
+    LINE = "line"
     SENTENCE = "sentence"
 
 
@@ -131,7 +131,7 @@ class TopicModelingAnalysisRequest(_StrictModel):
     random_seed: int = 0
     sample_fractions: list[float | None] | None = None
     segmentation_method: TopicSegmentationMethod = TopicSegmentationMethod.AUTOMATIC
-    max_segment_tokens: int = Field(default=256, ge=32, le=510)
+    max_segment_tokens: int = Field(default=256, ge=32, le=256)
 
     @model_validator(mode="after")
     def validate_nodes_and_sampling(self) -> TopicModelingAnalysisRequest:

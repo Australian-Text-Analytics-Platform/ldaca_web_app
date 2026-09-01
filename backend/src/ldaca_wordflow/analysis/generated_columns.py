@@ -41,18 +41,14 @@ CONCORDANCE_DATA_BLOCK_CREATION_COLUMNS = CORE_CONCORDANCE_COLUMNS + (
 
 def concordance_extraction_expr(
     document_column: str,
-    *,
-    contexts_include_separators: bool = False,
 ) -> pl.Expr:
     """Polars expression that slices the raw KWIC window from ``document_column``.
 
     Goes from the start of ``CONC_left_context`` to the end of
     ``CONC_right_context`` so the extract preserves the original whitespace
     and punctuation between the context tokens and the matched span.
-    Legacy context strings are token-bounded with no surrounding whitespace,
-    so they require the historical single-character separator adjustment.
-    Offset-sliced contexts already include every separator adjacent to the
-    matched span and set ``contexts_include_separators=True``.
+    Offset-sliced contexts include every separator adjacent to the matched span,
+    so their lengths can be applied directly to the match offsets.
 
     Requires the input frame to carry ``CONC_left_context``,
     ``CONC_right_context``, ``CONC_start_idx``, ``CONC_end_idx``, and the
@@ -61,25 +57,11 @@ def concordance_extraction_expr(
     """
     left_len = pl.col(CONC_LEFT_CONTEXT_COLUMN).fill_null("").str.len_chars()
     right_len = pl.col(CONC_RIGHT_CONTEXT_COLUMN).fill_null("").str.len_chars()
-    if contexts_include_separators:
-        left_sep = pl.lit(0, dtype=pl.Int64)
-        right_sep = pl.lit(0, dtype=pl.Int64)
-    else:
-        left_sep = (
-            pl.when(left_len > 0)
-            .then(pl.lit(1, dtype=pl.Int64))
-            .otherwise(pl.lit(0, dtype=pl.Int64))
-        )
-        right_sep = (
-            pl.when(right_len > 0)
-            .then(pl.lit(1, dtype=pl.Int64))
-            .otherwise(pl.lit(0, dtype=pl.Int64))
-        )
     window_start = pl.max_horizontal(
         pl.lit(0, dtype=pl.Int64),
-        pl.col(CONC_START_IDX_COLUMN) - left_len - left_sep,
+        pl.col(CONC_START_IDX_COLUMN) - left_len,
     )
-    window_end = pl.col(CONC_END_IDX_COLUMN) + right_len + right_sep
+    window_end = pl.col(CONC_END_IDX_COLUMN) + right_len
     return (
         pl.col(document_column)
         .cast(pl.Utf8, strict=False)
@@ -95,7 +77,6 @@ def compute_concordance_extraction_string(
     right_context: str | None,
     start_idx: int,
     end_idx: int,
-    contexts_include_separators: bool = False,
 ) -> str:
     """Python equivalent of ``concordance_extraction_expr`` for one hit.
 
@@ -106,10 +87,8 @@ def compute_concordance_extraction_string(
     """
     left = left_context or ""
     right = right_context or ""
-    left_sep = 0 if contexts_include_separators else int(bool(left))
-    right_sep = 0 if contexts_include_separators else int(bool(right))
-    window_start = max(0, int(start_idx) - len(left) - left_sep)
-    window_end = int(end_idx) + len(right) + right_sep
+    window_start = max(0, int(start_idx) - len(left))
+    window_end = int(end_idx) + len(right)
     return (document_text or "")[window_start:window_end]
 
 
@@ -135,13 +114,13 @@ def concordance_struct_projection(struct_column: str) -> tuple[pl.Expr, ...]:
 TOPIC_COLUMN = "TOPIC_topic"
 TOPIC_MEANING_COLUMN = "TOPIC_topic_meaning"
 # Internal-only column on the per-node assignment parquet holding each row's
-# soft topic distribution (list of {topic_id, proportion}). Used by the
-# Data Block Creation distribution filter; never projected into an output Data Block.
-TOPIC_DISTRIBUTION_COLUMN = "TOPIC_topic_distribution"
+# Topic Coverage (list of {topic_id, coverage}). Used by the Data Block Creation
+# coverage filter; never projected into an output Data Block.
+TOPIC_COVERAGE_COLUMN = "TOPIC_topic_coverage"
 # User-facing output column names: the dominant ("top 1") topic id and
-# the full soft distribution (rendered as a Topic Distribution proportion bar).
+# full Topic Coverage (rendered as a source-coverage bar).
 TOPIC_TOP1_COLUMN = "TOPIC_top1"
-TOPIC_DISTRIBUTION_OUTPUT_COLUMN = "TOPIC_distribution"
+TOPIC_COVERAGE_OUTPUT_COLUMN = "TOPIC_coverage"
 
 QUOTE_EXTRACTION_COLUMN = "QUOTE_extraction"
 QUOTE_SPEAKER_COLUMN = "QUOTE_speaker"

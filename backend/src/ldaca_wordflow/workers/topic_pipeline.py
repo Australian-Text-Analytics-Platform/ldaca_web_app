@@ -14,8 +14,8 @@ Used by:
 
 from __future__ import annotations
 
-import json
 import logging
+import math
 import os
 from typing import Any, cast
 
@@ -177,12 +177,6 @@ def _resolve_vectorizer_model(docs: list[str], *, sample_limit: int = 200) -> st
     return _LINDERA_ZH_VECTORIZER
 
 
-def _automatic_segment_overlap(max_segment_tokens: int) -> int:
-    """Return the bounded overlap used only by automatic segmentation."""
-
-    return min(32, max_segment_tokens // 8)
-
-
 def _run_rust_topic_modeling(
     *,
     all_docs: list[str],
@@ -197,10 +191,9 @@ def _run_rust_topic_modeling(
     """Run the scalar Rust topic-modeling expression and validate its payload.
 
     Rust owns the shared segment → embed → cluster → c-TF-IDF → length-weighted
-    rollup pipeline. Its scalar result contains complete ``documents`` and
-    ``topics`` lists, so topic metadata does not depend on whether a topic is
-    dominant for any document. This boundary pads distributions for persisted
-    Topic Distribution values and rejects malformed native output.
+    coverage pipeline. Its scalar result contains complete ``documents`` and
+    ``topics`` lists. This boundary pads Topic Coverage for persistence and
+    rejects malformed native output.
 
     Called by:
     - ``_compute_topic_payload`` in ``topic_modeling`` for the initial run.
@@ -210,14 +203,13 @@ def _run_rust_topic_modeling(
     result_frame = pl.DataFrame({"__doc__": all_docs}).select(
         cast(Any, pl.col("__doc__"))
         .text.topic_modeling(
-            embedder_model=embedder_model,
-            cache=embedding_cache,
-            segmentation_method=segmentation_method,
+            embedding_model=embedder_model,
+            embedding_cache=embedding_cache,
+            segmentation=segmentation_method,
             max_tokens=max_segment_tokens,
-            overlap=_automatic_segment_overlap(max_segment_tokens),
             seed=int(seed),
-            min_cluster_size=int(min_cluster_size),
-            vectorizer_model=vectorizer_model,
+            min_topic_size=int(min_cluster_size),
+            tokenizer_model=vectorizer_model,
             lowercase=True,
         )
         .alias("__topic__")
@@ -227,9 +219,9 @@ def _run_rust_topic_modeling(
     raw_result = result_frame["__topic__"][0]
     if not isinstance(raw_result, dict):
         raise ValueError("Topic modeling native result is malformed")
-    clustering_context = raw_result.get("clustering_context")
-    if not isinstance(clustering_context, bytes):
-        raise ValueError("Topic modeling native clustering context is malformed")
+    projection_context = raw_result.get("projection_context")
+    if projection_context is not None and not isinstance(projection_context, bytes):
+        raise ValueError("Topic modeling native projection context is malformed")
 
     raw_topics = raw_result.get("topics")
     if not isinstance(raw_topics, list):
@@ -258,6 +250,8 @@ def _run_rust_topic_modeling(
     all_topic_ids = [cast(int, topic["id"]) for topic in topics]
     if all_topic_ids != list(range(len(topics))):
         raise ValueError("Topic modeling native topic ids must be contiguous")
+    if bool(topics) != isinstance(projection_context, bytes):
+        raise ValueError("Topic modeling native projection context does not match Topics")
 
     raw_documents = raw_result.get("documents")
     if not isinstance(raw_documents, list) or len(raw_documents) != len(all_docs):
@@ -270,31 +264,35 @@ def _run_rust_topic_modeling(
         try:
             doc_index = int(cast(Any, document_data["doc_index"]))
             dominant_topic = int(cast(Any, document_data["dominant_topic"]))
-            raw_distribution = document_data["topic_distribution"] or []
+            raw_coverage = document_data["topic_coverage"] or []
         except (KeyError, TypeError, ValueError) as exc:
             raise ValueError("Topic modeling native document is malformed") from exc
         if doc_index != index:
             raise ValueError("Topic modeling native document indices are invalid")
         if dominant_topic not in {-1, *all_topic_ids}:
             raise ValueError("Topic modeling native dominant topic is unknown")
-        if not isinstance(raw_distribution, list):
-            raise ValueError("Topic Distribution is malformed")
+        if not isinstance(raw_coverage, list):
+            raise ValueError("Topic Coverage is malformed")
         present: dict[int, float] = {}
-        for entry in raw_distribution:
+        for entry in raw_coverage:
             if not isinstance(entry, dict):
-                raise ValueError("Topic Distribution entry is malformed")
-            distribution_entry = cast(dict[str, object], entry)
+                raise ValueError("Topic Coverage entry is malformed")
+            coverage_entry = cast(dict[str, object], entry)
             try:
-                topic_id = int(cast(Any, distribution_entry["topic_id"]))
-                proportion = float(cast(Any, distribution_entry["proportion"]))
+                topic_id = int(cast(Any, coverage_entry["topic_id"]))
+                coverage = float(cast(Any, coverage_entry["coverage"]))
             except (KeyError, TypeError, ValueError) as exc:
-                raise ValueError("Topic Distribution entry is malformed") from exc
+                raise ValueError("Topic Coverage entry is malformed") from exc
             if topic_id in present:
-                raise ValueError("Topic Distribution contains a duplicate topic id")
-            present[topic_id] = proportion
+                raise ValueError("Topic Coverage contains a duplicate Topic id")
+            if not math.isfinite(coverage) or coverage < 0.0:
+                raise ValueError("Topic Coverage contains an invalid value")
+            present[topic_id] = coverage
         unknown = set(present).difference({-1, *all_topic_ids})
         if unknown:
-            raise ValueError("Topic Distribution contains an unknown topic id")
+            raise ValueError("Topic Coverage contains an unknown Topic id")
+        if present and not math.isclose(sum(present.values()), 1.0, abs_tol=1e-5):
+            raise ValueError("Topic Coverage must sum to one")
         padded: dict[int, float] = {-1: present.get(-1, 0.0)}
         for topic_id in all_topic_ids:
             padded[topic_id] = present.get(topic_id, 0.0)
@@ -302,54 +300,37 @@ def _run_rust_topic_modeling(
             {
                 "doc_index": index,
                 "dominant_topic": dominant_topic,
-                "topic_distribution": [
-                    {"topic_id": topic_id, "proportion": padded[topic_id]}
+                "topic_coverage": [
+                    {"topic_id": topic_id, "coverage": padded[topic_id]}
                     for topic_id in sorted(padded)
                 ],
             }
         )
 
     try:
-        n_chunks = int(raw_result["n_chunks"])
-        truncated_segment_count = int(raw_result["truncated_segment_count"])
+        n_segments = int(raw_result["n_segments"])
     except (KeyError, TypeError, ValueError) as exc:
         raise ValueError("Topic modeling native run metadata is malformed") from exc
-    raw_stage_timings = raw_result.get("stage_timings_ms") or []
-    stage_timings_ms = []
-    for timing in raw_stage_timings or []:
-        if not isinstance(timing, dict):
-            continue
-        stage = timing.get("stage")
-        elapsed_ms = timing.get("elapsed_ms")
-        if stage is None or elapsed_ms is None:
-            continue
-        stage_timings_ms.append({"stage": str(stage), "elapsed_ms": float(elapsed_ms)})
-
     return {
         "topics": topics,
         "documents": documents,
         "n_topics": len(topics),
-        "n_chunks": n_chunks,
-        "truncated_segment_count": truncated_segment_count,
-        "stage_timings_ms": stage_timings_ms,
-        "clustering_context": clustering_context,
+        "n_segments": n_segments,
+        "projection_context": projection_context,
     }
 
-def _project_rust_topic_modeling(
-    *, clustering_context: bytes, cluster_count: int, document_count: int
-) -> dict[str, Any]:
-    """Project complete row distributions for Data Block Creation."""
 
-    from polars_text import _internal
+def _project_rust_topic_modeling(
+    *, projection_context: bytes, cluster_count: int, document_count: int
+) -> dict[str, Any]:
+    """Project complete row coverage for Data Block Creation."""
+
+    from polars_text import project_topics
 
     try:
-        raw_result = json.loads(
-            _internal.project_topic_modeling_context(
-                clustering_context, int(cluster_count)
-            )
-        )
+        raw_result = project_topics(projection_context, int(cluster_count))
     except (TypeError, ValueError, RuntimeError) as exc:
-        raise ValueError("Topic clustering context is invalid") from exc
+        raise ValueError("Topic projection context is invalid") from exc
     if not isinstance(raw_result, dict):
         raise ValueError("Topic projection result is malformed")
     raw_documents = raw_result.get("documents")
@@ -366,29 +347,40 @@ def _project_rust_topic_modeling(
         document = cast(dict[str, Any], raw_document)
         if int(document.get("doc_index", -1)) != expected_index:
             raise ValueError("Topic projection document indices are invalid")
-        distribution: dict[int, float] = {}
-        for raw_entry in document.get("topic_distribution") or []:
+        coverage_by_topic: dict[int, float] = {}
+        for raw_entry in document.get("topic_coverage") or []:
             try:
-                topic_id, proportion = raw_entry
+                topic_id, coverage = raw_entry
                 normalized_topic_id = int(topic_id)
-                normalized_proportion = float(proportion)
+                normalized_coverage = float(coverage)
             except (TypeError, ValueError) as exc:
-                raise ValueError("Topic projection distribution is malformed") from exc
+                raise ValueError("Topic projection coverage is malformed") from exc
             if normalized_topic_id not in expected_topic_ids:
-                raise ValueError("Topic projection distribution contains an unknown Topic")
-            if normalized_topic_id in distribution:
-                raise ValueError("Topic projection distribution contains a duplicate Topic")
-            distribution[normalized_topic_id] = normalized_proportion
+                raise ValueError("Topic projection coverage contains an unknown Topic")
+            if normalized_topic_id in coverage_by_topic:
+                raise ValueError("Topic projection coverage contains a duplicate Topic")
+            if not math.isfinite(normalized_coverage) or normalized_coverage < 0.0:
+                raise ValueError("Topic projection coverage contains an invalid value")
+            coverage_by_topic[normalized_topic_id] = normalized_coverage
+        dominant_topic = int(document.get("dominant_topic", -1))
+        if dominant_topic not in expected_topic_ids:
+            raise ValueError("Topic projection dominant Topic is unknown")
+        if coverage_by_topic and not math.isclose(
+            sum(coverage_by_topic.values()), 1.0, abs_tol=1e-5
+        ):
+            raise ValueError("Topic projection coverage must sum to one")
+        if not coverage_by_topic and dominant_topic != -1:
+            raise ValueError("Topic projection empty coverage must be outlier-dominant")
         documents.append(
             {
                 "doc_index": expected_index,
-                "dominant_topic": int(document.get("dominant_topic", -1)),
-                "topic_distribution": [
+                "dominant_topic": dominant_topic,
+                "topic_coverage": [
                     {
                         "topic_id": topic_id,
-                        "proportion": distribution[topic_id],
+                        "coverage": coverage_by_topic[topic_id],
                     }
-                    for topic_id in sorted(distribution)
+                    for topic_id in sorted(coverage_by_topic)
                 ],
             }
         )
@@ -396,9 +388,5 @@ def _project_rust_topic_modeling(
         "topics": topics,
         "documents": documents,
         "n_topics": cluster_count,
-        "n_chunks": int(raw_result.get("n_chunks") or 0),
-        "truncated_segment_count": int(
-            raw_result.get("truncated_segment_count") or 0
-        ),
-        "stage_timings_ms": [],
+        "n_segments": int(raw_result.get("n_segments") or 0),
     }

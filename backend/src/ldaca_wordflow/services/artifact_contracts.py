@@ -54,12 +54,12 @@ def sequential_artifacts(result: BaseModel) -> list[ArtifactProjection]:
 
 def topic_modeling_artifacts(result: BaseModel) -> list[ArtifactProjection]:
     value = TopicModelingWorkerResult.model_validate(result)
-    if value.clustering_context.artifact is None:
+    if value.projection_context.artifact is None:
         return []
     return [
         (
-            ("clustering_context", "artifact"),
-            value.clustering_context.artifact,
+            ("projection_context", "artifact"),
+            value.projection_context.artifact,
         )
     ]
 

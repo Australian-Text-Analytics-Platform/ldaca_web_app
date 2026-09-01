@@ -202,7 +202,7 @@ def _build_concordance_occurrence_dataframe(
         return the frame and exact output-column order.
     """
     import polars as pl
-    import polars_text as pt
+    import polars_text  # noqa: F401
 
     corpus = [str(v) if v is not None else "" for v in node_corpus]
     non_empty_mask = [bool(v.strip()) for v in corpus]
@@ -254,18 +254,19 @@ def _build_concordance_occurrence_dataframe(
             [
                 pl.col(source_column_name).alias("__concordance_doc__"),
                 *base_columns,
-                pt.concordance(
-                    pl.col(source_column_name),
+                cast(Any, pl.col(source_column_name))
+                .text.concordance(
                     search_pattern,
-                    num_left_tokens=num_left_tokens,
-                    num_right_tokens=num_right_tokens,
+                    left_tokens=num_left_tokens,
+                    right_tokens=num_right_tokens,
                     regex=use_regex,
                     case_sensitive=case_sensitive,
-                    remove_punct=ignore_punctuation,
-                ).alias("concordance"),
+                    ignore_punctuation=ignore_punctuation,
+                )
+                .alias("concordance"),
             ]
         )
-        .explode("concordance")
+        .explode("concordance", empty_as_null=True)
         .select(
             [
                 pl.exclude("concordance"),
@@ -273,12 +274,7 @@ def _build_concordance_occurrence_dataframe(
             ]
         )
         .filter(pl.col(CONC_MATCHED_TEXT_COLUMN).is_not_null())
-        .with_columns(
-            concordance_extraction_expr(
-                "__concordance_doc__",
-                contexts_include_separators=ignore_punctuation,
-            )
-        )
+        .with_columns(concordance_extraction_expr("__concordance_doc__"))
         .drop("__concordance_doc__")
     )
     return result, output_columns + list(CORE_CONCORDANCE_COLUMNS) + [

@@ -83,7 +83,7 @@ def analysis_process(
             input_snapshot_dir=invocation.input_snapshot_dir,
             output_dir=invocation.output_dir,
             request_payload=invocation.request_payload,
-            clustering_context_path=invocation.clustering_context_path,
+            projection_context_path=invocation.projection_context_path,
             source_projection=invocation.source_projection,
             progress_callback=progress,
         )

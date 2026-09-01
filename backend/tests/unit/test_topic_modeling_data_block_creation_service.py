@@ -32,7 +32,7 @@ from ldaca_wordflow.services.analysis_artifacts import (
     _publish_topic_modeling_data_blocks,
 )
 from ldaca_wordflow.services.workspace_sql import _query_page
-from ldaca_wordflow.shared.topic_types import topic_distribution_dtype
+from ldaca_wordflow.shared.topic_types import topic_coverage_dtype
 
 
 def _data_block_creation_fixture(
@@ -101,15 +101,15 @@ def _data_block_creation_fixture(
         {
             "text": ["first"],
             "TOPIC_top1": [0],
-            "TOPIC_distribution": pl.Series(
-                "TOPIC_distribution",
+            "TOPIC_coverage": pl.Series(
+                "TOPIC_coverage",
                 [
                     [
-                        {"topic_id": -1, "proportion": 0.0},
-                        {"topic_id": 0, "proportion": 1.0},
+                        {"topic_id": -1, "coverage": 0.0},
+                        {"topic_id": 0, "coverage": 1.0},
                     ]
                 ],
-                dtype=topic_distribution_dtype(1),
+                dtype=topic_coverage_dtype(1),
             ),
         }
     ).write_parquet(topic_path)
@@ -155,7 +155,7 @@ def _data_block_creation_fixture(
                     "output_columns": [
                         "text",
                         "TOPIC_top1",
-                        "TOPIC_distribution",
+                        "TOPIC_coverage",
                     ],
                     "record_count": 1,
                 },
@@ -213,10 +213,10 @@ def test_topic_modeling_data_block_creation_preserves_semantic_pair_and_parent_o
         page_size=20,
     )
     ipc_dtype = pl.read_ipc_stream(BytesIO(page.content)).schema[
-        "TOPIC_distribution"
+        "TOPIC_coverage"
     ]
     assert isinstance(ipc_dtype, pl.Extension)
-    assert ipc_dtype.ext_name() == "org.ldaca.wordflow.topic_distribution.v1"
+    assert ipc_dtype.ext_name() == "org.ldaca.wordflow.topic_coverage.v1"
 
 
 def test_topic_modeling_data_block_creation_rolls_back_every_output_on_failure(

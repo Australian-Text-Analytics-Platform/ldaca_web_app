@@ -8,7 +8,7 @@ from io import BytesIO
 import polars as pl
 
 from .errors import InvalidInputError
-from .topic_types import TOPIC_DISTRIBUTION_EXTENSION, topic_distribution_dtype
+from .topic_types import TOPIC_COVERAGE_EXTENSION, topic_coverage_dtype
 
 ARROW_STREAM_MEDIA_TYPE = "application/vnd.apache.arrow.stream"
 HAS_NEXT_HEADER = "X-Wordflow-Has-Next"
@@ -73,10 +73,10 @@ __all__ = [
     "HAS_NEXT_HEADER",
     "TOTAL_ROWS_HEADER",
     "IpcTablePage",
-    "TOPIC_DISTRIBUTION_EXTENSION",
+    "TOPIC_COVERAGE_EXTENSION",
     "encode_ipc_stream",
     "encode_schema_stream",
     "materialize_page",
-    "topic_distribution_dtype",
+    "topic_coverage_dtype",
     "write_ipc_stream",
 ]

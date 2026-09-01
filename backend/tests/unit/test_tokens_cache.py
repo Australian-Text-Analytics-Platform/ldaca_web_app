@@ -22,12 +22,12 @@ def isolated_cache_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return db_path
 
 
-def test_cache_schema_has_six_columns(isolated_cache_db: Path) -> None:
+def test_cache_schema_has_seven_columns(isolated_cache_db: Path) -> None:
     base = pl.DataFrame({"text": ["hello world"]}).lazy()
     expr = cast(Any, pl.col("text")).text.tokenize(
         model="huggingface:bert-base-uncased",
         lowercase=True,
-        remove_punct=True,
+        remove_punctuation=True,
         cache=tc.tokens_cache_path(TEST_USER),
     )
     base.with_columns(expr.alias("tokens")).collect()
@@ -39,6 +39,7 @@ def test_cache_schema_has_six_columns(isolated_cache_db: Path) -> None:
 
     assert [row[0] for row in rows] == [
         "model",
+        "fingerprint",
         "params_hash",
         "content_hash",
         "tokens",

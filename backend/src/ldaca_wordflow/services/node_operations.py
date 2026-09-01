@@ -39,7 +39,7 @@ from ..domain.workspace.provenance import (
     node_reference,
 )
 
-from ..shared.topic_types import is_topic_distribution_storage_dtype
+from ..shared.topic_types import is_topic_coverage_storage_dtype
 from ..shared.errors import InvalidInputError, NodeNotFoundError
 from ..shared.json_data import JsonData
 from .node_casting import cast_lazyframe_column
@@ -501,8 +501,8 @@ def _condition_expression(
     value = condition.value
     operator = condition.operator
 
-    if is_topic_distribution_storage_dtype(dtype):
-        expression = _topic_distribution_expression(condition)
+    if is_topic_coverage_storage_dtype(dtype):
+        expression = _topic_coverage_expression(condition)
     elif operator in {"eq", "ne", "gt", "gte", "lt", "lte"}:
         scalar = _coerce_scalar(_parse_temporal(value))
         literal = cast(
@@ -588,39 +588,39 @@ def _condition_expression(
     return ~expression if condition.negate else expression
 
 
-def _topic_distribution_expression(condition: FilterCondition) -> pl.Expr:
+def _topic_coverage_expression(condition: FilterCondition) -> pl.Expr:
     if not isinstance(condition.value, dict):
         raise InvalidInputError(
-            "Topic-distribution filters require topic_id and threshold"
+            "Topic Coverage filters require topic_id and threshold"
         )
     try:
         topic_id = int(cast(Any, condition.value.get("topic_id")))
         threshold = float(cast(Any, condition.value.get("threshold")))
     except (TypeError, ValueError) as exc:
         raise InvalidInputError(
-            "Topic-distribution filters require numeric topic_id and threshold"
+            "Topic Coverage filters require numeric topic_id and threshold"
         ) from exc
-    proportion = (
+    coverage = (
         pl.col(condition.column)
         .arr.eval(
             pl.when(pl.element().struct.field("topic_id") == topic_id)
-            .then(pl.element().struct.field("proportion"))
+            .then(pl.element().struct.field("coverage"))
             .otherwise(0.0)
         )
         .arr.max()
         .fill_null(0.0)
     )
     operators = {
-        "eq": proportion == threshold,
-        "ne": proportion != threshold,
-        "gt": proportion > threshold,
-        "gte": proportion >= threshold,
-        "lt": proportion < threshold,
-        "lte": proportion <= threshold,
+        "eq": coverage == threshold,
+        "ne": coverage != threshold,
+        "gt": coverage > threshold,
+        "gte": coverage >= threshold,
+        "lt": coverage < threshold,
+        "lte": coverage <= threshold,
     }
     expression = operators.get(condition.operator)
     if expression is None:
-        raise InvalidInputError("Unsupported topic-distribution filter operator")
+        raise InvalidInputError("Unsupported Topic Coverage filter operator")
     return expression
 
 

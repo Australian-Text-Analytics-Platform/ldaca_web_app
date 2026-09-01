@@ -1,15 +1,14 @@
 """Deterministic unit tests for the Rust-backed topic-modeling worker.
 
-The heavy lifting (chunking, ORT embeddings, PaCMAP, HDBSCAN, c-TF-IDF) lives
-in the ``polars-text`` Rust extension and is exercised by the hand-run
-experiment harness, not here -- its output is non-deterministic. These tests
-cover only the deterministic Python glue:
+The heavy lifting (segmentation, ORT embeddings, PaCMAP, HDBSCAN, c-TF-IDF) lives
+in the ``polars-text`` Rust extension and is exercised by that package's native
+tests. These tests cover only the deterministic Python glue:
 
 - corpus sampling and the c-TF-IDF vectorizer/stopword heuristics
   (``workers.topic_pipeline``),
 - the reconstruction of the result dict from the ``.text.topic_modeling``
   expression (``_run_rust_topic_modeling``), with the expression itself faked,
-- the payload/parquet assembly and diagnostics in the orchestrator
+- the payload/parquet assembly in the orchestrator
   (``_compute_topic_modeling``) and the exact-count re-aggregation path, with
   ``_run_rust_topic_modeling`` faked to a canned result.
 """
@@ -20,18 +19,11 @@ import uuid
 from typing import Any
 
 import polars as pl
+import polars_text
 import pytest
 from ldaca_wordflow.analysis.topic_projection import TopicNodeInfo
 from ldaca_wordflow.workers import topic_modeling, topic_pipeline, topic_result
-from ldaca_wordflow.workers.topic_pipeline import (
-    _automatic_segment_overlap,
-    _sample_corpus,
-)
-
-_STAGE_TIMINGS = [
-    {"stage": "embedding", "elapsed_ms": 12.5},
-    {"stage": "total", "elapsed_ms": 15.0},
-]
+from ldaca_wordflow.workers.topic_pipeline import _sample_corpus
 
 
 def _terms(*words: str) -> list[dict[str, Any]]:
@@ -41,33 +33,57 @@ def _terms(*words: str) -> list[dict[str, Any]]:
 @pytest.mark.parametrize(
     "entries",
     [
-        [{"topic_id": 0, "proportion": 0.5}, {"topic_id": 0, "proportion": 0.5}],
-        [{"topic_id": 9, "proportion": 1.0}],
-        [{"topic_id": "bad", "proportion": 1.0}],
+        [{"topic_id": 0, "coverage": 0.5}, {"topic_id": 0, "coverage": 0.5}],
+        [{"topic_id": 9, "coverage": 1.0}],
+        [{"topic_id": "bad", "coverage": 1.0}],
     ],
 )
-def test_topic_distribution_rejects_noncanonical_entries(entries) -> None:
-    with pytest.raises(ValueError, match="Topic Distribution"):
-        topic_result._distribution_by_doc_index(
-            [{"doc_index": 0, "topic_distribution": entries}],
+def test_topic_coverage_rejects_noncanonical_entries(entries) -> None:
+    with pytest.raises(ValueError, match="Topic Coverage"):
+        topic_result._coverage_by_doc_index(
+            [{"doc_index": 0, "topic_coverage": entries}],
             1,
             [0],
+        )
+
+
+def test_projected_topic_coverage_rejects_non_unit_total(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        polars_text,
+        "project_topics",
+        lambda _context, _count: {
+            "topics": [
+                {
+                    "id": 0,
+                    "representative_words": [],
+                    "x": 0.0,
+                    "y": 0.0,
+                }
+            ],
+            "documents": [
+                {
+                    "doc_index": 0,
+                    "dominant_topic": 0,
+                    "topic_coverage": [(0, 0.5)],
+                }
+            ],
+            "n_segments": 1,
+        },
+    )
+
+    with pytest.raises(ValueError, match="sum to one"):
+        topic_pipeline._project_rust_topic_modeling(
+            projection_context=b"context",
+            cluster_count=1,
+            document_count=1,
         )
 
 
 # ---------------------------------------------------------------------------
 # Sampling helpers (pure, deterministic)
 # ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize(
-    ("max_segment_tokens", "expected_overlap"),
-    [(32, 4), (64, 8), (128, 16), (256, 32), (510, 32)],
-)
-def test_automatic_segment_overlap_is_scaled_and_bounded(
-    max_segment_tokens: int, expected_overlap: int
-) -> None:
-    assert _automatic_segment_overlap(max_segment_tokens) == expected_overlap
 
 
 def test_sample_corpus_reduces_length_and_is_reproducible():
@@ -117,10 +133,8 @@ def _fake_topic_modeling_expr_factory(
     *,
     documents: list[dict[str, Any]],
     topics: list[dict[str, Any]],
-    n_chunks: int,
-    truncated_segment_count: int = 0,
-    distribution: list[list[dict[str, Any]]] | None = None,
-    stage_timings: list[dict[str, Any]] | None = None,
+    n_segments: int,
+    coverage: list[list[dict[str, Any]]] | None = None,
     seen_kwargs: dict[str, Any] | None = None,
 ):
     """Build a fake ``.text.topic_modeling`` method returning a canned struct.
@@ -133,15 +147,15 @@ def _fake_topic_modeling_expr_factory(
     documents = [
         {
             **document,
-            "topic_distribution": (
-                distribution[index]
-                if distribution is not None
+            "topic_coverage": (
+                coverage[index]
+                if coverage is not None
                 else document.get(
-                    "topic_distribution",
+                    "topic_coverage",
                     [
                         {
                             "topic_id": int(document["dominant_topic"]),
-                            "proportion": 1.0,
+                            "coverage": 1.0,
                         }
                     ]
                     if int(document["dominant_topic"]) >= 0
@@ -151,8 +165,6 @@ def _fake_topic_modeling_expr_factory(
         }
         for index, document in enumerate(documents)
     ]
-    timings = stage_timings if stage_timings is not None else _STAGE_TIMINGS
-
     def _fake(self, **kwargs):  # noqa: ANN001 - mirrors namespace method shape
         if seen_kwargs is not None:
             seen_kwargs.update(kwargs)
@@ -165,9 +177,9 @@ def _fake_topic_modeling_expr_factory(
                         {
                             "doc_index": pl.UInt32,
                             "dominant_topic": pl.Int32,
-                            "topic_distribution": pl.List(
+                            "topic_coverage": pl.List(
                                 pl.Struct(
-                                    {"topic_id": pl.Int32, "proportion": pl.Float32}
+                                    {"topic_id": pl.Int32, "coverage": pl.Float32}
                                 )
                             ),
                         }
@@ -192,18 +204,8 @@ def _fake_topic_modeling_expr_factory(
                     )
                 ),
             ),
-            pl.lit(n_chunks, dtype=pl.UInt32).alias("n_chunks"),
-            pl.lit(truncated_segment_count, dtype=pl.UInt32).alias(
-                "truncated_segment_count"
-            ),
-            pl.lit(b"context", dtype=pl.Binary).alias("clustering_context"),
-            pl.Series(
-                "stage_timings_ms",
-                [timings],
-                dtype=pl.List(
-                    pl.Struct({"stage": pl.String, "elapsed_ms": pl.Float64})
-                ),
-            ),
+            pl.lit(n_segments, dtype=pl.UInt32).alias("n_segments"),
+            pl.lit(b"context", dtype=pl.Binary).alias("projection_context"),
         )
 
     return _fake
@@ -236,16 +238,16 @@ def test_run_rust_topic_modeling_reconstructs_result_dict(monkeypatch):
                     "y": 4.0,
                 },
             ],
-            n_chunks=5,
-            distribution=[
+            n_segments=5,
+            coverage=[
                 [
-                    {"topic_id": 0, "proportion": 0.9},
-                    {"topic_id": 1, "proportion": 0.1},
+                    {"topic_id": 0, "coverage": 0.9},
+                    {"topic_id": 1, "coverage": 0.1},
                 ],
-                [{"topic_id": 0, "proportion": 1.0}],
+                [{"topic_id": 0, "coverage": 1.0}],
                 [
-                    {"topic_id": 0, "proportion": 0.2},
-                    {"topic_id": 1, "proportion": 0.8},
+                    {"topic_id": 0, "coverage": 0.2},
+                    {"topic_id": 1, "coverage": 0.8},
                 ],
                 [],
             ],
@@ -260,47 +262,47 @@ def test_run_rust_topic_modeling_reconstructs_result_dict(monkeypatch):
         embedder_model="fake-model",
     )
 
-    # Documents carry both the dominant topic and the soft Topic Distribution.
-    # The distribution always starts with outlier -1 and then every real topic id.
+    # Documents carry both the dominant Topic and source-character coverage.
+    # Coverage always starts with outlier -1 and then every real Topic id.
     # appears in every document, with 0.0 where the doc has no presence; this
-    # powers the Topic Distribution filter and the data-view bars. The outlier
+    # powers the Topic Coverage filter and data-view bars. The outlier
     # document (-1) has no non-negative dominant topics of its own but still
     # gets the full padded key set.
     assert result["documents"] == [
         {
             "doc_index": 0,
             "dominant_topic": 0,
-            "topic_distribution": [
-                {"topic_id": -1, "proportion": pytest.approx(0.0)},
-                {"topic_id": 0, "proportion": pytest.approx(0.9)},
-                {"topic_id": 1, "proportion": pytest.approx(0.1)},
+            "topic_coverage": [
+                {"topic_id": -1, "coverage": pytest.approx(0.0)},
+                {"topic_id": 0, "coverage": pytest.approx(0.9)},
+                {"topic_id": 1, "coverage": pytest.approx(0.1)},
             ],
         },
         {
             "doc_index": 1,
             "dominant_topic": 0,
-            "topic_distribution": [
-                {"topic_id": -1, "proportion": pytest.approx(0.0)},
-                {"topic_id": 0, "proportion": pytest.approx(1.0)},
-                {"topic_id": 1, "proportion": pytest.approx(0.0)},
+            "topic_coverage": [
+                {"topic_id": -1, "coverage": pytest.approx(0.0)},
+                {"topic_id": 0, "coverage": pytest.approx(1.0)},
+                {"topic_id": 1, "coverage": pytest.approx(0.0)},
             ],
         },
         {
             "doc_index": 2,
             "dominant_topic": 0,
-            "topic_distribution": [
-                {"topic_id": -1, "proportion": pytest.approx(0.0)},
-                {"topic_id": 0, "proportion": pytest.approx(0.2)},
-                {"topic_id": 1, "proportion": pytest.approx(0.8)},
+            "topic_coverage": [
+                {"topic_id": -1, "coverage": pytest.approx(0.0)},
+                {"topic_id": 0, "coverage": pytest.approx(0.2)},
+                {"topic_id": 1, "coverage": pytest.approx(0.8)},
             ],
         },
         {
             "doc_index": 3,
             "dominant_topic": -1,
-            "topic_distribution": [
-                {"topic_id": -1, "proportion": pytest.approx(0.0)},
-                {"topic_id": 0, "proportion": pytest.approx(0.0)},
-                {"topic_id": 1, "proportion": pytest.approx(0.0)},
+            "topic_coverage": [
+                {"topic_id": -1, "coverage": pytest.approx(0.0)},
+                {"topic_id": 0, "coverage": pytest.approx(0.0)},
+                {"topic_id": 1, "coverage": pytest.approx(0.0)},
             ],
         },
     ]
@@ -310,11 +312,10 @@ def test_run_rust_topic_modeling_reconstructs_result_dict(monkeypatch):
         {"id": 1, "representative_words": _terms("gamma"), "x": 2.0, "y": 4.0},
     ]
     assert result["n_topics"] == 2
-    assert result["n_chunks"] == 5
-    assert result["stage_timings_ms"] == _STAGE_TIMINGS
+    assert result["n_segments"] == 5
 
 
-@pytest.mark.parametrize("segmentation_method", ["automatic", "paragraph", "sentence"])
+@pytest.mark.parametrize("segmentation_method", ["automatic", "line", "sentence"])
 def test_run_rust_topic_modeling_forwards_each_segmentation_mode_to_shared_pipeline(
     monkeypatch, segmentation_method: str
 ) -> None:
@@ -334,8 +335,7 @@ def test_run_rust_topic_modeling_forwards_each_segmentation_mode_to_shared_pipel
                     "y": 0.0,
                 }
             ],
-            n_chunks=3,
-            truncated_segment_count=2,
+            n_segments=3,
             seen_kwargs=seen_kwargs,
         ),
     )
@@ -349,12 +349,12 @@ def test_run_rust_topic_modeling_forwards_each_segmentation_mode_to_shared_pipel
         max_segment_tokens=64,
     )
 
-    assert (
-        seen_kwargs["segmentation_method"],
-        seen_kwargs["max_tokens"],
-        seen_kwargs["overlap"],
-        result["truncated_segment_count"],
-    ) == (segmentation_method, 64, 8, 2)
+    assert (seen_kwargs["segmentation"], seen_kwargs["max_tokens"]) == (
+        segmentation_method,
+        64,
+    )
+    assert "overlap" not in seen_kwargs
+    assert result["n_segments"] == 3
 
 
 @pytest.mark.parametrize(
@@ -365,7 +365,7 @@ def test_run_rust_topic_modeling_forwards_each_segmentation_mode_to_shared_pipel
                 {
                     "doc_index": 0,
                     "dominant_topic": 1,
-                    "topic_distribution": [{"topic_id": 1, "proportion": 1.0}],
+                    "topic_coverage": [{"topic_id": 1, "coverage": 1.0}],
                 }
             ],
             [
@@ -383,7 +383,7 @@ def test_run_rust_topic_modeling_forwards_each_segmentation_mode_to_shared_pipel
                 {
                     "doc_index": 3,
                     "dominant_topic": 0,
-                    "topic_distribution": [{"topic_id": 0, "proportion": 1.0}],
+                    "topic_coverage": [{"topic_id": 0, "coverage": 1.0}],
                 }
             ],
             [
@@ -401,9 +401,9 @@ def test_run_rust_topic_modeling_forwards_each_segmentation_mode_to_shared_pipel
                 {
                     "doc_index": 0,
                     "dominant_topic": 0,
-                    "topic_distribution": [
-                        {"topic_id": 0, "proportion": 0.5},
-                        {"topic_id": 0, "proportion": 0.5},
+                    "topic_coverage": [
+                        {"topic_id": 0, "coverage": 0.5},
+                        {"topic_id": 0, "coverage": 0.5},
                     ],
                 }
             ],
@@ -415,7 +415,7 @@ def test_run_rust_topic_modeling_forwards_each_segmentation_mode_to_shared_pipel
                     "y": 0.0,
                 }
             ],
-            "duplicate topic id",
+            "duplicate Topic id",
         ),
     ],
 )
@@ -433,7 +433,7 @@ def test_run_rust_topic_modeling_rejects_invalid_native_identity_contracts(
         _fake_topic_modeling_expr_factory(
             documents=documents,
             topics=topics,
-            n_chunks=1,
+            n_segments=1,
         ),
     )
 
@@ -455,18 +455,14 @@ def _canned_rust_result(
     *,
     documents: list[dict[str, Any]],
     topics: list[dict[str, Any]],
-    n_chunks: int = 7,
-    truncated_segment_count: int = 0,
-    stage_timings_ms: list[dict[str, Any]] | None = None,
+    n_segments: int = 7,
 ) -> dict[str, Any]:
     return {
         "documents": documents,
         "topics": topics,
         "n_topics": len(topics),
-        "n_chunks": n_chunks,
-        "truncated_segment_count": truncated_segment_count,
-        "stage_timings_ms": stage_timings_ms or _STAGE_TIMINGS,
-        "clustering_context": b"context",
+        "n_segments": n_segments,
+        "projection_context": b"context" if topics else None,
     }
 
 
@@ -479,7 +475,7 @@ def _node_info(node_id: str = "node-1") -> TopicNodeInfo:
     )
 
 
-def test__compute_topic_modeling_writes_only_clustering_context(
+def test__compute_topic_modeling_writes_only_projection_context(
     tmp_path, monkeypatch
 ):
     messages: list[str] = []
@@ -499,14 +495,14 @@ def test__compute_topic_modeling_writes_only_clustering_context(
                 {
                     "doc_index": 0,
                     "dominant_topic": 0,
-                    "topic_distribution": [{"topic_id": 0, "proportion": 1.0}],
+                    "topic_coverage": [{"topic_id": 0, "coverage": 1.0}],
                 },
                 {
                     "doc_index": 1,
                     "dominant_topic": 0,
-                    "topic_distribution": [
-                        {"topic_id": 0, "proportion": 0.7},
-                        {"topic_id": 1, "proportion": 0.3},
+                    "topic_coverage": [
+                        {"topic_id": 0, "coverage": 0.7},
+                        {"topic_id": 1, "coverage": 0.3},
                     ],
                 },
             ],
@@ -524,7 +520,6 @@ def test__compute_topic_modeling_writes_only_clustering_context(
                     "y": 3.0,
                 },
             ],
-            truncated_segment_count=2,
         )
 
     monkeypatch.setattr(topic_modeling, "_run_rust_topic_modeling", fake_run)
@@ -535,13 +530,13 @@ def test__compute_topic_modeling_writes_only_clustering_context(
         node_infos=[_node_info()],
         artifact_dir=str(tmp_path),
         artifact_prefix="tm_test",
-        segmentation_method="paragraph",
+        segmentation_method="line",
         max_segment_tokens=64,
         embedding_cache_path=str(embedding_cache_path),
         progress_callback=lambda p, m: progress.append((p, m)),
     )
 
-    context_path = tmp_path / "tm_test_topic_clustering_context.msgpack.zst"
+    context_path = tmp_path / "tm_test_topic_projection_context.msgpack.zst"
     assert context_path.read_bytes() == b"context"
     assert not list(tmp_path.glob("*assignments*.parquet"))
     assert not list(tmp_path.glob("*meanings*.parquet"))
@@ -554,12 +549,10 @@ def test__compute_topic_modeling_writes_only_clustering_context(
     assert topic["size"] == [2]
 
     assert seen_run_kwargs["embedding_cache"] == str(embedding_cache_path)
-    assert seen_run_kwargs["segmentation_method"] == "paragraph"
+    assert seen_run_kwargs["segmentation_method"] == "line"
     assert seen_run_kwargs["max_segment_tokens"] == 64
     assert result["segment_count"] == 7
-    assert result["truncated_segment_count"] == 2
     assert any("engine=rust backend=ort" in message for message in messages)
-    assert any("stage_timings=" in message for message in messages)
     assert progress[0][1].startswith("Loading topic modelling")
     assert progress[-1] == (0.9, "Writing topic-modelling results...")
     assert all(0.0 <= fraction < 1.0 for fraction, _message in progress)

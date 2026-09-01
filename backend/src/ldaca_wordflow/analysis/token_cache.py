@@ -58,7 +58,7 @@ def tokenize_lazyframe(
         cast(Any, pl.col(source_column))
         .text.tokenize(
             lowercase=normalized_model not in _CASE_FREE_MODELS,
-            remove_punct=True,
+            remove_punctuation=True,
             model=normalized_model,
             cache=cache,
         )

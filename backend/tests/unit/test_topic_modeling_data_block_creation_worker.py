@@ -8,7 +8,7 @@ import pytest
 
 from ldaca_wordflow.analysis.generated_columns import (
     TOPIC_COLUMN,
-    TOPIC_DISTRIBUTION_OUTPUT_COLUMN,
+    TOPIC_COVERAGE_OUTPUT_COLUMN,
     TOPIC_MEANING_COLUMN,
     TOPIC_TOP1_COLUMN,
 )
@@ -50,28 +50,28 @@ def test_topic_modeling_data_block_creation_publishes_ordered_data_and_meanings(
         snapshot_dir=snapshot_dir,
         max_snapshot_bytes=10_000_000,
     )
-    distribution = [
+    coverage = [
         [
-            {"topic_id": -1, "proportion": 0.0},
-            {"topic_id": 0, "proportion": 0.0},
-            {"topic_id": 1, "proportion": 1.0},
+            {"topic_id": -1, "coverage": 0.0},
+            {"topic_id": 0, "coverage": 0.0},
+            {"topic_id": 1, "coverage": 1.0},
         ],
         [
-            {"topic_id": -1, "proportion": 0.0},
-            {"topic_id": 0, "proportion": 0.6},
-            {"topic_id": 1, "proportion": 0.4},
+            {"topic_id": -1, "coverage": 0.0},
+            {"topic_id": 0, "coverage": 0.6},
+            {"topic_id": 1, "coverage": 0.4},
         ],
         [
-            {"topic_id": -1, "proportion": 0.0},
-            {"topic_id": 0, "proportion": 0.0},
-            {"topic_id": 1, "proportion": 1.0},
+            {"topic_id": -1, "coverage": 0.0},
+            {"topic_id": 0, "coverage": 0.0},
+            {"topic_id": 1, "coverage": 1.0},
         ],
     ]
     projected_documents = [
         {
             "doc_index": index,
             "dominant_topic": [1, 0, 1][index % 3],
-            "topic_distribution": distribution[index % 3],
+            "topic_coverage": coverage[index % 3],
         }
         for index in range(6)
     ]
@@ -108,7 +108,7 @@ def test_topic_modeling_data_block_creation_publishes_ordered_data_and_meanings(
             "top_n_topics": 2,
             "topic_meanings_override": [{"topic_id": 1, "words": ["new"]}],
         },
-        clustering_context_path=str(context_path),
+        projection_context_path=str(context_path),
         source_projection={
             first_id: {"row_indices": [0, 1, 2], "offset": 0, "size": 3},
             second_id: {"row_indices": [0, 1, 2], "offset": 3, "size": 3},
@@ -127,17 +127,17 @@ def test_topic_modeling_data_block_creation_publishes_ordered_data_and_meanings(
     assert data.columns == [
         "text",
         TOPIC_TOP1_COLUMN,
-        TOPIC_DISTRIBUTION_OUTPUT_COLUMN,
+        TOPIC_COVERAGE_OUTPUT_COLUMN,
     ]
     assert data["text"].to_list() == ["zero", "one", "two"]
     assert data[TOPIC_TOP1_COLUMN].to_list() == [1, 0, 1]
-    output_dtype = data.schema[TOPIC_DISTRIBUTION_OUTPUT_COLUMN]
+    output_dtype = data.schema[TOPIC_COVERAGE_OUTPUT_COLUMN]
     assert isinstance(output_dtype, pl.Extension)
-    assert output_dtype.ext_name() == "org.ldaca.wordflow.topic_distribution.v1"
+    assert output_dtype.ext_name() == "org.ldaca.wordflow.topic_coverage.v1"
     second_data = pl.read_parquet(result["outputs"][1]["topic_data"]["parquet_path"])
     assert second_data.columns == [
         TOPIC_TOP1_COLUMN,
-        TOPIC_DISTRIBUTION_OUTPUT_COLUMN,
+        TOPIC_COVERAGE_OUTPUT_COLUMN,
     ]
     assert [progress for progress, _message in progress_updates] == [
         pytest.approx(0.475),

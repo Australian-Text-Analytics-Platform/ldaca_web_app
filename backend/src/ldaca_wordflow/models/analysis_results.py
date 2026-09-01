@@ -224,8 +224,8 @@ class TopicSource(_StrictModel):
     original_columns: list[str]
 
 
-class _TopicClusteringContext[ArtifactValueT](_StrictModel):
-    version: Literal[1]
+class _TopicProjectionContext[ArtifactValueT](_StrictModel):
+    version: Literal[2]
     artifact: ArtifactValueT | None
     source_row_indices: list[list[int]]
 
@@ -237,7 +237,6 @@ class _TopicModelingBody(_StrictModel):
     clustering: TopicClustering
     topic_inclusion: TopicInclusion
     segment_count: int = Field(ge=0)
-    truncated_segment_count: int = Field(ge=0)
 
 
 class TopicClustering(_StrictModel):
@@ -257,11 +256,11 @@ class TopicInclusion(_StrictModel):
 
 
 class TopicModelingWorkerResult(_TopicModelingBody):
-    clustering_context: _TopicClusteringContext[PrivateArtifactPath]
+    projection_context: _TopicProjectionContext[PrivateArtifactPath]
 
 
 class TopicModelingStoredResult(_TopicModelingBody):
-    clustering_context: _TopicClusteringContext[StoredArtifactIdentity]
+    projection_context: _TopicProjectionContext[StoredArtifactIdentity]
 
 
 class TopicModelingResult(_TopicModelingBody):

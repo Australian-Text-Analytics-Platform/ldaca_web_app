@@ -40,13 +40,13 @@ from .topic_pipeline import (
 )
 from .topic_result import (
     _build_empty_topic_payload,
-    _distribution_by_doc_index,
+    _coverage_by_doc_index,
 )
 from .topic_types import _PreparedTopicPayload
 from .utils import process_entrypoint
 
 # Default ONNX embedder used by the Rust ORT pipeline when no override is given.
-_DEFAULT_EMBEDDER_MODEL = "onnx-community/all-MiniLM-L6-v2-ONNX"
+_DEFAULT_EMBEDDER_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +62,7 @@ def run_topic_modeling_data_block_creation(
     input_snapshot_dir: str,
     output_dir: str,
     request_payload: dict[str, Any],
-    clustering_context_path: str,
+    projection_context_path: str,
     source_projection: dict[uuid.UUID, dict[str, Any]],
     progress_callback: Callable[[float, str], None] | None = None,
 ) -> dict[str, Any]:
@@ -72,14 +72,14 @@ def run_topic_modeling_data_block_creation(
 
     from ..analysis.generated_columns import (
         TOPIC_COLUMN,
-        TOPIC_DISTRIBUTION_COLUMN,
-        TOPIC_DISTRIBUTION_OUTPUT_COLUMN,
+        TOPIC_COVERAGE_COLUMN,
+        TOPIC_COVERAGE_OUTPUT_COLUMN,
         TOPIC_MEANING_COLUMN,
         TOPIC_TOP1_COLUMN,
     )
     from ..analysis.topic_inclusion import top_topic_ids
     from ..domain.workspace import TopicModelingDataBlockCreationAnalysisRequest
-    from ..shared.topic_types import topic_distribution_dtype
+    from ..shared.topic_types import topic_coverage_dtype
     from ..infrastructure.storage.input_snapshots import load_snapshot_node
 
     request = TopicModelingDataBlockCreationAnalysisRequest.model_validate(request_payload)
@@ -88,7 +88,7 @@ def run_topic_modeling_data_block_creation(
     from .topic_pipeline import _project_rust_topic_modeling
 
     projection = _project_rust_topic_modeling(
-        clustering_context=Path(clustering_context_path).read_bytes(),
+        projection_context=Path(projection_context_path).read_bytes(),
         cluster_count=request.cluster_count,
         document_count=sum(int(item["size"]) for item in source_projection.values()),
     )
@@ -125,7 +125,7 @@ def run_topic_modeling_data_block_creation(
         included_top_topics: set[int] = set()
         for row_offset, document in enumerate(projected_documents):
             row_topics = top_topic_ids(
-                document.get("topic_distribution") or [],
+                document.get("topic_coverage") or [],
                 request.cluster_count,
                 request.top_n_topics,
             )
@@ -133,11 +133,11 @@ def run_topic_modeling_data_block_creation(
                 continue
             included_rows.append(row_offset)
             included_top_topics.update(row_topics)
-        padded_distributions = _distribution_by_doc_index(
+        padded_coverage = _coverage_by_doc_index(
             [
                 {
                     "doc_index": row_offset,
-                    "topic_distribution": document.get("topic_distribution") or [],
+                    "topic_coverage": document.get("topic_coverage") or [],
                 }
                 for row_offset, document in enumerate(projected_documents)
             ],
@@ -159,10 +159,10 @@ def run_topic_modeling_data_block_creation(
                     ],
                     dtype=pl.Int64,
                 ),
-                TOPIC_DISTRIBUTION_COLUMN: pl.Series(
-                    TOPIC_DISTRIBUTION_COLUMN,
-                    [padded_distributions[row_offset] for row_offset in included_rows],
-                    dtype=topic_distribution_dtype(request.cluster_count),
+                TOPIC_COVERAGE_COLUMN: pl.Series(
+                    TOPIC_COVERAGE_COLUMN,
+                    [padded_coverage[row_offset] for row_offset in included_rows],
+                    dtype=topic_coverage_dtype(request.cluster_count),
                 ),
             }
         ).lazy()
@@ -173,8 +173,8 @@ def run_topic_modeling_data_block_creation(
             .select(
                 *[pl.col(column) for column in selected_columns],
                 pl.col(TOPIC_COLUMN).alias(TOPIC_TOP1_COLUMN),
-                pl.col(TOPIC_DISTRIBUTION_COLUMN).alias(
-                    TOPIC_DISTRIBUTION_OUTPUT_COLUMN
+                pl.col(TOPIC_COVERAGE_COLUMN).alias(
+                    TOPIC_COVERAGE_OUTPUT_COLUMN
                 ),
             )
         )
@@ -390,8 +390,6 @@ def _compute_topic_payload(
         return _build_empty_topic_payload(
             sampled=sampled,
             node_infos=node_infos,
-            artifact_root=artifact_root,
-            artifact_prefix=artifact_prefix,
         )
 
     if any(size == 0 for size in sampled.corpus_sizes):
@@ -434,34 +432,35 @@ def _compute_topic_payload(
         corpus_sizes=sampled.corpus_sizes,
         top_n_topics=int(topic_inclusion["top_n_topics"]),
     )
-    context_path = artifact_root / f"{artifact_prefix}_topic_clustering_context.msgpack.zst"
-    context_path.write_bytes(rust_result["clustering_context"])
     natural_count = len(payload["topics"])
+    raw_context = rust_result["projection_context"]
+    context_path: Path | None = None
+    if raw_context is not None:
+        if not isinstance(raw_context, bytes):
+            raise ValueError("Topic projection context is malformed")
+        context_path = artifact_root / f"{artifact_prefix}_topic_projection_context.msgpack.zst"
+        context_path.write_bytes(raw_context)
     payload["clustering"] = {
         "cluster_count": natural_count,
-        "min_cluster_count": 2 if natural_count >= 2 else natural_count,
+        "min_cluster_count": 1 if natural_count >= 1 else 0,
         "max_cluster_count": natural_count,
         "default_cluster_count": natural_count,
-        "adjustable": natural_count > 2,
+        "adjustable": natural_count > 1,
     }
-    payload["clustering_context"] = {
-        "version": 1,
-        "artifact": str(context_path),
+    payload["projection_context"] = {
+        "version": 2,
+        "artifact": str(context_path) if context_path is not None else None,
         "source_row_indices": sampled.active_corpora_indices,
     }
-    payload["segment_count"] = int(rust_result.get("n_chunks") or 0)
-    payload["truncated_segment_count"] = int(
-        rust_result.get("truncated_segment_count") or 0
-    )
+    payload["segment_count"] = int(rust_result.get("n_segments") or 0)
     logger.info(
         "Topic modeling diagnostics engine=rust backend=ort model=%s vectorizer=%s "
-        "random_seed=%d corpus_sizes_before=%s corpus_sizes_after=%s stage_timings=%s",
+        "random_seed=%d corpus_sizes_before=%s corpus_sizes_after=%s",
         _DEFAULT_EMBEDDER_MODEL,
         vectorizer_model,
         random_state,
         sampled.corpus_sizes_before_sample,
         sampled.corpus_sizes,
-        rust_result.get("stage_timings_ms"),
     )
     return payload
 
@@ -538,9 +537,8 @@ def _compute_topic_modeling(
             "sources": topic_payload["sources"],
             "clustering": topic_payload["clustering"],
             "topic_inclusion": topic_payload["topic_inclusion"],
-            "clustering_context": topic_payload["clustering_context"],
+            "projection_context": topic_payload["projection_context"],
             "segment_count": topic_payload["segment_count"],
-            "truncated_segment_count": topic_payload["truncated_segment_count"],
         }
 
         logger.info("[Worker %d] Topic modeling completed successfully", os.getpid())

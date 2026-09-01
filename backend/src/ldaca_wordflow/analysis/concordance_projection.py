@@ -39,7 +39,10 @@ def filter_concordance_documents(
                 _MATCH_ORDER_COLUMN
             )
         )
-        .explode(["concordance", _MATCH_ORDER_COLUMN])
+        .explode(
+            ["concordance", _MATCH_ORDER_COLUMN],
+            empty_as_null=True,
+        )
         .unnest("concordance")
     )
     if excluded_matched_texts:

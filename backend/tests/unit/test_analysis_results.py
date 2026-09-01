@@ -85,7 +85,6 @@ def _topic_stored_result() -> TopicModelingStoredResult:
             ],
             "corpus_sizes": [4],
             "segment_count": 4,
-            "truncated_segment_count": 0,
             "sources": [
                 {
                     "node_id": source_id,
@@ -108,11 +107,11 @@ def _topic_stored_result() -> TopicModelingStoredResult:
                 "default_top_n_topics": 2,
                 "adjustable": True,
             },
-            "clustering_context": {
-                "version": 1,
+            "projection_context": {
+                "version": 2,
                 "artifact": {
-                    "name": "topic_clustering_context",
-                    "media_type": "application/vnd.ldaca.topic-clustering-context",
+                    "name": "topic_projection_context",
+                    "media_type": "application/vnd.ldaca.topic-projection-context",
                 },
                 "source_row_indices": [[0, 1, 2, 3]],
             },
@@ -130,7 +129,7 @@ def test_natural_topic_query_is_side_effect_free_and_hides_private_context() -> 
         None,
     )
 
-    assert "clustering_context" not in payload
+    assert "projection_context" not in payload
     clustering = cast(dict[str, Any], payload["clustering"])
     topics = cast(list[dict[str, Any]], payload["topics"])
     assert clustering["cluster_count"] == 4
@@ -145,7 +144,7 @@ def test_topic_query_rejects_pagination(field: str) -> None:
         TopicModelingResultQuery.model_validate({field: 1})
 
 
-def test_explicit_natural_topic_query_runs_projector(tmp_path, monkeypatch) -> None:
+def test_explicit_natural_topic_query_reuses_stored_projection(tmp_path, monkeypatch) -> None:
     context_path = tmp_path / "context.msgpack.zst"
     context_path.write_bytes(b"context")
     calls: list[int] = []
@@ -179,7 +178,7 @@ def test_explicit_natural_topic_query_runs_projector(tmp_path, monkeypatch) -> N
         context_path,
     )
 
-    assert calls == [4]
+    assert calls == []
     assert cast(dict[str, Any], payload["clustering"])["cluster_count"] == 4
 
 
@@ -221,7 +220,7 @@ def test_changing_only_top_n_reuses_the_projection_basis(tmp_path, monkeypatch) 
     )
     tied = _query_topics(
         _topic_stored_result(),
-        TopicModelingResultQuery(top_n_topics=2),
+        TopicModelingResultQuery(top_n_topics=3),
         context_path,
         cache,
     )

@@ -125,12 +125,12 @@ def test_native_round_trip_preserves_tokenizer_and_rejects_previous_schema(
 
     _rewrite_workspace_snapshot(
         path,
-        lambda payload: payload["workspace_metadata"].update({"version": 21}),
+        lambda payload: payload["workspace_metadata"].update({"version": 22}),
     )
     with pytest.raises(WorkspaceSchemaVersionError) as exc_info:
         store.load(path)
-    assert exc_info.value.stored_version == 21
-    assert exc_info.value.supported_version == 22
+    assert exc_info.value.stored_version == 22
+    assert exc_info.value.supported_version == 23
 
 
 @pytest.mark.parametrize("invalid_graph", ["missing", "self", "cycle", "duplicate"])
@@ -282,7 +282,7 @@ def test_tab_generations_follow_the_workspace_commit_point(tmp_path: Path) -> No
     second_payload = json.loads((path / "workspace.json").read_text(encoding="utf-8"))
     second_record = path / second_payload["tabs"][0]["record_path"]
 
-    assert first_payload["workspace_metadata"]["version"] == 22
+    assert first_payload["workspace_metadata"]["version"] == 23
     assert first_record != second_record
     assert not first_record.exists()
     assert second_record.exists()

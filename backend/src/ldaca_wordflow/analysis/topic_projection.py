@@ -92,7 +92,11 @@ def build_topic_projection_basis(
             len(topics),
         ),
         "has_outlier": any(
-            int(document.get("dominant_topic", -1)) == -1
+            any(
+                int(entry.get("topic_id", -2)) == -1
+                and float(entry.get("coverage", 0.0)) > 0.0
+                for entry in document.get("topic_coverage") or []
+            )
             for document in documents
         ),
     }
@@ -100,24 +104,22 @@ def build_topic_projection_basis(
 
 def project_rust_topic_projection_basis(
     *,
-    clustering_context: bytes,
+    projection_context: bytes,
     cluster_count: int,
     corpus_sizes: list[int],
 ) -> dict[str, Any]:
     """Project compact top-N-independent bubble-count facts in native code."""
 
-    from polars_text import _internal
+    from polars_text import project_topic_basis
 
     try:
-        raw_basis = json.loads(
-            _internal.project_topic_modeling_basis(
-                clustering_context,
-                int(cluster_count),
-                [int(size) for size in corpus_sizes],
-            )
+        raw_basis = project_topic_basis(
+            projection_context,
+            int(cluster_count),
+            [int(size) for size in corpus_sizes],
         )
     except (TypeError, ValueError, RuntimeError) as exc:
-        raise ValueError("Topic clustering context is invalid") from exc
+        raise ValueError("Topic projection context is invalid") from exc
     if not isinstance(raw_basis, dict):
         raise ValueError("Topic projection basis is malformed")
     topics = normalize_projected_topics(raw_basis.get("topics"), cluster_count)

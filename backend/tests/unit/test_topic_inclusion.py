@@ -1,4 +1,4 @@
-"""Top-N Topic membership semantics over complete sparse distributions."""
+"""Top-N Topic membership semantics over complete sparse coverage."""
 
 import pytest
 
@@ -10,10 +10,10 @@ from ldaca_wordflow.analysis.topic_inclusion import (
 )
 
 
-def _distribution(*values: float) -> list[dict[str, float | int]]:
+def _coverage(*values: float) -> list[dict[str, float | int]]:
     return [
-        {"topic_id": topic_id, "proportion": proportion}
-        for topic_id, proportion in enumerate(values)
+        {"topic_id": topic_id, "coverage": coverage}
+        for topic_id, coverage in enumerate(values)
     ]
 
 
@@ -32,22 +32,22 @@ def test_descriptor_handles_empty_single_and_adjustable_results() -> None:
 
 
 def test_membership_excludes_zero_and_outlier_and_includes_cutoff_ties() -> None:
-    distribution = [
-        {"topic_id": -1, "proportion": 0.8},
-        *_distribution(0.5, 0.25, 0.25, 0.0),
+    coverage = [
+        {"topic_id": -1, "coverage": 0.8},
+        *_coverage(0.5, 0.25, 0.25, 0.0),
     ]
 
-    assert top_topic_ids(distribution, 4, 1) == {0}
-    assert top_topic_ids(distribution, 4, 2) == {0, 1, 2}
-    assert top_topic_ids(distribution, 4, 4) == {0, 1, 2}
+    assert top_topic_ids(coverage, 4, 1) == {0}
+    assert top_topic_ids(coverage, 4, 2) == {0, 1, 2}
+    assert top_topic_ids(coverage, 4, 4) == {0, 1, 2}
 
 
 def test_aggregated_counts_are_per_corpus_and_can_exceed_row_count() -> None:
     documents = [
-        {"doc_index": 0, "topic_distribution": _distribution(0.6, 0.4, 0.0)},
-        {"doc_index": 1, "topic_distribution": _distribution(0.5, 0.5, 0.0)},
-        {"doc_index": 2, "topic_distribution": _distribution(0.0, 0.2, 0.8)},
-        {"doc_index": 3, "topic_distribution": []},
+        {"doc_index": 0, "topic_coverage": _coverage(0.6, 0.4, 0.0)},
+        {"doc_index": 1, "topic_coverage": _coverage(0.5, 0.5, 0.0)},
+        {"doc_index": 2, "topic_coverage": _coverage(0.0, 0.2, 0.8)},
+        {"doc_index": 3, "topic_coverage": []},
     ]
     activations = aggregate_topic_activations(documents, [2, 2], 3)
 

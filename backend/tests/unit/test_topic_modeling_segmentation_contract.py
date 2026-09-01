@@ -40,7 +40,7 @@ def test_topic_modeling_request_rejects_minimum_cluster_size_below_two() -> None
         _request(min_cluster_size=1)
 
 
-@pytest.mark.parametrize("max_segment_tokens", [31, 511])
+@pytest.mark.parametrize("max_segment_tokens", [31, 257])
 def test_topic_modeling_request_rejects_segment_caps_outside_model_window(
     max_segment_tokens: int,
 ) -> None:
