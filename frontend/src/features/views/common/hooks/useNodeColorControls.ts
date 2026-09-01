@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import type { WorkspaceNodeMetadata } from '@/features/workspace/common/workspaceNodeMetadata';
 import { normalizeNodeColor } from '@/lib/nodeColor';
 import { GREY, VIZ_PALETTE, pickRandomColor } from '../vizPalette';
@@ -28,13 +29,13 @@ const sameColorMap = (a: Record<string, string>, b: Record<string, string>): boo
 
 /**
  * Adapts workspace-node colours for colour-coded analysis tabs.
- * Used by: token frequency, concordance, and topic modelling because their
- * selected source nodes drive chart/table colours.
+ * Used by: annotation, token frequency, concordance, and topic modelling
+ * because their selected source nodes drive table/chart colours.
  *
- * Colour model — preview then commit:
- * - A block's durable colour lives on ``Node.color`` (grey / unset until it has
- *   been through an analysis). The graph card and sidebar row read that, so an
- *   un-analysed block stays grey there.
+ * Colour model — automatic preview, explicit immediate commit:
+ * - A block's durable colour lives on ``Node.color`` (grey / unset until it is
+ *   assigned automatically on first analysis or explicitly edited). The graph
+ *   card and sidebar row read that persisted property.
  * - When a block is added to a tool's selection it gets a *temporary* colour
  *   (random, non-grey, distinct from its siblings) held only in local
  *   ``preview`` state — so the tool UI shows a pre-filled colour and the user
@@ -44,16 +45,23 @@ const sameColorMap = (a: Record<string, string>, b: Record<string, string>): boo
  * - ``ensureNodeColors`` (called just before an analysis runs) commits each
  *   selected block's previewed colour to ``Node.color``, at which point the
  *   graph/sidebar pick it up.
- * - ``setNodeColor`` (the picker) also stays a preview edit — it updates the
- *   temporary colour and commits on the next run.
+ * - ``setNodeColor`` (the picker) updates the tool optimistically and writes
+ *   ``Node.color`` immediately. Explicit colour changes are node metadata
+ *   mutations and do not wait for, or block, a later analysis run.
  */
 export function useNodeColorControls({
   nodeIds,
   nodes,
   persistNodeColor,
 }: NodeColorControlsParams) {
-  // Temporary, not-yet-persisted preview colours, keyed by node id.
+  // Tool-local colours: automatic previews plus optimistic explicit edits.
   const [previewColors, setPreviewColors] = useState<Record<string, string>>({});
+  // Tracks colours whose node-property request has already been started. This
+  // prevents a later analysis run from submitting the same metadata write.
+  const requestedColors = useRef(new Map<string, string>());
+  // Native colour inputs can emit several changes quickly. Serialize writes per
+  // node so an older response cannot overwrite the user's final choice.
+  const colorWriteQueues = useRef(new Map<string, Promise<void>>());
 
   const nodeById = new Map(nodes.map((node) => [node.id, node] as const));
   // Preview colour wins in the tool UI; otherwise the persisted colour; else grey.
@@ -63,13 +71,52 @@ export function useNodeColorControls({
     nodeColors[nodeId] = previewColors[nodeId] ?? persisted ?? GREY;
   });
 
+  const persistColor = (
+    nodeId: string,
+    color: string,
+    reportFailure: boolean,
+  ): Promise<void> | null => {
+    if (!persistNodeColor) return null;
+    requestedColors.current.set(nodeId, color);
+    const previousWrite = colorWriteQueues.current.get(nodeId) ?? Promise.resolve();
+    const write = previousWrite
+      .catch(() => undefined)
+      .then(async () => {
+        await persistNodeColor(nodeId, color);
+      })
+      .catch((error: unknown) => {
+        if (requestedColors.current.get(nodeId) === color) {
+          requestedColors.current.delete(nodeId);
+          setPreviewColors((prev) =>
+            prev[nodeId] === color ? withoutNodeColor(prev, nodeId) : prev,
+          );
+          if (reportFailure) {
+            toast.error('Could not save the Data Block color.');
+          }
+        }
+        throw error;
+      });
+    colorWriteQueues.current.set(nodeId, write);
+    void write
+      .finally(() => {
+        if (colorWriteQueues.current.get(nodeId) === write) {
+          colorWriteQueues.current.delete(nodeId);
+        }
+      })
+      .catch(() => undefined);
+    return write;
+  };
+
   const setNodeColor = (nodeId: string, color: string) => {
     const normalized = normalizeNodeColor(color);
     if (!nodeId || !normalized) return;
-    // Preview edit only; committed to Node.color on the next run.
+    // Show the explicit choice immediately while the node-property request is
+    // in flight. A failed latest write removes only its own optimistic value.
     setPreviewColors((prev) =>
       prev[nodeId] === normalized ? prev : { ...prev, [nodeId]: normalized },
     );
+    const write = persistColor(nodeId, normalized, true);
+    if (write) void write.catch(() => undefined);
   };
 
   // Signature of the selection + each block's persisted colour. Changes when a
@@ -85,7 +132,6 @@ export function useNodeColorControls({
   // a temporary colour for any newly-selected block that has none. No
   // persistence happens here — this only feeds the tool UI.
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- deliberate sync: reconcile the temporary preview map with the selection; guarded by sameColorMap so it settles in one pass and never loops.
     setPreviewColors((prev) => {
       const selected = nodeIds.filter(Boolean);
       const selectedSet = new Set(selected);
@@ -95,9 +141,15 @@ export function useNodeColorControls({
         if (persisted) used.add(persisted.toLowerCase());
       });
       const next: Record<string, string> = {};
-      // Keep existing previews (auto or user-picked) for still-selected blocks.
+      // Keep unresolved previews for still-selected blocks. Once the graph
+      // reflects a requested colour, its canonical Node.color takes over.
       for (const [nodeId, color] of Object.entries(prev)) {
         if (selectedSet.has(nodeId)) {
+          const persisted = normalizeNodeColor(nodeById.get(nodeId)?.color);
+          if (persisted === color && requestedColors.current.get(nodeId) === color) {
+            requestedColors.current.delete(nodeId);
+            continue;
+          }
           next[nodeId] = color;
           used.add(color.toLowerCase());
         }
@@ -106,6 +158,12 @@ export function useNodeColorControls({
       // persisted colour nor a preview yet.
       selected.forEach((nodeId) => {
         if (next[nodeId] || normalizeNodeColor(nodeById.get(nodeId)?.color)) return;
+        const requested = requestedColors.current.get(nodeId);
+        if (requested) {
+          next[nodeId] = requested;
+          used.add(requested.toLowerCase());
+          return;
+        }
         const color = pickRandomColor(used);
         used.add(color.toLowerCase());
         next[nodeId] = color;
@@ -117,7 +175,6 @@ export function useNodeColorControls({
 
   const ensureNodeColors = async () => {
     if (!persistNodeColor) return;
-    const persist = persistNodeColor;
     const used = new Set<string>();
     nodeIds.forEach((nodeId) => {
       const existing = normalizeNodeColor(nodeById.get(nodeId)?.color) ?? previewColors[nodeId];
@@ -138,17 +195,16 @@ export function useNodeColorControls({
         );
       }
       used.add(target.toLowerCase());
-      // Already committed with this exact colour — nothing to do.
-      if (persisted && persisted === target) return;
+      // Already persisted or requested by an explicit picker edit — nothing to do.
+      if (
+        (persisted && persisted === target) ||
+        requestedColors.current.get(nodeId) === target
+      ) {
+        return;
+      }
       const committed = target;
-      updates.push(
-        Promise.resolve(persist(nodeId, committed))
-          .then(() => undefined)
-          .catch((error: unknown) => {
-            setPreviewColors((prev) => withoutNodeColor(prev, nodeId));
-            throw error;
-          }),
-      );
+      const write = persistColor(nodeId, committed, false);
+      if (write) updates.push(write);
     });
     await Promise.all(updates);
   };
