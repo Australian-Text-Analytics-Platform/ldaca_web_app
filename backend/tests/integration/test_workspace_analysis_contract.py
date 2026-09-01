@@ -120,6 +120,117 @@ def test_quotation_preview_page_is_native_arrow_ipc(tmp_path: Path) -> None:
         assert removed_json.status_code == 422
 
 
+def test_topic_modeling_schema_mismatch_keeps_tables_and_other_results_usable(
+    tmp_path: Path,
+) -> None:
+    settings = Settings(
+        data_root=tmp_path,
+        multi_user=False,
+        session_cookie_secure=False,
+        cors_allowed_origins=("http://testserver",),
+        trusted_hosts=("testserver",),
+    )
+    with TestClient(
+        create_app(settings, serve_frontend=False),
+        base_url="http://testserver",
+    ) as client:
+        csrf = client.get("/api/session").json()["csrf_token"]
+        unsafe = {"Origin": "http://testserver", "X-CSRF-Token": csrf}
+        assert client.post(
+            "/api/user-files/uploads",
+            params={"path": "quotes.csv"},
+            content=b'text\n"Alice said hello."\n',
+            headers={**unsafe, "Content-Type": "application/octet-stream"},
+        ).status_code == 201
+        workspace_id = client.post(
+            "/api/workspaces",
+            json={"name": "Granular versions"},
+            headers=unsafe,
+        ).json()["id"]
+        assert client.put(
+            f"/api/workspaces/{workspace_id}/open", headers=unsafe
+        ).status_code == 200
+        node_id = client.post(
+            f"/api/workspaces/{workspace_id}/nodes",
+            json={"kind": "file", "file_path": "quotes.csv"},
+            headers=unsafe,
+        ).json()["id"]
+        quotation_tab_id = client.post(
+            f"/api/workspaces/{workspace_id}/tabs",
+            json={"kind": "quotation", "name": "Quotation"},
+            headers=unsafe,
+        ).json()["id"]
+        analysis_id = client.post(
+            f"/api/workspaces/{workspace_id}/tabs/{quotation_tab_id}/analyses",
+            json={
+                "execution_scope": "preview",
+                "request": {
+                    "kind": "quotation",
+                    "node_id": node_id,
+                    "column": "text",
+                    "engine": {"type": "local"},
+                },
+            },
+            headers=unsafe,
+        ).json()["id"]
+        assert _wait_analysis(client, workspace_id, analysis_id)["state"] == "succeeded"
+        topic_tab_id = client.post(
+            f"/api/workspaces/{workspace_id}/tabs",
+            json={"kind": "topic_modeling", "name": "Topics"},
+            headers=unsafe,
+        ).json()["id"]
+        assert client.delete(
+            f"/api/workspaces/{workspace_id}/open", headers=unsafe
+        ).status_code == 204
+
+        workspace_root = tmp_path / "workspaces" / workspace_id
+        manifest = json.loads((workspace_root / "workspace.json").read_text())
+        topic_reference = next(
+            item for item in manifest["tabs"] if item["id"] == topic_tab_id
+        )
+        topic_path = workspace_root / topic_reference["record_path"]
+        topic_envelope = json.loads(topic_path.read_text())
+        topic_envelope["schema_version"] = 2
+        topic_path.write_text(json.dumps(topic_envelope))
+
+        assert client.put(
+            f"/api/workspaces/{workspace_id}/open", headers=unsafe
+        ).status_code == 200
+        tabs = client.get(f"/api/workspaces/{workspace_id}/tabs").json()
+        incompatible = next(tab for tab in tabs if tab["id"] == topic_tab_id)
+        assert incompatible["reason"] == "incompatible_schema"
+        assert incompatible["analysis_kind"] == "topic_modeling"
+        assert incompatible["stored_schema_version"] == 2
+        assert incompatible["supported_schema_version"] == 1
+        assert next(tab for tab in tabs if tab["id"] == quotation_tab_id)[
+            "availability"
+        ] == "available"
+
+        table = client.post(
+            f"/api/workspaces/{workspace_id}/sql",
+            json={
+                "mode": "query",
+                "node_ids": [node_id],
+                "sql": f'SELECT text FROM "{node_id}"',
+                "page": 1,
+                "page_size": 50,
+            },
+            headers=unsafe,
+        )
+        assert table.status_code == 200, table.text
+        assert pl.read_ipc_stream(BytesIO(table.content)).to_dicts() == [
+            {"text": "Alice said hello."}
+        ]
+        result = client.get(
+            f"/api/workspaces/{workspace_id}/analyses/{analysis_id}/result"
+        )
+        assert result.status_code == 200
+        assert result.json() == {
+            "kind": "quotation",
+            "result": {"variant": "ready"},
+        }
+
+
 def test_sequential_analysis_is_owned_by_its_tab_and_workspace(tmp_path: Path) -> None:
     settings = Settings(
         data_root=tmp_path,
@@ -306,7 +417,7 @@ def test_analysis_artifacts_publish_under_the_analysis_directory(
         ).read_text()
         assert str(tmp_path) not in record_text
         record = json.loads(record_text)
-        assert record["artifact_references"]
+        assert record["payload"]["artifact_references"]
 
         result = client.get(
             f"/api/workspaces/{workspace_id}/analyses/{analysis_id}/result"
@@ -325,7 +436,10 @@ def test_analysis_artifacts_publish_under_the_analysis_directory(
         assert download.status_code == 200
         assert pl.read_ipc_stream(BytesIO(download.content)).height > 0
 
-        artifact_path = analysis_dir / record["artifact_references"][0]["relative_path"]
+        artifact_path = (
+            analysis_dir
+            / record["payload"]["artifact_references"][0]["relative_path"]
+        )
         artifact_path.unlink()
         gone = client.get(
             f"/api/workspaces/{workspace_id}/analyses/{analysis_id}/result"

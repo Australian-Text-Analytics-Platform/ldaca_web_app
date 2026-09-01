@@ -14,3 +14,6 @@
    reconciliation boundaries with fault-injection and restart tests.
 7. Update durable documentation and run the complete repository and packaged
    runtime proof set.
+8. Split the monolithic Workspace version into data schema 1 and independently
+   versioned Analysis-kind envelopes; make native loading branch-isolated and
+   make portable archives omit unsupported Analysis history with warnings.

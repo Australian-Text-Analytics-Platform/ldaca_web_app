@@ -180,14 +180,29 @@ and `WorkspaceResource.runtime_state` remains process-local.
 An `available` item contains every `WorkspaceResource` field. An `unavailable`
 item contains only `availability`, canonical `id`, safe `message`, and `reason`:
 `incompatible_format`, `corrupt_snapshot`, or `configured_limit`. Incompatible
-items also contain `stored_schema_version` and `supported_schema_version`;
-other reasons return those fields as null. Create, direct read, open, update,
-and import continue to return strict `WorkspaceResource` responses. Delete
-continues to authorize from the canonical directory and ownership sidecar.
+items also contain `stored_data_schema_version` and
+`supported_data_schema_version`; other reasons return those fields as null.
+Create, direct read, open, update, and import continue to return strict
+`WorkspaceResource` responses. Delete continues to authorize from the canonical
+directory and ownership sidecar. The client may invoke the ordinary open route
+for any catalogue ID; an unavailable entry therefore reports the backend load
+error without a separate compatibility endpoint.
 
-Native Workspace snapshots use schema version 22 and portable archives use
-format version 21. Readers accept only those exact versions; import and open do
-not migrate an earlier format at runtime.
+Native Workspace snapshots use data schema version 1. Tabs and Analyses carry
+independent per-kind schema versions, currently 1 for all six top-level kinds.
+Portable archives use data format version 1 and the same child envelopes.
+Opening rejects another data version, but isolates an unsupported Analysis-kind
+version as `incompatible_schema` while compatible resources remain available.
+Native schema 23 has no special detection or reader: its old `version` field
+fails normal snapshot validation and an attempted open returns the ordinary
+Workspace load error. Archive format 22 is rejected with no runtime migration.
+
+Workspace archive import and export return
+`X-Wordflow-Omitted-Tab-Count` and
+`X-Wordflow-Omitted-Analysis-Count`. An import rejects an unsupported archive
+data version but accepts a newer Analysis-kind version by omitting that record,
+its namespaced files, and dependent descendants. Export applies the same
+omission policy to unavailable native Analysis history.
 
 ## Data Blocks
 
@@ -374,11 +389,14 @@ inaccessible paths. There is no legacy `/health` route or Data Root alias.
   successful Artifact is `410 artifact_gone`; a missing retained input required
   for a completed on-demand Result query is `410 analysis_result_unavailable`.
 - Cross-user resources are concealed as `404`.
-- Current-schema corruption is isolated at the smallest attributable child.
+- Current-schema corruption and unsupported Analysis-kind schemas are isolated
+  at the smallest attributable child.
   Data Block, Tab, Analysis, and User File Import collections may therefore
   contain an `availability: unavailable` item with its UUID, parent identity,
-  `record_invalid` reason, and safe warning. Healthy siblings remain usable;
-  stored bytes are not rewritten or quarantined.
+  safe warning, and either `record_invalid` or `incompatible_schema` reason.
+  Incompatible Tabs and Analyses additionally expose `analysis_kind`,
+  `stored_schema_version`, and `supported_schema_version`. Healthy siblings
+  remain usable; stored bytes are not rewritten or quarantined.
 - Validation uses sanitized `422 ApiError` responses with `X-Request-ID`.
 - Analysis, Workspace SQL, Arrow row-page, and User File Import pagination is one-based and rejects zero.
   Workspace, Tab, Data Block, and User File collections return complete

@@ -25,8 +25,9 @@ unreachable operations and their two private-only tests.
 
 One coordinated cutover owns all breaking contracts:
 
-- native Workspace schema 22;
-- portable Workspace archive format 21;
+- native Workspace data schema 1 plus independent schema version 1 for each of
+  the six top-level Analysis kinds;
+- portable Workspace archive data format 1 with the same per-kind envelopes;
 - SQLite schema 7;
 - User File Import record envelope version 1;
 - UUID and aware-UTC identity/time types throughout the domain;
@@ -34,10 +35,15 @@ One coordinated cutover owns all breaking contracts:
 - strict remote Quotation v2 request and response models.
 
 There is no migration, converter, runtime fallback, or best-effort parser for
-the replaced formats. Incompatible Workspaces remain listable with a warning
-and retain bounded raw-ZIP download. Current-schema child failures remain in
-place, appear as the smallest attributable unavailable resource, and do not
-hide healthy siblings.
+the replaced formats. Native schema 23 receives no special detection: it is
+catalogued through the normal corrupt-snapshot path, remains selectable for a
+Load attempt, and reports the ordinary backend error. Archive format 22 is
+rejected. Workspaces with a recognized `data_schema_version` mismatch retain
+bounded raw-ZIP download. Current-version malformed children and unsupported
+Analysis-kind versions remain in place as the smallest attributable unavailable
+resource and do not hide healthy siblings. Opaque native Analysis records are
+preserved across unrelated commits; portable import and export deliberately
+omit them and their dependent subtrees with reported counts.
 
 ## Architecture
 

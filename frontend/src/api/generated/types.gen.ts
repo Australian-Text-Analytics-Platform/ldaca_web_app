@@ -4671,9 +4671,10 @@ export type UnaryExpressionOutput = {
 /**
  * UnavailableAnalysis
  *
- * Minimal safe item for an invalid persisted Analysis record.
+ * Minimal safe item for an unavailable persisted Analysis record.
  */
 export type UnavailableAnalysis = {
+    analysis_kind?: AnalysisKind | null;
     /**
      * Availability
      */
@@ -4685,7 +4686,15 @@ export type UnavailableAnalysis = {
     /**
      * Reason
      */
-    reason: 'record_invalid';
+    reason: 'record_invalid' | 'incompatible_schema';
+    /**
+     * Stored Schema Version
+     */
+    stored_schema_version?: number | null;
+    /**
+     * Supported Schema Version
+     */
+    supported_schema_version?: number | null;
     /**
      * Tab Id
      */
@@ -4693,7 +4702,7 @@ export type UnavailableAnalysis = {
     /**
      * Warning
      */
-    warning: 'This Analysis is unavailable because its stored record is invalid.';
+    warning: string;
 };
 
 /**
@@ -4727,9 +4736,10 @@ export type UnavailableDataBlock = {
 /**
  * UnavailableTab
  *
- * Minimal safe item for an invalid persisted Tab record.
+ * Minimal safe item for an unavailable persisted Tab record.
  */
 export type UnavailableTab = {
+    analysis_kind?: AnalysisKind | null;
     /**
      * Availability
      */
@@ -4741,11 +4751,19 @@ export type UnavailableTab = {
     /**
      * Reason
      */
-    reason: 'record_invalid';
+    reason: 'record_invalid' | 'incompatible_schema';
+    /**
+     * Stored Schema Version
+     */
+    stored_schema_version?: number | null;
+    /**
+     * Supported Schema Version
+     */
+    supported_schema_version?: number | null;
     /**
      * Warning
      */
-    warning: 'This Tab is unavailable because its stored record is invalid.';
+    warning: string;
     /**
      * Workspace Id
      */
@@ -4819,13 +4837,13 @@ export type UnavailableWorkspaceListItem = {
      */
     reason: 'incompatible_format' | 'corrupt_snapshot' | 'configured_limit';
     /**
-     * Stored Schema Version
+     * Stored Data Schema Version
      */
-    stored_schema_version?: number | null;
+    stored_data_schema_version?: number | null;
     /**
-     * Supported Schema Version
+     * Supported Data Schema Version
      */
-    supported_schema_version?: number | null;
+    supported_data_schema_version?: number | null;
 };
 
 /**
@@ -7370,7 +7388,7 @@ export type ImportWorkspaceArchiveError = ImportWorkspaceArchiveErrors[keyof Imp
 
 export type ImportWorkspaceArchiveResponses = {
     /**
-     * Successful Response
+     * Workspace archive installed
      */
     201: WorkspaceResource;
 };

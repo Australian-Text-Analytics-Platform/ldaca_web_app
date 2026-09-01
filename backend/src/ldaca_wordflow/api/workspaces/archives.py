@@ -19,13 +19,24 @@ router = APIRouter(
     tags=["workspace-archives"],
     responses=api_errors(401),
 )
+OMITTED_TAB_COUNT_HEADER = "X-Wordflow-Omitted-Tab-Count"
+OMITTED_ANALYSIS_COUNT_HEADER = "X-Wordflow-Omitted-Analysis-Count"
 
 
 @router.post(
     "/imports",
     response_model=WorkspaceResource,
     status_code=status.HTTP_201_CREATED,
-    responses=api_errors(400, 403, 409, 413, 415, 422, 507),
+    responses={
+        **api_errors(400, 403, 409, 413, 415, 422, 507),
+        status.HTTP_201_CREATED: {
+            "description": "Workspace archive installed",
+            "headers": {
+                OMITTED_TAB_COUNT_HEADER: {"schema": {"type": "integer"}},
+                OMITTED_ANALYSIS_COUNT_HEADER: {"schema": {"type": "integer"}},
+            },
+        },
+    },
     openapi_extra={
         "requestBody": {
             "required": True,
@@ -53,10 +64,12 @@ async def import_workspace_archive(
         raise UnsupportedMediaTypeError(
             "Workspace imports require application/octet-stream"
         )
-    payload = await archive_service.import_upload(
-        principal.user.id,
-        filename,
-        RequestByteStream(request),
+    payload, omitted_tab_count, omitted_analysis_count = (
+        await archive_service.import_upload(
+            principal.user.id,
+            filename,
+            RequestByteStream(request),
+        )
     )
     resource = WorkspaceResource.model_validate(payload)
     response.headers["Location"] = route_path(
@@ -65,6 +78,8 @@ async def import_workspace_archive(
         workspace_id=resource.id,
     )
     response.headers["ETag"] = workspace_etag(resource.revision)
+    response.headers[OMITTED_TAB_COUNT_HEADER] = str(omitted_tab_count)
+    response.headers[OMITTED_ANALYSIS_COUNT_HEADER] = str(omitted_analysis_count)
     return resource
 
 
@@ -78,6 +93,10 @@ async def import_workspace_archive(
                 "application/zip": {"schema": {"type": "string", "format": "binary"}}
             },
             "description": "Portable Workspace ZIP archive or raw archival copy",
+            "headers": {
+                OMITTED_TAB_COUNT_HEADER: {"schema": {"type": "integer"}},
+                OMITTED_ANALYSIS_COUNT_HEADER: {"schema": {"type": "integer"}},
+            },
         },
     },
 )
@@ -88,11 +107,16 @@ async def export_workspace_archive(
 ) -> FileResponse:
     """Return a portable ZIP, or a raw archival copy for an incompatible Workspace."""
 
-    snapshot, filename, revision = await archive_service.export_archive(
-        principal.user.id,
-        workspace_id,
-    )
+    (
+        snapshot,
+        filename,
+        revision,
+        omitted_tab_count,
+        omitted_analysis_count,
+    ) = await archive_service.export_archive(principal.user.id, workspace_id)
     headers = {"ETag": workspace_etag(revision)} if revision is not None else {}
+    headers[OMITTED_TAB_COUNT_HEADER] = str(omitted_tab_count)
+    headers[OMITTED_ANALYSIS_COUNT_HEADER] = str(omitted_analysis_count)
     return FileResponse(
         snapshot.path,
         filename=filename,

@@ -3,14 +3,38 @@
 from __future__ import annotations
 
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import Literal
 
 import polars_text  # noqa: F401  (register text namespace side-effects)
 
 from .node import Node
 from .provenance import NodeProvenance, compose_provenance, referenced_node_ids
-from .tab import Tab, TopicModelingTabSettings
+from .tab import AnalysisKind, Tab, TopicModelingTabSettings
 from .analysis import AnalysisRecord, AnalysisState, analysis_input_ids
+
+
+@dataclass(frozen=True, slots=True)
+class UnavailableChildRecord:
+    """Opaque persisted child record retained across unrelated Workspace commits."""
+
+    content: bytes
+    reason: Literal["record_invalid", "incompatible_schema"]
+    analysis_kind: AnalysisKind | None = None
+    stored_schema_version: int | None = None
+    supported_schema_version: int | None = None
+    tab_id: uuid.UUID | None = None
+
+    def __post_init__(self) -> None:
+        versions = (self.stored_schema_version, self.supported_schema_version)
+        if self.reason == "incompatible_schema":
+            if self.analysis_kind is None or any(version is None for version in versions):
+                raise ValueError(
+                    "Incompatible child records require kind and schema versions"
+                )
+        elif any(version is not None for version in versions):
+            raise ValueError("Invalid child records cannot expose schema versions")
 
 
 class Workspace:
@@ -34,9 +58,11 @@ class Workspace:
             uuid.UUID, tuple[uuid.UUID, ...]
         ] = {}
         self.tabs: dict[uuid.UUID, Tab] = {}
-        self._corrupt_tab_records: dict[uuid.UUID, bytes] = {}
+        self._unavailable_tab_records: dict[uuid.UUID, UnavailableChildRecord] = {}
         self.analyses: dict[uuid.UUID, AnalysisRecord] = {}
-        self._corrupt_analysis_records: dict[uuid.UUID, bytes] = {}
+        self._unavailable_analysis_records: dict[
+            uuid.UUID, UnavailableChildRecord
+        ] = {}
         self._children_by_parent: dict[uuid.UUID, list[Node]] = {}
         self.description: str = ""
         self.created_at: datetime = created_at or now
@@ -144,20 +170,27 @@ class Workspace:
         self.tabs[tab_id] = tab
         return tab
 
-    def add_corrupt_tab(self, tab_id: uuid.UUID, content: bytes) -> None:
-        if tab_id in self.tabs or tab_id in self._corrupt_tab_records:
+    def add_unavailable_tab(
+        self,
+        tab_id: uuid.UUID,
+        record: UnavailableChildRecord,
+    ) -> None:
+        if tab_id in self.tabs or tab_id in self._unavailable_tab_records:
             raise ValueError(f"Workspace already contains tab {tab_id}")
-        self._corrupt_tab_records[tab_id] = content
+        self._unavailable_tab_records[tab_id] = record
 
     @property
-    def corrupt_tab_ids(self) -> set[uuid.UUID]:
-        return set(self._corrupt_tab_records)
+    def unavailable_tab_ids(self) -> set[uuid.UUID]:
+        return set(self._unavailable_tab_records)
 
-    def corrupt_tab_bytes(self, tab_id: uuid.UUID) -> bytes:
-        return self._corrupt_tab_records[tab_id]
+    def unavailable_tab_record(self, tab_id: uuid.UUID) -> UnavailableChildRecord:
+        return self._unavailable_tab_records[tab_id]
 
-    def remove_tab(self, tab_id: uuid.UUID) -> Tab | None:
-        return self.tabs.pop(tab_id, None)
+    def remove_tab(self, tab_id: uuid.UUID) -> Tab | UnavailableChildRecord | None:
+        tab = self.tabs.pop(tab_id, None)
+        if tab is not None:
+            return tab
+        return self._unavailable_tab_records.pop(tab_id, None)
 
     # Analysis management --------------------------------------------
 
@@ -170,7 +203,7 @@ class Workspace:
         analysis_id = analysis.id
         if (
             analysis_id in self.analyses
-            or analysis_id in self._corrupt_analysis_records
+            or analysis_id in self._unavailable_analysis_records
         ):
             raise ValueError(f"Workspace already contains analysis {analysis_id}")
         tab = self.tabs.get(analysis.tab_id)
@@ -185,30 +218,37 @@ class Workspace:
             tab.analysis_ids.append(analysis.id)
         return analysis
 
-    def add_corrupt_analysis(self, analysis_id: uuid.UUID, content: bytes) -> None:
+    def add_unavailable_analysis(
+        self,
+        analysis_id: uuid.UUID,
+        record: UnavailableChildRecord,
+    ) -> None:
         if (
             analysis_id in self.analyses
-            or analysis_id in self._corrupt_analysis_records
+            or analysis_id in self._unavailable_analysis_records
         ):
             raise ValueError(f"Workspace already contains analysis {analysis_id}")
-        self._corrupt_analysis_records[analysis_id] = content
+        self._unavailable_analysis_records[analysis_id] = record
 
     @property
-    def corrupt_analysis_ids(self) -> set[uuid.UUID]:
-        return set(self._corrupt_analysis_records)
+    def unavailable_analysis_ids(self) -> set[uuid.UUID]:
+        return set(self._unavailable_analysis_records)
 
-    def corrupt_analysis_bytes(self, analysis_id: uuid.UUID) -> bytes:
-        return self._corrupt_analysis_records[analysis_id]
+    def unavailable_analysis_record(
+        self,
+        analysis_id: uuid.UUID,
+    ) -> UnavailableChildRecord:
+        return self._unavailable_analysis_records[analysis_id]
 
     def remove_analysis(
         self, analysis_id: uuid.UUID
-    ) -> AnalysisRecord | bytes | None:
+    ) -> AnalysisRecord | UnavailableChildRecord | None:
         analysis = self.analyses.get(analysis_id)
         if analysis is None:
-            corrupt = self._corrupt_analysis_records.pop(analysis_id, None)
-            if corrupt is not None:
+            unavailable = self._unavailable_analysis_records.pop(analysis_id, None)
+            if unavailable is not None:
                 self._unlink_analysis_id(analysis_id)
-            return corrupt
+            return unavailable
 
         descendants = self.analysis_descendants(analysis_id)
         for record in reversed(descendants):
@@ -275,7 +315,8 @@ class Workspace:
         for tab_id, tab in self.tabs.items():
             if analysis_id in tab.analysis_ids:
                 return tab_id
-        return None
+        unavailable = self._unavailable_analysis_records.get(analysis_id)
+        return unavailable.tab_id if unavailable is not None else None
 
     def reserved_node_ids(self) -> set[uuid.UUID]:
         """Derive active shared input reservations from durable Analysis state."""

@@ -56,6 +56,8 @@ records are historical evidence and must not be treated as current truth.
   response-serialization boundary.
 - Keep changes scoped to the request. Preserve unrelated staged and unstaged
   work.
+- Unless the user explicitly requests a push, create commits locally only and
+  do not push them to any remote.
 - Do not edit generated or vendored files directly; change their source or
   generator.
 - Keep implementation comments accurate when behavior, ownership, callers, or

@@ -17,7 +17,15 @@ describe('desktop download boundary', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.isTauri.mockReturnValue(true);
-    mocks.invoke.mockResolvedValue('/Users/test/Downloads/result.bin');
+    mocks.invoke.mockImplementation(async (command: string) =>
+      command === 'download_backend_to_downloads'
+        ? {
+            fullPath: '/Users/test/Downloads/result.bin',
+            omittedTabCount: 0,
+            omittedAnalysisCount: 0,
+          }
+        : '/Users/test/Downloads/result.bin',
+    );
     URL.createObjectURL = vi.fn(() => 'blob:download');
     URL.revokeObjectURL = vi.fn();
   });
@@ -34,7 +42,7 @@ describe('desktop download boundary', () => {
   it('streams backend GET downloads without loading a browser blob', async () => {
     const loadBrowserDownload = vi.fn();
 
-    await saveBackendDownload(
+    const omissions = await saveBackendDownload(
       '/api/user-files/content?path=corpus.csv',
       'corpus.csv',
       loadBrowserDownload,
@@ -45,6 +53,7 @@ describe('desktop download boundary', () => {
       apiPath: '/api/user-files/content?path=corpus.csv',
       filename: 'corpus.csv',
     });
+    expect(omissions).toEqual({ omittedTabCount: 0, omittedAnalysisCount: 0 });
   });
 
   it('uses only the explicit native Data Block export command for POST downloads', async () => {
@@ -75,12 +84,15 @@ describe('desktop download boundary', () => {
     const loadBrowserDownload = vi.fn().mockResolvedValue({
       blob: new Blob(['browser']),
       filename: 'server.csv',
+      omittedTabCount: 2,
+      omittedAnalysisCount: 3,
     });
 
-    await saveBackendDownload('/api/export', 'fallback.csv', loadBrowserDownload);
+    const omissions = await saveBackendDownload('/api/export', 'fallback.csv', loadBrowserDownload);
 
     expect(loadBrowserDownload).toHaveBeenCalledTimes(1);
     expect(click).toHaveBeenCalledTimes(1);
     expect(mocks.invoke).not.toHaveBeenCalled();
+    expect(omissions).toEqual({ omittedTabCount: 2, omittedAnalysisCount: 3 });
   });
 });

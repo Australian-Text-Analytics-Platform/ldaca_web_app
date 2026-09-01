@@ -24,7 +24,9 @@ from ldaca_wordflow.domain.workspace import (
     AnalysisQuerySnapshotRecord,
     AnalysisRecord,
     ConcordanceAnalysisRequest,
+    Failure,
     Node,
+    Progress,
     Tab,
     TokenFrequencyAnalysisRequest,
     Workspace,
@@ -184,12 +186,13 @@ def _valid_archive(
     name: str = "Imported",
     tabs: list[dict[str, Any]] | None = None,
     analyses: list[dict[str, Any]] | None = None,
-    version: int = 22,
+    data_schema_version: int = 1,
+    node_id: str | None = None,
 ) -> bytes:
-    node_id = str(uuid.uuid4())
+    resolved_node_id = node_id or str(uuid.uuid4())
     manifest = {
         "format": "wordflow-materialized-workspace",
-        "version": version,
+        "data_schema_version": data_schema_version,
         "workspace": {
             "id": workspace_id or str(uuid.uuid4()),
             "name": name,
@@ -199,13 +202,13 @@ def _valid_archive(
         },
         "nodes": [
             {
-                "id": node_id,
+                "id": resolved_node_id,
                 "name": "Values",
                 "provenance": {"type": "source"},
                 "document": None,
                 "color": None,
                 "tokenizer_model": None,
-                "data_file": f"data/{node_id}.parquet",
+                "data_file": f"data/{resolved_node_id}.parquet",
             }
         ],
         "tabs": tabs or [],
@@ -216,7 +219,7 @@ def _valid_archive(
     return _archive(
         [
             ("workspace/workspace.json", json.dumps(manifest).encode()),
-            (f"workspace/data/{node_id}.parquet", parquet.getvalue()),
+            (f"workspace/data/{resolved_node_id}.parquet", parquet.getvalue()),
         ]
     )
 
@@ -275,12 +278,13 @@ async def test_valid_archive_is_staged_then_atomically_installed(
     storage = FakeWorkspaceStorage(tmp_path)
     workspace_id = str(uuid.uuid4())
 
-    summary = await _service(storage).import_upload(
+    summary, omitted_tabs, omitted_analyses = await _service(storage).import_upload(
         "alice",
         "workspace.zip",
         ByteSource(_valid_archive(workspace_id=workspace_id)),
     )
 
+    assert (omitted_tabs, omitted_analyses) == (0, 0)
     assert summary["id"] != workspace_id
     assert summary["name"] == "Imported"
     assert summary["revision"] == 1
@@ -361,15 +365,16 @@ async def test_archive_round_trip_preserves_terminal_analysis_result_and_tab(
     _create_workspace_export(source, tmp_path, exported, 1024 * 1024)
     with zipfile.ZipFile(exported) as archive:
         manifest = json.loads(archive.read("workspace/workspace.json"))
-    assert manifest["version"] == 22
+    assert manifest["data_schema_version"] == 1
     assert len(manifest["analyses"]) == 1
 
     storage = FakeWorkspaceStorage(tmp_path / "installed")
-    summary = await _service(storage).import_upload(
+    summary, omitted_tabs, omitted_analyses = await _service(storage).import_upload(
         "alice",
         "analysis.zip",
         ByteSource(exported.read_bytes()),
     )
+    assert (omitted_tabs, omitted_analyses) == (0, 0)
     installed = storage.root / cast(str, summary["id"])
     loaded = WorkspaceStore(
         max_nodes=10_000,
@@ -434,11 +439,12 @@ async def test_archive_round_trip_preserves_query_snapshot(
     _create_workspace_export(source, source_root, exported, 1024 * 1024)
 
     storage = FakeWorkspaceStorage(tmp_path / "installed-query")
-    summary = await _service(storage).import_upload(
+    summary, omitted_tabs, omitted_analyses = await _service(storage).import_upload(
         "alice",
         "query-analysis.zip",
         ByteSource(exported.read_bytes()),
     )
+    assert (omitted_tabs, omitted_analyses) == (0, 0)
     installed = storage.root / cast(str, summary["id"])
     loaded = WorkspaceStore(
         max_nodes=10_000,
@@ -457,68 +463,201 @@ async def test_archive_round_trip_preserves_query_snapshot(
     ] == cast(str, summary["id"])
 
 
-async def test_archive_rejects_previous_manifest_version(tmp_path: Path) -> None:
+async def test_archive_rejects_unsupported_data_schema_version(tmp_path: Path) -> None:
     storage = FakeWorkspaceStorage(tmp_path)
 
     with pytest.raises(InvalidWorkspaceArchiveError):
         await _service(storage).import_upload(
             "alice",
             "workspace.zip",
-            ByteSource(_valid_archive(version=21)),
+            ByteSource(_valid_archive(data_schema_version=22)),
         )
 
     assert list((tmp_path / ".staging").iterdir()) == []
+
+
+async def test_archive_rejects_legacy_format_22_manifest(tmp_path: Path) -> None:
+    storage = FakeWorkspaceStorage(tmp_path)
+    current = _valid_archive()
+    with zipfile.ZipFile(io.BytesIO(current)) as source:
+        entries = [(name, source.read(name)) for name in source.namelist()]
+    rewritten: list[tuple[str | zipfile.ZipInfo, bytes]] = []
+    for name, content in entries:
+        if name == "workspace/workspace.json":
+            manifest = json.loads(content)
+            manifest["version"] = 22
+            manifest.pop("data_schema_version")
+            content = json.dumps(manifest).encode()
+        rewritten.append((name, content))
+
+    with pytest.raises(InvalidWorkspaceArchiveError):
+        await _service(storage).import_upload(
+            "alice",
+            "workspace.zip",
+            ByteSource(_archive(rewritten)),
+        )
+
+    assert list((tmp_path / ".staging").iterdir()) == []
+
+
+async def test_archive_omits_incompatible_analysis_and_keeps_data(
+    tmp_path: Path,
+) -> None:
+    storage = FakeWorkspaceStorage(tmp_path)
+    node_id = uuid.uuid4()
+    timestamp = datetime.now(UTC)
+    tab = Tab.create(
+        kind=AnalysisKind.CONCORDANCE,
+        name="Concordance",
+        timestamp=timestamp,
+    )
+    analysis = AnalysisRecord.create(
+        ConcordanceAnalysisRequest(
+            node_ids=[node_id],
+            node_columns={node_id: "value"},
+            search_word="hello",
+        ),
+        tab_id=tab.id,
+        execution_scope=AnalysisExecutionScope.PREVIEW,
+        timestamp=timestamp,
+    ).start(timestamp).fail(
+        timestamp,
+        failure=Failure(code="test_failure", message="Test failure"),
+        progress=Progress(fraction=0.5, message="Failed"),
+    )
+    tab.analysis_ids.append(analysis.id)
+    tabs = [
+        {
+            "id": str(tab.id),
+            "analysis_kind": tab.kind.value,
+            "schema_version": 1,
+            "payload": tab.model_dump(mode="json"),
+        }
+    ]
+    analyses = [
+        {
+            "id": str(analysis.id),
+            "tab_id": str(tab.id),
+            "analysis_kind": AnalysisKind.CONCORDANCE.value,
+            "schema_version": 2,
+            "payload": analysis.model_dump(mode="json"),
+            "query_inputs": [],
+        }
+    ]
+
+    summary, omitted_tabs, omitted_analyses = await _service(storage).import_upload(
+        "alice",
+        "workspace.zip",
+        ByteSource(
+            _valid_archive(
+                node_id=str(node_id),
+                tabs=tabs,
+                analyses=analyses,
+            )
+        ),
+    )
+
+    assert (omitted_tabs, omitted_analyses) == (0, 1)
+    installed = storage.root / cast(str, summary["id"])
+    loaded = WorkspaceStore(
+        max_nodes=10_000,
+        max_snapshot_bytes=1024 * 1024 * 1024,
+    ).load(installed).workspace
+    assert loaded.nodes[node_id].data.collect().to_dicts() == [{"value": "hello"}]
+    assert loaded.tabs[tab.id].analysis_ids == []
+    assert loaded.analyses == {}
+    assert loaded.unavailable_analysis_ids == set()
+
+
+async def test_archive_omits_incompatible_tab_without_decoding_payload(
+    tmp_path: Path,
+) -> None:
+    storage = FakeWorkspaceStorage(tmp_path)
+    tab_id = uuid.uuid4()
+    analysis_id = uuid.uuid4()
+    tabs = [
+        {
+            "id": str(tab_id),
+            "analysis_kind": AnalysisKind.CONCORDANCE.value,
+            "schema_version": 2,
+            "payload": {"future": "tab payload"},
+        }
+    ]
+    analyses = [
+        {
+            "id": str(analysis_id),
+            "tab_id": str(tab_id),
+            "analysis_kind": AnalysisKind.CONCORDANCE.value,
+            "schema_version": 1,
+            "payload": {"invalid": "but owned by the omitted Tab"},
+            "query_inputs": [],
+        }
+    ]
+
+    summary, omitted_tabs, omitted_analyses = await _service(storage).import_upload(
+        "alice",
+        "workspace.zip",
+        ByteSource(_valid_archive(tabs=tabs, analyses=analyses)),
+    )
+
+    assert (omitted_tabs, omitted_analyses) == (1, 1)
+    installed = storage.root / cast(str, summary["id"])
+    loaded = WorkspaceStore(
+        max_nodes=10_000,
+        max_snapshot_bytes=1024 * 1024 * 1024,
+    ).load(installed).workspace
+    assert loaded.tabs == {}
+    assert loaded.analyses == {}
 
 
 async def test_archive_rejects_duplicate_root_analysis_tab_references(
     tmp_path: Path,
 ) -> None:
     storage = FakeWorkspaceStorage(tmp_path)
-    timestamp = datetime.now(UTC).isoformat()
-    analysis_id = str(uuid.uuid4())
+    timestamp = datetime.now(UTC)
+    node_id = uuid.uuid4()
+    first_tab = Tab.create(
+        kind=AnalysisKind.CONCORDANCE,
+        name="First",
+        timestamp=timestamp,
+    )
+    second_tab = Tab.create(
+        kind=AnalysisKind.CONCORDANCE,
+        name="Second",
+        timestamp=timestamp,
+    )
+    analysis = AnalysisRecord.create(
+        ConcordanceAnalysisRequest(
+            node_ids=[node_id],
+            node_columns={node_id: "value"},
+            search_word="hello",
+        ),
+        tab_id=first_tab.id,
+        execution_scope=AnalysisExecutionScope.PREVIEW,
+        timestamp=timestamp,
+    ).start(timestamp).fail(
+        timestamp,
+        failure=Failure(code="test_failure", message="Test failure"),
+        progress=Progress(fraction=0.5, message="Failed"),
+    )
+    first_tab.analysis_ids.append(analysis.id)
+    second_tab.analysis_ids.append(analysis.id)
     tabs = [
         {
-            "id": str(uuid.uuid4()),
-            "kind": "concordance",
-            "name": name,
-            "analysis_id": analysis_id,
-            "created_at": timestamp,
-            "modified_at": timestamp,
-            "revision": 1,
+            "id": str(tab.id),
+            "analysis_kind": tab.kind.value,
+            "schema_version": 1,
+            "payload": tab.model_dump(mode="json"),
         }
-        for name in ("First", "Second")
+        for tab in (first_tab, second_tab)
     ]
-    request_node_id = str(uuid.uuid4())
     analyses = [
         {
-            "record": {
-                "id": analysis_id,
-                "parent_analysis_id": None,
-                "request": {
-                    "kind": "concordance",
-                    "node_ids": [request_node_id],
-                    "node_columns": {request_node_id: "text"},
-                    "search_word": "word",
-                    "num_left_tokens": 10,
-                    "num_right_tokens": 10,
-                    "regex": False,
-                    "whole_word": False,
-                    "case_sensitive": False,
-                    "search_mode": "regex",
-                },
-                "state": "failed",
-                "progress": {"fraction": 0.5, "message": "Failed"},
-                "cancellation_requested_at": None,
-                "error": {"code": "failed", "message": "Failed"},
-                "created_at": timestamp,
-                "started_at": timestamp,
-                "finished_at": timestamp,
-                "revision": 3,
-                "output_node_ids": [],
-                "result_payload": None,
-                "artifact_references": [],
-                "query_snapshot": None,
-            },
+            "id": str(analysis.id),
+            "tab_id": str(first_tab.id),
+            "analysis_kind": AnalysisKind.CONCORDANCE.value,
+            "schema_version": 1,
+            "payload": analysis.model_dump(mode="json"),
             "query_inputs": [],
         }
     ]
@@ -527,7 +666,13 @@ async def test_archive_rejects_duplicate_root_analysis_tab_references(
         await _service(storage).import_upload(
             "alice",
             "workspace.zip",
-            ByteSource(_valid_archive(tabs=tabs, analyses=analyses)),
+            ByteSource(
+                _valid_archive(
+                    tabs=tabs,
+                    analyses=analyses,
+                    node_id=str(node_id),
+                )
+            ),
         )
 
     assert list((tmp_path / ".staging").iterdir()) == []

@@ -17,6 +17,20 @@ function workspaceArtifactFilename(artifactName: string, workspaceId: string): s
   return `${(artifactName || workspaceId).replace(/[^a-zA-Z0-9._-]+/g, '_')}.zip`;
 }
 
+const omittedCount = (response: Response, header: string): number => {
+  const value = Number(response.headers.get(header) ?? 0);
+  return Number.isSafeInteger(value) && value > 0 ? value : 0;
+};
+
+const omissionMessage = (tabs: number, analyses: number): string => {
+  const parts = [];
+  if (tabs) parts.push(`${String(tabs)} unavailable Tab${tabs === 1 ? '' : 's'}`);
+  if (analyses) {
+    parts.push(`${String(analyses)} unavailable Analysis record${analyses === 1 ? '' : 's'}`);
+  }
+  return `${parts.join(' and ')} were omitted from the archive.`;
+};
+
 /**
  * Owns workspace artifact tasks for the full authenticated workspace-shell
  * lifetime. `WorkspaceShell` mounts this provider above `ViewRouter`, while
@@ -42,19 +56,31 @@ export function WorkspaceDownloadsProvider({ children }: { children: ReactNode }
       { workspaceId, artifactName: workspaceName, status: 'pending' },
     ]);
     try {
-      await saveBackendDownload(
+      const omissions = await saveBackendDownload(
         `/api/workspaces/${encodeURIComponent(workspaceId)}/archive`,
         workspaceArtifactFilename(workspaceName, workspaceId),
         async () => {
-          const { data } = await exportWorkspaceArchive({
+          const { data, response } = await exportWorkspaceArchive({
             parseAs: 'blob',
             path: { workspace_id: workspaceId },
             throwOnError: true,
           });
-          return { blob: data };
+          return {
+            blob: data,
+            omittedTabCount: omittedCount(response, 'x-wordflow-omitted-tab-count'),
+            omittedAnalysisCount: omittedCount(response, 'x-wordflow-omitted-analysis-count'),
+          };
         },
       );
-      toast.success(`Downloaded workspace "${workspaceName || workspaceId}".`, { duration: 3500 });
+      if (omissions.omittedTabCount || omissions.omittedAnalysisCount) {
+        toast.warning(omissionMessage(omissions.omittedTabCount, omissions.omittedAnalysisCount), {
+          duration: 7000,
+        });
+      } else {
+        toast.success(`Downloaded workspace "${workspaceName || workspaceId}".`, {
+          duration: 3500,
+        });
+      }
     } catch (error) {
       toast.error((error as Error).message || 'Failed to start workspace download.', {
         duration: 6000,

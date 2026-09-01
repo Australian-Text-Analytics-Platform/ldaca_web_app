@@ -468,8 +468,8 @@ def test_corrupt_workspace_is_catalogued_but_directly_reported_and_deletable(
                 "description": None,
                 "created_at": None,
                 "modified_at": None,
-                "stored_schema_version": None,
-                "supported_schema_version": None,
+                "stored_data_schema_version": None,
+                "supported_data_schema_version": None,
             }
         ]
 
@@ -500,7 +500,7 @@ def test_incompatible_workspace_lists_metadata_and_supports_archival_download(
         workspace_path = tmp_path / "workspaces" / workspace_id
         metadata_path = workspace_path / "workspace.json"
         payload = json.loads(metadata_path.read_text(encoding="utf-8"))
-        payload["workspace_metadata"]["version"] = 22
+        payload["workspace_metadata"]["data_schema_version"] = 2
         payload["workspace_metadata"]["created_at"] = "2024-01-01T00:00:00+00:00"
         payload["workspace_metadata"]["modified_at"] = "2024-01-02T00:00:00+00:00"
         metadata_path.write_text(json.dumps(payload), encoding="utf-8")
@@ -512,13 +512,15 @@ def test_incompatible_workspace_lists_metadata_and_supports_archival_download(
                 "availability": "unavailable",
                 "id": workspace_id,
                 "reason": "incompatible_format",
-                "message": "Workspace format 22 is incompatible with supported format 23.",
+                "message": (
+                    "Workspace data schema 2 is incompatible with supported data schema 1."
+                ),
                 "name": "Archived workshop",
                 "description": "Workshop notes",
                 "created_at": "2024-01-01T00:00:00+00:00",
                 "modified_at": "2024-01-02T00:00:00+00:00",
-                "stored_schema_version": 22,
-                "supported_schema_version": 23,
+                "stored_data_schema_version": 2,
+                "supported_data_schema_version": 1,
             }
         ]
 

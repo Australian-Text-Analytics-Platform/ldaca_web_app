@@ -23,11 +23,14 @@ from ldaca_wordflow.domain.workspace import (
     DerivationProvenance,
     Node,
     Tab,
+    TopicModelingAnalysisRequest,
     Workspace,
     node_reference,
 )
 from ldaca_wordflow.domain.workspace.provenance import CloneDerivation
 from ldaca_wordflow.infrastructure.storage.workspace_store import (
+    ANALYSIS_SCHEMA_VERSIONS,
+    WORKSPACE_DATA_SCHEMA_VERSION,
     WorkspaceCapacityError,
     WorkspaceSchemaVersionError,
     WorkspaceSnapshotInvalidError,
@@ -92,6 +95,27 @@ def _clone_provenance(node_id: uuid.UUID) -> dict[str, object]:
     }
 
 
+def _child_record_path(path: Path, collection: str, record_id: uuid.UUID) -> Path:
+    manifest = json.loads((path / "workspace.json").read_text(encoding="utf-8"))
+    reference = next(
+        item for item in manifest[collection] if item["id"] == str(record_id)
+    )
+    return path / reference["record_path"]
+
+
+def _set_child_schema_version(
+    path: Path,
+    collection: str,
+    record_id: uuid.UUID,
+    version: int,
+) -> bytes:
+    record_path = _child_record_path(path, collection, record_id)
+    envelope = json.loads(record_path.read_text(encoding="utf-8"))
+    envelope["schema_version"] = version
+    record_path.write_text(json.dumps(envelope), encoding="utf-8")
+    return record_path.read_bytes()
+
+
 def test_load_resolves_forward_references_and_preserves_persisted_order(
     tmp_path: Path,
 ) -> None:
@@ -109,7 +133,7 @@ def test_load_resolves_forward_references_and_preserves_persisted_order(
     assert loaded.nodes[child.id].parents == [loaded.nodes[parent.id]]
 
 
-def test_native_round_trip_preserves_tokenizer_and_rejects_previous_schema(
+def test_native_round_trip_preserves_tokenizer_and_rejects_other_data_schemas(
     tmp_path: Path,
 ) -> None:
     path = tmp_path / "workspace"
@@ -125,12 +149,30 @@ def test_native_round_trip_preserves_tokenizer_and_rejects_previous_schema(
 
     _rewrite_workspace_snapshot(
         path,
-        lambda payload: payload["workspace_metadata"].update({"version": 22}),
+        lambda payload: payload["workspace_metadata"].update(
+            {"data_schema_version": 2}
+        ),
     )
     with pytest.raises(WorkspaceSchemaVersionError) as exc_info:
         store.load(path)
-    assert exc_info.value.stored_version == 22
-    assert exc_info.value.supported_version == 23
+    assert exc_info.value.stored_version == 2
+    assert exc_info.value.supported_version == WORKSPACE_DATA_SCHEMA_VERSION
+
+    def restore_clean_break_version(payload: dict) -> None:
+        metadata = payload["workspace_metadata"]
+        metadata.pop("data_schema_version")
+        metadata["version"] = 23
+
+    _rewrite_workspace_snapshot(path, restore_clean_break_version)
+    with pytest.raises(WorkspaceSnapshotInvalidError):
+        store.load(path)
+
+    _rewrite_workspace_snapshot(
+        path,
+        lambda payload: payload["workspace_metadata"].update({"version": 22}),
+    )
+    with pytest.raises(WorkspaceSnapshotInvalidError):
+        store.load(path)
 
 
 @pytest.mark.parametrize("invalid_graph", ["missing", "self", "cycle", "duplicate"])
@@ -282,7 +324,10 @@ def test_tab_generations_follow_the_workspace_commit_point(tmp_path: Path) -> No
     second_payload = json.loads((path / "workspace.json").read_text(encoding="utf-8"))
     second_record = path / second_payload["tabs"][0]["record_path"]
 
-    assert first_payload["workspace_metadata"]["version"] == 23
+    assert (
+        first_payload["workspace_metadata"]["data_schema_version"]
+        == WORKSPACE_DATA_SCHEMA_VERSION
+    )
     assert first_record != second_record
     assert not first_record.exists()
     assert second_record.exists()
@@ -408,14 +453,19 @@ def test_invalid_stored_result_is_isolated_without_rewriting_its_record(
     )
     record_path = path / reference["record_path"]
     payload = json.loads(record_path.read_text())
-    payload["result_payload"] = {"ready": "yes"}
+    payload["payload"]["result_payload"] = {"ready": "yes"}
     record_path.write_text(json.dumps(payload), encoding="utf-8")
     before = record_path.read_bytes()
 
     loaded = store.load(path).workspace
 
     assert record.id not in loaded.analyses
-    assert record.id in loaded.corrupt_analysis_ids
+    assert record.id in loaded.unavailable_analysis_ids
+    unavailable = loaded.unavailable_analysis_record(record.id)
+    assert unavailable.reason == "record_invalid"
+    assert unavailable.analysis_kind is AnalysisKind.CONCORDANCE
+    assert unavailable.stored_schema_version is None
+    assert unavailable.supported_schema_version is None
     assert record_path.read_bytes() == before
 
 
@@ -481,7 +531,7 @@ def test_analysis_private_execution_storage_survives_commits_until_record_remova
     assert not (path / "analyses" / str(root.id)).exists()
 
 
-def test_corrupt_analysis_is_isolated_and_preserved_across_tab_mutation(
+def test_invalid_analysis_is_isolated_and_preserved_across_tab_mutation(
     tmp_path: Path,
 ) -> None:
     path = tmp_path / "workspace"
@@ -516,8 +566,8 @@ def test_corrupt_analysis_is_isolated_and_preserved_across_tab_mutation(
     loaded = store.load(path).workspace
     assert loaded.tabs[tab.id].name == "Healthy tab"
     assert loaded.analyses == {}
-    assert loaded.corrupt_analysis_ids == {root.id}
-    assert loaded.corrupt_analysis_bytes(root.id) == invalid_bytes
+    assert loaded.unavailable_analysis_ids == {root.id}
+    assert loaded.unavailable_analysis_record(root.id).content == invalid_bytes
 
     loaded.tabs[tab.id].name = "Renamed around corruption"
     second = store.commit(path, loaded, expected_revision=1)
@@ -526,7 +576,258 @@ def test_corrupt_analysis_is_isolated_and_preserved_across_tab_mutation(
 
     assert second.revision == 2
     assert preserved.read_bytes() == invalid_bytes
-    assert store.load(path).workspace.corrupt_analysis_ids == {root.id}
+    assert store.load(path).workspace.unavailable_analysis_ids == {root.id}
+
+
+def test_incompatible_topic_analysis_preserves_data_and_other_kinds(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "workspace"
+    store = _store()
+    workspace = Workspace(name="granular versions")
+    node = workspace.add_node(_node("source"))
+    topic_tab = workspace.add_tab(
+        Tab.create(
+            kind=AnalysisKind.TOPIC_MODELING,
+            name="Topics",
+            timestamp=datetime.now(UTC),
+        )
+    )
+    topic = workspace.add_analysis(
+        AnalysisRecord.create(
+            TopicModelingAnalysisRequest(
+                node_ids=[node.id],
+                node_columns={node.id: "text"},
+            ),
+            tab_id=topic_tab.id,
+            execution_scope=AnalysisExecutionScope.PREVIEW,
+            timestamp=datetime.now(UTC),
+        )
+    )
+    concordance_tab = workspace.add_tab(
+        Tab.create(
+            kind=AnalysisKind.CONCORDANCE,
+            name="Concordance",
+            timestamp=datetime.now(UTC),
+        )
+    )
+    concordance = workspace.add_analysis(
+        AnalysisRecord.create(
+            ConcordanceAnalysisRequest(
+                node_ids=[node.id],
+                node_columns={node.id: "text"},
+                search_word="source",
+            ),
+            tab_id=concordance_tab.id,
+            execution_scope=AnalysisExecutionScope.PREVIEW,
+            timestamp=datetime.now(UTC),
+        )
+    )
+    store.commit(path, workspace, expected_revision=None)
+
+    manifest = json.loads((path / "workspace.json").read_text(encoding="utf-8"))
+    topic_reference = next(
+        item for item in manifest["analyses"] if item["id"] == str(topic.id)
+    )
+    topic_path = path / topic_reference["record_path"]
+    envelope = json.loads(topic_path.read_text(encoding="utf-8"))
+    envelope["schema_version"] = (
+        ANALYSIS_SCHEMA_VERSIONS[AnalysisKind.TOPIC_MODELING] + 1
+    )
+    topic_path.write_text(json.dumps(envelope), encoding="utf-8")
+    incompatible_bytes = topic_path.read_bytes()
+
+    loaded = store.load(path).workspace
+
+    assert list(loaded.nodes) == [node.id]
+    assert loaded.nodes[node.id].data.collect().to_dicts() == [{"text": "source"}]
+    assert set(loaded.tabs) == {topic_tab.id, concordance_tab.id}
+    assert concordance.id in loaded.analyses
+    assert topic.id not in loaded.analyses
+    unavailable = loaded.unavailable_analysis_record(topic.id)
+    assert unavailable.reason == "incompatible_schema"
+    assert unavailable.analysis_kind is AnalysisKind.TOPIC_MODELING
+    assert unavailable.stored_schema_version == 2
+    assert unavailable.supported_schema_version == 1
+
+    loaded.name = "renamed around incompatible Analysis"
+    store.commit(path, loaded, expected_revision=1)
+    second = json.loads((path / "workspace.json").read_text(encoding="utf-8"))
+    preserved_reference = next(
+        item for item in second["analyses"] if item["id"] == str(topic.id)
+    )
+    assert (path / preserved_reference["record_path"]).read_bytes() == incompatible_bytes
+
+    with_data_change = store.load(path).workspace
+    with_data_change.add_node(_node("new data"))
+    store.commit(path, with_data_change, expected_revision=2)
+    assert (
+        _child_record_path(path, "analyses", topic.id).read_bytes()
+        == incompatible_bytes
+    )
+
+    with_analysis_change = store.load(path).workspace
+    with_analysis_change.replace_analysis(
+        with_analysis_change.analyses[concordance.id].start(datetime.now(UTC))
+    )
+    store.commit(path, with_analysis_change, expected_revision=3)
+    assert (
+        _child_record_path(path, "analyses", topic.id).read_bytes()
+        == incompatible_bytes
+    )
+
+
+def test_mixed_versions_of_one_analysis_kind_are_isolated_independently(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "workspace"
+    store = _store()
+    workspace = Workspace(name="mixed versions")
+    node = workspace.add_node(_node("source"))
+    tab = workspace.add_tab(
+        Tab.create(
+            kind=AnalysisKind.CONCORDANCE,
+            name="Concordance",
+            timestamp=datetime.now(UTC),
+        )
+    )
+    records = [
+        workspace.add_analysis(
+            AnalysisRecord.create(
+                ConcordanceAnalysisRequest(
+                    node_ids=[node.id],
+                    node_columns={node.id: "text"},
+                    search_word=word,
+                ),
+                tab_id=tab.id,
+                execution_scope=AnalysisExecutionScope.PREVIEW,
+                timestamp=datetime.now(UTC),
+            )
+        )
+        for word in ("source", "other")
+    ]
+    store.commit(path, workspace, expected_revision=None)
+    _set_child_schema_version(path, "analyses", records[0].id, 2)
+
+    loaded = store.load(path).workspace
+
+    assert records[0].id in loaded.unavailable_analysis_ids
+    assert loaded.unavailable_analysis_record(records[0].id).reason == (
+        "incompatible_schema"
+    )
+    assert loaded.analyses[records[1].id] == records[1]
+
+
+def test_incompatible_parent_isolates_descendants_but_not_independent_roots(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "workspace"
+    store = _store()
+    workspace = Workspace(name="forest isolation")
+    node = workspace.add_node(_node("source"))
+    tab = workspace.add_tab(
+        Tab.create(
+            kind=AnalysisKind.CONCORDANCE,
+            name="Concordance",
+            timestamp=datetime.now(UTC),
+        )
+    )
+    source_request = ConcordanceAnalysisRequest(
+        node_ids=[node.id],
+        node_columns={node.id: "text"},
+        search_word="source",
+    )
+    parent = workspace.add_analysis(
+        AnalysisRecord.create(
+            source_request,
+            tab_id=tab.id,
+            execution_scope=AnalysisExecutionScope.PREVIEW,
+            timestamp=datetime.now(UTC),
+        )
+    )
+    child = workspace.add_analysis(
+        AnalysisRecord.create(
+            ConcordanceRunAllAnalysisRequest(source=source_request),
+            tab_id=tab.id,
+            execution_scope=AnalysisExecutionScope.SUPPORTING,
+            timestamp=datetime.now(UTC),
+            parent_analysis_id=parent.id,
+        )
+    )
+    independent = workspace.add_analysis(
+        AnalysisRecord.create(
+            source_request.model_copy(update={"search_word": "independent"}),
+            tab_id=tab.id,
+            execution_scope=AnalysisExecutionScope.PREVIEW,
+            timestamp=datetime.now(UTC),
+        )
+    )
+    store.commit(path, workspace, expected_revision=None)
+    _set_child_schema_version(path, "analyses", parent.id, 2)
+
+    loaded = store.load(path).workspace
+
+    assert set(loaded.unavailable_analysis_ids) == {parent.id, child.id}
+    assert loaded.unavailable_analysis_record(parent.id).stored_schema_version == 2
+    inherited = loaded.unavailable_analysis_record(child.id)
+    assert inherited.reason == "incompatible_schema"
+    assert inherited.stored_schema_version == 2
+    assert inherited.supported_schema_version == 1
+    assert loaded.analyses[independent.id] == independent
+
+
+def test_incompatible_tab_isolates_owned_analyses_and_can_be_deleted(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "workspace"
+    store = _store()
+    workspace = Workspace(name="tab isolation")
+    node = workspace.add_node(_node("source"))
+    incompatible_tab = workspace.add_tab(
+        Tab.create(
+            kind=AnalysisKind.CONCORDANCE,
+            name="Future Tab",
+            timestamp=datetime.now(UTC),
+        )
+    )
+    owned = workspace.add_analysis(
+        AnalysisRecord.create(
+            ConcordanceAnalysisRequest(
+                node_ids=[node.id],
+                node_columns={node.id: "text"},
+                search_word="source",
+            ),
+            tab_id=incompatible_tab.id,
+            execution_scope=AnalysisExecutionScope.PREVIEW,
+            timestamp=datetime.now(UTC),
+        )
+    )
+    healthy_tab = workspace.add_tab(
+        Tab.create(
+            kind=AnalysisKind.QUOTATION,
+            name="Healthy Tab",
+            timestamp=datetime.now(UTC),
+        )
+    )
+    store.commit(path, workspace, expected_revision=None)
+    _set_child_schema_version(path, "tabs", incompatible_tab.id, 2)
+
+    loaded = store.load(path).workspace
+
+    assert loaded.unavailable_tab_ids == {incompatible_tab.id}
+    assert loaded.tabs[healthy_tab.id] == healthy_tab
+    unavailable_analysis = loaded.unavailable_analysis_record(owned.id)
+    assert unavailable_analysis.reason == "incompatible_schema"
+    assert unavailable_analysis.tab_id == incompatible_tab.id
+
+    loaded.remove_tab(incompatible_tab.id)
+    loaded.remove_analysis(owned.id)
+    store.commit(path, loaded, expected_revision=1)
+    reloaded = store.load(path).workspace
+    assert incompatible_tab.id not in reloaded.unavailable_tab_ids
+    assert owned.id not in reloaded.unavailable_analysis_ids
+    assert not (path / "tabs" / str(incompatible_tab.id)).exists()
+    assert not (path / "analyses" / str(owned.id)).exists()
 
 
 @pytest.mark.parametrize("revision", [True, 1.0, "1"])

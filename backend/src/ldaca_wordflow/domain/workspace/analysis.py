@@ -25,6 +25,7 @@ from ..annotation import (
     AnnotationProviderSnapshot,
 )
 from ..background import BackgroundState, Failure, Progress
+from .tab import AnalysisKind
 
 
 class _StrictModel(BaseModel):
@@ -533,6 +534,23 @@ SupportingAnalysisRequest = Annotated[
 
 AnalysisRequest = PreviewAnalysisRequest | SupportingAnalysisRequest
 
+
+def analysis_kind_for_request(request: AnalysisRequest) -> AnalysisKind:
+    """Return the top-level Tab kind that owns one persisted Analysis request."""
+
+    return AnalysisKind(
+        {
+            "annotation_run_all": "annotation",
+            "concordance_run_all": "concordance",
+            "concordance_match_data_block_creation": "concordance",
+            "concordance_document_data_block_creation": "concordance",
+            "quotation_run_all": "quotation",
+            "quotation_result_data_block_creation": "quotation",
+            "sequential_data_block_creation": "sequential",
+            "topic_modeling_data_block_creation": "topic_modeling",
+        }.get(request.kind, request.kind)
+    )
+
 AnalysisSubmission = Annotated[
     TokenFrequencyAnalysisRequest
     | TopicModelingAnalysisRequest
@@ -861,15 +879,28 @@ class Analysis(_AnalysisLifecycle):
 
 
 class UnavailableAnalysis(_StrictModel):
-    """Minimal safe item for an invalid persisted Analysis record."""
+    """Minimal safe item for an unavailable persisted Analysis record."""
 
     availability: Literal["unavailable"]
     id: uuid.UUID
     tab_id: uuid.UUID
-    reason: Literal["record_invalid"]
-    warning: Literal[
-        "This Analysis is unavailable because its stored record is invalid."
-    ]
+    reason: Literal["record_invalid", "incompatible_schema"]
+    analysis_kind: AnalysisKind | None = None
+    stored_schema_version: int | None = None
+    supported_schema_version: int | None = None
+    warning: str
+
+    @model_validator(mode="after")
+    def validate_schema_versions(self) -> UnavailableAnalysis:
+        versions = (self.stored_schema_version, self.supported_schema_version)
+        if self.reason == "incompatible_schema":
+            if self.analysis_kind is None or any(version is None for version in versions):
+                raise ValueError(
+                    "Incompatible Analyses require kind and schema versions"
+                )
+        elif any(version is not None for version in versions):
+            raise ValueError("Invalid Analyses cannot expose schema versions")
+        return self
 
 
 type AnalysisResource = Annotated[
@@ -941,6 +972,7 @@ __all__ = [
     "ValidAnalysisIntegrity",
     "UnavailableAnalysis",
     "analysis_input_ids",
+    "analysis_kind_for_request",
     "analysis_snapshot_input_ids",
     "SupportingAnalysisRequest",
     "SupportingAnalysisSubmission",

@@ -35,26 +35,40 @@ from .node_store import to_dict as node_to_dict
 from ...domain.workspace import (
     AnalysisRecord,
     AnalysisExecutionScope,
+    AnalysisKind,
     AnalysisState,
     Node,
     NodeProvenance,
     Tab,
+    UnavailableChildRecord,
+    analysis_kind_for_request,
     analysis_input_ids,
     referenced_node_ids,
     validate_node_provenance,
 )
 
 logger = logging.getLogger(__name__)
-WORKSPACE_SCHEMA_VERSION = 23
+WORKSPACE_DATA_SCHEMA_VERSION = 1
+ANALYSIS_SCHEMA_VERSIONS: dict[AnalysisKind, int] = {
+    kind: 1 for kind in AnalysisKind
+}
 _WORKSPACE_ENVELOPE_FIELDS = {"workspace_metadata", "nodes", "tabs", "analyses"}
 _WORKSPACE_METADATA_FIELDS = {
     "id",
     "name",
-    "version",
+    "data_schema_version",
     "description",
     "created_at",
     "modified_at",
     "revision",
+}
+_TAB_RECORD_FIELDS = {"id", "analysis_kind", "schema_version", "payload"}
+_ANALYSIS_RECORD_FIELDS = {
+    "id",
+    "tab_id",
+    "analysis_kind",
+    "schema_version",
+    "payload",
 }
 
 
@@ -76,7 +90,7 @@ class WorkspaceSchemaVersionError(WorkspaceSnapshotInvalidError):
         workspace_metadata: Mapping[str, Any] | None = None,
     ) -> None:
         super().__init__(
-            "Workspace schema version "
+            "Workspace data schema version "
             f"{stored_version} is incompatible with supported version {supported_version}"
         )
         self.stored_version = stored_version
@@ -258,6 +272,66 @@ def _garbage_collect_workspace_data(
                 candidate.unlink(missing_ok=True)
 
 
+def _canonical_uuid_text(raw: object, *, label: str) -> str:
+    if not isinstance(raw, str):
+        raise ValueError(f"{label} must be a string")
+    value = str(uuid.UUID(raw))
+    if value != raw:
+        raise ValueError(f"{label} must be canonical")
+    return value
+
+
+def _stored_tab_record(tab: Tab) -> dict[str, Any]:
+    return {
+        "id": str(tab.id),
+        "analysis_kind": tab.kind.value,
+        "schema_version": ANALYSIS_SCHEMA_VERSIONS[tab.kind],
+        "payload": tab.model_dump(mode="json"),
+    }
+
+
+def _stored_analysis_record(record: AnalysisRecord) -> dict[str, Any]:
+    analysis_kind = analysis_kind_for_request(record.request)
+    return {
+        "id": str(record.id),
+        "tab_id": str(record.tab_id),
+        "analysis_kind": analysis_kind.value,
+        "schema_version": ANALYSIS_SCHEMA_VERSIONS[analysis_kind],
+        "payload": record.model_dump(mode="json"),
+    }
+
+
+def _record_invalid(
+    content: bytes,
+    *,
+    analysis_kind: AnalysisKind | None = None,
+    tab_id: uuid.UUID | None = None,
+) -> UnavailableChildRecord:
+    return UnavailableChildRecord(
+        content=content,
+        reason="record_invalid",
+        analysis_kind=analysis_kind,
+        tab_id=tab_id,
+    )
+
+
+def _incompatible_record(
+    content: bytes,
+    *,
+    analysis_kind: AnalysisKind,
+    stored_schema_version: int,
+    tab_id: uuid.UUID | None = None,
+) -> UnavailableChildRecord:
+    return UnavailableChildRecord(
+        content=content,
+        reason="incompatible_schema",
+        analysis_kind=analysis_kind,
+        stored_schema_version=stored_schema_version,
+        supported_schema_version=ANALYSIS_SCHEMA_VERSIONS[analysis_kind],
+        tab_id=tab_id,
+    )
+
+
 def _tab_references(payload: Mapping[str, Any]) -> list[tuple[str, Path]]:
     """Validate the commit-point references to strict Tab generations."""
 
@@ -298,11 +372,11 @@ def _read_tabs(
     references: list[tuple[str, Path]],
     *,
     max_bytes: int,
-) -> tuple[list[Tab], dict[str, bytes], int]:
-    """Read valid Tabs while retaining invalid bytes as isolated resources."""
+) -> tuple[list[Tab], dict[str, UnavailableChildRecord], int]:
+    """Read version-compatible Tabs while retaining unavailable bytes."""
 
     tabs: list[Tab] = []
-    corrupt: dict[str, bytes] = {}
+    unavailable: dict[str, UnavailableChildRecord] = {}
     total_bytes = 0
     analysis_ids: set[uuid.UUID] = set()
     for tab_id, relative in references:
@@ -314,20 +388,43 @@ def _read_tabs(
         if total_bytes + len(content) > max_bytes:
             raise WorkspaceCapacityError("Workspace Tab records exceed their byte budget")
         total_bytes += len(content)
+        analysis_kind: AnalysisKind | None = None
         try:
-            tab = Tab.model_validate_json(content)
-            if str(tab.id) != tab_id:
+            envelope = json.loads(content)
+            if not isinstance(envelope, Mapping) or set(envelope) != _TAB_RECORD_FIELDS:
+                raise ValueError("Workspace Tab record envelope is invalid")
+            if _canonical_uuid_text(envelope["id"], label="Workspace Tab ID") != tab_id:
                 raise ValueError("Workspace Tab identity does not match its reference")
+            analysis_kind = AnalysisKind(envelope["analysis_kind"])
+            schema_version = envelope["schema_version"]
+            if type(schema_version) is not int or schema_version < 1:
+                raise ValueError("Workspace Tab schema version is invalid")
+            payload = envelope["payload"]
+            if not isinstance(payload, Mapping):
+                raise ValueError("Workspace Tab payload is invalid")
+            if schema_version != ANALYSIS_SCHEMA_VERSIONS[analysis_kind]:
+                unavailable[tab_id] = _incompatible_record(
+                    content,
+                    analysis_kind=analysis_kind,
+                    stored_schema_version=schema_version,
+                )
+                continue
+            tab = Tab.model_validate(payload)
+            if str(tab.id) != tab_id or tab.kind is not analysis_kind:
+                raise ValueError("Workspace Tab envelope does not match its payload")
             if len(tab.analysis_ids) != len(set(tab.analysis_ids)):
                 raise ValueError("A Tab cannot contain duplicate Analysis IDs")
             if analysis_ids.intersection(tab.analysis_ids):
                 raise ValueError("An Analysis cannot belong to multiple Tabs")
             analysis_ids.update(tab.analysis_ids)
-        except ValueError, UnicodeError:
-            corrupt[tab_id] = content
+        except (TypeError, ValueError, UnicodeError):
+            unavailable[tab_id] = _record_invalid(
+                content,
+                analysis_kind=analysis_kind,
+            )
         else:
             tabs.append(tab)
-    return tabs, corrupt, total_bytes
+    return tabs, unavailable, total_bytes
 
 
 def _garbage_collect_workspace_tabs(
@@ -403,11 +500,15 @@ def _read_analysis_records(
     references: list[tuple[str, Path]],
     *,
     max_bytes: int,
-) -> tuple[list[tuple[AnalysisRecord, bytes]], dict[str, bytes], int]:
-    """Read valid records while retaining invalid bytes as isolated resources."""
+) -> tuple[
+    list[tuple[AnalysisRecord, bytes]],
+    dict[str, UnavailableChildRecord],
+    int,
+]:
+    """Read version-compatible records while retaining unavailable bytes."""
 
     records: list[tuple[AnalysisRecord, bytes]] = []
-    corrupt: dict[str, bytes] = {}
+    unavailable: dict[str, UnavailableChildRecord] = {}
     total_bytes = 0
     for analysis_id, relative in references:
         try:
@@ -420,15 +521,56 @@ def _read_analysis_records(
                 "Workspace Analysis records exceed their byte budget"
             )
         total_bytes += len(content)
+        analysis_kind: AnalysisKind | None = None
+        tab_id: uuid.UUID | None = None
         try:
-            record = AnalysisRecord.model_validate_json(content)
-            if str(record.id) != analysis_id:
+            envelope = json.loads(content)
+            if (
+                not isinstance(envelope, Mapping)
+                or set(envelope) != _ANALYSIS_RECORD_FIELDS
+            ):
+                raise ValueError("Workspace Analysis record envelope is invalid")
+            if (
+                _canonical_uuid_text(envelope["id"], label="Workspace Analysis ID")
+                != analysis_id
+            ):
                 raise ValueError("Analysis identity does not match its reference")
-        except ValueError, UnicodeError:
-            corrupt[analysis_id] = content
+            raw_tab_id = _canonical_uuid_text(
+                envelope["tab_id"],
+                label="Workspace Analysis Tab ID",
+            )
+            tab_id = uuid.UUID(raw_tab_id)
+            analysis_kind = AnalysisKind(envelope["analysis_kind"])
+            schema_version = envelope["schema_version"]
+            if type(schema_version) is not int or schema_version < 1:
+                raise ValueError("Workspace Analysis schema version is invalid")
+            payload = envelope["payload"]
+            if not isinstance(payload, Mapping):
+                raise ValueError("Workspace Analysis payload is invalid")
+            if schema_version != ANALYSIS_SCHEMA_VERSIONS[analysis_kind]:
+                unavailable[analysis_id] = _incompatible_record(
+                    content,
+                    analysis_kind=analysis_kind,
+                    stored_schema_version=schema_version,
+                    tab_id=tab_id,
+                )
+                continue
+            record = AnalysisRecord.model_validate(payload)
+            if (
+                str(record.id) != analysis_id
+                or record.tab_id != tab_id
+                or analysis_kind_for_request(record.request) is not analysis_kind
+            ):
+                raise ValueError("Analysis envelope does not match its payload")
+        except (TypeError, ValueError, UnicodeError):
+            unavailable[analysis_id] = _record_invalid(
+                content,
+                analysis_kind=analysis_kind,
+                tab_id=tab_id,
+            )
         else:
             records.append((record, content))
-    return records, corrupt, total_bytes
+    return records, unavailable, total_bytes
 
 
 def _analysis_private_owner_ids(
@@ -439,12 +581,12 @@ def _analysis_private_owner_ids(
 ) -> tuple[set[str], set[str], set[str]]:
     """Derive which strict records may retain private Analysis storage."""
 
-    records, corrupt, _total_bytes = _read_analysis_records(
+    records, unavailable, _total_bytes = _read_analysis_records(
         root,
         references,
         max_bytes=max_bytes,
     )
-    corrupt_ids = set(corrupt)
+    unavailable_ids = set(unavailable)
     execution_owner_ids = {
         str(record.id)
         for record, _content in records
@@ -466,17 +608,17 @@ def _analysis_private_owner_ids(
             is not None
             and parent.state in {AnalysisState.QUEUED, AnalysisState.RUNNING}
         )
-    } | corrupt_ids
+    } | unavailable_ids
     artifact_owner_ids = {
         str(record.id)
         for record, _content in records
         if record.state is AnalysisState.SUCCEEDED
-    } | corrupt_ids
+    } | unavailable_ids
     query_snapshot_owner_ids = {
         str(record.id)
         for record, _content in records
         if record.state is AnalysisState.SUCCEEDED and record.query_snapshot is not None
-    } | corrupt_ids
+    } | unavailable_ids
     return execution_owner_ids, artifact_owner_ids, query_snapshot_owner_ids
 
 
@@ -484,9 +626,9 @@ def _add_workspace_analyses(
     workspace: Workspace,
     workspace_root: Path,
     records: list[tuple[AnalysisRecord, bytes]],
-    corrupt: dict[str, bytes],
+    unavailable: dict[str, UnavailableChildRecord],
 ) -> None:
-    """Hydrate valid ownership while isolating corrupt Tab-referenced roots.
+    """Hydrate valid ownership while isolating unavailable records.
 
     Valid detached roots and children stay in the aggregate until cancellation
     and cleanup finish. Public visibility is derived separately from current
@@ -498,13 +640,42 @@ def _add_workspace_analyses(
         for tab in workspace.tabs.values()
         for analysis_id in tab.analysis_ids
     }
-    by_id = {record.id: (record, content) for record, content in records}
+
+    def unavailable_dependency_record(
+        record: AnalysisRecord,
+        content: bytes,
+        dependency: UnavailableChildRecord,
+    ) -> UnavailableChildRecord:
+        analysis_kind = analysis_kind_for_request(record.request)
+        if dependency.reason == "incompatible_schema":
+            if dependency.stored_schema_version is None:
+                raise ValueError("Incompatible dependency is missing its schema version")
+            return _incompatible_record(
+                content,
+                analysis_kind=analysis_kind,
+                stored_schema_version=dependency.stored_schema_version,
+                tab_id=record.tab_id,
+            )
+        return _record_invalid(
+            content,
+            analysis_kind=analysis_kind,
+            tab_id=record.tab_id,
+        )
+
     pending = list(records)
     while pending:
         next_pending: list[tuple[AnalysisRecord, bytes]] = []
         progressed = False
         for record, content in pending:
             analysis_id = record.id
+            if record.tab_id in workspace.unavailable_tab_ids:
+                unavailable[str(analysis_id)] = unavailable_dependency_record(
+                    record,
+                    content,
+                    workspace.unavailable_tab_record(record.tab_id),
+                )
+                progressed = True
+                continue
             try:
                 validate_analysis_result_integrity(
                     workspace_root,
@@ -512,11 +683,19 @@ def _add_workspace_analyses(
                     set(workspace.nodes),
                 )
             except (OSError, ValueError):
-                corrupt[str(analysis_id)] = content
+                unavailable[str(analysis_id)] = _record_invalid(
+                    content,
+                    analysis_kind=analysis_kind_for_request(record.request),
+                    tab_id=record.tab_id,
+                )
                 progressed = True
                 continue
             if set(analysis_input_ids(record.request)) & workspace.unavailable_node_ids:
-                corrupt[str(analysis_id)] = content
+                unavailable[str(analysis_id)] = _record_invalid(
+                    content,
+                    analysis_kind=analysis_kind_for_request(record.request),
+                    tab_id=record.tab_id,
+                )
                 progressed = True
                 continue
             parent_id = (
@@ -524,33 +703,60 @@ def _add_workspace_analyses(
                 if record.parent_analysis_id is not None
                 else None
             )
+            if parent_id is not None and str(parent_id) in unavailable:
+                unavailable[str(analysis_id)] = unavailable_dependency_record(
+                    record,
+                    content,
+                    unavailable[str(parent_id)],
+                )
+                progressed = True
+                continue
             if parent_id is not None and parent_id not in workspace.analyses:
                 next_pending.append((record, content))
                 continue
             tab = workspace.tabs.get(record.tab_id)
             linked = analysis_id in tab_analysis_ids
             if linked and (tab is None or record.id not in tab.analysis_ids):
-                corrupt[str(analysis_id)] = content
+                unavailable[str(analysis_id)] = _record_invalid(
+                    content,
+                    analysis_kind=analysis_kind_for_request(record.request),
+                    tab_id=record.tab_id,
+                )
                 progressed = True
                 continue
             try:
                 workspace.add_analysis(record, link_to_tab=linked)
             except ValueError:
-                corrupt[str(analysis_id)] = content
+                unavailable[str(analysis_id)] = _record_invalid(
+                    content,
+                    analysis_kind=analysis_kind_for_request(record.request),
+                    tab_id=record.tab_id,
+                )
             progressed = True
         if not progressed:
             for record, content in next_pending:
-                corrupt[str(record.id)] = content
+                unavailable[str(record.id)] = _record_invalid(
+                    content,
+                    analysis_kind=analysis_kind_for_request(record.request),
+                    tab_id=record.tab_id,
+                )
             break
         pending = next_pending
 
     for analysis_id in sorted(tab_analysis_ids):
         if analysis_id in workspace.analyses:
             continue
-        content = corrupt.get(
-            str(analysis_id), by_id.get(analysis_id, (None, b""))[1]
+        unavailable.setdefault(
+            str(analysis_id),
+            _record_invalid(
+                b"",
+                tab_id=workspace.analysis_tab_id(analysis_id),
+            ),
         )
-        workspace.add_corrupt_analysis(analysis_id, content)
+    for raw_analysis_id, record in unavailable.items():
+        analysis_id = uuid.UUID(raw_analysis_id)
+        if analysis_id not in workspace.analyses:
+            workspace.add_unavailable_analysis(analysis_id, record)
 
 
 def _garbage_collect_workspace_analyses(
@@ -718,18 +924,18 @@ def _write_workspace(
             record_path = target.parent / relative
             record_bytes = atomic_write_json(
                 record_path,
-                tab.model_dump(mode="json"),
+                _stored_tab_record(tab),
                 max_bytes=remaining,
             )
             created_tab_records.append(record_path)
             tabs_data.append({"id": tab_id_text, "record_path": relative.as_posix()})
             remaining -= record_bytes
 
-        for tab_id in sorted(workspace.corrupt_tab_ids):
-            content = workspace.corrupt_tab_bytes(tab_id)
+        for tab_id in sorted(workspace.unavailable_tab_ids):
+            content = workspace.unavailable_tab_record(tab_id).content
             if len(content) > remaining:
                 raise AtomicWriteCapacityError(
-                    "Corrupt Tab record exceeds its storage budget"
+                    "Unavailable Tab record exceeds its storage budget"
                 )
             tab_id_text = str(tab_id)
             relative = Path("tabs") / tab_id_text / f"{generation}.json"
@@ -750,7 +956,7 @@ def _write_workspace(
             record_path = target.parent / relative
             record_bytes = atomic_write_json(
                 record_path,
-                analysis.model_dump(mode="json"),
+                _stored_analysis_record(analysis),
                 max_bytes=remaining,
             )
             created_analysis_records.append(record_path)
@@ -759,11 +965,11 @@ def _write_workspace(
             )
             remaining -= record_bytes
 
-        for analysis_id in sorted(workspace.corrupt_analysis_ids):
-            content = workspace.corrupt_analysis_bytes(analysis_id)
+        for analysis_id in sorted(workspace.unavailable_analysis_ids):
+            content = workspace.unavailable_analysis_record(analysis_id).content
             if len(content) > remaining:
                 raise AtomicWriteCapacityError(
-                    "Corrupt Analysis record exceeds its storage budget"
+                    "Unavailable Analysis record exceeds its storage budget"
                 )
             analysis_id_text = str(analysis_id)
             relative = (
@@ -781,7 +987,7 @@ def _write_workspace(
         workspace_metadata: dict[str, Any] = {
             "id": str(workspace.id),
             "name": workspace.name,
-            "version": WORKSPACE_SCHEMA_VERSION,
+            "data_schema_version": WORKSPACE_DATA_SCHEMA_VERSION,
             "description": description,
             "created_at": created_at,
             "modified_at": modified_at,
@@ -842,20 +1048,20 @@ def _write_workspace(
                     and parent.state in {AnalysisState.QUEUED, AnalysisState.RUNNING}
                 )
             }
-            | {str(value) for value in workspace.corrupt_analysis_ids},
+            | {str(value) for value in workspace.unavailable_analysis_ids},
             artifact_owner_ids={
                 str(analysis_id)
                 for analysis_id, analysis in workspace.analyses.items()
                 if analysis.state is AnalysisState.SUCCEEDED
             }
-            | {str(value) for value in workspace.corrupt_analysis_ids},
+            | {str(value) for value in workspace.unavailable_analysis_ids},
             query_snapshot_owner_ids={
                 str(analysis_id)
                 for analysis_id, analysis in workspace.analyses.items()
                 if analysis.state is AnalysisState.SUCCEEDED
                 and analysis.query_snapshot is not None
             }
-            | {str(value) for value in workspace.corrupt_analysis_ids},
+            | {str(value) for value in workspace.unavailable_analysis_ids},
         )
     except Exception:
         logger.warning(
@@ -880,11 +1086,14 @@ def _read_workspace_metadata(path: str | Path) -> dict[str, Any]:
     workspace_metadata = payload.get("workspace_metadata")
     if not isinstance(workspace_metadata, dict):
         raise ValueError("Workspace metadata envelope is invalid")
-    stored_version = workspace_metadata.get("version")
-    if type(stored_version) is int and stored_version != WORKSPACE_SCHEMA_VERSION:
+    stored_version = workspace_metadata.get("data_schema_version")
+    if (
+        type(stored_version) is int
+        and stored_version != WORKSPACE_DATA_SCHEMA_VERSION
+    ):
         raise WorkspaceSchemaVersionError(
             stored_version,
-            WORKSPACE_SCHEMA_VERSION,
+            WORKSPACE_DATA_SCHEMA_VERSION,
             workspace_metadata,
         )
     if set(payload) != _WORKSPACE_ENVELOPE_FIELDS:
@@ -900,8 +1109,8 @@ def _read_workspace_metadata(path: str | Path) -> dict[str, Any]:
         raise ValueError("Workspace metadata envelope is invalid")
     if set(workspace_metadata) != _WORKSPACE_METADATA_FIELDS:
         raise ValueError("Workspace metadata fields are invalid")
-    if stored_version != WORKSPACE_SCHEMA_VERSION:
-        raise ValueError("Workspace schema version is invalid")
+    if stored_version != WORKSPACE_DATA_SCHEMA_VERSION:
+        raise ValueError("Workspace data schema version is invalid")
     if not isinstance(workspace_metadata.get("id"), str) or not isinstance(
         workspace_metadata.get("name"), str
     ):
@@ -937,9 +1146,9 @@ def _stored_schema_signature(raw_schema: object) -> tuple[tuple[str, str], ...]:
 def _read_workspace(
     path: str | Path,
     tabs: list[Tab],
-    corrupt_tabs: dict[str, bytes],
+    unavailable_tabs: dict[str, UnavailableChildRecord],
     analyses: list[tuple[AnalysisRecord, bytes]],
-    corrupt_analyses: dict[str, bytes],
+    unavailable_analyses: dict[str, UnavailableChildRecord],
     *,
     published_root: Path | None = None,
 ) -> Workspace:
@@ -1179,13 +1388,13 @@ def _read_workspace(
 
     for tab in tabs:
         workspace.add_tab(tab)
-    for tab_id, content in corrupt_tabs.items():
-        workspace.add_corrupt_tab(uuid.UUID(tab_id), content)
+    for tab_id, record in unavailable_tabs.items():
+        workspace.add_unavailable_tab(uuid.UUID(tab_id), record)
     _add_workspace_analyses(
         workspace,
         target.parent,
         analyses,
-        corrupt_analyses,
+        unavailable_analyses,
     )
 
     return workspace
@@ -1454,13 +1663,13 @@ class WorkspaceStore:
                     "Workspace snapshot exceeds its byte limit"
                 )
             references = _tab_references(payload)
-            _tabs, _corrupt_tabs, tab_bytes = _read_tabs(
+            _tabs, _unavailable_tabs, tab_bytes = _read_tabs(
                 root,
                 references,
                 max_bytes=self.max_snapshot_bytes - total_bytes,
             )
             total_bytes += tab_bytes
-            _records, _corrupt, analysis_bytes = _read_analysis_records(
+            _records, _unavailable_analyses, analysis_bytes = _read_analysis_records(
                 root,
                 _analysis_references(payload),
                 max_bytes=self.max_snapshot_bytes - total_bytes,
@@ -1541,12 +1750,12 @@ class WorkspaceStore:
         try:
             target = _resolve_metadata_path(Path(path))
             payload = _read_workspace_metadata(target)
-            tabs, corrupt_tabs, _tab_bytes = _read_tabs(
+            tabs, unavailable_tabs, _tab_bytes = _read_tabs(
                 target.parent.resolve(),
                 _tab_references(payload),
                 max_bytes=self.max_snapshot_bytes,
             )
-            analyses, corrupt_analyses, _analysis_bytes = _read_analysis_records(
+            analyses, unavailable_analyses, _analysis_bytes = _read_analysis_records(
                 target.parent.resolve(),
                 _analysis_references(payload),
                 max_bytes=self.max_snapshot_bytes,
@@ -1554,9 +1763,9 @@ class WorkspaceStore:
             workspace = _read_workspace(
                 path,
                 tabs,
-                corrupt_tabs,
+                unavailable_tabs,
                 analyses,
-                corrupt_analyses,
+                unavailable_analyses,
                 published_root=published_root,
             )
         except WorkspaceStoreError:
@@ -1730,7 +1939,9 @@ class WorkspaceStore:
 
 
 __all__ = [
+    "ANALYSIS_SCHEMA_VERSIONS",
     "LoadedWorkspace",
+    "WORKSPACE_DATA_SCHEMA_VERSION",
     "WorkspaceCapacityError",
     "WorkspaceRevisionConflictError",
     "WorkspaceSerializationError",

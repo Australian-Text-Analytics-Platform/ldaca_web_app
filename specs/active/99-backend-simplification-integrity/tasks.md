@@ -14,7 +14,12 @@
   remote adapter. This needs the deployment target and separate authorization.
 - [x] Install the pinned spaCy pipeline as a package and remove runtime acquisition.
 - [x] Upgrade direct dependencies and modernize Python 3.14 and FastAPI typing.
-- [x] Land native schema 22, archive format 21, SQLite schema 7, and import envelope 1.
+- [x] Land the original native schema 22, archive format 21, SQLite schema 7,
+  and import envelope 1 cutover.
+- [x] Replace the later monolithic native schema 23 and archive format 22 with
+  data schema 1, archive data format 1, and independent Analysis-kind version 1
+  envelopes; preserve incompatible native records and omit them portably with
+  warning counts.
 - [x] Replace Tab and Result contracts and regenerate frontend consumers.
 - [x] Add unavailable child resources with in-place current-schema isolation.
 - [x] Complete every persistence-integrity boundary and recovery test.
@@ -48,3 +53,13 @@
 - The implementation was recorded as local commits only. No push, release,
   signed desktop artifact, live migration, or old-format conversion was
   performed.
+
+## Granular versioning acceptance evidence (2026-09-01)
+
+- Backend Ruff and Ty pass; Pytest reports 826 passing tests.
+- The regenerated OpenAPI client, frontend lint, production build, and all 275
+  frontend test files with 1,360 tests pass.
+- Cargo formatting, 26 runnable tests, and Clippy with warnings denied pass; one
+  packaged-runtime probe remains intentionally ignored without a packaged
+  desktop bundle.
+- Documentation links, bundled-document drift, and `git diff --check` pass.

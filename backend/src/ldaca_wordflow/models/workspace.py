@@ -16,12 +16,10 @@ from pydantic import (
 
 from .names import NodeName
 from ..domain.workspace import (
-    AnalysisRecord,
-    AnalysisState,
+    AnalysisKind,
     NodeProvenance,
-    Tab,
-    analysis_snapshot_input_ids,
 )
+from ..shared.json_data import JsonData
 
 
 class _StrictModel(BaseModel):
@@ -108,12 +106,15 @@ class UnavailableWorkspaceListItem(_StrictModel):
     description: str | None = None
     created_at: str | None = None
     modified_at: str | None = None
-    stored_schema_version: int | None = None
-    supported_schema_version: int | None = None
+    stored_data_schema_version: int | None = None
+    supported_data_schema_version: int | None = None
 
     @model_validator(mode="after")
     def validate_schema_versions(self) -> UnavailableWorkspaceListItem:
-        versions = (self.stored_schema_version, self.supported_schema_version)
+        versions = (
+            self.stored_data_schema_version,
+            self.supported_data_schema_version,
+        )
         if self.reason == "incompatible_format":
             if any(version is None for version in versions):
                 raise ValueError("Incompatible Workspace formats require both versions")
@@ -157,7 +158,7 @@ class WorkspaceUpdateRequest(_StrictModel):
 
 
 class WorkspaceArchiveMetadata(_StrictModel):
-    """Safe portable workspace metadata stored in archive manifest version 15."""
+    """Safe portable Workspace metadata stored in archive data format version 1."""
 
     id: uuid.UUID
     name: str = Field(min_length=1, max_length=500)
@@ -205,77 +206,35 @@ class WorkspaceArchiveAnalysisInput(_StrictModel):
     data_file: str = Field(min_length=1)
 
 
+class WorkspaceArchiveTab(_StrictModel):
+    """One schema-versioned Analysis Tab entry in a portable archive."""
+
+    id: uuid.UUID
+    analysis_kind: AnalysisKind
+    schema_version: int = Field(ge=1)
+    payload: dict[str, JsonData]
+
+
 class WorkspaceArchiveAnalysis(_StrictModel):
-    """One terminal Analysis plus safe materialized query inputs, when needed."""
+    """One schema-versioned Analysis entry plus materialized query inputs."""
 
-    record: AnalysisRecord
+    id: uuid.UUID
+    tab_id: uuid.UUID
+    analysis_kind: AnalysisKind
+    schema_version: int = Field(ge=1)
+    payload: dict[str, JsonData]
     query_inputs: list[WorkspaceArchiveAnalysisInput] = Field(default_factory=list)
-
-    @model_validator(mode="after")
-    def validate_query_inputs(self) -> WorkspaceArchiveAnalysis:
-        expected_ids = list(analysis_snapshot_input_ids(self.record.request))
-        actual_ids = [item.id for item in self.query_inputs]
-        if self.record.query_snapshot is None:
-            if actual_ids:
-                raise ValueError("Only a queryable Analysis has archived query inputs")
-            return self
-        if actual_ids != expected_ids:
-            raise ValueError("Archived query inputs must match the Analysis request")
-        analysis_id = str(self.record.id)
-        for item in self.query_inputs:
-            expected_file = f"analyses/{analysis_id}/query-data/{item.id}.parquet"
-            if item.data_file != expected_file:
-                raise ValueError("Archived query input path is invalid")
-        return self
 
 
 class WorkspaceArchiveManifest(_StrictModel):
     """Only accepted client workspace archive manifest."""
 
     format: Literal["wordflow-materialized-workspace"]
-    version: Literal[22]
+    data_schema_version: Literal[1]
     workspace: WorkspaceArchiveMetadata
     nodes: list[WorkspaceArchiveNode]
-    tabs: list[Tab]
+    tabs: list[WorkspaceArchiveTab]
     analyses: list[WorkspaceArchiveAnalysis]
-
-    @model_validator(mode="after")
-    def validate_analysis_ownership(self) -> WorkspaceArchiveManifest:
-        analysis_ids = [str(item.record.id) for item in self.analyses]
-        if len(analysis_ids) != len(set(analysis_ids)):
-            raise ValueError("Workspace archive has duplicate Analysis IDs")
-        by_id = {str(item.record.id): item.record for item in self.analyses}
-        if any(
-            record.state
-            not in {
-                AnalysisState.SUCCEEDED,
-                AnalysisState.FAILED,
-                AnalysisState.CANCELLED,
-            }
-            for record in by_id.values()
-        ):
-            raise ValueError("Workspace archives contain only terminal Analyses")
-        tab_analysis_ids = [
-            str(analysis_id)
-            for tab in self.tabs
-            for analysis_id in tab.analysis_ids
-        ]
-        if len(tab_analysis_ids) != len(set(tab_analysis_ids)):
-            raise ValueError("An Analysis may belong to only one archived Tab")
-        if set(tab_analysis_ids) != set(by_id):
-            raise ValueError("Archived Analyses must belong to exactly one Tab")
-        for tab in self.tabs:
-            for analysis_id in tab.analysis_ids:
-                record = by_id[str(analysis_id)]
-                if record.tab_id != tab.id:
-                    raise ValueError("Archived Tab and Analysis ownership is invalid")
-        for record in by_id.values():
-            if record.parent_analysis_id is None:
-                continue
-            parent = by_id.get(str(record.parent_analysis_id))
-            if parent is None or parent.tab_id != record.tab_id:
-                raise ValueError("Archived Sub-Analysis parent is invalid")
-        return self
 
 
 __all__ = [
@@ -284,6 +243,7 @@ __all__ = [
     "WorkspaceCreateRequest",
     "WorkspaceArchiveAnalysis",
     "WorkspaceArchiveAnalysisInput",
+    "WorkspaceArchiveTab",
     "WorkspaceArchiveManifest",
     "WorkspaceNodeInfo",
     "WorkspaceNodeReorderRequest",

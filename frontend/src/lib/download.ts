@@ -55,6 +55,8 @@ export interface SaveBlobOptions {
 interface BrowserDownload {
   blob: Blob;
   filename?: string;
+  omittedTabCount?: number;
+  omittedAnalysisCount?: number;
 }
 
 type BrowserDownloadLoader = () => Promise<BrowserDownload>;
@@ -72,6 +74,15 @@ type NativeDownloadCommand =
   | 'download_backend_to_downloads'
   | 'export_data_blocks_to_downloads'
   | 'save_bytes_to_downloads';
+
+export interface DownloadOmissions {
+  omittedTabCount: number;
+  omittedAnalysisCount: number;
+}
+
+interface NativeBackendDownloadResult extends DownloadOmissions {
+  fullPath: string;
+}
 
 const invokeNativeDownload = async (
   command: NativeDownloadCommand,
@@ -126,19 +137,31 @@ export const saveBackendDownload = async (
   filename: string,
   loadBrowserDownload: BrowserDownloadLoader,
   options: SaveBlobOptions = {},
-): Promise<void> => {
+): Promise<DownloadOmissions> => {
   const safeFilename = toBasename(filename);
   if (!isTauri()) {
     const download = await loadBrowserDownload();
     browserDownload(download.blob, toBasename(download.filename ?? safeFilename));
-    return;
+    return {
+      omittedTabCount: download.omittedTabCount ?? 0,
+      omittedAnalysisCount: download.omittedAnalysisCount ?? 0,
+    };
   }
-  await saveNativeDownload(
-    'download_backend_to_downloads',
-    { apiPath, filename: safeFilename },
-    safeFilename,
-    options.silent ?? false,
-  );
+  try {
+    const { invoke } = await import('@tauri-apps/api/core');
+    const result = await invoke<NativeBackendDownloadResult>('download_backend_to_downloads', {
+      apiPath,
+      filename: safeFilename,
+    });
+    showNativeDownloadSuccess(safeFilename, result.fullPath, options.silent ?? false);
+    return {
+      omittedTabCount: result.omittedTabCount,
+      omittedAnalysisCount: result.omittedAnalysisCount,
+    };
+  } catch (error) {
+    reportDownloadFailure(safeFilename, error, options.silent ?? false);
+    throw error;
+  }
 };
 
 /** Stream the explicit Data Block POST export natively without exposing a generic HTTP proxy. */

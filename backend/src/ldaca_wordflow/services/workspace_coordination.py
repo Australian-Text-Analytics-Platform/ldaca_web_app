@@ -93,8 +93,8 @@ class UnavailableWorkspaceRecord:
     description: str | None = None
     created_at: str | None = None
     modified_at: str | None = None
-    stored_schema_version: int | None = None
-    supported_schema_version: int | None = None
+    stored_data_schema_version: int | None = None
+    supported_data_schema_version: int | None = None
 
 
 type WorkspaceListRecord = WorkspaceRecord | UnavailableWorkspaceRecord
@@ -218,15 +218,15 @@ class _WorkspaceCatalogue:
                         id=candidate_id,
                         reason="incompatible_format",
                         message=(
-                            f"Workspace format {exc.stored_version} is incompatible "
-                            f"with supported format {exc.supported_version}."
+                            f"Workspace data schema {exc.stored_version} is incompatible "
+                            f"with supported data schema {exc.supported_version}."
                         ),
                         name=_incompatible_metadata_text(exc, "name"),
                         description=_incompatible_metadata_text(exc, "description"),
                         created_at=_incompatible_metadata_text(exc, "created_at"),
                         modified_at=_incompatible_metadata_text(exc, "modified_at"),
-                        stored_schema_version=exc.stored_version,
-                        supported_schema_version=exc.supported_version,
+                        stored_data_schema_version=exc.stored_version,
+                        supported_data_schema_version=exc.supported_version,
                     )
                 )
                 continue
@@ -691,7 +691,7 @@ class _WorkspaceMutationCommitter:
             node_count=len(workspace.nodes),
             tab_count=len(workspace.tabs),
             analysis_count=(
-                len(workspace.analyses) + len(workspace.corrupt_analysis_ids)
+                len(workspace.analyses) + len(workspace.unavailable_analysis_ids)
             ),
         )
         slot.closing = closing
@@ -726,7 +726,7 @@ class _WorkspaceEventPublisher:
         *,
         before_tabs: dict[uuid.UUID, int],
         before_analyses: dict[uuid.UUID, int],
-        before_corrupt: set[uuid.UUID],
+        before_unavailable: set[uuid.UUID],
     ) -> None:
         """Publish only after the complete Workspace generation is durable."""
 
@@ -778,7 +778,7 @@ class _WorkspaceEventPublisher:
                 state=record.state,
                 progress=record.progress,
             )
-        removed_analyses = (before_analyses.keys() | before_corrupt) - after_live
+        removed_analyses = (before_analyses.keys() | before_unavailable) - after_live
         for analysis_id in sorted(removed_analyses):
             await self.removed(
                 user_id,

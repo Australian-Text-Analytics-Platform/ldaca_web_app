@@ -273,7 +273,9 @@ and `group_index` values. Group indices always identify exact source-value
 tuples; optional case folding belongs to the result frontend. Trends Data Block Creation filters only this immutable
 artifact and never re-reads the live source Data Block.
 
-Native schema 22 and portable archive format 21 validate
-parent ownership, ordered Tab membership, terminal archive state, output
-identities, and retained query inputs. Older layouts are rejected without
-runtime migration.
+Native data schema 1 plus the owning Analysis-kind schema validate parent
+ownership, ordered Tab membership, output identities, and retained query
+inputs. Portable archive data format 1 applies the same kind registry and also
+validates terminal archive state. Unsupported native Analysis versions isolate
+their dependent branch; portable archives omit that branch. Earlier monolithic
+layouts are rejected without runtime migration.

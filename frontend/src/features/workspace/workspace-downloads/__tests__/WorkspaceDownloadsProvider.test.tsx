@@ -7,7 +7,7 @@ import { useWorkspaceDownloads } from '../WorkspaceDownloadsContext';
 const mocks = vi.hoisted(() => ({
   exportWorkspaceArchive: vi.fn(),
   saveBackendDownload: vi.fn(),
-  toast: { error: vi.fn(), success: vi.fn() },
+  toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() },
 }));
 
 vi.mock('@/api', async (importOriginal) => ({
@@ -36,7 +36,10 @@ describe('WorkspaceDownloadsProvider', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.exportWorkspaceArchive.mockResolvedValue({ data: new Blob(['zip']) });
-    mocks.saveBackendDownload.mockResolvedValue(undefined);
+    mocks.saveBackendDownload.mockResolvedValue({
+      omittedTabCount: 0,
+      omittedAnalysisCount: 0,
+    });
   });
 
   it('downloads the canonical workspace archive and keeps the command shell-owned', async () => {
@@ -55,6 +58,28 @@ describe('WorkspaceDownloadsProvider', () => {
       ),
     );
     expect(screen.getByText('idle')).toBeInTheDocument();
+  });
+
+  it('warns when incompatible Analysis history is omitted', async () => {
+    mocks.saveBackendDownload.mockResolvedValue({
+      omittedTabCount: 1,
+      omittedAnalysisCount: 2,
+    });
+    render(
+      <WorkspaceDownloadsProvider>
+        <DownloadStarter />
+      </WorkspaceDownloadsProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Start download' }));
+
+    await waitFor(() =>
+      expect(mocks.toast.warning).toHaveBeenCalledWith(
+        '1 unavailable Tab and 2 unavailable Analysis records were omitted from the archive.',
+        { duration: 7000 },
+      ),
+    );
+    expect(mocks.toast.success).not.toHaveBeenCalled();
   });
 
   it('reports archive failures without leaving a pending marker', async () => {

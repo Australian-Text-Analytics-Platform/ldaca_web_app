@@ -71,9 +71,10 @@ flowchart TB
   UTF-8 become one document row each; undecodable members are ignored.
 - Downloads stream response-owned snapshots so concurrent source mutation
   cannot truncate an accepted response.
-- Incompatible Workspace downloads preserve stored content in a bounded raw ZIP
-  without deployment-only `access.json`; they do not relax the strict load or
-  portable-import gates.
+- Workspaces with a recognized `data_schema_version` mismatch can be preserved
+  in a bounded raw ZIP without deployment-only `access.json`; this does not
+  relax the strict load or portable-import gates. Old layouts such as native
+  schema 23 receive no format-specific download treatment.
 - Workspace archives are inspected and extracted into staging before
   publication. The remaining crash window around final publication and plan
   rebasing is tracked in the
@@ -82,12 +83,13 @@ flowchart TB
   `access.json` ownership is checked before portable content is exposed.
 - Archive exports omit deployment ownership, and imports reject embedded
   ownership before generating a new sidecar for the importer.
-- Portable Workspace archive format 21 contains materialized Data Blocks,
-  terminal Analysis forests, declared Artifacts, and materialized immutable
-  query inputs. It contains no serialized executable plans. Import assigns a
-  fresh Workspace identity, rebuilds and rebases the private lazy plans, and
-  rejects earlier archive versions rather than guessing at missing lifecycle
-  content.
+- Portable Workspace archive data format 1 contains materialized Data Blocks,
+  compatible terminal Analysis forests, declared Artifacts, and materialized
+  immutable query inputs. It contains no serialized executable plans. Import
+  assigns a fresh Workspace identity, rebuilds and rebases the private lazy
+  plans, and rejects an unsupported data version. Newer Analysis-kind versions
+  and their dependent files are omitted with response-header counts instead of
+  blocking compatible data.
 - One `QuotaService` owns total allocated-byte policy and usage snapshots for
   every principal. `StorageAdmissionService` applies that policy to Workspace,
   User File, import, Analysis, and response-snapshot writes. User Preferences

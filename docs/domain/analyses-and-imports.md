@@ -290,10 +290,22 @@ selection.
 
 Closing and reopening a Workspace restores Tabs, terminal Analysis forests,
 immutable requests, stored Results, Artifacts, and retained query inputs.
-Native Workspace schema 22 and portable archive format 21 accept only this
-forest representation. Older layouts are rejected without runtime migration.
-Browser-local active Tab selection and Active Analysis Drafts are outside both
-storage forms.
+Native data schema version 1 owns only the Workspace and Data Block contract.
+Each top-level Analysis kind independently owns version 1 of its complete Tab,
+request, lifecycle, Result, Artifact, and supporting-record contract. Supporting
+request kinds inherit their top-level owner's version. A shared lifecycle
+envelope change increments all six Analysis-kind versions without incrementing
+the data version.
+
+An unsupported Analysis-kind version makes that Tab or Analysis and its
+dependent subtree unavailable while leaving compatible branches and Data Block
+queries usable. Its native bytes remain opaque and are preserved across
+unrelated commits. Portable archive data format version 1 accepts newer
+Analysis-kind versions but deliberately omits their payloads, namespaced files,
+and descendants. Native schema 23 has no special reader or classification and
+fails the ordinary snapshot load path; archive format 22 is rejected without
+runtime migration. Browser-local active Tab selection and Active Analysis Drafts
+remain outside both storage forms.
 
 ## User File Import
 

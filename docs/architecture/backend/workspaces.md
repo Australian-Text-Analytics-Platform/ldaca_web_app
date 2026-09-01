@@ -35,11 +35,13 @@ incompatible, corrupt, or over-limit Workspace with a valid current-owner
 sidecar appears as an Unavailable Workspace with a safe reason. Incompatible
 entries also retain best-effort name, description, and timestamp text read from
 the parsed metadata envelope; strict opening still fails with
-`500 workspace_corrupt`. Their archive action emits a bounded raw ZIP of the
-stored content while omitting deployment-only `access.json`, so the bytes can
-be preserved even though this build cannot load them. Other users receive a
-concealed 404 before portable data is parsed. The valid sidecar is sufficient
-to authorize deletion of unavailable content.
+`500 workspace_corrupt`. The client keeps a Load action for every unavailable
+entry and displays that ordinary open error. A recognized incompatible entry's
+archive action emits a bounded raw ZIP of the stored content while omitting
+deployment-only `access.json`, so the bytes can be preserved even though this
+build cannot load them. Other users receive a concealed 404 before portable
+data is parsed. The valid sidecar is sufficient to authorize deletion of
+unavailable content.
 
 ## Service Boundary
 
@@ -120,13 +122,26 @@ there is no second per-node custom-type registry to reconcile with plan
 history.
 
 `infrastructure.storage.WorkspaceStore` is the only snapshot-format boundary.
-It validates the complete `workspace.json` envelope and plan files, constructs
-unattached nodes, resolves parents, rejects invalid or cyclic graphs, and
-strictly loads per-Tab and per-Analysis records, and publishes the aggregate
-only after complete validation. Generation-named plan, Tab, and Analysis files
-are written before the atomically replaced `workspace.json` commit point. The
-store shares the central durable-filesystem primitives for file and directory
-`fsync` and same-filesystem atomic replacement.
+Native data schema version 1 governs the `workspace.json` envelope, Data Block
+graph and plans, and stable child-record references. A separate registry gives
+each top-level Analysis kind its own schema version; Annotation, Concordance,
+Quotation, Trends, Token Frequency, and Topic Modelling are all version 1.
+Supporting request kinds use their owning top-level kind.
+
+Each generation-named Tab record is a storage-only
+`{id, analysis_kind, schema_version, payload}` envelope. Each Analysis record
+adds its stable `tab_id`. The store validates those duplicated identities and
+kinds after dispatch without exposing storage fields through ordinary public
+resources. A data-version mismatch rejects the complete Workspace. An
+unsupported Analysis-kind version instead preserves its exact bytes as an
+`incompatible_schema` Tab or Analysis; malformed current-version records are
+`record_invalid`. An unavailable Tab or parent Analysis makes only its owned
+subtree unavailable. Compatible Data Blocks, Tabs, and independent Analysis
+branches remain usable, and unrelated commits copy opaque unavailable records
+byte-for-byte. Generation files are written before the atomically replaced
+`workspace.json` commit point. The store shares the central durable-filesystem
+primitives for file and directory `fsync` and same-filesystem atomic
+replacement.
 
 Snapshots encode only each node's current plan. Construction and reconstruction
 therefore start with empty history, as do clones and imported Workspaces.
@@ -164,12 +179,22 @@ point; no mutation follows visibility. Export omits `access.json`; import
 rejects an archive-supplied sidecar. Lock files are outside Workspace
 directories and are never portable archive content.
 
-Portable archive format 21 materializes Data Blocks and retained Analysis query
-inputs as Parquet, includes terminal Analysis forests and declared Artifacts,
-and contains no serialized executable plans. Import reconstructs private lazy
-plans from those safe files, rebases their sources and Workspace identity after
-final publication, and strictly rejects older archive versions. Queued and
-running Analyses are omitted from each Tab's archived forest.
+Portable archive data format version 1 uses the same stable per-kind Tab and
+Analysis envelopes. It materializes Data Blocks and retained Analysis query
+inputs as Parquet, includes terminal compatible Analysis forests and declared
+Artifacts, and contains no serialized executable plans. Import rejects an
+unsupported data version but accepts supported data containing newer Analysis
+versions. Unsupported Tabs and Analyses, their namespaced files, and descendants
+of an omitted parent are omitted; surviving Tab references are filtered.
+Exports apply the same policy to unavailable native children. Both routes
+report omitted counts in `X-Wordflow-Omitted-Tab-Count` and
+`X-Wordflow-Omitted-Analysis-Count`. Import reconstructs private lazy plans
+from safe retained files and rebases their sources and Workspace identity after
+final publication. Native schema 23 receives no format-specific detection or
+reader: catalogue discovery classifies the failed current-contract validation
+as corrupt, and Load invokes the ordinary backend open path and returns its
+error. Archive format 22 is rejected without migration or a fallback reader.
+Queued and running Analyses remain omitted from each Tab's archived forest.
 
 ## Mutation And Deletion
 

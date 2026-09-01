@@ -9,9 +9,9 @@ describe('availableWorkspacesFromCatalogue', () => {
         availability: 'unavailable',
         id: '0a120442-2f33-4474-9d09-9adbdfea7ebc',
         reason: 'incompatible_format',
-        message: 'Workspace format 14 is incompatible with supported format 15.',
-        stored_schema_version: 14,
-        supported_schema_version: 15,
+        message: 'Workspace data schema 14 is incompatible with supported data schema 15.',
+        stored_data_schema_version: 14,
+        supported_data_schema_version: 15,
       },
       {
         availability: 'available',

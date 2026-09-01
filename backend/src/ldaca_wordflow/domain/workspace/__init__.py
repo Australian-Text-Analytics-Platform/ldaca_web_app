@@ -4,7 +4,7 @@ Persistence, HTTP resources, and lifecycle coordination remain outside this
 package so the aggregate can be tested without I/O or framework dependencies.
 """
 
-from .graph import Workspace
+from .graph import UnavailableChildRecord, Workspace
 from .node import Node
 from .provenance import (
     AnnotationDerivation,
@@ -85,6 +85,7 @@ from .analysis import (
     ValidAnalysisIntegrity,
     UnavailableAnalysis,
     analysis_input_ids,
+    analysis_kind_for_request,
     analysis_snapshot_input_ids,
     SupportingAnalysisRequest,
     SupportingAnalysisSubmission,
@@ -161,9 +162,11 @@ __all__ = [
     "TopicMeaningOverride",
     "UnavailableTab",
     "UnavailableAnalysis",
+    "UnavailableChildRecord",
     "ValidAnalysisIntegrity",
     "Workspace",
     "analysis_input_ids",
+    "analysis_kind_for_request",
     "analysis_snapshot_input_ids",
     "SupportingAnalysisRequest",
     "SupportingAnalysisSubmission",

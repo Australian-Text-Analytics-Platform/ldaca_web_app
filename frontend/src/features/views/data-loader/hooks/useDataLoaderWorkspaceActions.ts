@@ -48,7 +48,7 @@ export function useDataLoaderWorkspaceActions({
 
   /**
    * Runs the sole Load/Unload operation, clears an old Load failure before a
-   * retry, and records any new Load failure on that available Workspace.
+   * retry, and records any new Load failure on that Workspace catalogue entry.
    */
   const handleSetCurrentWorkspace = async (
     workspaceId: string | null,
@@ -226,13 +226,30 @@ export function useDataLoaderWorkspaceActions({
   const handleUploadWorkspaceZip = async (file: File) => {
     setUploadingWorkspaceZip(true);
     try {
-      await importWorkspaceArchive({
+      const { response } = await importWorkspaceArchive({
         body: file,
         query: { filename: file.name },
         throwOnError: true,
       });
       await queryClient.refetchQueries({ queryKey: queryKeys.workspaceList, exact: true });
-      notify('success', `Workspace ZIP "${file.name}" uploaded.`);
+      const omittedTabs = Number(response.headers.get('x-wordflow-omitted-tab-count') ?? 0);
+      const omittedAnalyses = Number(
+        response.headers.get('x-wordflow-omitted-analysis-count') ?? 0,
+      );
+      if (omittedTabs > 0 || omittedAnalyses > 0) {
+        const omissions = [];
+        if (omittedTabs > 0) {
+          omissions.push(`${String(omittedTabs)} unavailable Tab${omittedTabs === 1 ? '' : 's'}`);
+        }
+        if (omittedAnalyses > 0) {
+          omissions.push(
+            `${String(omittedAnalyses)} unavailable Analysis record${omittedAnalyses === 1 ? '' : 's'}`,
+          );
+        }
+        notify('info', `Workspace ZIP uploaded with ${omissions.join(' and ')} omitted.`);
+      } else {
+        notify('success', `Workspace ZIP "${file.name}" uploaded.`);
+      }
     } catch (error) {
       notify('error', (error as Error).message || 'Failed to upload workspace ZIP.');
     } finally {

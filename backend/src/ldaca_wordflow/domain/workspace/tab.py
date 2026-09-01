@@ -188,26 +188,56 @@ class Tab(BaseModel):
 
 
 class UnavailableTab(BaseModel):
-    """Minimal safe item for an invalid persisted Tab record."""
+    """Minimal safe item for an unavailable persisted Tab record."""
 
     model_config = ConfigDict(extra="forbid")
 
     availability: Literal["unavailable"]
     id: uuid.UUID
     workspace_id: uuid.UUID
-    reason: Literal["record_invalid"]
-    warning: Literal[
-        "This Tab is unavailable because its stored record is invalid."
-    ]
+    reason: Literal["record_invalid", "incompatible_schema"]
+    analysis_kind: AnalysisKind | None = None
+    stored_schema_version: int | None = None
+    supported_schema_version: int | None = None
+    warning: str
+
+    @model_validator(mode="after")
+    def validate_schema_versions(self) -> UnavailableTab:
+        versions = (self.stored_schema_version, self.supported_schema_version)
+        if self.reason == "incompatible_schema":
+            if self.analysis_kind is None or any(version is None for version in versions):
+                raise ValueError(
+                    "Incompatible Tabs require kind and schema versions"
+                )
+        elif any(version is not None for version in versions):
+            raise ValueError("Invalid Tabs cannot expose schema versions")
+        return self
 
     @classmethod
-    def create(cls, *, tab_id: uuid.UUID, workspace_id: uuid.UUID) -> UnavailableTab:
+    def create(
+        cls,
+        *,
+        tab_id: uuid.UUID,
+        workspace_id: uuid.UUID,
+        reason: Literal["record_invalid", "incompatible_schema"],
+        analysis_kind: AnalysisKind | None = None,
+        stored_schema_version: int | None = None,
+        supported_schema_version: int | None = None,
+    ) -> UnavailableTab:
+        warning = (
+            "This Tab is unavailable because its stored schema is not supported."
+            if reason == "incompatible_schema"
+            else "This Tab is unavailable because its stored record is invalid."
+        )
         return cls(
             availability="unavailable",
             id=tab_id,
             workspace_id=workspace_id,
-            reason="record_invalid",
-            warning="This Tab is unavailable because its stored record is invalid.",
+            reason=reason,
+            analysis_kind=analysis_kind,
+            stored_schema_version=stored_schema_version,
+            supported_schema_version=supported_schema_version,
+            warning=warning,
         )
 
 

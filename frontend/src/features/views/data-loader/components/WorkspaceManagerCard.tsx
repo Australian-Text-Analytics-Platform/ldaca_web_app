@@ -109,6 +109,7 @@ export function WorkspaceManagerCard({
             <input
               ref={zipInputRef}
               type="file"
+              aria-label="Upload workspace archive"
               accept=".zip,application/zip"
               className="hidden"
               onChange={(e) => {

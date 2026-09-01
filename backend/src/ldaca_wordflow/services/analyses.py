@@ -38,9 +38,11 @@ from ..domain.workspace import (
     Progress,
     QuotationResultDataBlockCreationAnalysisRequest,
     SequentialDataBlockCreationAnalysisRequest,
+    Tab,
     ValidAnalysisIntegrity,
     Workspace,
     analysis_input_ids,
+    analysis_kind_for_request,
     persisted_submission,
     public_analysis,
 )
@@ -206,26 +208,35 @@ class AnalysisService:
     ) -> AnalysisRecord:
         if analysis_id not in lease.workspace.live_analysis_ids():
             raise AnalysisNotFoundError("Analysis not found")
-        if analysis_id in lease.workspace.corrupt_analysis_ids:
-            raise AnalysisCorruptError("Analysis data is corrupt")
+        if analysis_id in lease.workspace.unavailable_analysis_ids:
+            raise AnalysisCorruptError("Analysis is unavailable")
         record = lease.workspace.analyses.get(analysis_id)
         if record is None:
             raise AnalysisNotFoundError("Analysis not found")
         return record
 
     @staticmethod
-    def _tab_kind_for(request: object) -> str:
-        kind = getattr(request, "kind", "")
-        return {
-            "annotation_run_all": "annotation",
-            "concordance_run_all": "concordance",
-            "concordance_match_data_block_creation": "concordance",
-            "concordance_document_data_block_creation": "concordance",
-            "quotation_run_all": "quotation",
-            "quotation_result_data_block_creation": "quotation",
-            "sequential_data_block_creation": "sequential",
-            "topic_modeling_data_block_creation": "topic_modeling",
-        }.get(kind, kind)
+    def _unavailable_resource(
+        workspace: Workspace,
+        analysis_id: uuid.UUID,
+        tab_id: uuid.UUID,
+    ) -> UnavailableAnalysis:
+        record = workspace.unavailable_analysis_record(analysis_id)
+        warning = (
+            "This Analysis is unavailable because its stored schema is not supported."
+            if record.reason == "incompatible_schema"
+            else "This Analysis is unavailable because its stored record is invalid."
+        )
+        return UnavailableAnalysis(
+            availability="unavailable",
+            id=analysis_id,
+            tab_id=tab_id,
+            reason=record.reason,
+            analysis_kind=record.analysis_kind,
+            stored_schema_version=record.stored_schema_version,
+            supported_schema_version=record.supported_schema_version,
+            warning=warning,
+        )
 
     async def submit(
         self,
@@ -274,7 +285,7 @@ class AnalysisService:
             tab = lease.workspace.tabs.get(tab_id)
             if tab is None:
                 raise TabNotFoundError("Tab not found")
-            if self._tab_kind_for(request) != tab.kind.value:
+            if analysis_kind_for_request(request) is not tab.kind:
                 raise AnalysisKindMismatchError("Analysis kind does not match the Tab")
             linear_annotation = tab.kind is AnalysisKind.ANNOTATION
             if linear_annotation and (
@@ -504,17 +515,12 @@ class AnalysisService:
                 record = lease.workspace.analyses.get(analysis_id)
                 if record is not None:
                     items.append(self._project(lease, record))
-                elif analysis_id in lease.workspace.corrupt_analysis_ids:
+                elif analysis_id in lease.workspace.unavailable_analysis_ids:
                     items.append(
-                        UnavailableAnalysis(
-                            availability="unavailable",
-                            id=analysis_id,
-                            tab_id=tab.id,
-                            reason="record_invalid",
-                            warning=(
-                                "This Analysis is unavailable because its stored "
-                                "record is invalid."
-                            ),
+                        self._unavailable_resource(
+                            lease.workspace,
+                            analysis_id,
+                            tab.id,
                         )
                     )
             return items
@@ -572,7 +578,7 @@ class AnalysisService:
         page: int,
         page_size: int,
     ) -> AnalysisPage:
-        """Return valid live Analyses first, followed by corrupt root items."""
+        """Return valid live Analyses first, followed by unavailable root items."""
 
         async with self._workspaces.read_context(user_id, workspace_id) as lease:
             live_ids = lease.workspace.live_analysis_ids()
@@ -586,19 +592,16 @@ class AnalysisService:
             items: list[AnalysisResource] = [
                 self._project(lease, record) for record in records
             ]
-            for analysis_id in sorted(lease.workspace.corrupt_analysis_ids & live_ids):
+            for analysis_id in sorted(
+                lease.workspace.unavailable_analysis_ids & live_ids
+            ):
                 tab_id = lease.workspace.analysis_tab_id(analysis_id)
                 if tab_id is not None:
                     items.append(
-                        UnavailableAnalysis(
-                            availability="unavailable",
-                            id=analysis_id,
-                            tab_id=tab_id,
-                            reason="record_invalid",
-                            warning=(
-                                "This Analysis is unavailable because its stored "
-                                "record is invalid."
-                            ),
+                        self._unavailable_resource(
+                            lease.workspace,
+                            analysis_id,
+                            tab_id,
                         )
                     )
 
@@ -733,7 +736,23 @@ class AnalysisService:
             tab = lease.workspace.remove_tab(tab_id)
             if tab is None:
                 raise TabNotFoundError("Tab not found")
-            owned_ids = set(tab.analysis_ids)
+            owned_ids = (
+                set(tab.analysis_ids)
+                if isinstance(tab, Tab)
+                else {
+                    analysis_id
+                    for analysis_id, record in lease.workspace.analyses.items()
+                    if record.tab_id == tab_id
+                }
+                | {
+                    analysis_id
+                    for analysis_id in lease.workspace.unavailable_analysis_ids
+                    if lease.workspace.unavailable_analysis_record(
+                        analysis_id
+                    ).tab_id
+                    == tab_id
+                }
+            )
             root_ids = [
                 analysis_id
                 for analysis_id in owned_ids
@@ -766,7 +785,7 @@ class AnalysisService:
         root_id: uuid.UUID,
         timestamp: datetime,
     ) -> list[AnalysisExecutionKey]:
-        if root_id in lease.workspace.corrupt_analysis_ids:
+        if root_id in lease.workspace.unavailable_analysis_ids:
             lease.workspace.remove_analysis(root_id)
             return []
 

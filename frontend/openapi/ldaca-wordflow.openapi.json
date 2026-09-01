@@ -9226,8 +9226,18 @@
       },
       "UnavailableAnalysis": {
         "additionalProperties": false,
-        "description": "Minimal safe item for an invalid persisted Analysis record.",
+        "description": "Minimal safe item for an unavailable persisted Analysis record.",
         "properties": {
+          "analysis_kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnalysisKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "availability": {
             "const": "unavailable",
             "title": "Availability",
@@ -9239,9 +9249,34 @@
             "type": "string"
           },
           "reason": {
-            "const": "record_invalid",
+            "enum": [
+              "record_invalid",
+              "incompatible_schema"
+            ],
             "title": "Reason",
             "type": "string"
+          },
+          "stored_schema_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stored Schema Version"
+          },
+          "supported_schema_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supported Schema Version"
           },
           "tab_id": {
             "format": "uuid",
@@ -9249,7 +9284,6 @@
             "type": "string"
           },
           "warning": {
-            "const": "This Analysis is unavailable because its stored record is invalid.",
             "title": "Warning",
             "type": "string"
           }
@@ -9305,8 +9339,18 @@
       },
       "UnavailableTab": {
         "additionalProperties": false,
-        "description": "Minimal safe item for an invalid persisted Tab record.",
+        "description": "Minimal safe item for an unavailable persisted Tab record.",
         "properties": {
+          "analysis_kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnalysisKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "availability": {
             "const": "unavailable",
             "title": "Availability",
@@ -9318,12 +9362,36 @@
             "type": "string"
           },
           "reason": {
-            "const": "record_invalid",
+            "enum": [
+              "record_invalid",
+              "incompatible_schema"
+            ],
             "title": "Reason",
             "type": "string"
           },
+          "stored_schema_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stored Schema Version"
+          },
+          "supported_schema_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supported Schema Version"
+          },
           "warning": {
-            "const": "This Tab is unavailable because its stored record is invalid.",
             "title": "Warning",
             "type": "string"
           },
@@ -9456,7 +9524,7 @@
             "title": "Reason",
             "type": "string"
           },
-          "stored_schema_version": {
+          "stored_data_schema_version": {
             "anyOf": [
               {
                 "type": "integer"
@@ -9465,9 +9533,9 @@
                 "type": "null"
               }
             ],
-            "title": "Stored Schema Version"
+            "title": "Stored Data Schema Version"
           },
-          "supported_schema_version": {
+          "supported_data_schema_version": {
             "anyOf": [
               {
                 "type": "integer"
@@ -9476,7 +9544,7 @@
                 "type": "null"
               }
             ],
-            "title": "Supported Schema Version"
+            "title": "Supported Data Schema Version"
           }
         },
         "required": [
@@ -13620,7 +13688,19 @@
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "Workspace archive installed",
+            "headers": {
+              "X-Wordflow-Omitted-Analysis-Count": {
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-Wordflow-Omitted-Tab-Count": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
           },
           "400": {
             "content": {
@@ -15894,7 +15974,19 @@
                 }
               }
             },
-            "description": "Portable Workspace ZIP archive or raw archival copy"
+            "description": "Portable Workspace ZIP archive or raw archival copy",
+            "headers": {
+              "X-Wordflow-Omitted-Analysis-Count": {
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-Wordflow-Omitted-Tab-Count": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
           },
           "401": {
             "content": {

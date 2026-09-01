@@ -45,7 +45,10 @@ This decision supersedes the overlap, truncation, dominant-real-Topic, Ward,
 five-dimensional projection, two-Topic lower-bound, and explicit-default-query
 clauses in ADRs 0019, 0023, 0024, and 0025. It changes the semantic Arrow type
 to `org.ldaca.wordflow.topic_coverage.v1` with `{topic_id, coverage}` entries.
-Native Workspace schema 23 and portable archive format 22 reject older layouts.
+This decision originally advanced native Workspace schema 23 and portable
+archive format 22. The later granular-versioning clean break rejects both and
+stores this Topic Modelling contract under data schema 1, Topic Modelling
+schema 1, and archive data format 1.
 
 ## Consequences
 

@@ -73,6 +73,8 @@ export function WorkspaceManagerItem({
   const workspaceId = workspace.id;
   if ('message' in workspace) {
     const isIncompatible = workspace.reason === 'incompatible_format';
+    const isSelectionTarget =
+      selectionOperation?.action === 'load' && selectionOperation.workspaceId === workspaceId;
     const trimmedWorkspaceName = workspace.name?.trim();
     let workspaceName = 'Unnamed workspace';
     if (trimmedWorkspaceName) workspaceName = trimmedWorkspaceName;
@@ -97,8 +99,40 @@ export function WorkspaceManagerItem({
           <div className="mt-2 max-w-prose text-label-secondary text-description">
             {workspace.message}
           </div>
+          {loadFailure ? (
+            <div
+              role="alert"
+              className="mt-2 flex max-w-prose items-start gap-1.5 text-label-secondary text-error"
+            >
+              <CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              <span>
+                <span className="font-medium">Failed to load:</span> {loadFailure}
+              </span>
+            </div>
+          ) : null}
         </div>
         <div className="flex flex-wrap gap-2">
+          <DisabledReasonTooltip
+            reason={
+              hasActiveTask
+                ? 'A task is still running on the current workspace. Wait for it to finish, or cancel it from the task list, before switching workspaces.'
+                : selectionOperation
+                  ? 'Another Workspace Load or Unload operation is in progress.'
+                  : undefined
+            }
+          >
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                onLoadWorkspace(workspaceId);
+              }}
+              disabled={hasActiveTask || Boolean(selectionOperation)}
+            >
+              {isSelectionTarget ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
+              {isSelectionTarget ? 'Loading…' : 'Load'}
+            </Button>
+          </DisabledReasonTooltip>
           <DisabledReasonTooltip reason={isIncompatible ? undefined : workspace.message}>
             <Button
               size="sm"

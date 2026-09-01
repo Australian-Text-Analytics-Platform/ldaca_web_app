@@ -276,6 +276,9 @@ def test_tab_persists_across_close_and_invalid_record_is_isolated(tmp_path: Path
                 "id": created["id"],
                 "workspace_id": workspace_id,
                 "reason": "record_invalid",
+                "analysis_kind": None,
+                "stored_schema_version": None,
+                "supported_schema_version": None,
                 "warning": (
                     "This Tab is unavailable because its stored record is invalid."
                 ),
@@ -304,16 +307,23 @@ def test_workspace_archive_round_trip_preserves_tabs(tmp_path: Path) -> None:
         assert manifest["tabs"] == [
             {
                 "id": original["id"],
-                "availability": "available",
-                "kind": "quotation",
-                "name": "Portable tab",
-                "analysis_ids": [],
-                "settings": {"kind": "quotation"},
-                "created_at": original["created_at"],
-                "modified_at": original["modified_at"],
-                "revision": 1,
+                "analysis_kind": "quotation",
+                "schema_version": 1,
+                "payload": {
+                    "availability": "available",
+                    "id": original["id"],
+                    "kind": "quotation",
+                    "name": "Portable tab",
+                    "analysis_ids": [],
+                    "settings": {"kind": "quotation"},
+                    "created_at": original["created_at"],
+                    "modified_at": original["modified_at"],
+                    "revision": 1,
+                },
             }
         ]
+        assert exported.headers["x-wordflow-omitted-tab-count"] == "0"
+        assert exported.headers["x-wordflow-omitted-analysis-count"] == "0"
 
         imported = client.post(
             "/api/workspaces/imports?filename=tabs.zip",
@@ -321,6 +331,8 @@ def test_workspace_archive_round_trip_preserves_tabs(tmp_path: Path) -> None:
             headers={**unsafe, "Content-Type": "application/octet-stream"},
         )
         assert imported.status_code == 201
+        assert imported.headers["x-wordflow-omitted-tab-count"] == "0"
+        assert imported.headers["x-wordflow-omitted-analysis-count"] == "0"
         imported_id = imported.json()["id"]
         assert client.put(
             f"/api/workspaces/{imported_id}/open", headers=unsafe

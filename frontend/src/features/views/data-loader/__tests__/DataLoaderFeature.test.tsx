@@ -4,8 +4,8 @@ import userEvent from '@testing-library/user-event';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { listFeaturedDataPortalCollections } from '@/api';
-import { WorkspaceDownloadsProvider } from '@/features/workspace/workspace-downloads/WorkspaceDownloadsProvider';
 import type { FileTreeNode } from '@/features/views/data-loader/types';
+import { WorkspaceDownloadsProvider } from '@/features/workspace/workspace-downloads/WorkspaceDownloadsProvider';
 import DataLoaderFeature from '../DataLoaderFeature';
 
 const {
@@ -22,6 +22,7 @@ const {
   mockCreateFolder,
   mockMoveFile,
   mockListFeaturedDataPortalCollections,
+  mockImportWorkspaceArchive,
   mockPublishContextualHints,
   mockToast,
 } = vi.hoisted(() => ({
@@ -38,6 +39,7 @@ const {
   mockCreateFolder: vi.fn(),
   mockMoveFile: vi.fn(),
   mockListFeaturedDataPortalCollections: vi.fn(),
+  mockImportWorkspaceArchive: vi.fn(),
   mockPublishContextualHints: vi.fn(),
   mockToast: vi.fn(),
 }));
@@ -62,8 +64,8 @@ interface MockWorkspaceState {
         description?: string | null;
         created_at?: string | null;
         modified_at?: string | null;
-        stored_schema_version?: number | null;
-        supported_schema_version?: number | null;
+        stored_data_schema_version?: number | null;
+        supported_data_schema_version?: number | null;
       }
   )[];
   currentWorkspaceId: string | null;
@@ -181,6 +183,7 @@ vi.mock('@/api', async (importOriginal) => ({
   createFolder: mockCreateFolder,
   moveFile: mockMoveFile,
   importSampleData: vi.fn(),
+  importWorkspaceArchive: mockImportWorkspaceArchive,
   listFeaturedDataPortalCollections: mockListFeaturedDataPortalCollections,
 }));
 
@@ -277,6 +280,10 @@ describe('DataLoaderFeature citation UI', () => {
     mockListFeaturedDataPortalCollections.mockResolvedValue({
       data: { items: [], page: 1, page_size: 20, total: 0 },
       error: undefined,
+    });
+    mockImportWorkspaceArchive.mockResolvedValue({
+      data: {},
+      response: new Response(null),
     });
     mockWorkspaceState = {
       workspaces: [
@@ -547,21 +554,47 @@ describe('DataLoaderFeature citation UI', () => {
     expect(screen.queryByRole('button', { name: /save as/i })).not.toBeInTheDocument();
   });
 
+  it('warns when incompatible Analysis history is omitted during upload', async () => {
+    mockImportWorkspaceArchive.mockResolvedValue({
+      data: {},
+      response: new Response(null, {
+        headers: {
+          'X-Wordflow-Omitted-Tab-Count': '1',
+          'X-Wordflow-Omitted-Analysis-Count': '2',
+        },
+      }),
+    });
+    renderWithProviders(<DataLoaderFeature />);
+    const input = screen.getByLabelText('Upload workspace archive');
+
+    fireEvent.change(input, {
+      target: { files: [new File(['zip'], 'future.zip', { type: 'application/zip' })] },
+    });
+
+    await waitFor(() =>
+      expect(mockToast).toHaveBeenCalledWith(
+        'Workspace ZIP uploaded with 1 unavailable Tab and 2 unavailable Analysis records omitted.',
+        { duration: 3500 },
+      ),
+    );
+  });
+
   it('renders unavailable workspace metadata and keeps archive download available', async () => {
     const user = userEvent.setup();
     const unavailableId = '0a120442-2f33-4474-9d09-9adbdfea7ebc';
+    mockSetCurrentWorkspace.mockRejectedValueOnce(new Error('Stored data could not be loaded.'));
     mockWorkspaceState.workspaceCatalogue = [
       {
         availability: 'unavailable',
         id: unavailableId,
         reason: 'incompatible_format',
-        message: 'Workspace format 14 is incompatible with supported format 15.',
+        message: 'Workspace data schema 14 is incompatible with supported data schema 15.',
         name: 'Archived workshop workspace',
         description: 'Workspace from the winter workshop.',
         created_at: '2024-01-01T00:00:00Z',
         modified_at: '2024-01-02T00:00:00Z',
-        stored_schema_version: 14,
-        supported_schema_version: 15,
+        stored_data_schema_version: 14,
+        supported_data_schema_version: 15,
       },
       ...mockWorkspaceState.workspaces,
     ];
@@ -576,9 +609,11 @@ describe('DataLoaderFeature citation UI', () => {
     expect(unavailable.queryByText('Workspace from the winter workshop.')).not.toBeInTheDocument();
     expect(unavailable.getByText(/Created/)).toBeInTheDocument();
     expect(
-      unavailable.getByText('Workspace format 14 is incompatible with supported format 15.'),
+      unavailable.getByText(
+        'Workspace data schema 14 is incompatible with supported data schema 15.',
+      ),
     ).toBeInTheDocument();
-    expect(unavailable.queryByRole('button', { name: 'Load' })).not.toBeInTheDocument();
+    expect(unavailable.getByRole('button', { name: 'Load' })).toBeEnabled();
     expect(unavailable.getByRole('button', { name: 'Download archive' })).toBeEnabled();
     expect(unavailable.getByRole('button', { name: 'Delete' })).toBeEnabled();
     expect(unavailable.queryByLabelText(/favorites/i)).not.toBeInTheDocument();
@@ -587,6 +622,12 @@ describe('DataLoaderFeature citation UI', () => {
     });
     fireEvent.pointerDown(descriptionButton, { button: 0 });
     expect(screen.getByText('Workspace from the winter workshop.')).toBeInTheDocument();
+
+    await user.click(unavailable.getByRole('button', { name: 'Load' }));
+    expect(mockSetCurrentWorkspace).toHaveBeenCalledWith(unavailableId);
+    expect(await unavailable.findByRole('alert')).toHaveTextContent(
+      'Failed to load: Stored data could not be loaded.',
+    );
 
     await user.click(unavailable.getByRole('button', { name: 'Delete' }));
     const confirmation = screen.getByRole('alertdialog', { name: 'Delete workspace?' });

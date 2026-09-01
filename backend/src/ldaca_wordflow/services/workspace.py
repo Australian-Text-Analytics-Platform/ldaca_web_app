@@ -453,8 +453,13 @@ class WorkspaceService:
                     UnavailableTab.create(
                         tab_id=tab_id,
                         workspace_id=workspace_id,
+                        reason=record.reason,
+                        analysis_kind=record.analysis_kind,
+                        stored_schema_version=record.stored_schema_version,
+                        supported_schema_version=record.supported_schema_version,
                     )
-                    for tab_id in sorted(lease.workspace.corrupt_tab_ids)
+                    for tab_id in sorted(lease.workspace.unavailable_tab_ids)
+                    for record in [lease.workspace.unavailable_tab_record(tab_id)]
                 ],
             ]
 
@@ -470,10 +475,15 @@ class WorkspaceService:
             tab = lease.workspace.tabs.get(tab_id)
             if tab is not None:
                 return tab.model_copy(deep=True)
-            if tab_id in lease.workspace.corrupt_tab_ids:
+            if tab_id in lease.workspace.unavailable_tab_ids:
+                record = lease.workspace.unavailable_tab_record(tab_id)
                 return UnavailableTab.create(
                     tab_id=tab_id,
                     workspace_id=workspace_id,
+                    reason=record.reason,
+                    analysis_kind=record.analysis_kind,
+                    stored_schema_version=record.stored_schema_version,
+                    supported_schema_version=record.supported_schema_version,
                 )
             raise TabNotFoundError("Tab not found")
 
@@ -733,7 +743,9 @@ class WorkspaceService:
                 for analysis_id, record in lease.workspace.analyses.items()
                 if analysis_id in before_live
             }
-            before_corrupt = lease.workspace.corrupt_analysis_ids & before_live
+            before_unavailable = (
+                lease.workspace.unavailable_analysis_ids & before_live
+            )
             before_node_histories = {
                 node_id: node.snapshot_plan_history()
                 for node_id, node in lease.workspace.nodes.items()
@@ -758,7 +770,7 @@ class WorkspaceService:
                         lease.revision,
                         before_tabs=before_tabs,
                         before_analyses=before_analyses,
-                        before_corrupt=before_corrupt,
+                        before_unavailable=before_unavailable,
                     )
                 await self._mutation_committer.cleanup_committed(lease)
 
@@ -875,7 +887,8 @@ class WorkspaceService:
                     node_count=len(workspace.nodes),
                     tab_count=len(workspace.tabs),
                     analysis_count=(
-                        len(workspace.analyses) + len(workspace.corrupt_analysis_ids)
+                        len(workspace.analyses)
+                        + len(workspace.unavailable_analysis_ids)
                     ),
                 )
                 slot.closing = False

@@ -150,7 +150,8 @@ Preference from a source, clone, or Analysis-created output.
   over-limit Workspace as an Unavailable Workspace without blocking healthy
   siblings. Incompatible entries retain best-effort name, description, and
   timestamp metadata and can be downloaded as a raw archival ZIP; direct owned
-  access remains strict and reports `workspace_corrupt`.
+  access remains strict and reports `workspace_corrupt`. The client still
+  offers Load for every unavailable entry and displays that backend error.
 - Collection scans hide foreign-owned, unattributable, unsafely named,
   staging, trash, and non-UUID entries. An Unavailable Workspace is visible
   only after its canonical UUID directory and current-owner sidecar validate.

@@ -44,11 +44,14 @@ from ..domain.workspace import (
     AnalysisRecord,
     AnalysisState,
     Node,
+    Tab,
     Workspace,
+    analysis_kind_for_request,
     analysis_snapshot_input_ids,
     referenced_node_ids,
 )
 from ..infrastructure.storage.workspace_store import (
+    ANALYSIS_SCHEMA_VERSIONS,
     WorkspaceCapacityError,
     WorkspaceSchemaVersionError,
     WorkspaceSnapshotInvalidError,
@@ -57,7 +60,7 @@ from ..infrastructure.storage.workspace_store import (
 from pydantic import ValidationError
 from ..shared.json_data import JsonData
 from ..shared.portable_names import portable_relative_path_parts
-from ..models.workspace import WorkspaceArchiveManifest
+from ..models.workspace import WorkspaceArchiveAnalysis, WorkspaceArchiveManifest
 
 import anyio
 from anyio.to_thread import run_sync as run_sync_in_worker_thread
@@ -120,6 +123,8 @@ class WorkspaceArchiveStorage(Protocol):
 class _PreparedArchive:
     staging: Path
     workspace_name: str
+    omitted_tab_count: int
+    omitted_analysis_count: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -189,7 +194,7 @@ class WorkspaceArchiveService:
         self,
         user_id: str,
         workspace_id: uuid.UUID,
-    ) -> tuple[ResponseSnapshot, str, int | None]:
+    ) -> tuple[ResponseSnapshot, str, int | None, int, int]:
         """Export one Workspace, falling back to a raw ZIP when its schema is incompatible.
 
         The returned file is immutable and independent of the live workspace,
@@ -220,6 +225,8 @@ class WorkspaceArchiveService:
                 )
                 loaded = await self._run_sync(self._workspace_store.load, source_snapshot)
                 detached = loaded.workspace
+                omitted_tab_count = len(detached.unavailable_tab_ids)
+                omitted_analysis_count = len(detached.unavailable_analysis_ids)
                 snapshot = await self._response_snapshots.create_generated(
                     suffix=".zip",
                     max_output_bytes=self._max_export_bytes,
@@ -231,7 +238,13 @@ class WorkspaceArchiveService:
                     ),
                 )
                 filename = f"{_safe_export_name(workspace_name)}.zip"
-                return snapshot, filename, revision
+                return (
+                    snapshot,
+                    filename,
+                    revision,
+                    omitted_tab_count,
+                    omitted_analysis_count,
+                )
             except WorkspaceNotOpenError as not_open:
                 path = await self._storage.resolve_owned_workspace_dir(
                     user_id,
@@ -258,7 +271,13 @@ class WorkspaceArchiveService:
                             source_snapshot,
                         ),
                     )
-                    return snapshot, f"{_safe_export_name(workspace_name)}.zip", None
+                    return (
+                        snapshot,
+                        f"{_safe_export_name(workspace_name)}.zip",
+                        None,
+                        0,
+                        0,
+                    )
                 except (WorkspaceCapacityError, WorkspaceSnapshotInvalidError):
                     raise not_open from None
                 raise not_open
@@ -273,7 +292,7 @@ class WorkspaceArchiveService:
         user_id: str,
         filename: str,
         source: AsyncUploadSource,
-    ) -> dict[str, Any]:
+    ) -> tuple[dict[str, Any], int, int]:
         """Admit one bounded expansion and serialize it through an import slot."""
 
         async with self._import_slots:
@@ -301,7 +320,7 @@ class WorkspaceArchiveService:
         filename: str,
         source: AsyncUploadSource,
         reservation: StorageReservation,
-    ) -> dict[str, Any]:
+    ) -> tuple[dict[str, Any], int, int]:
         """Stream, validate, and install one workspace ZIP.
 
         Validation and extraction happen outside the workspace mutation gate.
@@ -343,11 +362,16 @@ class WorkspaceArchiveService:
                 temporary,
                 root_resolver,
             )
-            return await self._storage.install_staged_archive(
+            workspace = await self._storage.install_staged_archive(
                 user_id,
                 prepared.staging,
                 prepared.workspace_name,
                 reservation,
+            )
+            return (
+                workspace,
+                prepared.omitted_tab_count,
+                prepared.omitted_analysis_count,
             )
         finally:
             with anyio.CancelScope(shield=True):
@@ -426,7 +450,7 @@ class WorkspaceArchiveService:
             if not is_valid_name:
                 raise InvalidWorkspaceArchiveError(f"Invalid workspace name: {reason}")
 
-            _compile_materialized_archive(
+            omitted_tab_count, omitted_analysis_count = _compile_materialized_archive(
                 staging,
                 manifest,
                 max_parent_edges=self._limits.max_parent_edges,
@@ -435,6 +459,8 @@ class WorkspaceArchiveService:
             return _PreparedArchive(
                 staging=staging,
                 workspace_name=workspace_name,
+                omitted_tab_count=omitted_tab_count,
+                omitted_analysis_count=omitted_analysis_count,
             )
         except BaseException:
             if staging.exists():
@@ -683,22 +709,160 @@ def _archive_artifact_path(record: AnalysisRecord, relative_path: str) -> Path:
     return Path("analyses") / str(record.id) / Path(*parts)
 
 
+@dataclass(frozen=True, slots=True)
+class _CompatibleArchiveChildren:
+    tabs: list[Tab]
+    analyses: list[tuple[WorkspaceArchiveAnalysis, AnalysisRecord]]
+    omitted_tab_ids: set[uuid.UUID]
+    omitted_analysis_ids: set[uuid.UUID]
+
+
+def _compatible_archive_children(
+    manifest: WorkspaceArchiveManifest,
+) -> _CompatibleArchiveChildren:
+    """Validate supported child payloads and omit incompatible forests."""
+
+    tab_entry_ids = [entry.id for entry in manifest.tabs]
+    analysis_entry_ids = [entry.id for entry in manifest.analyses]
+    if len(tab_entry_ids) != len(set(tab_entry_ids)):
+        raise InvalidWorkspaceArchiveError("Workspace archive has duplicate Tab IDs")
+    if len(analysis_entry_ids) != len(set(analysis_entry_ids)):
+        raise InvalidWorkspaceArchiveError(
+            "Workspace archive has duplicate Analysis IDs"
+        )
+
+    tabs_by_id: dict[uuid.UUID, Tab] = {}
+    omitted_tab_ids: set[uuid.UUID] = set()
+    for entry in manifest.tabs:
+        if entry.schema_version != ANALYSIS_SCHEMA_VERSIONS[entry.analysis_kind]:
+            omitted_tab_ids.add(entry.id)
+            continue
+        try:
+            tab = Tab.model_validate(entry.payload)
+        except ValidationError as exc:
+            raise InvalidWorkspaceArchiveError(
+                "Workspace archive Tab payload is invalid"
+            ) from exc
+        if tab.id != entry.id or tab.kind is not entry.analysis_kind:
+            raise InvalidWorkspaceArchiveError(
+                "Workspace archive Tab envelope does not match its payload"
+            )
+        tabs_by_id[tab.id] = tab
+
+    declared_analysis_ids = set(analysis_entry_ids)
+    declared_tab_ids = set(tab_entry_ids)
+    analysis_tab_ids = {entry.id: entry.tab_id for entry in manifest.analyses}
+    if any(tab_id not in declared_tab_ids for tab_id in analysis_tab_ids.values()):
+        raise InvalidWorkspaceArchiveError(
+            "Archived Analyses must belong to exactly one Tab"
+        )
+    for tab_id, tab in tabs_by_id.items():
+        owned_ids = {
+            analysis_id
+            for analysis_id, owner_tab_id in analysis_tab_ids.items()
+            if owner_tab_id == tab_id
+        }
+        if set(tab.analysis_ids) != owned_ids:
+            raise InvalidWorkspaceArchiveError(
+                "Archived Tab and Analysis ownership is invalid"
+            )
+
+    parsed: dict[uuid.UUID, tuple[WorkspaceArchiveAnalysis, AnalysisRecord]] = {}
+    omitted_analysis_ids: set[uuid.UUID] = set()
+    for entry in manifest.analyses:
+        if (
+            entry.tab_id in omitted_tab_ids
+            or entry.schema_version
+            != ANALYSIS_SCHEMA_VERSIONS[entry.analysis_kind]
+        ):
+            omitted_analysis_ids.add(entry.id)
+            continue
+        try:
+            record = AnalysisRecord.model_validate(entry.payload)
+        except ValidationError as exc:
+            raise InvalidWorkspaceArchiveError(
+                "Workspace archive Analysis payload is invalid"
+            ) from exc
+        if (
+            record.id != entry.id
+            or record.tab_id != entry.tab_id
+            or analysis_kind_for_request(record.request) is not entry.analysis_kind
+        ):
+            raise InvalidWorkspaceArchiveError(
+                "Workspace archive Analysis envelope does not match its payload"
+            )
+        if record.state not in {
+            AnalysisState.SUCCEEDED,
+            AnalysisState.FAILED,
+            AnalysisState.CANCELLED,
+        }:
+            raise InvalidWorkspaceArchiveError(
+                "Workspace archives contain only terminal Analyses"
+            )
+        parsed[entry.id] = (entry, record)
+
+    changed = True
+    while changed:
+        changed = False
+        for analysis_id, (_entry, record) in list(parsed.items()):
+            parent_id = record.parent_analysis_id
+            if parent_id is None:
+                continue
+            if parent_id not in declared_analysis_ids:
+                raise InvalidWorkspaceArchiveError(
+                    "Archived Sub-Analysis parent is invalid"
+                )
+            if analysis_tab_ids[parent_id] != record.tab_id:
+                raise InvalidWorkspaceArchiveError(
+                    "Archived Sub-Analysis parent is invalid"
+                )
+            if parent_id in omitted_analysis_ids:
+                omitted_analysis_ids.add(analysis_id)
+                parsed.pop(analysis_id)
+                changed = True
+
+    compatible_ids = set(parsed)
+    tabs = [
+        tab.model_copy(
+            deep=True,
+            update={
+                "analysis_ids": [
+                    analysis_id
+                    for analysis_id in tab.analysis_ids
+                    if analysis_id in compatible_ids
+                ]
+            },
+        )
+        for tab in tabs_by_id.values()
+    ]
+    analyses = [parsed[entry.id] for entry in manifest.analyses if entry.id in parsed]
+    return _CompatibleArchiveChildren(
+        tabs=tabs,
+        analyses=analyses,
+        omitted_tab_ids=omitted_tab_ids,
+        omitted_analysis_ids=omitted_analysis_ids,
+    )
+
+
 def _compile_materialized_archive(
     staging: Path,
     manifest: WorkspaceArchiveManifest,
     *,
     max_parent_edges: int,
     workspace_store: WorkspaceStore,
-) -> None:
+) -> tuple[int, int]:
     """Compile safe materialized Parquet entries into server-owned lazy plans."""
 
+    compatible_children = _compatible_archive_children(manifest)
     node_ids = [node.id for node in manifest.nodes]
     if len(node_ids) != len(set(node_ids)):
         raise InvalidWorkspaceArchiveError("Workspace archive has duplicate node IDs")
     known_ids = set(node_ids)
     allowed_files = {"workspace.json"}
     parent_map: dict[uuid.UUID, list[uuid.UUID]] = {}
-    children: dict[uuid.UUID, list[uuid.UUID]] = {node_id: [] for node_id in node_ids}
+    node_children: dict[uuid.UUID, list[uuid.UUID]] = {
+        node_id: [] for node_id in node_ids
+    }
     edge_count = 0
     for node in manifest.nodes:
         node_id = node.id
@@ -719,16 +883,43 @@ def _compile_materialized_archive(
             )
         parent_map[node_id] = parent_ids
         for parent_id in parent_ids:
-            children[parent_id].append(node_id)
+            node_children[parent_id].append(node_id)
         allowed_files.add(expected_file)
 
-    for archived in manifest.analyses:
-        record = archived.record
+    for archived, record in compatible_children.analyses:
+        expected_input_ids = list(analysis_snapshot_input_ids(record.request))
+        actual_input_ids = [item.id for item in archived.query_inputs]
+        if record.query_snapshot is None:
+            if actual_input_ids:
+                raise InvalidWorkspaceArchiveError(
+                    "Only a queryable Analysis has archived query inputs"
+                )
+        elif actual_input_ids != expected_input_ids:
+            raise InvalidWorkspaceArchiveError(
+                "Archived query inputs must match the Analysis request"
+            )
+        for item in archived.query_inputs:
+            expected_file = (
+                f"analyses/{record.id}/query-data/{item.id}.parquet"
+            )
+            if item.data_file != expected_file:
+                raise InvalidWorkspaceArchiveError(
+                    "Archived query input path is invalid"
+                )
         for reference in record.artifact_references:
             allowed_files.add(
                 _archive_artifact_path(record, reference.relative_path).as_posix()
             )
         allowed_files.update(item.data_file for item in archived.query_inputs)
+
+    for analysis_id in compatible_children.omitted_analysis_ids:
+        omitted_root = staging / "analyses" / str(analysis_id)
+        if omitted_root.exists():
+            if not omitted_root.is_dir() or omitted_root.is_symlink():
+                raise InvalidWorkspaceArchiveError(
+                    "Workspace Analysis storage is invalid"
+                )
+            shutil.rmtree(omitted_root)
 
     actual_files = {
         path.relative_to(staging).as_posix()
@@ -754,7 +945,7 @@ def _compile_materialized_archive(
     ready = deque(node_id for node_id in node_ids if indegree[node_id] == 0)
     processed = 0
     try:
-        for tab in manifest.tabs:
+        for tab in compatible_children.tabs:
             workspace.add_tab(tab.model_copy(deep=True))
         # The validated portable manifest and the strict internal snapshot share
         # the canonical filename but never the same schema.
@@ -787,7 +978,7 @@ def _compile_materialized_archive(
             )
             workspace.add_node(materialized)
             processed += 1
-            for child_id in children[node_id]:
+            for child_id in node_children[node_id]:
                 indegree[child_id] -= 1
                 if indegree[child_id] == 0:
                     ready.append(child_id)
@@ -795,10 +986,9 @@ def _compile_materialized_archive(
             raise InvalidWorkspaceArchiveError(
                 "Workspace archive node graph contains a cycle"
             )
-        for archived in manifest.analyses:
+        for archived, record in compatible_children.analyses:
             if not archived.query_inputs:
                 continue
-            record = archived.record
             if record.query_snapshot is None:
                 raise InvalidWorkspaceArchiveError(
                     "Workspace Analysis query inputs are invalid"
@@ -834,7 +1024,10 @@ def _compile_materialized_archive(
                 max_snapshot_bytes=workspace_store.max_snapshot_bytes,
             )
             shutil.rmtree(query_data_root)
-        pending = [archived.record.model_copy(deep=True) for archived in manifest.analyses]
+        pending = [
+            record.model_copy(deep=True)
+            for _archived, record in compatible_children.analyses
+        ]
         while pending:
             next_pending = []
             for record in pending:
@@ -864,6 +1057,10 @@ def _compile_materialized_archive(
         output.flush()
         os.fsync(output.fileno())
     _fsync_directory(staging)
+    return (
+        len(compatible_children.omitted_tab_ids),
+        len(compatible_children.omitted_analysis_ids),
+    )
 
 
 def _snapshot_workspace_tree(source: Path, max_bytes: int) -> Path:
@@ -1105,7 +1302,13 @@ def _create_workspace_export(
                     )
             analyses.append(
                 {
-                    "record": cast(
+                    "id": str(record.id),
+                    "tab_id": str(record.tab_id),
+                    "analysis_kind": analysis_kind_for_request(record.request).value,
+                    "schema_version": ANALYSIS_SCHEMA_VERSIONS[
+                        analysis_kind_for_request(record.request)
+                    ],
+                    "payload": cast(
                         JsonData,
                         record.model_dump(mode="json"),
                     ),
@@ -1115,7 +1318,7 @@ def _create_workspace_export(
         manifest = WorkspaceArchiveManifest.model_validate(
             {
                 "format": "wordflow-materialized-workspace",
-                "version": 22,
+                "data_schema_version": 1,
                 "workspace": {
                     "id": workspace.id,
                     "name": workspace.name,
@@ -1125,15 +1328,20 @@ def _create_workspace_export(
                 },
                 "nodes": nodes,
                 "tabs": [
-                    tab.model_copy(
-                        update={
-                            "analysis_ids": [
-                                analysis_id
-                                for analysis_id in tab.analysis_ids
-                                if analysis_id in archived_analysis_ids
-                            ]
-                        }
-                    ).model_dump(mode="json")
+                    {
+                        "id": str(tab.id),
+                        "analysis_kind": tab.kind.value,
+                        "schema_version": ANALYSIS_SCHEMA_VERSIONS[tab.kind],
+                        "payload": tab.model_copy(
+                            update={
+                                "analysis_ids": [
+                                    analysis_id
+                                    for analysis_id in tab.analysis_ids
+                                    if analysis_id in archived_analysis_ids
+                                ]
+                            }
+                        ).model_dump(mode="json"),
+                    }
                     for tab in workspace.tabs.values()
                 ],
                 "analyses": analyses,

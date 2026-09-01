@@ -152,6 +152,31 @@ async def test_corrupt_owned_workspace_is_exposed_and_remains_deletable(
 
 
 @pytest.mark.anyio
+async def test_schema_23_uses_normal_corrupt_load_failure_path(tmp_path: Path) -> None:
+    service = _service(tmp_path)
+    created = await service.create_workspace("owner", "Old snapshot")
+    snapshot_path = (
+        workspaces_root(service.settings) / str(created.id) / "workspace.json"
+    )
+    payload = json.loads(snapshot_path.read_text(encoding="utf-8"))
+    metadata = payload["workspace_metadata"]
+    metadata.pop("data_schema_version")
+    metadata["version"] = 23
+    snapshot_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    assert await service.list_workspaces("owner") == [
+        UnavailableWorkspaceRecord(
+            id=created.id,
+            reason="corrupt_snapshot",
+            message="Workspace data is corrupt.",
+        )
+    ]
+    with pytest.raises(WorkspaceCorruptError) as exc_info:
+        await service.open_workspace("owner", created.id)
+    assert exc_info.value.details == {"workspace_id": str(created.id)}
+
+
+@pytest.mark.anyio
 async def test_incompatible_workspace_versions_are_distinct_catalogue_entries(
     tmp_path: Path,
 ) -> None:
@@ -166,7 +191,7 @@ async def test_incompatible_workspace_versions_are_distinct_catalogue_entries(
             workspaces_root(service.settings) / str(workspace_id) / "workspace.json"
         )
         payload = json.loads(snapshot_path.read_text(encoding="utf-8"))
-        payload["workspace_metadata"]["version"] = version
+        payload["workspace_metadata"]["data_schema_version"] = version
         payload["workspace_metadata"]["description"] = f"Description {version}"
         payload["workspace_metadata"]["created_at"] = "2024-01-01T00:00:00+00:00"
         payload["workspace_metadata"]["modified_at"] = "2024-01-02T00:00:00+00:00"
@@ -179,10 +204,13 @@ async def test_incompatible_workspace_versions_are_distinct_catalogue_entries(
     unavailable = records[1:]
     assert [record.id for record in unavailable] == sorted(incompatible_ids)
     assert {
-        (record.stored_schema_version, record.supported_schema_version)
+        (
+            record.stored_data_schema_version,
+            record.supported_data_schema_version,
+        )
         for record in unavailable
         if isinstance(record, UnavailableWorkspaceRecord)
-    } == {(21, 23), (22, 23)}
+    } == {(21, 1), (22, 1)}
     assert all(
         isinstance(record, UnavailableWorkspaceRecord)
         and record.reason == "incompatible_format"
