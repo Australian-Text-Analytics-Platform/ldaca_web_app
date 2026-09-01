@@ -30,5 +30,5 @@ Workspace data boundary but is explicitly not a general SQL sandbox.
 Typed native operations remain the product contract for Filter, Find/Replace,
 Create, Expression, Sample, Join, Stack, cast, rename, and delete.
 Those operations preserve semantics that SQL does not represent losslessly,
-including Topic Distribution filtering, regex transformations, categorical
+including Topic Coverage filtering, regex transformations, categorical
 casts, plugins, and the validated typed-expression surface.

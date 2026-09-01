@@ -4,6 +4,9 @@ status: accepted
 
 # Length-Weighted Topic Distributions
 
+The distribution name, overlap weighting, and dominance clauses are superseded
+by [ADR 0028](0028-non-overlapping-topic-coverage.md).
+
 ## Context
 
 Topic Modelling clusters Topic Segments but presents results for source

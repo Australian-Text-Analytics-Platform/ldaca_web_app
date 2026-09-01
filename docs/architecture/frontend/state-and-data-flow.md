@@ -49,7 +49,7 @@ frontend column-kind registry. Type labels use the exact
 otherwise. Feature selectors and preprocessing controls inspect those fields
 directly. Decoder failures stay ordinary errors on the affected table query and
 retain the underlying Arrow cause. Known semantic extension identities select
-specialized behavior such as the Topic Distribution renderer. An unrecognized
+specialized behavior such as the Topic Coverage renderer. An unrecognized
 extension remains addressable by its exact name and retains its Arrow field
 metadata instead of being collapsed into a generic category.
 Raw network calls are limited to boundaries the generator cannot express
@@ -257,7 +257,7 @@ becomes the Tab's sole Analysis immediately. An Active Analysis Draft is
 client-only and is never written into Query data.
 
 Displayed Results resolve source identity, columns, ordering, search semantics,
-counts, seeds, and truncation data only from the strict Result tree and
+counts, seeds, and Topic projection data only from the strict Result tree and
 immutable submitted request. They do not fall back to current Workspace state.
 Editing the next draft therefore cannot rebind an existing Result. Manual Annotation
 uses the same principle locally: **Start** captures the source, annotation

@@ -177,7 +177,7 @@ flowchart LR
 
 Result queries are side-effect free and keys contain all content-bearing
 projection inputs. A missing retained snapshot fails clearly rather than
-falling back to a mutable Data Block. Topic Distribution remains a named Arrow
+falling back to a mutable Data Block. Topic Coverage remains a named Arrow
 extension through storage, transport, and Derived Data Block Creation.
 
 Concordance and Quotation Run All retain one row per matching source document.
@@ -199,15 +199,18 @@ Concordance density is a separate side-effect-free projection over the complete
 immutable child Result. It returns exact-match series in 100 fixed relative
 position bins and is independent of Review table page, sort, and row unit.
 
-Topic Modelling runs its initial HDBSCAN fit with the Analysis request's
-`min_cluster_size` (default 10), then publishes its natural JSON Result plus one
-private versioned clustering-context Artifact. The context stores a weighted
-Ward tree over the real HDBSCAN leaves and additive term, coordinate, document,
-corpus, row, and retained-character facts; it stores neither source text nor embeddings. An
-explicit `cluster_count` or `top_n_topics` Result query reads that immutable
+Topic Modelling creates non-overlapping Topic Segments, performs one seeded
+PaCMAP reduction for the initial HDBSCAN fit, and publishes its natural JSON
+Result plus one private versioned projection-context Artifact when real Topics
+exist. A corpus below the minimum usable segment count, or an all-noise fit,
+returns explicit outlier coverage with no projection Artifact. The context
+stores a deterministic cosine average-linkage tree over natural Topic embedding
+centroids plus additive term, document, corpus, row, and owned-character facts;
+it stores neither source text nor individual segment embeddings. An explicit
+`cluster_count` that differs from the stored count reads that immutable
 Artifact, cuts only downward from the natural count, and asks the native
-projector for a complete N-independent activation basis. Per-row distributions
-are not serialized for Result queries. The runtime's bounded single-flight LRU
+projector for a complete N-independent activation basis. Per-row coverage is
+not serialized for Result queries. The runtime's bounded single-flight LRU
 retains compact basis bytes by principal, Workspace, Analysis, immutable
 context identity, and K; each request derives fresh Top-N counts and retains no
 per-N Result. Public Results expose ordered source metadata and the applied
@@ -217,10 +220,10 @@ are emitted to structured logs.
 
 Topic Modelling Data Block Creation is the only table-materialization path. Its
 Supporting request captures the displayed K, Top N, and projected meaning
-overrides. The worker reads the parent's context and immutable input snapshot,
+overrides. The worker reads the parent's projection context and immutable input snapshot,
 runs the same projector, selects the union of rows activating any selected
 Topic, and atomically publishes assignment and meaning Data Blocks. It pads
-complete sparse distributions only at this derived-Data-Block boundary. A
+complete sparse coverage only at this derived-Data-Block boundary. A
 Result query itself never writes Artifacts, advances a revision, or emits
 lifecycle state.
 

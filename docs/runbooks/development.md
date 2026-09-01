@@ -104,6 +104,7 @@ cd polars-source-utils
 uv sync
 uv run maturin develop --release
 uv run pytest -q
+cargo clippy --all-targets --locked -- -D warnings
 cargo metadata --format-version 1 --no-deps
 ```
 

@@ -46,10 +46,11 @@ they are not mislabeled as an unknown physical type. A type that the decoder
 cannot decode fails that table request clearly; there is no JSON fallback,
 backend type profile, or alternate decoder.
 
-Topic Distribution uses extension name
-`org.ldaca.wordflow.topic_distribution.v1` over
-`fixed-size-list[N+1]<struct<topic_id: int64, proportion: float64>>`, where the
-entries are outlier `-1` followed by real topics `0..N-1`. Fixed-size storage
+Topic Coverage uses extension name `org.ldaca.wordflow.topic_coverage.v1` over
+`fixed-size-list[N+1]<struct<topic_id: int64, coverage: float64>>`, where the
+entries are outlier `-1` followed by real Topics `0..N-1`. Fixed-size storage
 expresses that domain invariant; it is not a client-compatibility workaround.
 Frontend code dispatches semantic rendering from the extension name and does
-not redefine the storage type or substitute a second display name.
+not redefine the storage type or substitute a second display name. ADR 0028
+owns the Topic Coverage semantics and supersedes the earlier distribution
+layout.

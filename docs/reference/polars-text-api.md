@@ -1,82 +1,82 @@
 # polars-text API Reference
 
-Importing `polars_text` registers the `.text` namespace on Polars expressions.
-Plugin wrappers resolve the exact imported `_internal` extension file so an
-editable environment cannot load a stale ABI sibling.
+Version 0.6 requires Python Polars 1.44.1. Importing `polars_text` registers the
+sole expression façade, the `.text` namespace. The namespace registers native
+plugins against the exact imported `_internal` extension; `clean_text` and
+`char_count` are native Polars expression compositions.
 
-## Expression API
+## Expression Namespace
 
-- `clean_text(expr)`
-- `word_count(expr)`
-- `char_count(expr)`
-- `sentence_count(expr)`
-- `concordance(expr, search_word, num_left_tokens=5, num_right_tokens=5, regex=False, case_sensitive=False, remove_punct=False)`
-- `embedding(expr, ...)`
-- `topic_modeling(expr, ...)`
-- `pl.col("text").text.tokenize(model=..., lowercase=..., remove_punct=..., cache=...)`
+```python
+expr.text.tokenize(
+    *, model, lowercase=True, remove_punctuation=True, cache=None
+)
+expr.text.concordance(
+    query, *, left_tokens=5, right_tokens=5, regex=False,
+    case_sensitive=False, ignore_punctuation=False
+)
+expr.text.embedding(*, model=None, cache=None, batch_size=None)
+expr.text.topic_modeling(
+    *, embedding_model=None, embedding_cache=None,
+    segmentation="automatic", max_tokens=256, seed=42,
+    min_topic_size=10, tokenizer_model=None, lowercase=True
+)
+expr.text.clean_text()
+expr.text.word_count()
+expr.text.char_count()
+expr.text.sentence_count()
+```
 
 Tokenization returns `List[Struct[token: String, start: Int64, end: Int64]]`
-with Unicode character offsets. Supported model namespaces are `native:`,
-`huggingface:`, and `lindera:`. A cache path enables the Rust-owned DuckDB
-cache; `None` computes directly.
+with Unicode character offsets. Model IDs use the `native:`, `huggingface:`, or
+`lindera:` namespace. `word_count` and `sentence_count` follow Unicode UAX #29.
 
-`concordance(..., remove_punct=True)` excludes tokens containing no Unicode
-alphanumeric characters when selecting left/right context and L1/R1. Context
-strings are sliced from the original text offsets, so punctuation and
-whitespace between retained tokens and the match remain visible. Match
-selection itself is unchanged.
+Concordance always slices contexts from the original source text, preserving
+its punctuation and whitespace. `ignore_punctuation` changes which tokens count
+toward the left and right window and L1/R1, not matching or returned text.
 
-Embedding accepts string or list-of-string input and returns a vector or nested
-vectors per row. `topic_modeling` is a scalar whole-column expression that
-returns exactly one run result. Its segmentation arguments are:
+Topic segmentation accepts `automatic`, `line`, or `sentence`. Every mode emits
+non-overlapping source spans. Oversized semantic units are subdivided on Unicode
+and token boundaries without discarding tail text. `max_tokens` includes any
+special tokens added by the embedding model.
 
-- `segmentation_method`: `"automatic"`, `"paragraph"`, or `"sentence"`;
-- `max_tokens`: maximum model tokens per Topic Segment; and
-- `overlap`: the automatic-mode overlap. Paragraph and Sentence modes ignore
-  overlap, preserve semantic units, and right-truncate units over `max_tokens`.
+The default embedder is `sentence-transformers/all-MiniLM-L6-v2`. Its Sentence
+Transformers metadata declares a 256-token maximum, which both the namespace
+and Wordflow enforce. Cache paths are dedicated disposable storage and may be
+replaced completely when their schema or model-pipeline fingerprint changes.
 
-The result contract is:
+The scalar topic result is:
 
 ```text
 {
-  documents: [{doc_index, dominant_topic, topic_distribution}],
+  documents: [{doc_index, dominant_topic, topic_coverage}],
   topics: [{id, representative_words, x, y}],
-  n_chunks,
-  truncated_segment_count,
-  stage_timings_ms,
-  clustering_context
+  n_segments,
+  projection_context
 }
 ```
 
-`documents` and `topics` are independent, so metadata is complete even when a
-topic never dominates a document. Topic Distribution proportions are weighted
-by retained Topic Segment Unicode-character length; Automatic overlap counts
-each repeated observation. Clustering remains one equal observation per Topic
-Segment. `n_chunks` retains its lower-level name but counts Topic Segments.
-`representative_words` is a list of
-`{word: String, occurrence_count: UInt64}` structs, fixed at at most 100 terms
-in descending c-TF-IDF order. Counts are over assigned model Topic Segments, so
-automatic overlap can count the same source text more than once. Stopwords and
-display limits are not expression arguments.
+Topic Coverage is weighted by the source-character length owned by each Topic
+Segment. Outlier `-1` competes normally for dominance. Clustering still treats
+each segment as one observation. When the corpus cannot support a real HDBSCAN
+Topic, `topics` is empty and `projection_context` is null. Otherwise the context
+is compressed MessagePack used by supported projectors without rerunning
+embedding or HDBSCAN.
 
-`clustering_context` is a zstd-compressed MessagePack binary produced alongside
-the natural HDBSCAN projection. The direct native projectors accept that value
-and an exact real-Topic count from two through the natural count without model
-inference. `project_topic_modeling_context` returns new `documents[]` and
-`topics[]` JSON for Data Block Creation. `project_topic_modeling_basis` also
-accepts ordered corpus sizes and returns Topic metadata plus sorted
-`[corpus_index, topic_id, minimum_n, count]` activations for Result-time bubble
-counts. Both preserve outlier `-1` semantics and canonicalize real Topic IDs by
-Ward-tree order.
+## Whole-Series Utilities
 
-## Direct Functions
+- `token_frequencies(series, model=...)`
+- `token_frequency_stats(corpus_0, corpus_1)`
+- `project_topics(projection_context, topic_count)`
+- `project_topic_basis(projection_context, topic_count, corpus_sizes)`
 
-- `token_frequencies(series, model=...)` returns a token-count dictionary.
-- `token_frequency_stats(corpus_0, corpus_1)` returns comparative statistics.
-- `prefetch_model(model)` and `list_loaded_models()` access the tokenizer
-  registry.
-- `PREDEFINED_MODELS` and `LINDERA_MODELS_BY_LANGUAGE` expose inventory, not
-  product recommendation policy.
+`project_topics` returns projected `documents` and `topics` for any count from
+one through the natural real-Topic count.
+`project_topic_basis` returns topic metadata plus sorted
+`[corpus_index, topic_id, minimum_n, count]` activations.
 
-Serialized plan path functions are provided by `polars_source_utils`, not
-`polars_text`.
+The immutable tokenizer catalogue is `TOKENIZER_MODELS`, a tuple of
+`TokenizerModel(model_id, label, languages)` records. Registry prefetch and
+loaded-model inspection are not public APIs.
+
+Serialized-plan path functions belong to `polars_source_utils`.

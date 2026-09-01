@@ -116,10 +116,10 @@ boundary only as Arrow IPC streams with media type
   dtypes; the zero-row Arrow schema is authoritative;
 - registered and unregistered extension types retain their exact names,
   storage types, and extension metadata from Data Block plans through IPC;
-- topic-assignment distribution values carry the stable Arrow extension name
-  `org.ldaca.wordflow.topic_distribution.v1` over a
-  `fixed-size-list[N+1]<struct<topic_id: int64, proportion: float64>>` storage
-  type, ordered as outlier `-1` followed by real topics `0..N-1`.
+- Topic Coverage values carry the stable Arrow extension name
+  `org.ldaca.wordflow.topic_coverage.v1` over a
+  `fixed-size-list[N+1]<struct<topic_id: int64, coverage: float64>>` storage
+  type, ordered as outlier `-1` followed by real Topics `0..N-1`.
 
 Explicit Data Block downloads are response-lifetime artifacts rather than an
 interactive table transport. A requested stable Workspace view is materialized

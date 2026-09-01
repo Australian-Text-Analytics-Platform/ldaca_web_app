@@ -115,29 +115,28 @@ Matches. Table View and Match Data Block Creation use this unit; Dispersion
 View and Document Data Block Creation use the stable source-document unit.
 _Avoid_: document hit, dispersion row, cached line
 
-**Topic Distribution**:
-The ordered per-document proportions for the outlier topic `-1` followed by
-every real topic in ascending ID order. Every entry is present, absent
-proportions are zero, and the proportions sum to approximately one. Each Topic
-Segment contributes the Unicode-character length of its retained text;
-automatic overlap therefore contributes repeated weight. Outlier weight stays
-in the denominator. The dominant topic is the highest-weight real topic, or
-`-1` only when no real topic is present. Topic Distribution is distinct from
-that single dominant topic.
-_Avoid_: variable topic list, dominant topic
+**Topic Coverage**:
+The ordered per-document source-character coverage for outlier Topic `-1`
+followed by every real Topic in ascending ID order. Every entry is present,
+absent coverage is zero, and coverage sums to approximately one. Each Topic
+Segment contributes the Unicode-character length of its non-overlapping owned
+source span. Outlier coverage remains in the denominator and competes normally
+for dominance, with the smaller Topic ID winning an exact tie. Topic Coverage
+is distinct from the single dominant Topic.
+_Avoid_: Topic Distribution, probability, variable topic list
 
 **Topic Segment**:
 The bounded span of source text embedded and clustered as one observation by
 Topic Modelling. A document may contribute one or many Topic Segments, whose
-assignments are rolled up into its Topic Distribution. In code and lower-level
-interfaces this unit may retain the established name `Chunk` or `n_chunks`.
-_Avoid_: document when referring to the model input, chunk in product copy
+assignments are rolled up into its Topic Coverage. Every non-whitespace source
+character belongs to at most one Topic Segment; oversized units are split
+without overlap or discarded tail text.
+_Avoid_: document when referring to the model input, chunk
 
 **Representative Word**:
 A term retained for a Topic in descending c-TF-IDF distinctiveness order. Its
-occurrence count is the number of tokens in assigned model Topic Segments,
-including repeated text introduced by automatic-segmentation overlap. It is not
-source-document frequency or a human-authored topic label.
+occurrence count is the number of tokens in assigned non-overlapping Topic
+Segments. It is not source-document frequency or a human-authored topic label.
 _Avoid_: label, document count, source occurrence
 
 **Artifact**:

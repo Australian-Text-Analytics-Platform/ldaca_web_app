@@ -9,18 +9,18 @@ text and summarises each group with statistically representative words.
 The unit processed by the model is a **Topic Segment**. Depending on your
 segmentation setting, one source document can contribute one or many Topic
 Segments. Wordflow embeds and clusters the segments, then combines their topic
-assignments into a distribution for the source document.
+assignments into source-character Topic Coverage for the source document.
 
 <h3 id="info-topic-modeling-pipeline">How the result is produced</h3>
 
-1. Automatic, Paragraph, or Sentence segmentation creates Topic Segments.
+1. Automatic, Line, or Sentence segmentation creates non-overlapping Topic Segments.
 2. A sentence-transformer model converts each segment into an embedding.
 3. PaCMAP reduces the embeddings and HDBSCAN discovers natural clusters and
    outliers.
-4. Wordflow builds a deterministic merge tree over the real clusters.
+4. Wordflow builds a deterministic cosine average-linkage tree over real Topics.
 5. Class-based TF-IDF (c-TF-IDF) ranks representative words for each topic.
-6. Segment assignments are rolled up to document-level topic distributions,
-   weighted by the Unicode-character length of each retained segment.
+6. Segment assignments are rolled up to document-level Topic Coverage, weighted
+   by the Unicode-character length owned by each segment.
 
 For keyword extraction, c-TF-IDF combines all Topic Segments assigned to a
 topic into one class-level text. The configured vectorizer tokenises that text
@@ -31,19 +31,17 @@ vocabulary, not necessarily the topic's meaning or an author's intent.
 
 <h3 id="info-topic-modeling-segmentation">Why segmentation matters</h3>
 
-Automatic segmentation retains long-document coverage by splitting and packing
-text with limited overlap. Paragraph and Sentence segmentation preserve chosen
-semantic boundaries, but an oversized unit keeps only its beginning. The
-Maximum tokens per segment control therefore trades local focus against wider
-context. Wordflow reports explicit-mode truncation above the Result chart.
-Automatic overlap counts repeated text as another observation. All three modes
-then use the same downstream modelling pipeline.
+Automatic segmentation prefers blank-line, Unicode sentence, word, and token
+boundaries within the model budget. Line begins from each non-empty physical
+line, and Sentence begins from Unicode sentence boundaries. Oversized semantic
+units are split further. Every source span is owned by at most one segment, so
+coverage is neither repeated nor silently discarded.
 
 <h3 id="info-topic-modeling-what-you-can-do">What you can do</h3>
 
 - Explore prominent and niche language patterns.
 - Compare the contribution of two corpora to the same discovered topics.
-- Adjust the displayed number of real Topics from the natural fit down to two.
+- Adjust the displayed number of real Topics from the natural fit down to one.
 - Count each row in bubbles for its strongest one or more positive Topics.
 - Inspect representative words, topic sizes, similarity, and outliers.
 - Pan and zoom the fitted Topic graph, or cumulatively lasso Topics to filter

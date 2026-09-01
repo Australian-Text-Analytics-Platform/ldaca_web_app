@@ -16,6 +16,12 @@ The public interface is intentionally small:
 - `list_source_paths(plan_path)` returns the plan's referenced source paths.
 - `replace_source_paths(plan_path, replacements)` rewrites matching plan paths.
 
+Traversal names every current `DslPlan` variant explicitly, including `Pivot`,
+`MergeSorted`, and `Gather`, so an upstream plan addition fails compilation
+until its child ownership is reviewed. Rewrites serialize into a same-directory
+temporary file, flush and sync it, and atomically replace the original only
+after serialization succeeds.
+
 ```mermaid
 flowchart LR
     ARCHIVE["Plan rebuilt in archive staging"] --> PLAN["Serialized LazyFrame plan"]

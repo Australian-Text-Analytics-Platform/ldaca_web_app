@@ -249,29 +249,29 @@ Data Block; Topic Modelling may create multiple ordered output Data Blocks.
 A Topic Modelling Analysis request owns one segmentation method, maximum token
 count, and HDBSCAN minimum cluster size for all selected Data Blocks. Minimum
 cluster size defaults to 10 and must be at least 2. The successful Result
-records the total Topic Segment count and how many semantic segments were truncated.
-Automatic segmentation may split and overlap text; Paragraph and Sentence
-segmentation preserve their respective Unicode text boundaries and truncate an
-oversized segment on the right.
+records the total Topic Segment count. Automatic, Line, and Sentence modes
+produce non-overlapping source spans; oversized semantic units are subdivided
+without discarding their tail.
 
 Every segmentation method then uses the same embedding, reduction, clustering,
 c-TF-IDF, and Result-construction pipeline. HDBSCAN uses the request's minimum
 cluster size and treats each Topic Segment as one equal observation. Its
-real Topics become the maximum-resolution leaves of a deterministic Ward merge
-tree; outlier `-1` is never merged. Document Topic Distributions are a separate
-rollup: each retained segment contributes its
-Unicode-character length, including repeated observations from Automatic
-overlap. Outlier weight remains in the normalization denominator. The highest-
-weight real topic is dominant, with smaller topic IDs breaking ties; `-1` is
-dominant only when the document has no real-topic segment. Bubble sizes are
+real Topics become the maximum-resolution leaves of a deterministic cosine
+average-linkage tree over original Topic embeddings; outlier `-1` is never
+merged. Document Topic Coverage is a separate rollup: each segment contributes
+the Unicode-character length of its owned source span. Outlier coverage remains
+in the normalization denominator and competes normally for dominance, with
+smaller Topic IDs breaking ties. Bubble sizes are
 integer row-membership counts: a positive real Topic counts when its share is
 among the row's Top N real-topic shares. Zero shares and outlier `-1` are
 excluded, while every cutoff tie is included, so totals across bubbles may
 exceed the number of source rows.
 
-Topic Results retain 100 Representative Words per topic in c-TF-IDF order,
+If fewer than `max(3, min_cluster_size)` Topic Segments are available, or
+HDBSCAN finds only noise, the Result has no real Topics or projection Artifact.
+Otherwise Topic Results retain 100 Representative Words per Topic in c-TF-IDF order,
 each with its model-segment occurrence count. Result queries may cut the stored
-tree from the natural real-Topic count down to two and recompute all derived
+tree from the natural real-Topic count down to one and recompute all derived
 Topic JSON without changing the Analysis. Each Result advertises a Top-topics-
 per-row range of 1 through K and defaults to `min(2, K)`; empty Results use 0.
 Canonical real Topic IDs are contiguous and ordered by smallest descendant

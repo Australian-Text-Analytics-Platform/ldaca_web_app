@@ -33,25 +33,24 @@ used for every selected Data Block.
 
 | Method | Boundary behavior | Oversized text |
 | --- | --- | --- |
-| **Automatic** | Splits blank-line blocks, then Unicode sentences and token-length units; packs nearby units with a small overlap | Subdivided so later text remains represented |
-| **Paragraph** | Each trimmed, non-empty newline-delimited line is one Topic Segment | Keeps only the beginning up to the token cap |
-| **Sentence** | Each Unicode UAX #29 sentence is one Topic Segment | Keeps only the beginning up to the token cap |
+| **Automatic** | Prefers blank-line blocks, Unicode sentences, words, then token boundaries | Split without overlap or lost tail text |
+| **Line** | Starts from each trimmed, non-empty newline-delimited line | Recursively split within the token cap |
+| **Sentence** | Starts from each Unicode UAX #29 sentence | Split at token boundaries within the cap |
 
-Paragraph means a physical non-empty line, not a blank-line block. Sentence
+Line means a physical non-empty line, not a blank-line block. Sentence
 uses a language-independent Unicode boundary algorithm, so abbreviations may
 occasionally form a short segment.
 
 <h4 id="help-topic-modeling-max-segment-tokens">Maximum tokens per segment</h4>
 
 Sets the maximum size of a Topic Segment in model tokens. The default is 256
-and the allowed range is 32–510. Tokens may be complete words or parts of
-words. A smaller cap gives more local observations; a larger cap gives each
-observation more context.
+and the allowed range is 32–256. Tokens may be complete words or parts of
+words, and the cap includes special tokens added by the embedding model. A
+smaller cap gives more local observations; a larger cap gives each observation
+more context.
 
-In Paragraph and Sentence modes, an over-cap segment is right-truncated rather
-than split. After the run, a warning reports how many segments lost tail text.
-Automatic mode may overlap adjacent segments; its hidden overlap is one eighth
-of the cap, up to 32 tokens.
+All modes split over-cap text into non-overlapping source spans. No mode silently
+discards the tail of an oversized semantic unit.
 
 <h4 id="help-topic-modeling-min-cluster-size">Min topic size</h4>
 
@@ -76,9 +75,8 @@ are loaded or downloaded.
 
 Every mode uses this same downstream pipeline. Each Topic Segment is one equal
 clustering observation. When assignments are rolled back to documents, each
-segment is weighted by the Unicode-character length of its retained text;
-Automatic overlap therefore counts repeated source text again. Outlier weight
-remains part of the normalized Topic Distribution.
+segment is weighted by the Unicode-character length of its owned source span.
+Outlier coverage remains part of normalized Topic Coverage and can be dominant.
 
 The **Run** label never changes. Parameters lock while the Analysis is
 submitting, queued, or running, then unlock after success. Changing an
@@ -95,10 +93,10 @@ your segmentation method, token cap, and Min topic size stay selected.
 <h3 id="help-topic-modeling-number-of-clusters">Number of topics</h3>
 
 The Result starts at HDBSCAN's natural number of real Topics. Use **Number of
-topics** to merge that fit down to two Topics without rerunning embedding or
+topics** to merge that fit down to one Topic without rerunning embedding or
 dimensionality reduction. Topic −1 is an outlier group, remains unchanged, and
-does not count toward the displayed number. Results with zero, one, or two real
-Topics show a fixed disabled control.
+does not count toward the displayed number. Results with zero or one real Topic
+show a fixed disabled control.
 
 The lower bound appears to the left of the slider. Change the topic count with
 either the slider or the number field on its right; both stay synchronized.
@@ -158,7 +156,7 @@ Topic lists and Result data.
 
 Hover for a representative-word cloud. Word order reflects c-TF-IDF
 distinctiveness, while word size reflects occurrences in assigned Topic
-Segments; automatic overlap can therefore count repeated source text. These are
+Segments. Because segments do not overlap, source tokens are not counted twice. These are
 not source-document frequencies.
 
 Drag empty graph space to pan and scroll or pinch to zoom. The graph initially
@@ -182,10 +180,6 @@ header records Data Block, cluster count, Top topics per document, random seed, 
 Topic count. CSV output continues to contain the complete projected Topic
 result and its current counts.
 
-If Paragraph or Sentence segments were over the token cap, an amber message
-above the chart reports the truncated count and reminds you that their later
-text was not modelled.
-
 <h3 id="help-topic-modeling-clear-results">Clear results</h3>
 
 **Clear Results** removes the retained Analysis and Result. The selected
@@ -199,7 +193,7 @@ available for the next run.
 | Almost all documents are outliers | Increase sampling, try another segmentation method, or check whether the corpus has shared themes |
 | Topics change substantially between runs | Increase sampling and compare runs with fixed seeds |
 | Representative words describe formatting rather than subject matter | Clean boilerplate or choose a segmentation method that better matches the document structure |
-| Many segments are truncated | Increase Maximum tokens per segment or use Automatic segmentation |
+| A structural unit becomes many segments | Increase Maximum tokens per segment or choose a coarser segmentation mode |
 | Run time is very long | Reduce the per-Data-Block sampling percentage |
 
 <h2 id="help-topic-modeling-defaults">Quick-reference defaults</h2>
@@ -219,9 +213,8 @@ available for the next run.
 1. Run a corpus with Automatic segmentation.
 2. Change Top topics per document and compare bubble membership without moving the map.
 3. Move Number of topics down and compare the merged representative words.
-4. Clear the Result, choose Paragraph or Sentence, and run again with the same
+4. Clear the Result, choose Line or Sentence, and run again with the same
    sample and seed.
-5. Compare the topic map, representative words, outlier share, and any
-   truncation warning.
+5. Compare the topic map, representative words, and outlier coverage.
 
 [← Back to tutorial index](./index.md)

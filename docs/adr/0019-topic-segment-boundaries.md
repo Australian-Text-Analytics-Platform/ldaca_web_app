@@ -4,6 +4,9 @@ status: accepted
 
 # Topic Segment Boundaries
 
+The overlap and truncation clauses are superseded by
+[ADR 0028](0028-non-overlapping-topic-coverage.md).
+
 ## Context
 
 Topic Modelling embeds bounded text spans rather than whole source documents.
@@ -27,7 +30,8 @@ segmentation uses Unicode UAX #29 sentence boundaries.
 Paragraph and Sentence units are never subdivided or overlapped. If a unit is
 over the cap, only its first configured number of tokenizer tokens is retained.
 The Result records the truncation count so the interface can disclose lost
-tail text. Existing lower-level names `Chunk` and `n_chunks` remain stable.
+tail text. Version 0.6 standardizes the lower-level names as `TopicSegment` and
+`n_segments` so implementation and product vocabulary agree.
 
 ## Consequences
 

@@ -285,14 +285,14 @@ contains ordered `sources[]`, authoritative projected `topics[]`, `clustering`
 bounds, and a `topic_inclusion` descriptor. `TopicModelingResultQuery` accepts
 nullable `cluster_count` and `top_n_topics` and does not expose pagination. An
 unfiltered query returns the complete projected Topic list in one response.
-Null for both returns the canonical stored Result; either explicit value uses
-the immutable projection basis.
+Null for both returns the canonical stored Result. An explicit value uses the
+immutable projection basis only when it differs from the stored projection.
 Invalid N returns 422 `invalid_topic_top_n` with the current 0 or 1..K bounds;
-invalid K returns its existing bounded 422, and a missing private clustering-
+invalid K returns its existing bounded 422, and a missing private projection-
 context Artifact returns 410. Topic Modelling Data Block Creation requires the
 displayed K and Top N. Selected bubbles publish the deduplicated union of rows
 whose Top-N memberships intersect the selection while preserving dominant
-`TOPIC_top1` and the complete Topic Distribution.
+`TOPIC_top1` and the complete Topic Coverage.
 
 `AnalysisCreate` contains one discriminated Analysis request, one execution
 scope (`preview`, `run_all`, or `supporting`), an optional

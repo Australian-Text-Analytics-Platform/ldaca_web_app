@@ -4,6 +4,9 @@ status: accepted
 
 # Top-N Topic Membership Projections
 
+The Topic Distribution terminology and explicit-default projection clause are
+superseded by [ADR 0028](0028-non-overlapping-topic-coverage.md).
+
 ## Context
 
 Document Topic Distributions already retain positive shares for Topics that do

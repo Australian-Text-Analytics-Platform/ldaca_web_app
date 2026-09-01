@@ -21,13 +21,18 @@ a long-lived PyPI token for the normal release path.
 ## Release
 
 1. Set the same PEP 440 version in `pyproject.toml` and `Cargo.toml`.
-2. Run `make build`, `make test`, and `uvx ty check`.
-3. Build the wheel and sdist and run `twine check --strict` on `dist/*`.
-4. Commit and push the release state.
-5. Create and push `v<version>`.
-6. Wait for every platform wheel, the sdist, and the publish job.
-7. Install the exact version from PyPI and run an import smoke test.
+2. Confirm Python Polars and both Rust Polars tags are the same release.
+3. Compile every supported Cargo feature configuration, run strict all-target
+   Clippy, rebuild the full optimized extension, then run `make test` and
+   `uvx ty check`.
+4. Build Linux x86-64, macOS arm64, and Windows x86-64 wheels. Install each
+   wheel and run an extension import plus a representative native operation.
+5. Build the sdist and run `twine check --strict` on every distribution.
+6. Commit and push the release state.
+7. Create and push `v<version>`.
+8. Wait for every platform wheel, the sdist, and the publish job.
+9. Install the exact version from PyPI and repeat the import/native smoke test.
 
-Release candidates use PEP 440 versions such as `0.5.0rc1` and are published by
+Release candidates use PEP 440 versions such as `0.6.0rc1` and are published by
 matching tags. Never reuse a version; failures after publication require a new
 release number.
