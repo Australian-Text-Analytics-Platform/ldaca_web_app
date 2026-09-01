@@ -6,8 +6,9 @@ from dataclasses import dataclass
 from typing import cast
 
 from .annotation_adapter import (
+    INFERENCE_TIMEOUT_SECONDS,
     MODEL_DISCOVERY_MAX_RETRIES,
-    REQUEST_TIMEOUT_SECONDS,
+    MODEL_DISCOVERY_TIMEOUT_SECONDS,
     AnnotationResponseError,
     InferenceConfig,
     completion_error,
@@ -35,7 +36,7 @@ class OpenAIAnnotationAdapter:
         client = AsyncOpenAI(
             api_key=api_key or "no-key-required",
             base_url=self.base_url,
-            timeout=REQUEST_TIMEOUT_SECONDS,
+            timeout=INFERENCE_TIMEOUT_SECONDS,
             max_retries=0,
         )
         messages: list[ChatCompletionMessageParam] = [
@@ -85,7 +86,7 @@ class OpenAIAnnotationAdapter:
         client = AsyncOpenAI(
             api_key=api_key or "no-key-required",
             base_url=self.base_url,
-            timeout=REQUEST_TIMEOUT_SECONDS,
+            timeout=MODEL_DISCOVERY_TIMEOUT_SECONDS,
             max_retries=MODEL_DISCOVERY_MAX_RETRIES,
         )
         ids: set[str] = set()

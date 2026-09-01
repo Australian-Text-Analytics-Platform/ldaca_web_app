@@ -4,8 +4,9 @@ import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useProviderCredentials } from '@/features/provider-credentials/useProviderCredentials';
+import { useProviderCredentials } from '../useProviderCredentials';
 
+/** Standalone Data Portal credential surface, intentionally outside LLM provider settings. */
 export function DataPortalCredentialPanel() {
   const credentials = useProviderCredentials();
   const [draft, setDraft] = useState('');

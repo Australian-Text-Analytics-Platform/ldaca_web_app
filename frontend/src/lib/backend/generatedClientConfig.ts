@@ -1,18 +1,16 @@
-import { getApiBase } from '@/lib/backend/env';
+import type { CreateClientConfig } from '@/api';
 import { ApiError, formatErrorDetail } from '@/lib/apiError';
 import { getCsrfToken } from '@/lib/backend/csrfToken';
-
-import type { CreateClientConfig } from '@/api';
+import { getApiBase } from '@/lib/backend/env';
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 
 // Opt-in per-request timeout override (milliseconds). Callers set this header to
 // extend or disable the default 30s client timeout for genuinely long-running
-// endpoints — e.g. the Annotation tab's AI preview/annotate-all, where the
-// backend fans provider requests out concurrently and one HTTP call can outlast
-// 30s. A value of "0" (or negative) disables the client timeout entirely,
-// deferring to the backend's own per-request bound. The header is stripped
-// before the request leaves the browser so it never reaches the server.
+// endpoints — e.g. the Annotation tab's AI Preview, where one provider request
+// can outlast 30s. A value of "0" (or negative) disables the client timeout
+// entirely, deferring to the backend's own per-request bound. The header is
+// stripped before the request leaves the browser so it never reaches the server.
 const TIMEOUT_OVERRIDE_HEADER = 'x-client-timeout-ms';
 
 /** Detects Request objects so generated SDK calls can preserve caller-provided headers and signals. */
@@ -82,8 +80,8 @@ const createTimeout = (sourceSignal?: AbortSignal, timeoutMs: number = DEFAULT_T
  * Pull the opt-in `x-client-timeout-ms` override off the outgoing headers and
  * return the resolved timeout plus an init whose headers no longer carry the
  * sentinel. Called by createGeneratedApiFetch before it builds the timeout so
- * long-running callers (AI preview/annotate-all) can extend or disable the
- * default 30s cap without the header ever reaching the server.
+ * long-running callers such as AI Preview can extend or disable the default 30s
+ * cap without the header ever reaching the server.
  */
 const resolveTimeoutOverride = (
   input: RequestInfo | URL,

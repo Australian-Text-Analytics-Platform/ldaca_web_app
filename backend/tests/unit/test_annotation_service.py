@@ -62,5 +62,7 @@ async def test_model_discovery_maps_each_provider_category_to_safe_502(
 
     assert exc_info.value.status_code == 502
     assert exc_info.value.code == code
+    assert exc_info.value.provider == "openai"
+    assert exc_info.value.model is None
     assert "private" not in exc_info.value.message
     assert "secret.invalid" not in exc_info.value.message

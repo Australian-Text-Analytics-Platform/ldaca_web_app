@@ -50,7 +50,7 @@ from .api.storage import router as storage_router
 from .api.tokenizers import router as tokenizers_router
 from .api.user_file_imports import router as user_file_imports_router
 from .api.workspaces import router as workspaces_router
-from .shared.errors import AppError
+from .shared.errors import AnnotationProviderError, AppError
 from .shared.json_data import JsonData
 from .runtime import (
     LifespanState,
@@ -106,6 +106,14 @@ def _request_id(request: Request) -> str:
 async def _app_error_handler(request: Request, exc: AppError) -> JSONResponse:
     """Map framework-neutral domain failures into the public error contract."""
 
+    if isinstance(exc, AnnotationProviderError):
+        logger.error(
+            "Annotation provider failure provider=%s model=%s code=%s request_id=%s",
+            exc.provider or "unknown",
+            exc.model or "none",
+            exc.code,
+            _request_id(request),
+        )
     if exc.status_code >= 500 and not exc.expose_message:
         logger.error(
             "Domain service failure code=%s request_id=%s",

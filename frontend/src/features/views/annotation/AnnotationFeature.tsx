@@ -1165,6 +1165,7 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
                           />
                         </div>
                         <AnnotationInferenceSettings
+                          provider={selectedAiProvider?.provider ?? null}
                           temperature={aiTemperature}
                           onTemperatureCommit={commitAiTemperature}
                           maxRetriesPerBatch={aiMaxRetriesPerBatch}

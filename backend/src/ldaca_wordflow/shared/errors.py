@@ -458,8 +458,17 @@ class AnnotationProviderError(BadGatewayError):
 
     expose_message = True
 
-    def __init__(self, code: str, message: str) -> None:
+    def __init__(
+        self,
+        code: str,
+        message: str,
+        *,
+        provider: str | None = None,
+        model: str | None = None,
+    ) -> None:
         self.code = code
+        self.provider = provider
+        self.model = model
         super().__init__(message)
 
 

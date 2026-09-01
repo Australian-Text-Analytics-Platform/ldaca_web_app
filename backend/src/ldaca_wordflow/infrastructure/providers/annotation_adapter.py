@@ -10,7 +10,8 @@ from ...domain.annotation import (
     AnnotationProviderFailureCode,
 )
 
-REQUEST_TIMEOUT_SECONDS = 90.0
+INFERENCE_TIMEOUT_SECONDS = 300.0
+MODEL_DISCOVERY_TIMEOUT_SECONDS = 90.0
 MODEL_DISCOVERY_MAX_RETRIES = 1
 ANSWER_TOKEN_HEADROOM = 4096
 
@@ -83,6 +84,12 @@ def completion_error(error: Exception, fallback: str) -> AnnotationAiError:
     if not isinstance(status, int):
         candidate = getattr(error, "code", None)
         status = candidate if isinstance(candidate, int) else None
+    error_name = type(error).__name__.casefold()
+    timed_out = (
+        status in {408, 504}
+        or isinstance(error, TimeoutError)
+        or "timeout" in error_name
+    )
     if status == 401:
         code: AnnotationProviderFailureCode = (
             "annotation_provider_authentication_failed"
@@ -91,12 +98,11 @@ def completion_error(error: Exception, fallback: str) -> AnnotationAiError:
         code = "annotation_provider_access_denied"
     elif status == 429:
         code = "annotation_provider_rate_limited"
-    elif status in {408} or (isinstance(status, int) and status >= 500):
+    elif timed_out or (isinstance(status, int) and status >= 500):
         code = "annotation_provider_unavailable"
     elif isinstance(status, int) and 400 <= status < 500:
         code = "annotation_provider_request_rejected"
     else:
-        error_name = type(error).__name__.casefold()
         if isinstance(error, (ConnectionError, TimeoutError)) or any(
             marker in error_name
             for marker in ("connection", "connect", "network", "timeout")
@@ -107,11 +113,14 @@ def completion_error(error: Exception, fallback: str) -> AnnotationAiError:
     return AnnotationAiError(
         message,
         code=code,
-        retryable=code
-        in {
-            "annotation_provider_rate_limited",
-            "annotation_provider_unavailable",
-        },
+        retryable=(
+            not timed_out
+            and code
+            in {
+                "annotation_provider_rate_limited",
+                "annotation_provider_unavailable",
+            }
+        ),
     )
 
 
@@ -153,9 +162,10 @@ __all__ = [
     "AnnotationContextLimitError",
     "AnnotationProviderAdapter",
     "AnnotationResponseError",
+    "INFERENCE_TIMEOUT_SECONDS",
     "InferenceConfig",
     "MODEL_DISCOVERY_MAX_RETRIES",
-    "REQUEST_TIMEOUT_SECONDS",
+    "MODEL_DISCOVERY_TIMEOUT_SECONDS",
     "completion_error",
     "max_completion_tokens",
     "reasoning_budget_tokens",

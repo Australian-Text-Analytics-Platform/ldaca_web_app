@@ -384,7 +384,7 @@ export const contextualHintRegistry: readonly ContextualHintDefinition[] = [
     CONTEXTUAL_HINT_IDS.annotation.aiAdvanced,
     '[data-guidance="annotation-ai-provider-model"]',
     'Tune only what the task needs',
-    'Prompt, processing mode, batch size, retries, temperature, and reasoning can change cost and output. Keep the defaults unless the task requires a deliberate adjustment.',
+    'Prompt and Wordflow processing controls can change cost and output. Each provider panel exposes only the sampling and reasoning controls supported by that provider; keep the defaults unless the task requires a deliberate adjustment.',
   ),
   hint(
     CONTEXTUAL_HINT_IDS.annotation.aiPreviewResults,

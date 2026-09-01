@@ -3,12 +3,14 @@ import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { AnnotationProviderType } from '../aiProviders';
 import { AnnotationInferenceSettings } from '../components/AnnotationInferenceSettings';
 
 // Stateful host so the reasoning switch + effort select actually update as the
 // user interacts, exercising the "effort appears only when reasoning is on" flow
 // and letting us assert the commit callbacks fire with the right values.
 function Harness({
+  provider = 'openai',
   initialTemperature = 0,
   initialMaxRetriesPerBatch = 2,
   initialBatchSize = 20,
@@ -21,6 +23,7 @@ function Harness({
   onBatchSizeCommit = vi.fn(),
   onProcessingModeChange = vi.fn(),
 }: {
+  provider?: AnnotationProviderType | null;
   initialTemperature?: number;
   initialMaxRetriesPerBatch?: number;
   initialBatchSize?: number;
@@ -41,6 +44,7 @@ function Harness({
   const [reasoningEffort, setReasoningEffort] = useState(initialEffort);
   return (
     <AnnotationInferenceSettings
+      provider={provider}
       temperature={temperature}
       onTemperatureCommit={(value) => {
         setTemperature(value);
@@ -79,27 +83,68 @@ beforeEach(() => {
 });
 
 describe('AnnotationInferenceSettings', () => {
-  it('renders temperature and reasoning controls for the shared Advanced section', () => {
+  it('renders OpenAI sampling and reasoning controls', () => {
     render(<Harness initialTemperature={0.5} />);
 
+    expect(screen.getByText('OpenAI parameters')).toBeInTheDocument();
     expect(screen.getByLabelText('Temperature')).toHaveValue(0.5);
     expect(screen.getByLabelText('Max retries per batch')).toHaveValue(2);
     expect(screen.getByLabelText('Batch size')).toHaveValue(20);
     expect(screen.getByRole('radio', { name: 'Reprocess all rows' })).toBeChecked();
     expect(screen.getByRole('radio', { name: 'Fill missing only' })).not.toBeChecked();
     expect(screen.getByRole('switch', { name: 'Toggle reasoning' })).not.toBeChecked();
-    expect(screen.queryByLabelText('Thinking effort')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Reasoning effort')).not.toBeInTheDocument();
   });
 
-  it('shows the thinking-effort select only after reasoning is enabled', async () => {
+  it('renders native Anthropic thinking controls without temperature', () => {
+    render(<Harness provider="anthropic" />);
+
+    expect(screen.getByText('Anthropic parameters')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Temperature')).not.toBeInTheDocument();
+    expect(screen.getByText(/adaptive thinking on current Claude models/i)).toBeInTheDocument();
+    expect(screen.getByText('Thinking')).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'Toggle thinking' })).not.toBeChecked();
+  });
+
+  it('renders Google temperature and native thinking controls', () => {
+    render(<Harness provider="google" initialTemperature={0.5} />);
+
+    expect(screen.getByText('Google parameters')).toBeInTheDocument();
+    expect(screen.getByLabelText('Temperature')).toHaveValue(0.5);
+    expect(screen.getByText(/Gemini thinking budget/i)).toBeInTheDocument();
+    expect(screen.getByText('Thinking')).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'Toggle thinking' })).not.toBeChecked();
+  });
+
+  it.each([
+    ['openrouter', 'OpenRouter parameters'],
+    ['custom', 'Custom endpoint parameters'],
+  ] as const)('renders the distinct %s provider component', (provider, heading) => {
+    render(<Harness provider={provider} />);
+
+    expect(screen.getByText(heading)).toBeInTheDocument();
+    expect(screen.getByLabelText('Temperature')).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'Toggle reasoning' })).toBeInTheDocument();
+  });
+
+  it('shows no native controls before a provider is selected', () => {
+    render(<Harness provider={null} />);
+
+    expect(screen.getByText('Provider parameters')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Temperature')).not.toBeInTheDocument();
+    expect(screen.queryByRole('switch')).not.toBeInTheDocument();
+    expect(screen.getByText('Run All controls')).toBeInTheDocument();
+  });
+
+  it('shows the reasoning-effort select only after OpenAI reasoning is enabled', async () => {
     const user = userEvent.setup();
     render(<Harness />);
 
-    expect(screen.queryByLabelText('Thinking effort')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Reasoning effort')).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('switch', { name: 'Toggle reasoning' }));
 
-    const effort = screen.getByLabelText('Thinking effort');
+    const effort = screen.getByLabelText('Reasoning effort');
     expect(effort).toBeInTheDocument();
     expect(effort).toHaveTextContent('medium');
   });
@@ -114,7 +159,7 @@ describe('AnnotationInferenceSettings', () => {
     await user.type(input, '9');
     await user.tab();
 
-    // 9 is out of range, so it is clamped to the max every provider accepts.
+    // The persisted request schema accepts up to 2 even though model support varies.
     expect(onTemperatureCommit).toHaveBeenLastCalledWith(2);
   });
 
@@ -146,7 +191,7 @@ describe('AnnotationInferenceSettings', () => {
 
   it('lets the user pick a different thinking effort', async () => {
     const user = userEvent.setup();
-    render(<Harness initialReasoning />);
+    render(<Harness provider="anthropic" initialReasoning />);
 
     await user.click(screen.getByLabelText('Thinking effort'));
     await user.click(await screen.findByRole('option', { name: 'high' }));
@@ -174,6 +219,6 @@ describe('AnnotationInferenceSettings', () => {
     expect(screen.getByRole('radio', { name: 'Reprocess all rows' })).toBeDisabled();
     expect(screen.getByRole('radio', { name: 'Fill missing only' })).toBeDisabled();
     expect(screen.getByRole('switch', { name: 'Toggle reasoning' })).toBeDisabled();
-    expect(screen.getByLabelText('Thinking effort')).toBeDisabled();
+    expect(screen.getByLabelText('Reasoning effort')).toBeDisabled();
   });
 });

@@ -82,7 +82,13 @@ maximum, method, and seed produce the same per-class subset throughout one
 Analysis; groups with fewer examples contribute every usable row.
 
 Advanced settings include the instruction prompt, processing mode, batch size,
-retry count, temperature, and supported reasoning controls. Defaults are a good
+retry count, and a distinct native panel for the selected provider. Anthropic's
+panel contains Claude thinking controls and has no temperature field; current
+Claude models use adaptive thinking while older Claude models use a fixed
+budget. Google has its own temperature and thinking panel. OpenAI, OpenRouter,
+and Custom each have separate sampling and reasoning panels, whose support still
+depends on the selected model. Wordflow-owned Run All processing, batch, and
+retry controls appear separately below the provider panel. Defaults are a good
 starting point. Change one setting deliberately, because provider capability,
 cost, latency, and repeatability vary by model.
 
@@ -92,6 +98,8 @@ Choose **Preview** to create an immutable Analysis snapshot and inspect predicte
 labels without writing to the annotation column. Page through the predictions,
 compare them with existing labels, add corrections if useful, then revise the
 Codebook, examples, model, or settings when the errors show a pattern.
+Preview waits for the bounded provider attempt instead of imposing a shorter
+browser deadline; use cancellation when you no longer want to wait.
 The label remains **Preview**, and it becomes available after an
 execution-request change. **Run All** compares against its own submitted request.
 
