@@ -393,6 +393,66 @@ def test_request_id_and_sanitized_validation_error_contract(tmp_path: Path) -> N
     assert "provider-key-must-not-echo" not in response.text
 
 
+def test_annotation_provider_errors_log_safe_request_context(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import ldaca_wordflow.main as main_module
+    from ldaca_wordflow.settings import load_settings
+    from ldaca_wordflow.shared.errors import AnnotationProviderError
+
+    log_calls: list[tuple[str, tuple[object, ...]]] = []
+
+    def capture_log(message: str, *args: object, **_kwargs: object) -> None:
+        log_calls.append((message, args))
+
+    monkeypatch.setattr(main_module.logger, "error", capture_log)
+    app = main_module.create_app(
+        load_settings(data_root=tmp_path, multi_user=False),
+        serve_frontend=False,
+    )
+    router = APIRouter()
+
+    @router.get("/api/__annotation-provider-probe", include_in_schema=False)
+    async def annotation_provider_probe() -> None:
+        raise AnnotationProviderError(
+            "annotation_provider_request_rejected",
+            "Annotation provider rejected the request.",
+            provider="anthropic",
+            model="claude-sonnet-5",
+        )
+
+    app.include_router(router)
+
+    with TestClient(
+        app,
+        base_url="http://localhost",
+        raise_server_exceptions=False,
+    ) as client:
+        response = client.get(
+            "/api/__annotation-provider-probe",
+            headers={"X-Request-ID": "annotation-provider-probe"},
+        )
+
+    assert response.status_code == 502
+    assert response.json() == {
+        "code": "annotation_provider_request_rejected",
+        "message": (
+            "AnnotationProviderError: Annotation provider rejected the request."
+        ),
+        "request_id": "annotation-provider-probe",
+    }
+    assert (
+        "Annotation provider failure provider=%s model=%s code=%s request_id=%s",
+        (
+            "anthropic",
+            "claude-sonnet-5",
+            "annotation_provider_request_rejected",
+            "annotation-provider-probe",
+        ),
+    ) in log_calls
+
+
 def test_unexpected_api_errors_cross_the_complete_http_boundary(tmp_path: Path) -> None:
     """Unhandled failures retain diagnostics across the browser HTTP boundary."""
 

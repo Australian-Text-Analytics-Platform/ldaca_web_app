@@ -25,6 +25,9 @@ from ldaca_wordflow.infrastructure.providers.annotation_adapter import (
     completion_error,
     reasoning_budget_tokens,
 )
+from ldaca_wordflow.infrastructure.providers.annotation_anthropic import (
+    AnthropicAnnotationAdapter,
+)
 from ldaca_wordflow.infrastructure.providers.annotation_google import (
     GoogleAnnotationAdapter,
 )
@@ -47,8 +50,10 @@ class _ProviderStatusError(Exception):
         (_ProviderStatusError(403), "annotation_provider_access_denied", False),
         (_ProviderStatusError(429), "annotation_provider_rate_limited", True),
         (_ProviderStatusError(422), "annotation_provider_request_rejected", False),
+        (_ProviderStatusError(408), "annotation_provider_unavailable", False),
+        (_ProviderStatusError(504), "annotation_provider_unavailable", False),
         (_ProviderStatusError(503), "annotation_provider_unavailable", True),
-        (TimeoutError("private endpoint"), "annotation_provider_unavailable", True),
+        (TimeoutError("private endpoint"), "annotation_provider_unavailable", False),
         (RuntimeError("private unknown"), "annotation_provider_failed", False),
     ],
 )
@@ -213,6 +218,42 @@ def _install_fake_openai(monkeypatch, *, model_ids: list[str] | None = None) -> 
     return create_kwargs
 
 
+def _install_fake_anthropic(monkeypatch) -> tuple[dict, dict]:
+    from anthropic.types import TextBlock
+
+    constructor_kwargs: dict = {}
+    create_kwargs: dict = {}
+
+    class _FakeMessages:
+        async def create(self, **kwargs):
+            create_kwargs.update(kwargs)
+            return type(
+                "Message",
+                (),
+                {
+                    "content": [
+                        TextBlock(
+                            text='{"labels": ["positive"]}',
+                            type="text",
+                        )
+                    ]
+                },
+            )()
+
+    class _FakeModels:
+        def list(self):
+            return _AsyncModelIterator([])
+
+    class _FakeAsyncAnthropic:
+        def __init__(self, **kwargs) -> None:
+            constructor_kwargs.update(kwargs)
+            self.messages = _FakeMessages()
+            self.models = _FakeModels()
+
+    monkeypatch.setattr("anthropic.AsyncAnthropic", _FakeAsyncAnthropic)
+    return constructor_kwargs, create_kwargs
+
+
 async def test_complete_openai_always_disables_streaming(monkeypatch):
     # Pin stream=False so a server cannot hand back an SSE body unexpectedly.
     create_kwargs = _install_fake_openai(monkeypatch)
@@ -222,6 +263,131 @@ async def test_complete_openai_always_disables_streaming(monkeypatch):
     )
     assert result == "positive"
     assert create_kwargs["stream"] is False
+
+
+async def test_openai_compatible_sampling_and_reasoning_controls_remain_supported(
+    monkeypatch,
+):
+    from openai import Omit
+
+    create_kwargs = _install_fake_openai(monkeypatch)
+    adapter = OpenAIAnnotationAdapter()
+
+    await adapter.complete(
+        "qwen-model", "key", "system", "user", _inference_config()
+    )
+
+    assert create_kwargs["temperature"] == 0.0
+    assert isinstance(create_kwargs["reasoning_effort"], Omit)
+
+    create_kwargs.clear()
+    await adapter.complete(
+        "qwen-model",
+        "key",
+        "system",
+        "user",
+        InferenceConfig(
+            temperature=0.7,
+            reasoning_enabled=True,
+            reasoning_effort="low",
+        ),
+    )
+
+    assert isinstance(create_kwargs["temperature"], Omit)
+    assert create_kwargs["reasoning_effort"] == "low"
+
+
+async def test_anthropic_omits_sampling_and_thinking_overrides_when_disabled(
+    monkeypatch,
+):
+    from anthropic import Omit
+
+    constructor_kwargs, create_kwargs = _install_fake_anthropic(monkeypatch)
+
+    result = await AnthropicAnnotationAdapter().complete(
+        "claude-sonnet-5",
+        "key",
+        "system",
+        "user",
+        _inference_config(),
+    )
+
+    assert result == '{"labels": ["positive"]}'
+    assert constructor_kwargs["timeout"] == 300.0
+    assert constructor_kwargs["max_retries"] == 0
+    assert "temperature" not in create_kwargs
+    assert isinstance(create_kwargs["thinking"], Omit)
+    assert isinstance(create_kwargs["output_config"], Omit)
+
+
+@pytest.mark.parametrize(
+    "model",
+    [
+        "claude-sonnet-4-6-20260217",
+        "claude-sonnet-4-8",
+        "claude-opus-4-8",
+        "claude-sonnet-5",
+        "claude-opus-5",
+        "claude-fable-5",
+    ],
+)
+async def test_current_anthropic_models_use_adaptive_thinking_and_effort(
+    monkeypatch,
+    model,
+):
+    _constructor_kwargs, create_kwargs = _install_fake_anthropic(monkeypatch)
+
+    await AnthropicAnnotationAdapter().complete(
+        model,
+        "key",
+        "system",
+        "user",
+        InferenceConfig(
+            temperature=0.7,
+            reasoning_enabled=True,
+            reasoning_effort="medium",
+        ),
+    )
+
+    assert "temperature" not in create_kwargs
+    assert create_kwargs["thinking"] == {"type": "adaptive"}
+    assert create_kwargs["output_config"] == {"effort": "medium"}
+    assert "budget_tokens" not in create_kwargs["thinking"]
+
+
+async def test_older_anthropic_models_retain_fixed_budget_thinking(monkeypatch):
+    from anthropic import Omit
+
+    _constructor_kwargs, create_kwargs = _install_fake_anthropic(monkeypatch)
+
+    await AnthropicAnnotationAdapter().complete(
+        "claude-sonnet-4-5-20250929",
+        "key",
+        "system",
+        "user",
+        InferenceConfig(
+            temperature=0.7,
+            reasoning_enabled=True,
+            reasoning_effort="low",
+        ),
+    )
+
+    assert "temperature" not in create_kwargs
+    assert create_kwargs["thinking"] == {
+        "type": "enabled",
+        "budget_tokens": 1024,
+    }
+    assert isinstance(create_kwargs["output_config"], Omit)
+
+
+async def test_anthropic_model_discovery_retains_shorter_deadline(monkeypatch):
+    constructor_kwargs, _create_kwargs = _install_fake_anthropic(monkeypatch)
+
+    models = await AnthropicAnnotationAdapter().list_models("key")
+
+    assert models == []
+    assert constructor_kwargs["timeout"] == 90.0
+    assert constructor_kwargs["max_retries"] == 1
 
 
 async def test_complete_openai_classifies_context_limit_errors(monkeypatch):
@@ -271,6 +437,8 @@ async def test_custom_model_discovery_uses_its_base_url_and_allows_no_key(
     assert models == ["local-model"]
     assert constructor_kwargs["base_url"] == "http://localhost:8080/v1"
     assert constructor_kwargs["api_key"] == "no-key-required"
+    assert constructor_kwargs["timeout"] == 90.0
+    assert constructor_kwargs["max_retries"] == 1
 
 
 async def test_google_model_discovery_has_bounded_timeout_and_retry(monkeypatch):
@@ -332,7 +500,36 @@ async def test_custom_chat_completion_uses_its_base_url_and_allows_no_key(
     assert result == '{"labels": ["positive"]}'
     assert constructor_kwargs["base_url"] == "http://localhost:8080/v1"
     assert constructor_kwargs["api_key"] == "no-key-required"
+    assert constructor_kwargs["timeout"] == 300.0
     assert create_kwargs["model"] == "local-model"
+
+
+async def test_annotation_preview_does_not_retry_provider_read_timeouts(monkeypatch):
+    attempts = 0
+
+    class _TimeoutCompletions:
+        async def create(self, **_kwargs):
+            nonlocal attempts
+            attempts += 1
+            raise TimeoutError("slow provider continued upstream")
+
+    class _FakeChat:
+        def __init__(self) -> None:
+            self.completions = _TimeoutCompletions()
+
+    class _FakeAsyncOpenAI:
+        def __init__(self, **_kwargs) -> None:
+            self.chat = _FakeChat()
+
+    monkeypatch.setattr("openai.AsyncOpenAI", _FakeAsyncOpenAI)
+    request = _source_request().model_copy(update={"max_retries_per_batch": 2})
+
+    with pytest.raises(AnnotationAiError) as exc_info:
+        await annotate_preview(request, "key", ["one input"])
+
+    assert exc_info.value.code == "annotation_provider_unavailable"
+    assert exc_info.value.retryable is False
+    assert attempts == 1
 
 
 async def test_annotation_preview_retries_a_truncated_openrouter_completion(
@@ -439,7 +636,7 @@ async def test_google_completion_disables_sdk_retries_and_bounds_output(monkeypa
     retry_options = constructor_kwargs["http_options"].retry_options
     assert retry_options is not None
     assert retry_options.attempts == 1
-    assert constructor_kwargs["http_options"].timeout == 90_000
+    assert constructor_kwargs["http_options"].timeout == 300_000
     assert generate_kwargs["config"].max_output_tokens == 4096
 
 

@@ -1,17 +1,9 @@
-import {
-  listAnnotationModels,
-  listFeaturedDataPortalCollections,
-  queryAnalysisResult,
-  searchDataPortal,
-  submitDataPortalImport,
-  submitTabAnalysis,
-} from '@/api';
 import type {
+  AnalysisExecutionScope,
   AnnotationAnalysisRequest,
   AnnotationProviderConfigurationResource,
   AnnotationResultQueryWritable,
   AnnotationRunAllSubmissionWritable,
-  AnalysisExecutionScope,
   ConcordanceAnalysisRequest,
   DataPortalImportSubmitRequest,
   DataPortalSearchRequest,
@@ -20,6 +12,14 @@ import type {
   SubmitTabAnalysisData,
   TokenFrequencyAnalysisRequest,
   TopicModelingAnalysisRequest,
+} from '@/api';
+import {
+  listAnnotationModels,
+  listFeaturedDataPortalCollections,
+  queryAnalysisResult,
+  searchDataPortal,
+  submitDataPortalImport,
+  submitTabAnalysis,
 } from '@/api';
 import { useAuthStore } from '@/stores/authStore';
 import {
@@ -91,7 +91,7 @@ export const queryAnnotationPreviewWithProviderCredential = ({
     ...(apiKey ? { api_key: apiKey } : {}),
   };
   return queryAnalysisResult({
-    headers: { 'x-client-timeout-ms': '120000' },
+    headers: { 'x-client-timeout-ms': '0' },
     path: { workspace_id: workspaceId, analysis_id: analysisId },
     body,
     signal,
@@ -123,7 +123,6 @@ export const submitAnnotationRunAllWithProviderCredential = ({
     ...(apiKey ? { api_key: apiKey } : {}),
   };
   return submitTabAnalysis({
-    headers: { 'x-client-timeout-ms': '120000' },
     path: { workspace_id: workspaceId, tab_id: tabId },
     body: {
       execution_scope: 'run_all',

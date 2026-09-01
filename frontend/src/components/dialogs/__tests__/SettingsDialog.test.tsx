@@ -1,10 +1,9 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-import { SettingsDialog } from '../SettingsDialog';
 import { DataRootContext } from '@/features/bootstrap/DataRootContext';
+import { SettingsDialog } from '../SettingsDialog';
 
 const mocks = vi.hoisted(() => ({
   isTauri: vi.fn(),
@@ -182,6 +181,17 @@ describe('SettingsDialog', () => {
     expect(await screen.findByText('Annotation providers')).toBeInTheDocument();
     expect(screen.getByText('No Annotation providers configured.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Add Provider' })).toBeInTheDocument();
+  });
+
+  it('keeps Data Portal credentials in their own Portal tab', async () => {
+    const user = userEvent.setup();
+    renderSettingsDialog();
+
+    await user.click(screen.getByRole('tab', { name: 'Portal' }));
+
+    expect(await screen.findByText('LDaCA Data Portal credential')).toBeInTheDocument();
+    expect(screen.getByLabelText('LDaCA Data Portal token')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add Provider' })).not.toBeInTheDocument();
   });
 
   it('renders update preferences only in the desktop runtime', async () => {

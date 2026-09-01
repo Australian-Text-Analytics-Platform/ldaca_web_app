@@ -113,6 +113,7 @@ describe('provider credential request boundary', () => {
     );
     expect(sdk.queryAnalysisResult).toHaveBeenCalledWith(
       expect.objectContaining({
+        headers: { 'x-client-timeout-ms': '0' },
         body: {
           kind: 'annotation',
           page: 1,
@@ -148,6 +149,7 @@ describe('provider credential request boundary', () => {
         },
       }),
     );
+    expect(sdk.submitTabAnalysis.mock.calls[1]?.[0]).not.toHaveProperty('headers');
     expect(sdk.listFeaturedDataPortalCollections).toHaveBeenCalledWith(
       expect.objectContaining({ body: { api_token: 'portal-secret' } }),
     );

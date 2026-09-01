@@ -42,7 +42,11 @@ class AnnotationService:
                 request.provider_base_url,
             ).list_models(api_key)
         except AnnotationAiError as exc:
-            raise AnnotationProviderError(exc.code, str(exc)) from exc
+            raise AnnotationProviderError(
+                exc.code,
+                str(exc),
+                provider=request.provider,
+            ) from exc
         return AnnotationModelsResource(
             provider_configuration_id=request.provider_configuration_id,
             provider=request.provider,

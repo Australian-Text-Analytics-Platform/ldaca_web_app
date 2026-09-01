@@ -65,7 +65,8 @@ a replacement and deleting the old entry.
 The Annotation provider dropdown shows only configured entries and keeps **Add
 Provider** at the bottom. Model discovery is attempted for Custom entries, but
 you can type a model name when discovery fails. **Settings → Portal** manages
-the independent Data Portal token. When Wordflow runs locally in single-user
+the independent Data Portal token in its own panel; it is not an AI provider
+configuration. When Wordflow runs locally in single-user
 mode, the local backend stores configurations for the fixed Root User. In
 hosted multi-user mode, configurations and secrets stay in this browser for the
 signed-in account, remain after logout, and must be entered again in another
@@ -84,7 +85,11 @@ Preview and Review also provide **Use as example**, which fills the optional
 Example Data Block controls with the source Data Block and selected correction
 column. Manual omits this shortcut. The collapsed **Advanced** row
 summarizes the selected provider and model; expanding it presents those two
-controls side by side, followed by Prompt and inference controls. **Batch
+controls side by side, followed by Prompt and provider-native inference
+controls. Each provider has a distinct panel: Anthropic has only Claude thinking
+and no temperature field, Google has temperature and Gemini thinking, and
+OpenAI, OpenRouter, and Custom have their own sampling and reasoning panels.
+Wordflow shows shared Run All controls separately below the provider panel. **Batch
 size** controls how many rows each Run All LLM request contains (20 by default,
 up to 100). **Max retries per
 batch** defaults to two retries—three attempts in total—and `0` disables

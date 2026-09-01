@@ -77,6 +77,15 @@ replacement and deletion across tabs. In single-user mode, the same facade
 projects the backend-owned collection and invokes its write-only CRUD
 operations without creating a browser credential entry.
 
+Annotation inference controls have one component per provider type rather than
+one universal form with hidden fields. The dispatcher passes only thinking
+state to Anthropic, whose component has no temperature contract; Google,
+OpenAI, OpenRouter, and Custom each own their native sampling and reasoning
+presentation. Wordflow-owned Run All processing, batch size, and retry controls
+remain in a separate shared component below the provider panel. Data Portal is
+not an Annotation provider: its standalone credential component belongs to the
+provider-credentials feature and is mounted only in the independent Portal tab.
+
 Annotation Tab presentation state retains the selected configuration UUID,
 provider type, a per-configuration model map, and the selected AI Preview
 correction column per source Data Block. Fresh Tabs choose the first usable

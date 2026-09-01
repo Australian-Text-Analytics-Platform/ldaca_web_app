@@ -86,18 +86,31 @@ of 20 by default, with a maximum configurable size of 100. One batch loop owns
 all provider attempts; native SDK retries are disabled, so the default two
 retries mean at most three calls for that batch. Each call has a 4,096-token
 answer allowance, plus the requested reasoning budget when reasoning is
-enabled. A successful response must be one JSON object containing exactly one
-known class name or null per input row. Truncated, malformed, wrong-cardinality,
-and unknown-label responses consume the same retry allowance. Context-limit
-failures split immediately, while an invalid response splits after its retries
-are exhausted. Each terminal batch reports its completed row count. Other
-exhausted provider failures become row-aligned null labels, so the worker can
-publish all successful batches instead of discarding the column; its durable
-Result retains attempted-row, failed-batch, and failed-row counts. Cancellation
-and failures outside provider inference still do not publish. Run All either
-reprocesses every row or fills only blank annotations and never overlays
-correction-column values. Preview processes exactly the requested page and has
-no batch-size or processing-mode fields.
+enabled. Model discovery has a separate 90-second deadline. One inference
+attempt may run for up to 300 seconds, and transport or HTTP read timeouts are
+not retried because the upstream provider may still be completing the request.
+A successful response must be one JSON object containing exactly one known
+class name or null per input row. Truncated, malformed, wrong-cardinality, and
+unknown-label responses consume the same retry allowance. Context-limit failures
+split immediately, while an invalid response splits after its retries are
+exhausted. Each terminal batch reports its completed row count. Other exhausted
+provider failures become row-aligned null labels, so the worker can publish all
+successful batches instead of discarding the column; its durable Result retains
+attempted-row, failed-batch, and failed-row counts. Cancellation and failures
+outside provider inference still do not publish. Run All either reprocesses
+every row or fills only blank annotations and never overlays correction-column
+values. Preview processes exactly the requested page and has no batch-size or
+processing-mode fields. Its browser request has no independent deadline, so the
+provider boundary owns timeout classification and the user may cancel the
+request.
+
+Provider adapters translate the persisted shared inference fields into native
+request shapes. Anthropic never receives a temperature override. When thinking
+is enabled, current Claude families receive adaptive thinking plus output
+effort, while older Claude models retain fixed-budget thinking. A disabled
+Anthropic thinking control sends neither override. Google receives temperature
+and a native thinking budget, while OpenAI and compatible providers receive
+their supported sampling or reasoning fields according to the selected mode.
 
 Supporting Analyses are ordinary Analyses with a parent. They use the same
 scheduler, cancellation, Result, persistence, and Artifact contracts and may

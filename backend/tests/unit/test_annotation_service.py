@@ -63,3 +63,5 @@ async def test_model_discovery_maps_each_provider_category_to_diagnostic_502(
     assert exc_info.value.status_code == 502
     assert exc_info.value.code == code
     assert exc_info.value.message == "private SDK body https://secret.invalid"
+    assert exc_info.value.provider == "openai"
+    assert exc_info.value.model is None

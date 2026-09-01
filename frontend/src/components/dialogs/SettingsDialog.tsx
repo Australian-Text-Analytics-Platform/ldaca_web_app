@@ -1,3 +1,6 @@
+import { Bot, Eye, FolderOpen, Hash, KeyRound, Moon, RotateCcw, Sparkles, Sun } from 'lucide-react';
+import { toast } from 'sonner';
+import { DataFolderSettingsPanel } from '@/components/dialogs/DataFolderSettingsPanel';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -11,28 +14,25 @@ import {
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { DataFolderSettingsPanel } from '@/components/dialogs/DataFolderSettingsPanel';
-import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
-import { VIEW_DEFINITIONS } from '@/features/views/viewRegistry';
-import { useVisibleViews } from '@/features/views/useVisibleViews';
+import { useAuth } from '@/features/auth/hooks/useAuth';
+import { useGuidanceAcknowledgmentsStore } from '@/features/guidance/acknowledgmentsStore';
 import {
   useUpdateUserPreferences,
   useUserPreferences,
 } from '@/features/preferences/useUserPreferences';
-import { useAuth } from '@/features/auth/hooks/useAuth';
-import { useGuidanceAcknowledgmentsStore } from '@/features/guidance/acknowledgmentsStore';
-import { AiProvidersPreferencesPanel } from '@/features/views/annotation/components/AiProvidersPreferencesPanel';
-import { DataPortalCredentialPanel } from '@/features/settings/DataPortalCredentialPanel';
-import { DesktopUpdateSettings } from '@/features/updater/DesktopUpdateSettings';
-import { isTauri } from '@/lib/isTauri';
-import { toast } from 'sonner';
-import { Bot, Eye, FolderOpen, Hash, KeyRound, Moon, RotateCcw, Sparkles, Sun } from 'lucide-react';
+import { DataPortalCredentialPanel } from '@/features/provider-credentials/components/DataPortalCredentialPanel';
 import {
   applyColorTheme,
   DARK_THEME,
   LIGHT_THEME,
   useActiveTheme,
 } from '@/features/theme/themeRuntime';
+import { DesktopUpdateSettings } from '@/features/updater/DesktopUpdateSettings';
+import { AiProvidersPreferencesPanel } from '@/features/views/annotation/components/AiProvidersPreferencesPanel';
+import { useVisibleViews } from '@/features/views/useVisibleViews';
+import { VIEW_DEFINITIONS } from '@/features/views/viewRegistry';
+import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
+import { isTauri } from '@/lib/isTauri';
 
 interface SettingsDialogProps {
   open: boolean;

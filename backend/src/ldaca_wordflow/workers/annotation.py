@@ -104,8 +104,10 @@ def run_annotation_analysis(
             )
         except AnnotationAiError as error:
             logger.warning(
-                "Annotation provider failed configuration_id=%s code=%s",
+                "Annotation provider failed configuration_id=%s provider=%s model=%s code=%s",
                 source_request.provider_configuration_id,
+                source_request.provider,
+                source_request.model,
                 error.code,
                 exc_info=error,
             )

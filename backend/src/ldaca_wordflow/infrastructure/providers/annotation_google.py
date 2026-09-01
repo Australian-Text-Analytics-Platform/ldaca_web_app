@@ -5,8 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .annotation_adapter import (
+    INFERENCE_TIMEOUT_SECONDS,
     MODEL_DISCOVERY_MAX_RETRIES,
-    REQUEST_TIMEOUT_SECONDS,
+    MODEL_DISCOVERY_TIMEOUT_SECONDS,
     AnnotationAiError,
     InferenceConfig,
     completion_error,
@@ -40,7 +41,7 @@ class GoogleAnnotationAdapter:
         client = genai.Client(
             api_key=api_key,
             http_options=types.HttpOptions(
-                timeout=int(REQUEST_TIMEOUT_SECONDS * 1000),
+                timeout=int(INFERENCE_TIMEOUT_SECONDS * 1000),
                 retry_options=types.HttpRetryOptions(attempts=1),
             ),
         )
@@ -79,7 +80,7 @@ class GoogleAnnotationAdapter:
         client = genai.Client(
             api_key=api_key,
             http_options=types.HttpOptions(
-                timeout=int(REQUEST_TIMEOUT_SECONDS * 1000),
+                timeout=int(MODEL_DISCOVERY_TIMEOUT_SECONDS * 1000),
                 retry_options=types.HttpRetryOptions(
                     attempts=MODEL_DISCOVERY_MAX_RETRIES + 1
                 ),

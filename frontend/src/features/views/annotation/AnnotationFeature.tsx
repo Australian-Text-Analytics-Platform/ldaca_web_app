@@ -1,12 +1,9 @@
-import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import type { Analysis, AnnotationResult, AnnotationRunAllResult } from '@/api';
 import { sqlIdentifier, sqlTable } from '@/api';
 import { Button } from '@/components/ui/button';
-import { useGuidance } from '@/features/guidance/GuidanceContext';
-import { CONTEXTUAL_HINT_IDS } from '@/features/guidance/registry';
-import { useProgressiveContextualHints } from '@/features/guidance/useProgressiveContextualHints';
 import { DisabledReasonTooltip } from '@/components/ui/disabled-reason-tooltip';
 import { Label } from '@/components/ui/label';
 import {
@@ -18,39 +15,42 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { useGuidance } from '@/features/guidance/GuidanceContext';
+import { CONTEXTUAL_HINT_IDS } from '@/features/guidance/registry';
+import { useProgressiveContextualHints } from '@/features/guidance/useProgressiveContextualHints';
 import {
   submitAnnotationRunAllWithProviderCredential,
   submitTabAnalysisWithProviderCredential,
 } from '@/features/provider-credentials/providerCredentialRequests';
 import { useProviderCredentials } from '@/features/provider-credentials/useProviderCredentials';
-import { AnalysisCardLayout } from '@/features/views/common/components/AnalysisCardLayout';
-import { RunAllReviewTable } from '@/features/views/common/components/RunAllReviewTable';
 import { DEFAULT_INTERCODER_RELIABILITY_METRIC } from '@/features/views/common/columnComparisonModel';
+import { AnalysisCardLayout } from '@/features/views/common/components/AnalysisCardLayout';
 import type { NodeInputColumnAddonArgs } from '@/features/views/common/components/NodeInputsPanel';
 import { NodeInputsPanel } from '@/features/views/common/components/NodeInputsPanel';
+import { RunAllReviewTable } from '@/features/views/common/components/RunAllReviewTable';
 import type { NodeInputConstraints } from '@/features/views/common/nodeInputs';
 import { nodeInputsFromSelections, useTabNodeInputs } from '@/features/views/common/nodeInputs';
 import type { AnalysisTabFeatureProps } from '@/features/views/common/tabs/AnalysisTabsHost';
 import { DEFAULT_TAB_INPUT_SET_ID } from '@/features/views/common/tabs/tabStateOps';
+import { useNodeColumnInfos } from '@/features/workspace/common/hooks/useNodeColumnInfos';
 import { useWorkspaceActions } from '@/features/workspace/common/hooks/useWorkspaceActions';
 import { useWorkspaceData } from '@/features/workspace/common/hooks/useWorkspaceData';
-import { useNodeColumnInfos } from '@/features/workspace/common/hooks/useNodeColumnInfos';
-import { cn } from '@/lib/utils';
-import { queryKeys } from '@/lib/queryKeys';
 import { isArrowStringField } from '@/lib/arrow/arrowTable';
-import { getAnalysisOutputResource } from '../common/analysisApi';
-import { ANALYSIS_TASK_TYPES } from '../common/analysisIds';
-import AnalysisTaskBanner from '../common/components/AnalysisTaskBanner';
-import { type AnalysisRequestOfKind, useAnalysisFeature } from '../common/hooks/useAnalysisFeature';
-import { usePersistNodeDocumentColumn } from '../common/hooks/usePersistNodeDocumentColumn';
-import { useNodeColorControls } from '../common/hooks/useNodeColorControls';
-import { GREY } from '../common/vizPalette';
-import { hasParameterDiff } from '../common/parameterComparison';
-import { getRerunActionState } from '../common/rerunActionState';
+import { queryKeys } from '@/lib/queryKeys';
+import { cn } from '@/lib/utils';
 import {
   getAnalysisActionLifecycle,
   hasClearRequiredAnalysis,
 } from '../common/analysisActionLifecycle';
+import { getAnalysisOutputResource } from '../common/analysisApi';
+import { ANALYSIS_TASK_TYPES } from '../common/analysisIds';
+import AnalysisTaskBanner from '../common/components/AnalysisTaskBanner';
+import { type AnalysisRequestOfKind, useAnalysisFeature } from '../common/hooks/useAnalysisFeature';
+import { useNodeColorControls } from '../common/hooks/useNodeColorControls';
+import { usePersistNodeDocumentColumn } from '../common/hooks/usePersistNodeDocumentColumn';
+import { hasParameterDiff } from '../common/parameterComparison';
+import { getRerunActionState } from '../common/rerunActionState';
+import { GREY } from '../common/vizPalette';
 import { canAnnotate, canListModels, resolveAnnotationProviderConfiguration } from './aiProviders';
 import { AnnotationAiPreviewPanel } from './components/AnnotationAiPreviewPanel';
 import { AnnotationAiSettings } from './components/AnnotationAiSettings';
@@ -1165,6 +1165,7 @@ function AnnotationFeature({ host }: AnalysisTabFeatureProps) {
                           />
                         </div>
                         <AnnotationInferenceSettings
+                          provider={selectedAiProvider?.provider ?? null}
                           temperature={aiTemperature}
                           onTemperatureCommit={commitAiTemperature}
                           maxRetriesPerBatch={aiMaxRetriesPerBatch}
