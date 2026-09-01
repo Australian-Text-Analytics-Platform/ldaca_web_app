@@ -52,7 +52,7 @@ def test_polars_text_maturin_workflows_pin_maturin_and_use_action_sccache() -> N
         POLARS_TEXT / ".github" / "workflows" / "release.yml",
     ]:
         text = _read(workflow)
-        assert "maturin-version: v1.14.1" in text
+        assert "maturin-version: v1.15.0" in text
         assert "sccache: true" in text
         assert "RUSTC_WRAPPER: sccache" not in text
         assert "mozilla-actions/sccache-action" not in text
