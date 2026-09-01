@@ -17,7 +17,7 @@ import {
   isArrowStringListField,
   isArrowTemporalField,
 } from '@/lib/arrow/arrowTable';
-import { isTopicDistributionField } from '@/lib/arrow/semanticTypes';
+import { isTopicCoverageField } from '@/lib/arrow/semanticTypes';
 import { FilterValueChecklist, type FilterChecklistOption } from './FilterValueChecklist';
 import {
   getCategoricalOptionKey,
@@ -48,7 +48,7 @@ interface FilterConditionValueInputProps {
  * Renders the value editor for one Filter condition row.
  * Rendered by: useFilterSubTabSections through ConditionBuilder's
  * `renderValueInput` slot so the hook owns data/state while this component
- * owns branchy form controls for dictionary, Topic Distribution, datetime,
+ * owns branchy form controls for dictionary, Topic Coverage, datetime,
  * boolean, numeric, and text conditions.
  * Flow: choose the editor from the decoded Arrow field, translate user input into
  * `FilterConditionWithId.value`, and delegate lazy categorical retries/search
@@ -89,8 +89,8 @@ export function FilterConditionValueInput({
     );
   }
 
-  if (isTopicDistributionField(field)) {
-    // Topic Distribution extension: render [topic dropdown] [operator] [value %].
+  if (isTopicCoverageField(field)) {
+    // Topic Coverage extension: render [Topic] [operator] [coverage %].
     // The generic operator select is hidden in the parent ConditionBuilder so
     // the topic dropdown can sit before the operator here.
     const current =

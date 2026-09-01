@@ -48,7 +48,6 @@ describe('getAnalysisResultResource', () => {
       kind: 'topic_modeling' as const,
       corpus_sizes: [501],
       segment_count: 501,
-      truncated_segment_count: 7,
       artifacts: { version: 1 as const, topic_meanings_parquet_path: {}, nodes: [] },
     };
     getAnalysisResultMock.mockResolvedValue({
@@ -60,12 +59,12 @@ describe('getAnalysisResultResource', () => {
     });
 
     const result = await getAnalysisResultResource<{
-      data: { topics: { id: number }[]; truncated_segment_count: number };
+      data: { topics: { id: number }[]; segment_count: number };
     }>('workspace-1', 'analysis-1');
 
     expect(result?.data.topics).toHaveLength(501);
     expect(result?.data.topics.at(-1)?.id).toBe(500);
-    expect(result?.data.truncated_segment_count).toBe(7);
+    expect(result?.data.segment_count).toBe(501);
     expect(queryAnalysisResultMock).not.toHaveBeenCalled();
   });
 
@@ -76,7 +75,6 @@ describe('getAnalysisResultResource', () => {
         topics: [],
         corpus_sizes: [],
         segment_count: 0,
-        truncated_segment_count: 0,
         sources: [],
         clustering: {
           cluster_count: 3,

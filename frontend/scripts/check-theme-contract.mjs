@@ -32,7 +32,7 @@ const allowedRawColorFiles = new Set([
   'features/views/topic-modeling/topicModelingAdapters.ts',
   'features/views/token-frequency/TokenFrequencyFeature.tsx',
   'features/views/token-frequency/tokenFrequencyExport.ts',
-  'features/workspace/data-view/components/TopicDistributionBar.tsx',
+  'features/workspace/data-view/components/TopicCoverageBar.tsx',
   'lib/chartExport.ts',
 ]);
 

@@ -28,7 +28,7 @@ import {
   decodeArrowTable,
   fetchArrowTable,
 } from '../arrowTable';
-import { isTopicDistributionField, TOPIC_DISTRIBUTION_EXTENSION } from '../semanticTypes';
+import { isTopicCoverageField, TOPIC_COVERAGE_EXTENSION } from '../semanticTypes';
 
 const stream = (table: ReturnType<typeof tableFromArrays>): Uint8Array =>
   tableToIPC(table, 'stream');
@@ -141,17 +141,17 @@ describe('Arrow table transport', () => {
   it('recognizes semantic extension metadata without inspecting nested field names', () => {
     const entry = new Field(
       'item',
-      new Struct([new Field('topic_id', new Int64()), new Field('proportion', new Float64())]),
+      new Struct([new Field('topic_id', new Int64()), new Field('coverage', new Float64())]),
     );
-    const distribution = new Field(
-      'distribution',
+    const coverage = new Field(
+      'coverage',
       new FixedSizeList(3, entry),
       true,
-      new Map([['ARROW:extension:name', TOPIC_DISTRIBUTION_EXTENSION]]),
+      new Map([['ARROW:extension:name', TOPIC_COVERAGE_EXTENSION]]),
     );
 
-    expect(arrowTypeName(distribution)).toBe(TOPIC_DISTRIBUTION_EXTENSION);
-    expect(isTopicDistributionField(distribution)).toBe(true);
+    expect(arrowTypeName(coverage)).toBe(TOPIC_COVERAGE_EXTENSION);
+    expect(isTopicCoverageField(coverage)).toBe(true);
   });
 
   it('preserves the exact identity of an unknown foreign extension', () => {
@@ -170,39 +170,39 @@ describe('Arrow table transport', () => {
     expect(foreign.metadata.get('ARROW:extension:metadata')).toBe('{"unit":"widgets"}');
   });
 
-  it('decodes fixed-size Topic Distribution values through official Apache Arrow', async () => {
+  it('decodes fixed-size Topic Coverage values through official Apache Arrow', async () => {
     const entry = new Field(
       'item',
-      new Struct([new Field('topic_id', new Int64()), new Field('proportion', new Float64())]),
+      new Struct([new Field('topic_id', new Int64()), new Field('coverage', new Float64())]),
     );
     const type = new FixedSizeList(2, entry);
     const field = new Field(
-      'distribution',
+      'coverage',
       type,
       true,
-      new Map([['ARROW:extension:name', TOPIC_DISTRIBUTION_EXTENSION]]),
+      new Map([['ARROW:extension:name', TOPIC_COVERAGE_EXTENSION]]),
     );
     const values = vectorFromArray(
       [
         [
-          { topic_id: -1n, proportion: 0.2 },
-          { topic_id: 0n, proportion: 0.8 },
+          { topic_id: -1n, coverage: 0.2 },
+          { topic_id: 0n, coverage: 0.8 },
         ],
       ],
       type,
     );
-    const source = new Table(new Schema([field]), { distribution: values });
+    const source = new Table(new Schema([field]), { coverage: values });
 
     const decoded = await decodeArrowTable(stream(source).buffer as ArrayBuffer);
 
     expect(decoded.schema[0] && arrowTypeName(decoded.schema[0].field)).toBe(
-      TOPIC_DISTRIBUTION_EXTENSION,
+      TOPIC_COVERAGE_EXTENSION,
     );
     expect(decoded.rows).toEqual([
       {
-        distribution: [
-          { topic_id: '-1', proportion: 0.2 },
-          { topic_id: '0', proportion: 0.8 },
+        coverage: [
+          { topic_id: '-1', coverage: 0.2 },
+          { topic_id: '0', coverage: 0.8 },
         ],
       },
     ]);

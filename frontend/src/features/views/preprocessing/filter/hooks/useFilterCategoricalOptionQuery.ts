@@ -9,7 +9,7 @@ import {
   isArrowDictionaryField,
   isArrowStringListField,
 } from '@/lib/arrow/arrowTable';
-import { isTopicDistributionField } from '@/lib/arrow/semanticTypes';
+import { isTopicCoverageField } from '@/lib/arrow/semanticTypes';
 import type { ConditionColumnOption } from '../../types';
 import {
   buildCategoricalOptionEntries,
@@ -100,7 +100,7 @@ export function useFilterCategoricalOptionQuery({
     };
   }, [identity, searchQuery]);
 
-  const isTopicDistribution = isTopicDistributionField(field);
+  const isTopicCoverage = isTopicCoverageField(field);
   const isDictionary = field !== undefined && isArrowDictionaryField(field);
   const isStringList = field !== undefined && isArrowStringListField(field);
   const canQuery = Boolean(workspaceId && nodeId && column) && (isDictionary || isStringList);
@@ -151,7 +151,7 @@ export function useFilterCategoricalOptionQuery({
     });
   }, [queryClient, queryKey, revisionChanged]);
 
-  const topicOptions = isTopicDistribution
+  const topicOptions = isTopicCoverage
     ? buildCategoricalOptionEntries(topicIds(columnOption), false)
     : [];
   const pageOptions = pages.map((page) => {
@@ -173,7 +173,7 @@ export function useFilterCategoricalOptionQuery({
       count: countsByKey.get(option.key),
     }));
   });
-  const options = isTopicDistribution
+  const options = isTopicCoverage
     ? topicOptions
     : pageOptions.reduce<CategoricalOptionEntry[]>(mergeOptions, []);
 

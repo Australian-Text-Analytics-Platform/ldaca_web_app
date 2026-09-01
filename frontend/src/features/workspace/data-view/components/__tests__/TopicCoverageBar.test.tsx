@@ -1,16 +1,16 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { TopicDistributionBar } from '../TopicDistributionBar';
+import { TopicCoverageBar } from '../TopicCoverageBar';
 
-describe('TopicDistributionBar', () => {
-  it('renders decoded Arrow entries as ordered colored proportions', () => {
+describe('TopicCoverageBar', () => {
+  it('renders decoded Arrow entries as ordered source coverage', () => {
     render(
-      <TopicDistributionBar
+      <TopicCoverageBar
         value={[
-          { topic_id: '-1', proportion: 0.1 },
-          { topic_id: '0', proportion: 0.6 },
-          { topic_id: '1', proportion: 0.3 },
+          { topic_id: '-1', coverage: 0.1 },
+          { topic_id: '0', coverage: 0.6 },
+          { topic_id: '1', coverage: 0.3 },
         ]}
       />,
     );

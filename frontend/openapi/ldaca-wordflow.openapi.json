@@ -8450,7 +8450,7 @@
           },
           "max_segment_tokens": {
             "default": 256,
-            "maximum": 510.0,
+            "maximum": 256.0,
             "minimum": 32.0,
             "title": "Max Segment Tokens",
             "type": "integer"
@@ -8793,11 +8793,6 @@
             },
             "title": "Topics",
             "type": "array"
-          },
-          "truncated_segment_count": {
-            "minimum": 0.0,
-            "title": "Truncated Segment Count",
-            "type": "integer"
           }
         },
         "required": [
@@ -8807,7 +8802,6 @@
           "clustering",
           "topic_inclusion",
           "segment_count",
-          "truncated_segment_count",
           "query"
         ],
         "title": "TopicModelingResult",
@@ -8981,7 +8975,7 @@
       "TopicSegmentationMethod": {
         "enum": [
           "automatic",
-          "paragraph",
+          "line",
           "sentence"
         ],
         "title": "TopicSegmentationMethod",

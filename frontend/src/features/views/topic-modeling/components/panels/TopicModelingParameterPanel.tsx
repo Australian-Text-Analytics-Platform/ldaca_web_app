@@ -226,7 +226,7 @@ export function TopicModelingParameterPanel({
               Segmentation method
               <span
                 aria-label="Segmentation method controls which text spans become Topic Segments"
-                title="Automatic packs nearby text and may overlap boundaries. Paragraph uses each non-empty line. Sentence uses Unicode sentence boundaries."
+                title="Automatic prefers semantic boundaries within the token budget. Line starts from each non-empty line. Sentence starts from Unicode sentence boundaries. Oversized units are split without overlap."
                 className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-description"
               >
                 <CircleHelp className="h-4 w-4" />
@@ -247,7 +247,7 @@ export function TopicModelingParameterPanel({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="automatic">Automatic</SelectItem>
-                <SelectItem value="paragraph">Paragraph</SelectItem>
+                <SelectItem value="line">Line</SelectItem>
                 <SelectItem value="sentence">Sentence</SelectItem>
               </SelectContent>
             </Select>
@@ -261,7 +261,7 @@ export function TopicModelingParameterPanel({
               Maximum tokens per segment
               <span
                 aria-label="Tokens are model units and may be words or parts of words"
-                title="Sets the largest Topic Segment from 32 to 510 model tokens. Oversized Paragraph and Sentence segments keep their beginning and report truncation after the run."
+                title="Sets the largest Topic Segment from 32 to 256 model tokens. Oversized Line and Sentence units are split into complete non-overlapping segments."
                 className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-description"
               >
                 <CircleHelp className="h-4 w-4" />
@@ -272,7 +272,7 @@ export function TopicModelingParameterPanel({
               aria-label="Maximum tokens per segment"
               type="number"
               min={32}
-              max={510}
+              max={256}
               step={1}
               value={maxSegmentTokensValueDraft}
               className="h-9 w-full px-2 text-right text-body"

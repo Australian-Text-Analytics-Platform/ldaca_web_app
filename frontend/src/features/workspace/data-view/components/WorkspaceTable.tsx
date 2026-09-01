@@ -30,10 +30,10 @@ import { RowDetailPanel } from '@/features/views/common/components/RowDetailPane
 import { useRowDetailDialog } from '@/features/views/common/components/useRowDetailDialog';
 import { ServerPaginationFooter } from '@/features/views/common/components/ServerPaginationFooter';
 import { WorkspaceColumnHeader } from './WorkspaceColumnHeader';
-import { TopicDistributionBar } from './TopicDistributionBar';
+import { TopicCoverageBar } from './TopicCoverageBar';
 import type { DataRow, NodeTablePagination } from '../types';
 import { arrowTypeName, type ArrowField } from '@/lib/arrow/arrowTable';
-import { isTopicDistributionField } from '@/lib/arrow/semanticTypes';
+import { isTopicCoverageField } from '@/lib/arrow/semanticTypes';
 import { DATA_TYPES, getTypeDisplayName, type ColumnCastType } from '../services/schemaMutations';
 import { useColumnMutations } from '../hooks/useColumnMutations';
 import {
@@ -287,8 +287,8 @@ export function WorkspaceTable({
         const cellValue = getValue();
         // This renderer is selected by the exact extension identity published
         // in IPC metadata, not by a second frontend dtype alias.
-        if (isTopicDistributionField(currentField)) {
-          return <TopicDistributionBar value={cellValue} />;
+        if (isTopicCoverageField(currentField)) {
+          return <TopicCoverageBar value={cellValue} />;
         }
         // Cell values may be structs/objects; default stringification preserves prior display text.
         // eslint-disable-next-line @typescript-eslint/no-base-to-string

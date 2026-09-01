@@ -8,7 +8,7 @@ import {
   isArrowTemporalField,
   type ArrowField,
 } from '@/lib/arrow/arrowTable';
-import { isTopicDistributionField } from '@/lib/arrow/semanticTypes';
+import { isTopicCoverageField } from '@/lib/arrow/semanticTypes';
 
 /**
  * Supplies condition operators directly from the decoded IPC field.
@@ -17,7 +17,7 @@ import { isTopicDistributionField } from '@/lib/arrow/semanticTypes';
  * matching operator set, and return filter-builder options.
  */
 export const getOperatorsForField = (field: ArrowField | undefined) => {
-  if (isTopicDistributionField(field)) {
+  if (isTopicCoverageField(field)) {
     return [
       { value: 'gte', label: '≥' },
       { value: 'gt', label: '>' },

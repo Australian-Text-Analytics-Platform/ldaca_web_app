@@ -150,7 +150,7 @@ describe('TopicModelingParameterPanel', () => {
 
     fireEvent.change(input, { target: { value: '999' } });
     fireEvent.blur(input);
-    expect(onMaxSegmentTokensChange).toHaveBeenLastCalledWith(510);
+    expect(onMaxSegmentTokensChange).toHaveBeenLastCalledWith(256);
   });
 
   it('renders percentage sampling inside the selected node card', () => {

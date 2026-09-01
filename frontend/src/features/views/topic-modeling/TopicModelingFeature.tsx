@@ -239,7 +239,7 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
       request.node_ids.length,
     ),
     segmentation_method:
-      request.segmentation_method === 'paragraph' || request.segmentation_method === 'sentence'
+      request.segmentation_method === 'line' || request.segmentation_method === 'sentence'
         ? request.segmentation_method
         : 'automatic',
     max_segment_tokens: request.max_segment_tokens ?? DEFAULT_MAX_SEGMENT_TOKENS,
@@ -283,7 +283,6 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
       ? resultSources.map((source) => source.node_name)
       : panelSelectedNodes.map((node) => node.name);
   const resultRandomSeed = serverRequest?.random_seed ?? randomSeed;
-  const resultMaxSegmentTokens = serverRequest?.max_segment_tokens ?? maxSegmentTokens;
   const firstResultNodeId = resultNodeIds[0] ?? null;
   const firstResultColumn = firstResultNodeId
     ? (serverRequest?.node_columns[firstResultNodeId] ??
@@ -477,7 +476,6 @@ function TopicModelingFeature({ host }: AnalysisTabFeatureProps) {
           onGraphViewReady={setReadyGraphProjectionKey}
           nodeNames={resultNodeNames}
           randomSeed={resultRandomSeed}
-          maxSegmentTokens={resultMaxSegmentTokens}
           onAddToWorkspace={openAddToWorkspaceDialog}
           isAddingToWorkspace={isAddingToWorkspace}
           projectionPending={projectionPending}

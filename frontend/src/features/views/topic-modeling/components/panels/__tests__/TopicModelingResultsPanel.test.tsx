@@ -111,7 +111,6 @@ const baseProps = {
   onGraphViewReady: vi.fn(),
   nodeNames: ['Corpus A'],
   randomSeed: 0,
-  maxSegmentTokens: 256,
   onAddToWorkspace: vi.fn(),
   isAddingToWorkspace: false,
   projectionPending: false,
@@ -451,6 +450,34 @@ describe('TopicModelingResultsPanel', () => {
     expect(screen.getByRole('button', { name: 'Add to Workspace' })).toBeInTheDocument();
   });
 
+  it('disables Add to Workspace when density clustering discovers no Topics', () => {
+    render(
+      <TooltipProvider>
+        <TopicModelingResultsPanel
+          {...baseProps}
+          topics={[]}
+          exportTopics={[]}
+          clustering={{
+            cluster_count: 0,
+            min_cluster_count: 0,
+            max_cluster_count: 0,
+            default_cluster_count: 0,
+            adjustable: false,
+          }}
+          topicInclusion={{
+            top_n_topics: 0,
+            min_top_n_topics: 0,
+            max_top_n_topics: 0,
+            default_top_n_topics: 0,
+            adjustable: false,
+          }}
+        />
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByRole('button', { name: 'Add to Workspace' })).toBeDisabled();
+  });
+
   it('organizes Result settings and moves the Top-N explanation into help', async () => {
     const user = userEvent.setup();
     const explanation =
@@ -496,27 +523,4 @@ describe('TopicModelingResultsPanel', () => {
     expect(onWordsPerTopicChange).toHaveBeenCalledWith(100);
   });
 
-  it('warns when later text was truncated from Topic Segments', () => {
-    render(
-      <TooltipProvider>
-        <TopicModelingResultsPanel
-          {...baseProps}
-          result={{
-            ...baseProps.result,
-            data: {
-              ...baseProps.result.data,
-              segment_count: 742,
-              truncated_segment_count: 18,
-            },
-          }}
-        />
-      </TooltipProvider>,
-    );
-
-    expect(
-      screen.getByText(
-        '18 of 742 Topic Segments were truncated to 256 tokens; later text in those segments was not modelled.',
-      ),
-    ).toBeInTheDocument();
-  });
 });

@@ -8,7 +8,7 @@ import {
   isArrowStringField,
   isArrowStringListField,
 } from '@/lib/arrow/arrowTable';
-import { isTopicDistributionField } from '@/lib/arrow/semanticTypes';
+import { isTopicCoverageField } from '@/lib/arrow/semanticTypes';
 import { getOperatorsForField } from '../../utils/typeUtils';
 import { buildFilterAutoNodeName } from '../../utils/autoNodeNames';
 import {
@@ -421,9 +421,9 @@ export const useFilterSubTabSections = (
   const shouldHideOperatorSelect = (condition: FilterConditionWithId) =>
     (condition.field !== undefined &&
       (isArrowDictionaryField(condition.field) || isArrowStringListField(condition.field))) ||
-    // Topic Distribution renders its own topic + operator + value controls together so the
+    // Topic Coverage renders its own Topic, operator, and threshold controls so the
     // topic dropdown can sit before the operator.
-    isTopicDistributionField(condition.field);
+    isTopicCoverageField(condition.field);
 
   /**
    * Supplies type-aware operator options to the shared ConditionBuilder.

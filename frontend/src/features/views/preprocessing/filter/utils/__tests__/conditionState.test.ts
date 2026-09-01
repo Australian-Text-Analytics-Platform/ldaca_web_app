@@ -11,20 +11,20 @@ import {
 } from 'apache-arrow';
 import { describe, expect, it } from 'vitest';
 import { arrowTypeName } from '@/lib/arrow/arrowTable';
-import { TOPIC_DISTRIBUTION_EXTENSION } from '@/lib/arrow/semanticTypes';
+import { TOPIC_COVERAGE_EXTENSION } from '@/lib/arrow/semanticTypes';
 import { applyFilterConditionFieldChange, createFilterCondition } from '../conditionState';
 import type { ConditionColumnOption, FilterConditionWithId } from '../../../types';
 
 const categoryField = new Field('Category', new Dictionary(new Utf8(), new Int32()));
 const topicEntry = new Field(
   'item',
-  new Struct([new Field('topic_id', new Int64()), new Field('proportion', new Float64())]),
+  new Struct([new Field('topic_id', new Int64()), new Field('coverage', new Float64())]),
 );
 const topicField = new Field(
   'Topics',
   new FixedSizeList(2, topicEntry),
   true,
-  new Map([['ARROW:extension:name', TOPIC_DISTRIBUTION_EXTENSION]]),
+  new Map([['ARROW:extension:name', TOPIC_COVERAGE_EXTENSION]]),
 );
 const createdField = new Field('Created', new TimestampMillisecond());
 const scoreField = new Field('Score', new Float64());
@@ -62,7 +62,7 @@ describe('conditionState', () => {
     });
   });
 
-  it('resets Topic Distribution value and requests checklist options on column change', () => {
+  it('resets Topic Coverage value and requests checklist options on column change', () => {
     const result = applyFilterConditionFieldChange({
       condition: baseCondition,
       field: 'column',

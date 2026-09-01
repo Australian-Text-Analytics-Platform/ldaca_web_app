@@ -25,7 +25,7 @@ describe('topicModelingParameterReducer', () => {
         node_columns: { 'node-1': 'text', 'node-2': 'text' },
         min_cluster_size: 25,
         random_seed: 7,
-        segmentation_method: 'paragraph',
+        segmentation_method: 'line',
         max_segment_tokens: 64,
         sample_fractions: [0.2, null],
       },
@@ -35,7 +35,7 @@ describe('topicModelingParameterReducer', () => {
       minClusterSize: 25,
       randomSeed: 7,
       randomSeedUserSet: true,
-      segmentationMethod: 'paragraph',
+      segmentationMethod: 'line',
       maxSegmentTokens: 64,
       corpusSamplesByNodeId: {
         'node-1': { percent: '20' },

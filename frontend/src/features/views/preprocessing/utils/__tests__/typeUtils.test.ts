@@ -1,7 +1,7 @@
 import { Field, FixedSizeList, Float64, Int64, LargeList, Struct, Utf8View } from 'apache-arrow';
 import { describe, expect, it } from 'vitest';
 
-import { TOPIC_DISTRIBUTION_EXTENSION } from '@/lib/arrow/semanticTypes';
+import { TOPIC_COVERAGE_EXTENSION } from '@/lib/arrow/semanticTypes';
 import { getOperatorsForField } from '../typeUtils';
 
 describe('preprocessing type utils', () => {
@@ -10,16 +10,16 @@ describe('preprocessing type utils', () => {
     expect(getOperatorsForField(field)).toEqual([{ value: 'in', label: 'contains any of' }]);
   });
 
-  it('offers proportion operators from Topic Distribution extension metadata', () => {
+  it('offers comparison operators from Topic Coverage extension metadata', () => {
     const entry = new Field(
       'item',
-      new Struct([new Field('topic_id', new Int64()), new Field('proportion', new Float64())]),
+      new Struct([new Field('topic_id', new Int64()), new Field('coverage', new Float64())]),
     );
     const field = new Field(
-      'distribution',
+      'coverage',
       new FixedSizeList(2, entry),
       true,
-      new Map([['ARROW:extension:name', TOPIC_DISTRIBUTION_EXTENSION]]),
+      new Map([['ARROW:extension:name', TOPIC_COVERAGE_EXTENSION]]),
     );
     expect(getOperatorsForField(field)).toEqual([
       { value: 'gte', label: '≥' },

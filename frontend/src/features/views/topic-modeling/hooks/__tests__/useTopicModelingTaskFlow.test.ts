@@ -41,7 +41,7 @@ describe('useTopicModelingTaskFlow', () => {
         representativeWordsCount: 10,
         sampleFractions: null,
         minClusterSize: 5,
-        segmentationMethod: 'paragraph',
+        segmentationMethod: 'line',
         maxSegmentTokens: 64,
       },
       actions: {
@@ -60,7 +60,7 @@ describe('useTopicModelingTaskFlow', () => {
             kind: 'topic_modeling',
             node_ids: ['node-1'],
             min_cluster_size: 5,
-            segmentation_method: 'paragraph',
+            segmentation_method: 'line',
             max_segment_tokens: 64,
           }),
         }),

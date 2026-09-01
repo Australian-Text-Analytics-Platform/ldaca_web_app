@@ -45,7 +45,7 @@ export const createTopicModelingParameterState = (): TopicModelingParameterState
 export const sanitizeMaxSegmentTokens = (value: string | number | undefined): number => {
   const raw = typeof value === 'number' ? value : Number(value);
   const rounded = Number.isFinite(raw) ? Math.round(raw) : DEFAULT_MAX_SEGMENT_TOKENS;
-  return Math.min(510, Math.max(32, rounded));
+  return Math.min(256, Math.max(32, rounded));
 };
 
 export const sanitizeMinClusterSize = (value: string | number | undefined): number => {
@@ -55,7 +55,7 @@ export const sanitizeMinClusterSize = (value: string | number | undefined): numb
 };
 
 const normalizeSegmentationMethod = (value: unknown): TopicSegmentationMethod => {
-  return value === 'paragraph' || value === 'sentence' ? value : 'automatic';
+  return value === 'line' || value === 'sentence' ? value : 'automatic';
 };
 
 export const defaultCorpusSample = (): CorpusSample => {

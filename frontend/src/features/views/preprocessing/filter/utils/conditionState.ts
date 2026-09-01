@@ -6,7 +6,7 @@ import {
   isArrowTemporalField,
   type ArrowField,
 } from '@/lib/arrow/arrowTable';
-import { isTopicDistributionField } from '@/lib/arrow/semanticTypes';
+import { isTopicCoverageField } from '@/lib/arrow/semanticTypes';
 import { getOperatorsForField } from '../../utils/typeUtils';
 import type {
   ConditionColumnOption,
@@ -50,13 +50,13 @@ const isChecklistField = (field: ArrowField | undefined): boolean =>
   field !== undefined &&
   (isArrowDictionaryField(field) ||
     isArrowStringListField(field) ||
-    isTopicDistributionField(field));
+    isTopicCoverageField(field));
 
 const getDefaultValueForColumn = (
   field: ArrowField | undefined,
   operator: FilterCondition['operator'],
 ): ConditionValue => {
-  if (isTopicDistributionField(field)) return { topic_id: 0, threshold: 0.05 };
+  if (isTopicCoverageField(field)) return { topic_id: 0, threshold: 0.05 };
   return operator === 'in' ? [] : '';
 };
 

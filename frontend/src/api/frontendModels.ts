@@ -72,7 +72,6 @@ export type TopicModelingResponse = Omit<TopicModelingResult, 'topics'> & {
     topics: TopicModelingResult['topics'];
     corpus_sizes: number[];
     segment_count: number;
-    truncated_segment_count: number;
   };
 };
 

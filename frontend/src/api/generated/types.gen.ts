@@ -4513,10 +4513,6 @@ export type TopicModelingResult = {
      * Topics
      */
     topics: Array<TopicItem>;
-    /**
-     * Truncated Segment Count
-     */
-    truncated_segment_count: number;
 };
 
 /**
@@ -4588,7 +4584,7 @@ export type TopicModelingTabUpdate = {
 /**
  * TopicSegmentationMethod
  */
-export type TopicSegmentationMethod = 'automatic' | 'paragraph' | 'sentence';
+export type TopicSegmentationMethod = 'automatic' | 'line' | 'sentence';
 
 /**
  * TopicSource
