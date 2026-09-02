@@ -113,12 +113,12 @@ describe('ResponsiveWordCloud', () => {
               expect.objectContaining({
                 name: 'alpha',
                 value: 100,
-                textStyle: expect.objectContaining({ color: '#ff0000', fontSize: 70 }),
+                textStyle: { color: '#ff0000' },
               }),
               expect.objectContaining({
                 name: 'beta',
                 value: 50,
-                textStyle: expect.objectContaining({ color: '#0000ff', fontSize: 41 }),
+                textStyle: { color: '#0000ff' },
               }),
             ],
           }),

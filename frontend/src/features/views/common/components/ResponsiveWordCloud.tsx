@@ -55,9 +55,6 @@ function ResponsiveWordCloudInstance({
   const measuredWidth = useElementWidth(containerRef);
   const cloudWidth = Math.max(minWidth, measuredWidth);
   const cloudHeight = Math.max(minHeight, Math.round(cloudWidth * aspectRatio));
-  const maxFontSize = Math.max(28, Math.min(160, Math.round(cloudWidth * 0.14)));
-  const minFontSize = Math.max(10, Math.round(maxFontSize / 6));
-  const maxValue = Math.max(Number.EPSILON, ...words.map((word) => word.value));
   const interactive = Boolean(onWordClick ?? onWordContextMenu);
   const ariaLabel = words.map((word) => `${word.text}: ${String(word.value)}`).join(', ');
 
@@ -104,7 +101,6 @@ function ResponsiveWordCloudInstance({
       top: 0,
       width: '100%',
       height: '100%',
-      sizeRange: [minFontSize, maxFontSize],
       rotationRange: [0, 0],
       rotationStep: 1,
       gridSize: 4,
@@ -123,15 +119,6 @@ function ResponsiveWordCloudInstance({
         value: word.value,
         textStyle: {
           color: word.color ?? color,
-          fontFamily: 'Segoe UI, Roboto, sans-serif',
-          fontWeight: 'normal',
-          fontSize: Math.max(
-            minFontSize,
-            Math.min(
-              maxFontSize,
-              (word.value / maxValue) * (maxFontSize - minFontSize) + minFontSize,
-            ),
-          ),
         },
       })),
     };
@@ -148,17 +135,7 @@ function ResponsiveWordCloudInstance({
     return () => {
       svgRef?.(null);
     };
-  }, [
-    cloudHeight,
-    cloudWidth,
-    color,
-    interactive,
-    maxFontSize,
-    maxValue,
-    minFontSize,
-    svgRef,
-    words,
-  ]);
+  }, [cloudHeight, cloudWidth, color, interactive, svgRef, words]);
 
   return (
     <div ref={containerRef} className="w-full">
