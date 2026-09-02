@@ -20,9 +20,8 @@ flowchart LR
 
 ## Boundaries
 
-- `polars_text/_expressions.py` validates arguments once and registers plugin
-  functions against the exact imported extension path.
-- `polars_text/namespace.py` is the only expression façade.
+- `polars_text/namespace.py` is the expression façade and validates arguments
+  before registering plugin functions against the exact imported extension path.
 - `src/expressions.rs` implements lazy Polars plugins and output schemas.
 - `src/tokenizer.rs` owns tokenizer backend dispatch and its process-local
   registry.
