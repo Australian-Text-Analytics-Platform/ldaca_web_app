@@ -8,6 +8,7 @@ from collections.abc import Mapping
 from pathlib import Path
 
 from ..domain.workspace import AnalysisRecord, AnalysisState
+from ..infrastructure.storage.safe_paths import is_link_or_reparse
 from ..models.analysis_results import ANALYSIS_STORED_RESULT_MODELS
 
 
@@ -94,9 +95,7 @@ def _regular_file_without_links(root: Path, relative: Path) -> Path:
     for part in relative.parts:
         current /= part
         metadata = current.lstat()
-        attributes = int(getattr(metadata, "st_file_attributes", 0))
-        reparse = int(getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400))
-        if stat.S_ISLNK(metadata.st_mode) or attributes & reparse:
+        if is_link_or_reparse(metadata):
             raise ValueError("Analysis Artifact path contains a link")
     if not stat.S_ISREG(current.lstat().st_mode):
         raise ValueError("Analysis Artifact is not a regular file")
@@ -114,9 +113,7 @@ def _owned_artifact_files(root: Path) -> set[Path]:
     files: set[Path] = set()
     for candidate in root.rglob("*"):
         candidate_metadata = candidate.lstat()
-        attributes = int(getattr(candidate_metadata, "st_file_attributes", 0))
-        reparse = int(getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400))
-        if stat.S_ISLNK(candidate_metadata.st_mode) or attributes & reparse:
+        if is_link_or_reparse(candidate_metadata):
             raise ValueError("Analysis Artifact tree contains a link")
         if stat.S_ISREG(candidate_metadata.st_mode):
             files.add(candidate.resolve(strict=True))

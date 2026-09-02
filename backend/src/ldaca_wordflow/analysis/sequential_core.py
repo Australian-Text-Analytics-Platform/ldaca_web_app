@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import polars as pl
 
-DEFAULT_CHART_TYPE = "line"
 SEQUENTIAL_PERIOD_INDEX_COLUMN = "period_index"
 SEQUENTIAL_GROUP_INDEX_COLUMN = "group_index"
 SEQUENTIAL_PUBLICATION_PERIOD_INDEX_COLUMN = "__wordflow_trends_period_index"

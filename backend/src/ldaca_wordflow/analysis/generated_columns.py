@@ -17,11 +17,6 @@ CONC_R1_FREQ_COLUMN = "CONC_r1_freq"
 # Data Block Creation may select it directly; Document Data Block Creation normalizes and
 # joins the surviving values after applying the Review filter.
 CONC_EXTRACTION_COLUMN = "CONC_extraction"
-CONC_DOC_HITS_COLUMN = "CONC_doc_hits"
-CONC_HIT_COUNT_COLUMN = "CONC_hit_count"
-CONC_HIT_LINE_MARKERS_COLUMN = "CONC_hit_line_markers"
-CONC_HIT_LINE_TEXT_COLUMN = "CONC_hit_line_text"
-CONC_HIT_START_INDICES_COLUMN = "CONC_hit_start_indices"
 
 CORE_CONCORDANCE_COLUMNS = (
     CONC_LEFT_CONTEXT_COLUMN,

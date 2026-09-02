@@ -420,7 +420,12 @@ def _entry_allocated_bytes(metadata: os.stat_result, unit: int) -> int:
     return max(blocks * 512, unit)
 
 
-def _allocated_tree_bytes(root: Path, unit: int) -> int:
+def _allocated_tree_bytes(
+    root: Path,
+    unit: int,
+    *,
+    exclude_unpublished: bool = False,
+) -> int:
     try:
         root_metadata = root.lstat()
     except FileNotFoundError:
@@ -428,7 +433,7 @@ def _allocated_tree_bytes(root: Path, unit: int) -> int:
     if _is_link_or_reparse(root_metadata):
         return 0
     if stat.S_ISREG(root_metadata.st_mode):
-        return _entry_allocated_bytes(root_metadata, unit)
+        return 0 if exclude_unpublished else _entry_allocated_bytes(root_metadata, unit)
     if not stat.S_ISDIR(root_metadata.st_mode):
         return 0
     total = _entry_allocated_bytes(root_metadata, unit)
@@ -440,46 +445,7 @@ def _allocated_tree_bytes(root: Path, unit: int) -> int:
         current = Path(current_root)
         safe_directories: list[str] = []
         for name in directory_names:
-            candidate = current / name
-            try:
-                metadata = candidate.lstat()
-            except FileNotFoundError:
-                continue
-            if _is_link_or_reparse(metadata) or not stat.S_ISDIR(metadata.st_mode):
-                continue
-            safe_directories.append(name)
-            total += _entry_allocated_bytes(metadata, unit)
-        directory_names[:] = safe_directories
-        for name in file_names:
-            candidate = current / name
-            try:
-                metadata = candidate.lstat()
-            except FileNotFoundError:
-                continue
-            if stat.S_ISREG(metadata.st_mode) and not _is_link_or_reparse(metadata):
-                total += _entry_allocated_bytes(metadata, unit)
-    return total
-
-
-def _allocated_user_bytes(root: Path, unit: int) -> int:
-    """Measure durable user state while excluding known unpublished staging."""
-
-    try:
-        root_metadata = root.lstat()
-    except FileNotFoundError:
-        return 0
-    if not stat.S_ISDIR(root_metadata.st_mode) or _is_link_or_reparse(root_metadata):
-        return 0
-    total = _entry_allocated_bytes(root_metadata, unit)
-    for current_root, directory_names, file_names in os.walk(
-        root,
-        topdown=True,
-        followlinks=False,
-    ):
-        current = Path(current_root)
-        safe_directories: list[str] = []
-        for name in directory_names:
-            if name == USER_FILE_IMPORT_STAGING_DIRECTORY:
+            if exclude_unpublished and name == USER_FILE_IMPORT_STAGING_DIRECTORY:
                 continue
             candidate = current / name
             try:
@@ -492,7 +458,9 @@ def _allocated_user_bytes(root: Path, unit: int) -> int:
             total += _entry_allocated_bytes(metadata, unit)
         directory_names[:] = safe_directories
         for name in file_names:
-            if name.startswith(".") and name.endswith(".upload"):
+            if exclude_unpublished and name.startswith(".") and name.endswith(
+                ".upload"
+            ):
                 continue
             candidate = current / name
             try:
@@ -532,7 +500,7 @@ def _owned_allocated_bytes(
     user_id: str,
     unit: int,
 ) -> int:
-    total = _allocated_user_bytes(user_root, unit)
+    total = _allocated_tree_bytes(user_root, unit, exclude_unpublished=True)
     total += _owned_workspace_bytes(workspaces_root, user_id, unit)
     total += _owned_workspace_bytes(workspaces_root / ".trash", user_id, unit)
     return total

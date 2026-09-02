@@ -37,6 +37,7 @@ from ..infrastructure.storage.workspace_lock import (
     WorkspaceProcessLock,
     acquire_workspace_lock,
 )
+from ..infrastructure.storage.safe_paths import is_link_or_reparse
 from ..infrastructure.storage.workspace_store import (
     WorkspaceCapacityError,
     WorkspaceRevisionConflictError,
@@ -163,13 +164,10 @@ class _WorkspaceCatalogue:
             try:
                 canonical_id = str(uuid.UUID(candidate.name))
                 metadata = candidate.lstat()
-                attributes = int(getattr(metadata, "st_file_attributes", 0))
-                reparse = int(getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400))
                 if (
                     canonical_id != candidate.name
                     or not stat.S_ISDIR(metadata.st_mode)
-                    or stat.S_ISLNK(metadata.st_mode)
-                    or attributes & reparse
+                    or is_link_or_reparse(metadata)
                 ):
                     raise ValueError("Workspace entry is not a canonical directory")
             except OSError, ValueError:
@@ -284,12 +282,9 @@ class _WorkspaceCatalogue:
         path = workspaces_root(self._settings) / str(workspace_id)
         try:
             metadata = path.lstat()
-            attributes = int(getattr(metadata, "st_file_attributes", 0))
-            reparse = int(getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400))
             if (
                 not stat.S_ISDIR(metadata.st_mode)
-                or stat.S_ISLNK(metadata.st_mode)
-                or attributes & reparse
+                or is_link_or_reparse(metadata)
             ):
                 raise WorkspaceAccessInvalidError(
                     "Workspace path is not a safe directory"

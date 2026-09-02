@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .durable_fs import fsync_directory, mkdir_durable
+from .safe_paths import is_link_or_reparse
 
 
 class WorkspaceLockContendedError(Exception):
@@ -55,24 +56,19 @@ def _is_safe_owned_directory(path: Path) -> bool:
         metadata = path.lstat()
     except OSError:
         return False
-    reparse = int(getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400))
-    attributes = int(getattr(metadata, "st_file_attributes", 0))
     return (
         stat.S_ISDIR(metadata.st_mode)
-        and not stat.S_ISLNK(metadata.st_mode)
-        and not attributes & reparse
+        and not is_link_or_reparse(metadata)
         and (not hasattr(os, "getuid") or metadata.st_uid == os.getuid())
     )
 
 
 def _is_safe_owned_file(descriptor: int) -> bool:
     metadata = os.fstat(descriptor)
-    reparse = int(getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400))
-    attributes = int(getattr(metadata, "st_file_attributes", 0))
     return (
         stat.S_ISREG(metadata.st_mode)
         and metadata.st_nlink == 1
-        and not attributes & reparse
+        and not is_link_or_reparse(metadata)
         and (not hasattr(os, "getuid") or metadata.st_uid == os.getuid())
     )
 
@@ -82,11 +78,8 @@ def _descriptor_matches_path(descriptor: int, path: Path) -> bool:
         path_metadata = path.lstat()
     except OSError:
         return False
-    reparse = int(getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400))
-    attributes = int(getattr(path_metadata, "st_file_attributes", 0))
     return (
-        not stat.S_ISLNK(path_metadata.st_mode)
-        and not attributes & reparse
+        not is_link_or_reparse(path_metadata)
         and os.path.samestat(os.fstat(descriptor), path_metadata)
     )
 
@@ -157,11 +150,7 @@ def acquire_workspace_lock(
             except FileNotFoundError:
                 pass
             else:
-                reparse = int(
-                    getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
-                )
-                attributes = int(getattr(metadata, "st_file_attributes", 0))
-                if stat.S_ISLNK(metadata.st_mode) or attributes & reparse:
+                if is_link_or_reparse(metadata):
                     raise WorkspaceLockStorageError
             descriptor = os.open(path, flags, 0o600)
     except (OSError, WorkspaceLockStorageError) as exc:

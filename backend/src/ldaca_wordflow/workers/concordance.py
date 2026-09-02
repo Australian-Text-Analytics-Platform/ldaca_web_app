@@ -39,11 +39,6 @@ from ..analysis.generated_columns import (
 )
 from .utils import process_entrypoint
 
-# Run All reuses `CONC_extraction` as the source-window column name
-# for the per-document multi-line joined string. It carries the same KWIC
-# windows as the per-hit `CONC_extraction` column, collapsed into one row per
-# source document.
-DISPERSION_EXTRACTED_CONTENTS_COLUMN = CONC_EXTRACTION_COLUMN
 SOURCE_ROW_ID_COLUMN = "__wordflow_source_row_id"
 
 logger = logging.getLogger(__name__)

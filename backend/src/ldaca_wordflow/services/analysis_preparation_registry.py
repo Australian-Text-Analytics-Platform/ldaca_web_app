@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import cast
 import uuid
 
 from ..analysis.token_cache import tokens_cache_path
@@ -80,22 +78,42 @@ class AnalysisPreparationContext:
     cache_root: Path
 
 
-type PreparationHandler = Callable[
-    [object, AnalysisPreparationContext], AnalysisWorkerInput
-]
-
-
 def prepare_analysis_worker_input(
     context: AnalysisPreparationContext,
 ) -> AnalysisWorkerInput:
     """Dispatch one exact request model to its focused preparation function."""
 
     request = context.record.request
-    try:
-        handler = _PREPARATION_HANDLERS[type(request)]
-    except KeyError as exc:
-        raise InvalidInputError("Analysis kind has no process implementation") from exc
-    return handler(request, context)
+    if isinstance(
+        request,
+        (AnnotationAnalysisRequest, ConcordanceAnalysisRequest, QuotationAnalysisRequest),
+    ):
+        return _prepare_preview(request, context)
+    if isinstance(request, TokenFrequencyAnalysisRequest):
+        return _prepare_token_frequency(request, context)
+    if isinstance(request, TopicModelingAnalysisRequest):
+        return _prepare_topic_modeling(request, context)
+    if isinstance(request, SequentialAnalysisRequest):
+        return _prepare_sequential(request, context)
+    if isinstance(request, TopicModelingDataBlockCreationAnalysisRequest):
+        return _prepare_topic_data_block_creation(request, context)
+    if isinstance(
+        request,
+        (
+            ConcordanceMatchDataBlockCreationAnalysisRequest,
+            ConcordanceDocumentDataBlockCreationAnalysisRequest,
+            QuotationResultDataBlockCreationAnalysisRequest,
+            SequentialDataBlockCreationAnalysisRequest,
+        ),
+    ):
+        return _prepare_result_data_block_creation(request, context)
+    if isinstance(request, ConcordanceRunAllAnalysisRequest):
+        return _prepare_concordance_run_all(request, context)
+    if isinstance(request, QuotationRunAllAnalysisRequest):
+        return _prepare_quotation_run_all(request, context)
+    if isinstance(request, AnnotationRunAllAnalysisRequest):
+        return _prepare_annotation_run_all(request, context)
+    raise InvalidInputError("Analysis kind has no process implementation")
 
 
 def _prepare_preview(
@@ -477,38 +495,5 @@ def _validate_document_data_block_creation_columns(
             "Document Data Block Creation metadata column is unavailable"
         )
 
-
-_PREPARATION_HANDLERS: dict[type[object], PreparationHandler] = {
-    AnnotationAnalysisRequest: cast("PreparationHandler", _prepare_preview),
-    ConcordanceAnalysisRequest: cast("PreparationHandler", _prepare_preview),
-    QuotationAnalysisRequest: cast("PreparationHandler", _prepare_preview),
-    TokenFrequencyAnalysisRequest: cast("PreparationHandler", _prepare_token_frequency),
-    TopicModelingAnalysisRequest: cast("PreparationHandler", _prepare_topic_modeling),
-    SequentialAnalysisRequest: cast("PreparationHandler", _prepare_sequential),
-    TopicModelingDataBlockCreationAnalysisRequest: cast(
-        "PreparationHandler", _prepare_topic_data_block_creation
-    ),
-    ConcordanceMatchDataBlockCreationAnalysisRequest: cast(
-        "PreparationHandler", _prepare_result_data_block_creation
-    ),
-    ConcordanceDocumentDataBlockCreationAnalysisRequest: cast(
-        "PreparationHandler", _prepare_result_data_block_creation
-    ),
-    QuotationResultDataBlockCreationAnalysisRequest: cast(
-        "PreparationHandler", _prepare_result_data_block_creation
-    ),
-    SequentialDataBlockCreationAnalysisRequest: cast(
-        "PreparationHandler", _prepare_result_data_block_creation
-    ),
-    ConcordanceRunAllAnalysisRequest: cast(
-        "PreparationHandler", _prepare_concordance_run_all
-    ),
-    QuotationRunAllAnalysisRequest: cast(
-        "PreparationHandler", _prepare_quotation_run_all
-    ),
-    AnnotationRunAllAnalysisRequest: cast(
-        "PreparationHandler", _prepare_annotation_run_all
-    ),
-}
 
 __all__ = ["AnalysisPreparationContext", "prepare_analysis_worker_input"]

@@ -44,6 +44,7 @@ from ..infrastructure.storage.workspace_store import (
     WorkspaceStore,
 )
 from ..infrastructure.storage.workspace_access import write_workspace_owner
+from ..infrastructure.storage.safe_paths import is_link_or_reparse
 
 from ..shared.errors import (
     InvalidInputError,
@@ -131,12 +132,9 @@ def _cleanup_abandoned_node_staging(workspace_path: Path) -> None:
             metadata = candidate.lstat()
         except FileNotFoundError:
             continue
-        reparse = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
-        attributes = getattr(metadata, "st_file_attributes", 0)
         if not (
             stat.S_ISREG(metadata.st_mode)
-            or stat.S_ISLNK(metadata.st_mode)
-            or bool(reparse and attributes & reparse)
+            or is_link_or_reparse(metadata)
         ):
             continue
         candidate.unlink(missing_ok=True)
@@ -182,13 +180,10 @@ def _cleanup_workspace_service_temps(root: Path) -> None:
             metadata = candidate.lstat()
         except OSError, ValueError:
             continue
-        attributes = int(getattr(metadata, "st_file_attributes", 0))
-        reparse = int(getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400))
         if (
             canonical_id == candidate.name
             and stat.S_ISDIR(metadata.st_mode)
-            and not stat.S_ISLNK(metadata.st_mode)
-            and not attributes & reparse
+            and not is_link_or_reparse(metadata)
         ):
             _cleanup_abandoned_node_staging(candidate)
 
@@ -696,20 +691,6 @@ class WorkspaceService:
                 workspace_id,
                 allow_closing=False,
             )
-
-    async def ensure_open(self, user_id: str, workspace_id: uuid.UUID) -> None:
-        """Validate child-resource access without leaking the aggregate."""
-
-        async with self.read_context(user_id, workspace_id):
-            return
-
-    async def ensure_accepting_work(
-        self, user_id: str, workspace_id: uuid.UUID
-    ) -> None:
-        """Admit one new-work request before it snapshots independent inputs."""
-
-        async with self.submission_context(user_id, workspace_id):
-            return
 
     @asynccontextmanager
     async def mutation_context(

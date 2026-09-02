@@ -345,13 +345,6 @@ class WorkspaceCorruptError(AppError):
     code = "workspace_corrupt"
 
 
-class TabCorruptError(AppError):
-    """A Workspace-referenced strict Tab record cannot be loaded."""
-
-    status_code = 500
-    code = "tab_corrupt"
-
-
 class AnalysisCorruptError(AppError):
     """A live Workspace-owned Analysis record cannot be validated."""
 

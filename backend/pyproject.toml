@@ -24,7 +24,6 @@ classifiers = [
 ]
 dependencies = [
     "aiosqlite>=0.21.0",
-    "duckdb>=1.5.5,<2",
     "fastapi>=0.141.1,<1",
     "fastexcel>=0.21.0,<1",
     "google-auth[requests]>=2.57.0,<3",         # Google ID-token verification
@@ -80,6 +79,7 @@ allow-direct-references = true
 
 [dependency-groups]
 dev = [
+    "duckdb>=1.5.5,<2",
     "pytest-asyncio>=0.23.0",
     "ruff>=0.16.5,<1",
     "ty==0.0.75",

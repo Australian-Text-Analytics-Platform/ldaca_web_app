@@ -27,6 +27,7 @@ from .durable_fs import (
     fsync_file,
     mkdir_durable as _mkdir_durable,
 )
+from .safe_paths import is_link_or_reparse
 
 from ...shared.errors import ResourceTooLargeError
 _SNAPSHOT_FILENAME = "snapshot.json"
@@ -383,9 +384,7 @@ def _require_contained_regular(root: Path, raw_source: str) -> Path:
     for part in relative.parts:
         current = current / part
         metadata = current.lstat()
-        reparse = int(getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400))
-        attributes = int(getattr(metadata, "st_file_attributes", 0))
-        if stat.S_ISLNK(metadata.st_mode) or attributes & reparse:
+        if is_link_or_reparse(metadata):
             raise RuntimeError("Execution snapshot plan source contains a link")
     if not stat.S_ISREG(current.stat().st_mode):
         raise RuntimeError("Execution snapshot plan source is not a regular file")

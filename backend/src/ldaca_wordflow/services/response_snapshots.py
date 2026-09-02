@@ -91,12 +91,7 @@ class ResponseSnapshotService:
             )
             return ResponseSnapshot(path, reservation, self._slots, self._limiter)
         except BaseException:
-            if path is not None:
-                await self._run_io(path.unlink, missing_ok=True)
-            if reservation is not None:
-                with anyio.CancelScope(shield=True):
-                    await reservation.release()
-            self._slots.release()
+            await self._cleanup_failed(path, reservation)
             raise
 
     async def create_generated(
@@ -125,18 +120,25 @@ class ResponseSnapshotService:
             )
             return ResponseSnapshot(path, reservation, self._slots, self._limiter)
         except BaseException:
-            if path is not None:
-                await self._run_io(path.unlink, missing_ok=True)
-            if reservation is not None:
-                with anyio.CancelScope(shield=True):
-                    await reservation.release()
-            self._slots.release()
+            await self._cleanup_failed(path, reservation)
             raise
 
     async def reconcile(self) -> None:
         """Remove only this process family's abandoned response directory."""
 
         await self._run_io(_remove_root, self._root)
+
+    async def _cleanup_failed(
+        self,
+        path: Path | None,
+        reservation: StorageReservation | None,
+    ) -> None:
+        if path is not None:
+            await self._run_io(path.unlink, missing_ok=True)
+        if reservation is not None:
+            with anyio.CancelScope(shield=True):
+                await reservation.release()
+        self._slots.release()
 
     async def _run_io(
         self, function: Callable[..., T], *args: object, **kwargs: object

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import stat
 import uuid
 from collections.abc import Callable
@@ -23,6 +22,7 @@ from .durable_fs import (
     fsync_directory,
     mkdir_durable,
 )
+from .safe_paths import is_link_or_reparse
 
 T = TypeVar("T")
 
@@ -138,12 +138,6 @@ class UserFileImportStore:
         )
 
 
-def _is_link_or_reparse(metadata: os.stat_result) -> bool:
-    attributes = int(getattr(metadata, "st_file_attributes", 0))
-    reparse = int(getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400))
-    return stat.S_ISLNK(metadata.st_mode) or bool(attributes & reparse)
-
-
 def _require_real_directory(path: Path, *, create: bool) -> Path:
     if create:
         mkdir_durable(path)
@@ -151,7 +145,7 @@ def _require_real_directory(path: Path, *, create: bool) -> Path:
         metadata = path.lstat()
     except FileNotFoundError as exc:
         raise UserFileImportStoreError("Import storage is missing") from exc
-    if not stat.S_ISDIR(metadata.st_mode) or _is_link_or_reparse(metadata):
+    if not stat.S_ISDIR(metadata.st_mode) or is_link_or_reparse(metadata):
         raise UserFileImportStoreError("Import storage is unsafe")
     try:
         resolved = path.resolve(strict=True)
@@ -175,7 +169,7 @@ def _save(root: Path, resource: UserFileImport, max_record_bytes: int) -> None:
     target = _record_path(root, resource.id)
     if target.exists():
         metadata = target.lstat()
-        if not stat.S_ISREG(metadata.st_mode) or _is_link_or_reparse(metadata):
+        if not stat.S_ISREG(metadata.st_mode) or is_link_or_reparse(metadata):
             raise UserFileImportStoreError("Import record is unsafe")
     try:
         atomic_write_json(
@@ -200,7 +194,7 @@ def _save_prepared_publication(
     target = _prepared_path(root, resource.id)
     if target.exists():
         metadata = target.lstat()
-        if not stat.S_ISREG(metadata.st_mode) or _is_link_or_reparse(metadata):
+        if not stat.S_ISREG(metadata.st_mode) or is_link_or_reparse(metadata):
             raise UserFileImportStoreError("Prepared publication is unsafe")
     try:
         atomic_write_json(
@@ -221,7 +215,7 @@ def _clear_prepared_publication(root: Path, import_id: uuid.UUID) -> None:
         metadata = target.lstat()
     except FileNotFoundError:
         return
-    if not stat.S_ISREG(metadata.st_mode) or _is_link_or_reparse(metadata):
+    if not stat.S_ISREG(metadata.st_mode) or is_link_or_reparse(metadata):
         raise UserFileImportStoreError("Prepared publication is unsafe")
     target.unlink()
     fsync_directory(root)
@@ -234,7 +228,7 @@ def _delete(root: Path, import_id: uuid.UUID) -> None:
         metadata = target.lstat()
     except FileNotFoundError:
         return
-    if not stat.S_ISREG(metadata.st_mode) or _is_link_or_reparse(metadata):
+    if not stat.S_ISREG(metadata.st_mode) or is_link_or_reparse(metadata):
         raise UserFileImportStoreError("Import record is unsafe")
     target.unlink()
     fsync_directory(root)
@@ -248,7 +242,7 @@ def _load_record(
     metadata = path.lstat()
     if (
         not stat.S_ISREG(metadata.st_mode)
-        or _is_link_or_reparse(metadata)
+        or is_link_or_reparse(metadata)
         or metadata.st_size > max_record_bytes
     ):
         raise UserFileImportStoreError("Import record is invalid")
@@ -270,7 +264,7 @@ def _load_prepared_publication(
     metadata = path.lstat()
     if (
         not stat.S_ISREG(metadata.st_mode)
-        or _is_link_or_reparse(metadata)
+        or is_link_or_reparse(metadata)
         or metadata.st_size > max_record_bytes
     ):
         raise UserFileImportStoreError("Prepared publication is invalid")
@@ -344,7 +338,7 @@ def _load_all(
             metadata = user_root.lstat()
         except FileNotFoundError:
             continue
-        if not stat.S_ISDIR(metadata.st_mode) or _is_link_or_reparse(metadata):
+        if not stat.S_ISDIR(metadata.st_mode) or is_link_or_reparse(metadata):
             continue
         imports_root = user_root / "imports"
         if not imports_root.exists():

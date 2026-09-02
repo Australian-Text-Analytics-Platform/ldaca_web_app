@@ -43,9 +43,7 @@ from .page_size import DEFAULT_PAGE_SIZE_CANDIDATES, estimate_page_size
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_CONCORDANCE_PAGE = 1
 DEFAULT_CONCORDANCE_PAGE_SIZE = 20
-DEFAULT_CONCORDANCE_DESCENDING = True
 
 
 def concordance_non_empty_expr() -> pl.Expr:

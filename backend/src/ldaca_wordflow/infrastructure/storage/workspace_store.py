@@ -26,6 +26,7 @@ from .durable_fs import (
     atomic_write_json,
     fsync_directory,
 )
+from .safe_paths import is_link_or_reparse
 
 if TYPE_CHECKING:  # pragma: no cover
     from ...domain.workspace import Workspace
@@ -165,9 +166,7 @@ def _resolve_regular_under(root: Path, relative: Path) -> Path:
             raise ValueError("Workspace file path is invalid")
         current = current / part
         metadata = current.lstat()
-        file_attributes = int(getattr(metadata, "st_file_attributes", 0))
-        reparse = int(getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400))
-        if stat.S_ISLNK(metadata.st_mode) or file_attributes & reparse:
+        if is_link_or_reparse(metadata):
             raise ValueError("Workspace file path contains a link or reparse point")
     if not stat.S_ISREG(current.lstat().st_mode):
         raise ValueError("Workspace file is not regular")

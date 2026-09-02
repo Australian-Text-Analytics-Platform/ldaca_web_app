@@ -71,6 +71,7 @@ from .node_projection import canonical_node_info
 from .response_snapshots import ResponseSnapshot, ResponseSnapshotService
 from .workspace import WorkspaceLease
 from ..infrastructure.storage.input_snapshots import clone_worker_input_snapshot
+from ..infrastructure.storage.safe_paths import is_link_or_reparse
 
 
 class AnalysisArtifactService:
@@ -149,8 +150,9 @@ class AnalysisArtifactService:
                 artifacts=[],
                 output_node_ids=[],
             )
+        data_block_stored = None
         if isinstance(result, TopicModelingDataBlockCreationWorkerResult):
-            stored = await run_sync_in_worker_thread(
+            data_block_stored = await run_sync_in_worker_thread(
                 partial(
                     _publish_topic_modeling_data_blocks,
                     lease.path / "analyses" / str(record.id),
@@ -163,17 +165,8 @@ class AnalysisArtifactService:
                 abandon_on_cancel=False,
                 limiter=self._limiter,
             )
-            lease.rollback_paths.extend(
-                lease.path / "data" / f"{node_id}.parquet"
-                for node_id in stored.output_node_ids
-            )
-            return PublishedAnalysisResult(
-                payload=cast(dict[str, JsonData], stored.model_dump(mode="json")),
-                artifacts=[],
-                output_node_ids=stored.output_node_ids,
-            )
-        if isinstance(result, DataBlockCreationWorkerResult):
-            stored = await run_sync_in_worker_thread(
+        elif isinstance(result, DataBlockCreationWorkerResult):
+            data_block_stored = await run_sync_in_worker_thread(
                 partial(
                     _create_result_data_blocks,
                     lease.path / "analyses" / str(record.id),
@@ -186,17 +179,8 @@ class AnalysisArtifactService:
                 abandon_on_cancel=False,
                 limiter=self._limiter,
             )
-            lease.rollback_paths.extend(
-                lease.path / "data" / f"{node_id}.parquet"
-                for node_id in stored.output_node_ids
-            )
-            return PublishedAnalysisResult(
-                payload=cast(dict[str, JsonData], stored.model_dump(mode="json")),
-                artifacts=[],
-                output_node_ids=stored.output_node_ids,
-            )
-        if isinstance(result, PublishedDataBlockWorkerResult):
-            stored = await run_sync_in_worker_thread(
+        elif isinstance(result, PublishedDataBlockWorkerResult):
+            data_block_stored = await run_sync_in_worker_thread(
                 partial(
                     _publish_analysis_data_block,
                     lease.path / "analyses" / str(record.id),
@@ -209,16 +193,18 @@ class AnalysisArtifactService:
                 abandon_on_cancel=False,
                 limiter=self._limiter,
             )
-            lease.rollback_paths.append(
-                lease.path / "data" / f"{stored.output_node_ids[0]}.parquet"
+        if data_block_stored is not None:
+            lease.rollback_paths.extend(
+                lease.path / "data" / f"{node_id}.parquet"
+                for node_id in data_block_stored.output_node_ids
             )
             return PublishedAnalysisResult(
                 payload=cast(
                     dict[str, JsonData],
-                    stored.model_dump(mode="json"),
+                    data_block_stored.model_dump(mode="json"),
                 ),
                 artifacts=[],
-                output_node_ids=stored.output_node_ids,
+                output_node_ids=data_block_stored.output_node_ids,
             )
 
         projector = ANALYSIS_ARTIFACT_PROJECTORS.get(kind)
@@ -804,9 +790,7 @@ def _resolve_output_file(root: Path, raw_path: str) -> tuple[Path, Path]:
     for part in relative.parts:
         current = current / part
         metadata = current.lstat()
-        reparse = int(getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400))
-        attributes = int(getattr(metadata, "st_file_attributes", 0))
-        if stat.S_ISLNK(metadata.st_mode) or attributes & reparse:
+        if is_link_or_reparse(metadata):
             raise ValueError("Analysis Artifact path contains a link")
     if not stat.S_ISREG(resolved.lstat().st_mode):
         raise ValueError("Analysis Artifact is not a regular file")
@@ -827,12 +811,9 @@ def _resolve_published_artifact(
     for part in ("analyses", analysis_id, "artifacts"):
         current /= part
         metadata = current.lstat()
-        reparse = int(getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400))
-        attributes = int(getattr(metadata, "st_file_attributes", 0))
         if (
             not stat.S_ISDIR(metadata.st_mode)
-            or stat.S_ISLNK(metadata.st_mode)
-            or attributes & reparse
+            or is_link_or_reparse(metadata)
         ):
             raise ValueError("Analysis Artifact owner is invalid")
     artifacts_root = artifacts_root.resolve(strict=True)
@@ -846,9 +827,7 @@ def _resolve_published_artifact(
     for part in resolved.relative_to(artifacts_root).parts:
         current /= part
         metadata = current.lstat()
-        reparse = int(getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400))
-        attributes = int(getattr(metadata, "st_file_attributes", 0))
-        if stat.S_ISLNK(metadata.st_mode) or attributes & reparse:
+        if is_link_or_reparse(metadata):
             raise ValueError("Analysis Artifact path contains a link")
     if not stat.S_ISREG(resolved.lstat().st_mode):
         raise ValueError("Analysis Artifact is not a regular file")

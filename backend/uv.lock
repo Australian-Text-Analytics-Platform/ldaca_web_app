@@ -1062,7 +1062,6 @@ source = { editable = "." }
 dependencies = [
     { name = "aiosqlite" },
     { name = "anthropic" },
-    { name = "duckdb" },
     { name = "en-core-web-md" },
     { name = "fastapi" },
     { name = "fastexcel" },
@@ -1091,6 +1090,7 @@ deploy = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "duckdb" },
     { name = "pytest-asyncio" },
     { name = "ruff" },
     { name = "ty" },
@@ -1100,7 +1100,6 @@ dev = [
 requires-dist = [
     { name = "aiosqlite", specifier = ">=0.21.0" },
     { name = "anthropic", specifier = ">=1.2.0,<2" },
-    { name = "duckdb", specifier = ">=1.5.5,<2" },
     { name = "en-core-web-md", url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.8.0/en_core_web_md-3.8.0-py3-none-any.whl" },
     { name = "fastapi", specifier = ">=0.141.1,<1" },
     { name = "fastexcel", specifier = ">=0.21.0,<1" },
@@ -1126,6 +1125,7 @@ provides-extras = ["deploy"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "duckdb", specifier = ">=1.5.5,<2" },
     { name = "pytest-asyncio", specifier = ">=0.23.0" },
     { name = "ruff", specifier = ">=0.16.5,<1" },
     { name = "ty", specifier = "==0.0.75" },

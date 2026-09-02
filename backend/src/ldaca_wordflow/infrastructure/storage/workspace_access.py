@@ -9,6 +9,7 @@ from pathlib import Path
 
 from .durable_fs import atomic_write_json
 from .layout import validate_user_id
+from .safe_paths import is_link_or_reparse
 from ...shared.errors import InvalidInputError
 
 ACCESS_FILENAME = "access.json"
@@ -37,9 +38,7 @@ def read_workspace_owner(workspace_path: Path) -> str:
     descriptor = -1
     try:
         path_metadata = path.lstat()
-        attributes = int(getattr(path_metadata, "st_file_attributes", 0))
-        reparse = int(getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400))
-        if stat.S_ISLNK(path_metadata.st_mode) or attributes & reparse:
+        if is_link_or_reparse(path_metadata):
             raise WorkspaceAccessInvalidError("Workspace access sidecar is unsafe")
         descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
         metadata = os.fstat(descriptor)
