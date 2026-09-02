@@ -24,9 +24,6 @@ from ldaca_wordflow.models.data_sources import SampleCollection
 from ldaca_wordflow.models.user_file_imports import UnavailableUserFileImport
 from ldaca_wordflow.services.sample_data import SampleImportExecution
 from ldaca_wordflow.services.events import EventHub
-from ldaca_wordflow.services.user_file_import_executor import (
-    UserFileImportProcessExecutor,
-)
 from ldaca_wordflow.services.user_file_imports import UserFileImportService
 from ldaca_wordflow.shared.errors import BackendStoppingError
 
@@ -137,7 +134,6 @@ def _service(
         store,
         cast(Any, samples),
         cast(Any, _Portal()),
-        UserFileImportProcessExecutor(),
         unlimited_storage_admission(tmp_path, limiter=limiter),
         EventHub(),
         capacity=capacity,

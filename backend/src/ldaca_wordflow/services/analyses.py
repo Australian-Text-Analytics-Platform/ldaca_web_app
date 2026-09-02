@@ -1207,7 +1207,7 @@ class AnalysisService:
             )
 
     async def confirm_cancellation(self, key: AnalysisExecutionKey) -> None:
-        """Commit cancelled only after the executor confirms process exit."""
+        """Commit cancelled only after the process runner confirms process exit."""
 
         async with self._workspaces.mutation_context(
             key.user_id,
@@ -1300,7 +1300,7 @@ class AnalysisService:
             )
 
     async def reconcile_interrupted_analyses(self) -> None:
-        """Fail durable work that lost its private executor on restart."""
+        """Fail durable work that lost its private process runner on restart."""
 
         def reconcile(workspace: Workspace) -> bool:
             changed = False

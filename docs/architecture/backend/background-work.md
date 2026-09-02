@@ -13,13 +13,13 @@ flowchart TB
         AS["AnalysisService"] --> WS["WorkspaceService and WorkspaceStore"]
         AS --> AR["AnalysisExecutionRuntime"]
         AR --> AQ["AnalysisScheduler"]
-        AR --> AP["AnalysisProcessExecutor"]
+        AR --> AP["SupervisedProcessRunner"]
     end
 
     subgraph ImportBoundary["User File Import boundary"]
         IS["UserFileImportService"] --> IR["UserFileImportStore"]
         IS --> IQ["UserFileImportScheduler"]
-        IS --> IP["Async sample execution or portal process"]
+        IS --> IP["Async sample execution or SupervisedProcessRunner"]
     end
 
     AS --> EVENTS["EventHub"]
@@ -32,8 +32,9 @@ flowchart TB
 The shared `BackgroundState`, `Progress`, `Failure`, event models, and fair
 scheduler kernel are private runtime primitives. The kernel owns per-user
 rotation, FIFO ordering, capacity, wakeup, queued cancellation, close, and idle
-detection for each independent scheduler instance. These primitives do not create cross-resource
-identity, persistence, cancellation, parentage, result, or cleanup ownership.
+detection for each independent scheduler instance. These primitives do not
+create cross-resource identity, persistence, cancellation, parentage, result,
+or cleanup ownership.
 
 ## Analysis Execution
 
@@ -44,10 +45,10 @@ Workspace gate, validates reserved Data Blocks, asks infrastructure storage to
 publish an execution-private immutable snapshot, reserves a launch entry, and
 atomically commits `running`.
 
-Each admitted Analysis uses one fresh `spawn` child process. The executor owns
-only its launch entry, eventual process handle, raw progress/result IPC, and
-termination. It owns no durable record and cannot mutate a Workspace. Worker
-functions are picklable `@process_entrypoint` functions. Progress and
+Each admitted Analysis uses one fresh `spawn` child process. The shared process
+runner owns only its launch entry, eventual process handle, raw progress/result
+IPC, and termination. It owns no durable record and cannot mutate a Workspace.
+Worker functions are picklable `@process_entrypoint` functions. Progress and
 completion return to the application event loop, where `AnalysisService`
 strictly validates them and commits the kind-specific Result through
 `WorkspaceService`. Only that terminal commit writes Progress `1.0`.
@@ -69,9 +70,9 @@ reservations, atomic publication, terminal persistence, and cleanup for both
 kinds.
 
 The import scheduler uses the same scheduler kernel as Analysis but no
-shared queue, capacity slot, executor, record, or cancellation state. One
-resource's failure is caught at its service boundary and cannot cancel sibling
-work or another user's resources.
+shared queue, capacity slot, process-runner instance, record, or cancellation
+state. One resource's failure is caught at its service boundary and cannot
+cancel sibling work or another user's resources.
 
 ## Recovery And Shutdown
 
@@ -82,7 +83,7 @@ resumes, guesses, or migrates them.
 
 Shutdown changes readiness to `stopping`, closes both submission boundaries,
 and stops both schedulers. Queued resources fail as interrupted. Analysis and
-import executors terminate concurrently against the same absolute
+import process runners terminate concurrently against the same absolute
 `shutdown_grace_seconds` deadline. A success already committed remains
 successful, a previously requested user cancellation follows normal confirmed
 cancellation, and any other confirmed stop becomes interrupted failure. A

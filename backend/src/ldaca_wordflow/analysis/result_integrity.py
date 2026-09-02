@@ -59,7 +59,7 @@ def validate_analysis_result_integrity(
         ):
             raise ValueError("Analysis Artifact path is invalid")
         resolved = _regular_file_without_links(analysis_root, relative)
-        expected_media_type = _artifact_media_type(resolved)
+        expected_media_type = artifact_media_type(resolved)
         if artifact.media_type != expected_media_type:
             raise ValueError("Analysis Artifact media type is invalid")
         resolved_declared.add(resolved)
@@ -122,7 +122,7 @@ def _owned_artifact_files(root: Path) -> set[Path]:
     return files
 
 
-def _artifact_media_type(path: Path) -> str:
+def artifact_media_type(path: Path) -> str:
     return {
         ".arrows": "application/vnd.apache.arrow.stream",
         ".parquet": "application/vnd.apache.parquet",
@@ -132,4 +132,4 @@ def _artifact_media_type(path: Path) -> str:
     }.get(path.suffix.casefold(), "application/octet-stream")
 
 
-__all__ = ["validate_analysis_result_integrity"]
+__all__ = ["artifact_media_type", "validate_analysis_result_integrity"]

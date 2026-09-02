@@ -17,9 +17,6 @@ from ldaca_wordflow.services.data_portal import (
 from ldaca_wordflow.services.user_file_import_execution_types import (
     UserFileImportKey,
 )
-from ldaca_wordflow.services.user_file_import_executor import (
-    UserFileImportProcessExecutor,
-)
 from ldaca_wordflow.settings import Settings
 
 
@@ -155,10 +152,10 @@ def test_portal_import_token_is_not_persisted_and_publish_is_atomic(
         self: DataPortalService,
         key: UserFileImportKey,
         execution: DataPortalImportExecution,
-        executor: UserFileImportProcessExecutor,
+        processes,
         report_progress,
     ) -> DataPortalUserFileImportResult:
-        del self, key, executor
+        del self, key, processes
         assert execution.input.api_token == "portal-secret"
         await report_progress(Progress(fraction=0.5, message="Importing"))
         staging = Path(execution.input.staging_dir)
@@ -225,10 +222,10 @@ def test_multi_user_portal_import_token_is_execution_only(
         self: DataPortalService,
         key: UserFileImportKey,
         execution: DataPortalImportExecution,
-        executor: UserFileImportProcessExecutor,
+        processes,
         report_progress,
     ) -> DataPortalUserFileImportResult:
-        del self, key, executor, report_progress
+        del self, key, processes, report_progress
         assert execution.input.api_token == "browser-import-secret"
         staging = Path(execution.input.staging_dir)
         (staging / "corpus.parquet").write_bytes(b"parquet")

@@ -45,9 +45,9 @@ from .user_file_import_execution_types import (
     UserFileImportKey,
     UserFileImportSchedulingStopped,
 )
-from .user_file_import_executor import (
-    UserFileImportProcessError,
-    UserFileImportProcessExecutor,
+from .supervised_process import (
+    SupervisedProcessError,
+    SupervisedProcessRunner,
 )
 from .user_file_import_scheduler import (
     ScheduledUserFileImport,
@@ -73,7 +73,6 @@ class UserFileImportService:
         store: UserFileImportStore,
         samples: SampleDataService,
         data_portal: DataPortalService,
-        process_executor: UserFileImportProcessExecutor,
         storage_admission: StorageAdmissionService,
         events: EventHub,
         *,
@@ -88,7 +87,9 @@ class UserFileImportService:
         self._store = store
         self._samples = samples
         self._data_portal = data_portal
-        self._process_executor = process_executor
+        self._processes = SupervisedProcessRunner[UserFileImportKey](
+            "Data Portal import"
+        )
         self._storage_admission = storage_admission
         self._events = events
         self._max_storage_bytes = max_storage_bytes
@@ -430,7 +431,7 @@ class UserFileImportService:
         async with anyio.create_task_group() as shutdown:
             for item in queued:
                 shutdown.start_soon(self._interrupt_queued_safely, item.key)
-            shutdown.start_soon(self._process_executor.close, deadline)
+            shutdown.start_soon(self._processes.close, deadline)
         with anyio.move_on_after(max(0.0, deadline - anyio.current_time())):
             await self._scheduler.wait_idle()
 
@@ -537,7 +538,7 @@ class UserFileImportService:
                 result = await self._data_portal.execute_import(
                     key,
                     execution,
-                    self._process_executor,
+                    self._processes,
                     lambda progress: self.report_progress(key, progress),
                 )
             await self._complete(key, execution, reservation, result)
@@ -554,7 +555,7 @@ class UserFileImportService:
                     else exc.message
                 ),
             )
-        except UserFileImportProcessError as exc:
+        except SupervisedProcessError as exc:
             logger.exception(
                 "Data Portal import failed import_id=%s user_id=%s",
                 key.import_id,

@@ -34,6 +34,7 @@ from ._middleware import (
     PrivateApiCacheMiddleware,
     RequestBodyLimitMiddleware,
     RequestLoggingMiddleware,
+    normalized_scope_path,
 )
 from .api.auth import router as auth_router
 from .api.annotations import router as annotations_router
@@ -224,7 +225,7 @@ class _RuntimeLeaseMiddleware:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
-        path = self._route_path(scope)
+        path = normalized_scope_path(scope)
         if (
             not path.startswith("/api")
             or path in self._control_paths
@@ -253,15 +254,6 @@ class _RuntimeLeaseMiddleware:
                 code="runtime_unavailable",
                 message="The Data Root runtime is not ready",
             )(scope, receive, send)
-
-    @staticmethod
-    def _route_path(scope: Scope) -> str:
-        path = str(scope.get("path") or "/")
-        root_path = str(scope.get("root_path") or "").rstrip("/")
-        if root_path and (path == root_path or path.startswith(f"{root_path}/")):
-            return path[len(root_path) :] or "/"
-        return path
-
 
 async def _http_error_handler(
     request: Request,

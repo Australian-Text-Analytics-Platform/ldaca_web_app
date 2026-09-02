@@ -21,15 +21,16 @@ from .analysis_execution_types import (
     AnalysisExecutionControl,
     AnalysisExecutionKey,
 )
-from .analysis_executor import (
-    AnalysisProcessCancelled,
-    AnalysisProcessError,
-    AnalysisProcessExecutor,
-    AnalysisProcessStartError,
-)
 from .analysis_preparation import AnalysisExecutionPreparer
 from .analysis_scheduler import AnalysisScheduler, ScheduledAnalysis
+from .supervised_process import (
+    SupervisedProcessCancelled,
+    SupervisedProcessError,
+    SupervisedProcessRunner,
+    SupervisedProcessStartError,
+)
 from .workspace import WorkspaceService
+from ..workers.entrypoints import analysis_process
 
 logger = logging.getLogger(__name__)
 
@@ -42,14 +43,13 @@ class AnalysisExecutionRuntime(AnalysisExecutionControl):
         *,
         capacity: int,
         preparer: AnalysisExecutionPreparer,
-        executor: AnalysisProcessExecutor,
         limiter: anyio.CapacityLimiter,
         workspaces: WorkspaceService,
         storage_reservation_bytes: int,
         storage_reservation_files: int,
     ) -> None:
         self._preparer = preparer
-        self._executor = executor
+        self._processes = SupervisedProcessRunner[AnalysisExecutionKey]("Analysis")
         self._limiter = limiter
         self._workspaces = workspaces
         self._storage_reservation_bytes = storage_reservation_bytes
@@ -58,7 +58,7 @@ class AnalysisExecutionRuntime(AnalysisExecutionControl):
         self._scheduler = AnalysisScheduler(
             capacity=capacity,
             runner=self._run,
-            cancel_running=executor.cancel,
+            cancel_running=self._processes.cancel,
             work_removed=self._work_removed,
         )
 
@@ -112,7 +112,7 @@ class AnalysisExecutionRuntime(AnalysisExecutionControl):
 
         service = self._service
         if service is None:
-            await self._executor.close(deadline)
+            await self._processes.close(deadline)
             return
 
         service.stop_accepting()
@@ -126,7 +126,7 @@ class AnalysisExecutionRuntime(AnalysisExecutionControl):
                     service,
                     item.key,
                 )
-            shutdown.start_soon(self._executor.close, deadline)
+            shutdown.start_soon(self._processes.close, deadline)
 
         idle = False
         with anyio.move_on_after(max(0.0, deadline - anyio.current_time())):
@@ -211,21 +211,25 @@ class AnalysisExecutionRuntime(AnalysisExecutionControl):
             item.key,
             credential=item.credential,
             prepare=prepare,
-            reserve_launch=self._executor.reserve,
-            discard_launch=self._executor.discard_reservation,
+            reserve_launch=self._processes.reserve,
+            discard_launch=self._processes.discard_reservation,
         )
         if invocation is None:
             return
 
         try:
-            result = await self._executor.execute_reserved(
+            result = await self._processes.execute_reserved(
                 item.key,
-                invocation,
+                analysis_process,
+                {"invocation": invocation.input},
                 partial(service.report_progress, item.key),
+                storage_roots=invocation.storage_roots,
+                max_storage_bytes=invocation.max_storage_bytes,
+                max_storage_files=invocation.max_storage_files,
             )
-        except AnalysisProcessCancelled:
+        except SupervisedProcessCancelled:
             await service.confirm_cancellation(item.key)
-        except AnalysisProcessStartError as exc:
+        except SupervisedProcessStartError as exc:
             logger.exception(
                 "Analysis process launch failed analysis_id=%s user_id=%s",
                 item.key.analysis_id,
@@ -236,7 +240,7 @@ class AnalysisExecutionRuntime(AnalysisExecutionControl):
                 code="analysis_start_failed",
                 message=format_exception_diagnostic(exc),
             )
-        except AnalysisProcessError as exc:
+        except SupervisedProcessError as exc:
             logger.exception(
                 "Analysis process failed analysis_id=%s user_id=%s",
                 item.key.analysis_id,

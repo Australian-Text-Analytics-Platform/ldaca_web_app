@@ -15,6 +15,7 @@ import polars as pl
 from ..domain.workspace import Node
 from ..models.node_resources import DataBlockExportFormat, DataBlockExportRequest
 from ..shared.errors import NodeNotFoundError, ResourceTooLargeError
+from ..infrastructure.storage.bounded_io import BoundedSeekableWriter
 from .response_snapshots import ResponseSnapshot, ResponseSnapshotService
 from .workspace import WorkspaceService
 
@@ -130,34 +131,6 @@ class _BudgetedBinaryWriter:
         return self._output.tell()
 
 
-class _BoundedSeekableWriter:
-    """Keep the final ZIP file inside the admitted response budget."""
-
-    def __init__(self, output: IO[bytes], limit: int) -> None:
-        self._output = output
-        self._limit = limit
-
-    def write(self, content: bytes) -> int:
-        if self._output.tell() + len(content) > self._limit:
-            raise ResourceTooLargeError("Data Block export exceeds its storage budget")
-        return self._output.write(content)
-
-    def seek(self, offset: int, whence: int = os.SEEK_SET) -> int:
-        return self._output.seek(offset, whence)
-
-    def tell(self) -> int:
-        return self._output.tell()
-
-    def flush(self) -> None:
-        self._output.flush()
-
-    def seekable(self) -> bool:
-        return True
-
-    def writable(self) -> bool:
-        return True
-
-
 def _write_export(
     nodes: tuple[Node, ...],
     export_format: DataBlockExportFormat,
@@ -174,7 +147,14 @@ def _write_export(
             else:
                 zip_output = cast(
                     BinaryIO,
-                    _BoundedSeekableWriter(raw_output, max_output_bytes),
+                    BoundedSeekableWriter(
+                        raw_output,
+                        max_output_bytes,
+                        overflow=partial(
+                            ResourceTooLargeError,
+                            "Data Block export exceeds its storage budget",
+                        ),
+                    ),
                 )
                 with zipfile.ZipFile(
                     zip_output,

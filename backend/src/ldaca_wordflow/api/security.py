@@ -17,6 +17,7 @@ from starlette.datastructures import Headers
 from starlette.requests import Request as StarletteRequest
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from .._middleware import normalized_scope_path
 from ..models.session import SessionUser
 from ..runtime import Runtime, RuntimeManager, get_runtime
 from ..services.sessions import SessionPrincipal
@@ -100,7 +101,7 @@ class CsrfOriginMiddleware:
             await self.app(scope, receive, send)
             return
         method = str(scope.get("method", "GET")).upper()
-        path = _route_path(scope)
+        path = normalized_scope_path(scope)
         if (
             method not in self._unsafe_methods
             or not path.startswith("/api")
@@ -222,13 +223,3 @@ class ExactHostMiddleware:
             code="host_not_allowed",
             message="Request host is not allowed",
         )(scope, receive, send)
-
-
-def _route_path(scope: Scope) -> str:
-    """Normalize ASGI path across servers that include or strip root_path."""
-
-    path = str(scope.get("path") or "/")
-    root_path = str(scope.get("root_path") or "").rstrip("/")
-    if root_path and (path == root_path or path.startswith(f"{root_path}/")):
-        return path[len(root_path) :] or "/"
-    return path

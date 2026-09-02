@@ -15,6 +15,7 @@ import anyio
 import polars as pl
 from anyio.to_thread import run_sync as run_sync_in_worker_thread
 
+from ..analysis.result_integrity import artifact_media_type
 from ..domain.workspace import (
     AnalysisArtifactRecord,
     AnalysisQuerySnapshotRecord,
@@ -721,7 +722,7 @@ def _publish_result(
         by_relative[relative] = AnalysisArtifactRecord(
             name=name,
             relative_path=(Path("artifacts") / relative).as_posix(),
-            media_type=_media_type(relative),
+            media_type=artifact_media_type(relative),
         )
 
     for field_path, _resolved, relative in projected:
@@ -876,16 +877,6 @@ def _unique_name(original: str, used: set[str]) -> str:
     while f"{path.stem}-{index}{path.suffix}" in used:
         index += 1
     return f"{path.stem}-{index}{path.suffix}"
-
-
-def _media_type(path: Path) -> str:
-    return {
-        ".arrows": "application/vnd.apache.arrow.stream",
-        ".parquet": "application/vnd.apache.parquet",
-        ".json": "application/json",
-        ".csv": "text/csv",
-        ".zip": "application/zip",
-    }.get(path.suffix.casefold(), "application/octet-stream")
 
 
 __all__ = ["AnalysisArtifactService"]

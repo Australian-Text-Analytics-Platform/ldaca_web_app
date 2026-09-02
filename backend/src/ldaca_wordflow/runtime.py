@@ -8,11 +8,12 @@ Used by:
 - tests that run multiple applications without global state leakage.
 
 Flow:
-- ``runtime_context`` initializes storage and hosted database state, creates the
-  runtime-owned AnyIO task group and capacity limiters, and warms executors;
+- ``runtime_context`` initializes storage and hosted database state, creates
+  the runtime-owned AnyIO task group and capacity limiters, and starts
+  background services;
 - FastAPI copies the yielded ``LifespanState`` into each request's state; and
-- shutdown rejects submissions, drains application-owned work, closes
-  executors, then releases the runtime task group in reverse order.
+- shutdown rejects submissions, drains application-owned work, closes process
+  runners, then releases the runtime task group in reverse order.
 """
 
 from __future__ import annotations
@@ -68,7 +69,6 @@ from .infrastructure.storage.user_file_import_store import UserFileImportStore
 from .services.analysis_results import AnalysisResultService
 from .services.analyses import AnalysisService
 from .services.analysis_execution import AnalysisExecutionRuntime
-from .services.analysis_executor import AnalysisProcessExecutor
 from .services.analysis_preparation import AnalysisExecutionPreparer
 from .services.analysis_artifacts import AnalysisArtifactService
 from .services.annotations import AnnotationService
@@ -76,7 +76,6 @@ from .services.provider_credentials import ProviderCredentialStore
 from .services.user_preferences import UserPreferenceStore
 from .services.sample_data import SampleDataService
 from .services.data_portal import DataPortalService
-from .services.user_file_import_executor import UserFileImportProcessExecutor
 from .services.user_file_imports import UserFileImportService
 from .services.nodes import NodeService
 from .services.data_block_exports import DataBlockExportService
@@ -783,8 +782,8 @@ async def runtime_context(settings: Settings) -> AsyncIterator[Runtime]:
     2. initialize the hosted app-owned database when multi-user mode requires it,
     3. enter the runtime task group and construct capacity limiters,
     4. reconcile retained resources and start private execution plus maintenance,
-    5. on shutdown reject submissions, drain services, stop executors, and let
-       ``AsyncExitStack`` unwind the runtime task group in reverse order.
+    5. on shutdown reject submissions, drain services, stop process runners,
+       and let ``AsyncExitStack`` unwind the runtime task group in reverse order.
     """
 
     async with AsyncExitStack() as stack:
@@ -927,11 +926,9 @@ async def runtime_context(settings: Settings) -> AsyncIterator[Runtime]:
             limiter=io_limiter,
             cache_root=lambda user_id: user_cache_root(settings, user_id),
         )
-        analysis_executor = AnalysisProcessExecutor()
         analysis_execution = AnalysisExecutionRuntime(
             capacity=settings.analysis_execution_capacity,
             preparer=analysis_preparer,
-            executor=analysis_executor,
             limiter=io_limiter,
             workspaces=workspace_service,
             storage_reservation_bytes=settings.max_analysis_storage_bytes,
@@ -979,7 +976,6 @@ async def runtime_context(settings: Settings) -> AsyncIterator[Runtime]:
             user_file_import_store,
             sample_data_service,
             data_portal_service,
-            UserFileImportProcessExecutor(),
             storage_admission,
             event_hub,
             capacity=settings.user_file_import_capacity,

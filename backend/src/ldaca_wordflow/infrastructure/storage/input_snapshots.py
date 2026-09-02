@@ -13,6 +13,8 @@ import shutil
 import stat
 import tempfile
 import uuid
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
@@ -95,6 +97,40 @@ def _node_snapshot_payload(node: Node, rel_data_path: Path) -> _SnapshotNodeMani
     )
 
 
+@contextmanager
+def _snapshot_staging(destination: Path) -> Iterator[Path]:
+    staging = Path(
+        tempfile.mkdtemp(
+            prefix=f".{destination.name}.",
+            suffix=".tmp",
+            dir=destination.parent,
+        )
+    )
+    try:
+        yield staging
+    finally:
+        shutil.rmtree(staging, ignore_errors=True)
+
+
+def _publish_snapshot(
+    staging: Path,
+    destination: Path,
+    manifest: _SnapshotManifest,
+) -> Path:
+    metadata_path = staging / _SNAPSHOT_FILENAME
+    with metadata_path.open("w", encoding="utf-8") as handle:
+        handle.write(manifest.model_dump_json(indent=2))
+        handle.write("\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+    _fsync_directory(staging / _SNAPSHOT_DATA_DIR)
+    _fsync_directory(staging / "sources")
+    _fsync_directory(staging)
+    os.replace(staging, destination)
+    _fsync_directory(destination.parent)
+    return destination
+
+
 def create_worker_input_snapshot(
     *,
     workspace_id: uuid.UUID,
@@ -119,14 +155,7 @@ def create_worker_input_snapshot(
     _mkdir_durable(snapshot_root)
     if destination.exists():
         raise FileExistsError("Execution input snapshot already exists")
-    staging = Path(
-        tempfile.mkdtemp(
-            prefix=f".{destination.name}.",
-            suffix=".tmp",
-            dir=snapshot_root,
-        )
-    )
-    try:
+    with _snapshot_staging(destination) as staging:
         data_dir = staging / _SNAPSHOT_DATA_DIR
         data_dir.mkdir()
         sources_dir = staging / "sources"
@@ -162,21 +191,7 @@ def create_worker_input_snapshot(
             workspace_id=workspace_id,
             nodes=nodes,
         )
-        metadata_path = staging / _SNAPSHOT_FILENAME
-        with metadata_path.open("w", encoding="utf-8") as handle:
-            handle.write(payload.model_dump_json(indent=2))
-            handle.write("\n")
-            handle.flush()
-            os.fsync(handle.fileno())
-        _fsync_directory(data_dir)
-        _fsync_directory(sources_dir)
-        _fsync_directory(staging)
-        os.replace(staging, destination)
-        _fsync_directory(snapshot_root)
-        return destination
-    except BaseException:
-        shutil.rmtree(staging, ignore_errors=True)
-        raise
+        return _publish_snapshot(staging, destination, payload)
 
 
 def clone_worker_input_snapshot(
@@ -198,14 +213,7 @@ def clone_worker_input_snapshot(
         raise FileExistsError("Execution input snapshot already exists")
 
     destination.parent.mkdir(parents=True, exist_ok=True)
-    staging = Path(
-        tempfile.mkdtemp(
-            prefix=f".{destination.name}.",
-            suffix=".tmp",
-            dir=destination.parent,
-        )
-    )
-    try:
+    with _snapshot_staging(destination) as staging:
         data_dir = staging / _SNAPSHOT_DATA_DIR
         data_dir.mkdir()
         sources_dir = staging / "sources"
@@ -234,21 +242,7 @@ def clone_worker_input_snapshot(
                     "Execution input snapshot exceeds its storage budget"
                 )
 
-        metadata_path = staging / _SNAPSHOT_FILENAME
-        with metadata_path.open("w", encoding="utf-8") as handle:
-            handle.write(manifest.model_dump_json(indent=2))
-            handle.write("\n")
-            handle.flush()
-            os.fsync(handle.fileno())
-        _fsync_directory(data_dir)
-        _fsync_directory(sources_dir)
-        _fsync_directory(staging)
-        os.replace(staging, destination)
-        _fsync_directory(destination.parent)
-        return destination
-    except BaseException:
-        shutil.rmtree(staging, ignore_errors=True)
-        raise
+        return _publish_snapshot(staging, destination, manifest)
 
 
 def rebase_worker_input_snapshot_sources(

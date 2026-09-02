@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -28,14 +27,13 @@ from ..models.data_sources import (
     DataPortalSearchResource,
 )
 from ..settings import Settings
+from ..workers.data_portal import data_portal_import_process
 from ..workers.invocations import DataPortalImportInput
 from ..infrastructure.storage.layout import validate_display_name
 from .user_files import UserFileStore
 from .user_file_import_execution_types import UserFileImportKey
-from .user_file_import_executor import UserFileImportProcessExecutor
+from .supervised_process import ProgressReporter, SupervisedProcessRunner
 from .provider_credentials import ProviderCredentialStore
-
-ProgressReporter = Callable[[object], Awaitable[None]]
 
 
 @dataclass(frozen=True, slots=True)
@@ -171,12 +169,13 @@ class DataPortalService:
         self,
         key: UserFileImportKey,
         execution: DataPortalImportExecution,
-        executor: UserFileImportProcessExecutor,
+        processes: SupervisedProcessRunner[UserFileImportKey],
         report_progress: ProgressReporter,
     ) -> DataPortalUserFileImportResult:
-        result = await executor.execute(
+        result = await processes.execute(
             key,
-            execution.input,
+            data_portal_import_process,
+            {"invocation": execution.input},
             report_progress,
             storage_roots=(str(execution.staging),),
             max_storage_bytes=self._settings.max_user_file_import_bytes,

@@ -14,9 +14,8 @@ import polars as pl
 
 from ldaca_wordflow.infrastructure.providers.annotation_ai import AnnotationAllResult
 from ldaca_wordflow.main import create_app
-from ldaca_wordflow.services import analysis_executor as analysis_executor_module
+from ldaca_wordflow.services.supervised_process import SupervisedProcessRunner
 from ldaca_wordflow.settings import Settings
-from ldaca_wordflow.workers.entrypoints import analysis_process
 
 
 def _client(tmp_path: Path) -> TestClient:
@@ -107,12 +106,19 @@ def test_annotation_preview_is_durable_and_run_all_edits_the_source(
         def put(self, item: object) -> None:
             self.items.append(item)
 
-    async def execute_in_process(_self, _key, invocation, report_progress):
+    async def execute_in_process(
+        _self,
+        _key,
+        function,
+        kwargs,
+        report_progress,
+        **_limits,
+    ):
         progress = _ProgressQueue()
         result = await run_sync_in_worker_thread(
             partial(
-                analysis_process,
-                invocation=invocation.input,
+                function,
+                **kwargs,
                 progress_queue=cast(Any, progress),
             )
         )
@@ -121,7 +127,7 @@ def test_annotation_preview_is_durable_and_run_all_edits_the_source(
         return result
 
     monkeypatch.setattr(
-        analysis_executor_module.AnalysisProcessExecutor,
+        SupervisedProcessRunner,
         "execute_reserved",
         execute_in_process,
     )

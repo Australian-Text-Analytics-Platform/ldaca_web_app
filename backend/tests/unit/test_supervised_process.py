@@ -10,10 +10,7 @@ from typing import Any, cast
 import anyio
 import pytest
 
-from ldaca_wordflow.services.analysis_execution_types import AnalysisExecutionKey, AnalysisInvocation
-from ldaca_wordflow.services.analysis_executor import (
-    AnalysisProcessExecutor,
-)
+from ldaca_wordflow.services.analysis_execution_types import AnalysisExecutionKey
 from ldaca_wordflow.services.supervised_process import (
     SupervisedProcessCancelled,
     SupervisedProcessError,
@@ -21,7 +18,7 @@ from ldaca_wordflow.services.supervised_process import (
     poll_result_connection,
 )
 from ldaca_wordflow.shared.errors import format_exception_diagnostic
-from ldaca_wordflow.workers.entrypoints import _progress_callback
+from ldaca_wordflow.workers.entrypoints import _progress_callback, analysis_process
 from ldaca_wordflow.workers.invocations import PreviewReadyInput
 
 
@@ -181,9 +178,9 @@ async def test_child_failure_separates_complete_diagnostic_from_traceback() -> N
         )
 
     assert format_exception_diagnostic(captured.value) == f"ValueError: {message}"
-    assert "test_analysis_executor.py" not in str(captured.value)
+    assert "test_supervised_process.py" not in str(captured.value)
     assert any(
-        "test_analysis_executor.py" in note
+        "test_supervised_process.py" in note
         for note in getattr(captured.value, "__notes__", ())
     )
     await runner.close(anyio.current_time() + 1)
@@ -214,24 +211,23 @@ async def test_progress_failure_terminates_the_owned_process(tmp_path: Path) -> 
 
 
 @pytest.mark.anyio
-async def test_analysis_executor_dispatches_the_typed_process_entrypoint() -> None:
-    executor = AnalysisProcessExecutor()
+async def test_supervised_runner_dispatches_the_typed_analysis_entrypoint() -> None:
+    runner = SupervisedProcessRunner[AnalysisExecutionKey]("Analysis")
     key = AnalysisExecutionKey("user", uuid.uuid4(), uuid.uuid4())
-    await executor.reserve(key)
+    await runner.reserve(key)
 
-    result = await executor.execute_reserved(
+    result = await runner.execute_reserved(
         key,
-        AnalysisInvocation(
-            input=PreviewReadyInput(),
-            storage_roots=(),
-            max_storage_bytes=1024,
-            max_storage_files=10,
-        ),
+        analysis_process,
+        {"invocation": PreviewReadyInput()},
         _ignore,
+        storage_roots=(),
+        max_storage_bytes=1024,
+        max_storage_files=10,
     )
 
     assert result == {"ready": True}
-    await executor.close(anyio.current_time() + 1)
+    await runner.close(anyio.current_time() + 1)
 
 
 async def _ignore(_payload: object) -> None:

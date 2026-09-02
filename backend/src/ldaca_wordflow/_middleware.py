@@ -116,7 +116,9 @@ class PrivateApiCacheMiddleware:
         self.app = app
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http" or not _normalized_path(scope).startswith("/api"):
+        if scope["type"] != "http" or not normalized_scope_path(scope).startswith(
+            "/api"
+        ):
             await self.app(scope, receive, send)
             return
 
@@ -151,7 +153,9 @@ class PrivateApiCacheMiddleware:
         await self.app(scope, receive, send_wrapper)
 
 
-def _normalized_path(scope: Scope) -> str:
+def normalized_scope_path(scope: Scope) -> str:
+    """Normalize ASGI path across servers that include or strip root_path."""
+
     path = str(scope.get("path") or "/")
     root_path = str(scope.get("root_path") or "").rstrip("/")
     if root_path and (path == root_path or path.startswith(f"{root_path}/")):
@@ -187,7 +191,10 @@ class RequestBodyLimitMiddleware:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
-        key = (str(scope.get("method", "GET")).upper(), _normalized_path(scope))
+        key = (
+            str(scope.get("method", "GET")).upper(),
+            normalized_scope_path(scope),
+        )
         limit = self.limits.get(key, self.default_limit)
 
         for name, value in scope.get("headers", []):

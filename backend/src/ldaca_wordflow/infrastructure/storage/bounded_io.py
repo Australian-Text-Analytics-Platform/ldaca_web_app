@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+from collections.abc import Callable
 from typing import BinaryIO, IO, cast
 
 import polars as pl
@@ -35,6 +37,41 @@ class BoundedBinaryWriter:
         return self._output.tell()
 
 
+class BoundedSeekableWriter:
+    """Delegate seekable binary writes while enforcing one file-size ceiling."""
+
+    def __init__(
+        self,
+        output: BinaryIO,
+        limit: int,
+        *,
+        overflow: Callable[[], Exception],
+    ) -> None:
+        self._output = output
+        self._limit = limit
+        self._overflow = overflow
+
+    def write(self, content: bytes) -> int:
+        if self._output.tell() + len(content) > self._limit:
+            raise self._overflow()
+        return self._output.write(content)
+
+    def seek(self, offset: int, whence: int = os.SEEK_SET) -> int:
+        return self._output.seek(offset, whence)
+
+    def tell(self) -> int:
+        return self._output.tell()
+
+    def flush(self) -> None:
+        self._output.flush()
+
+    def seekable(self) -> bool:
+        return True
+
+    def writable(self) -> bool:
+        return True
+
+
 def write_parquet_bounded(
     dataframe: pl.DataFrame,
     output: BinaryIO,
@@ -53,4 +90,8 @@ def write_parquet_bounded(
         raise
 
 
-__all__ = ["BoundedBinaryWriter", "write_parquet_bounded"]
+__all__ = [
+    "BoundedBinaryWriter",
+    "BoundedSeekableWriter",
+    "write_parquet_bounded",
+]

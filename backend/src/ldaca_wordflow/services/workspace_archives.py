@@ -70,7 +70,10 @@ from ..shared.errors import (
     UploadTooLargeError,
     WorkspaceNotOpenError,
 )
-from ..infrastructure.storage.bounded_io import write_parquet_bounded
+from ..infrastructure.storage.bounded_io import (
+    BoundedSeekableWriter,
+    write_parquet_bounded,
+)
 from ..infrastructure.storage.durable_fs import (
     atomic_write_json as _atomic_json_write,
     fsync_directory as _fsync_directory,
@@ -1111,7 +1114,17 @@ def _create_raw_workspace_archive(
 
     try:
         with target.open("xb") as output:
-            bounded = cast(BinaryIO, _BoundedSeekableWriter(output, max_output_bytes))
+            bounded = cast(
+                BinaryIO,
+                BoundedSeekableWriter(
+                    output,
+                    max_output_bytes,
+                    overflow=partial(
+                        UploadTooLargeError,
+                        "Workspace export exceeds the configured limit",
+                    ),
+                ),
+            )
             with zipfile.ZipFile(
                 bounded,
                 mode="w",
@@ -1355,7 +1368,17 @@ def _create_workspace_export(
         if expanded_bytes > max_output_bytes:
             raise UploadTooLargeError("Workspace export exceeds the configured limit")
         with target.open("xb") as output:
-            bounded = cast(BinaryIO, _BoundedSeekableWriter(output, max_output_bytes))
+            bounded = cast(
+                BinaryIO,
+                BoundedSeekableWriter(
+                    output,
+                    max_output_bytes,
+                    overflow=partial(
+                        UploadTooLargeError,
+                        "Workspace export exceeds the configured limit",
+                    ),
+                ),
+            )
             with zipfile.ZipFile(
                 bounded,
                 mode="w",
@@ -1379,34 +1402,6 @@ def _create_workspace_export(
         raise
     finally:
         shutil.rmtree(staging, ignore_errors=True)
-
-
-class _BoundedSeekableWriter:
-    """File adapter that prevents ZIP output from crossing its reservation."""
-
-    def __init__(self, output: Any, limit: int) -> None:
-        self._output = output
-        self._limit = limit
-
-    def write(self, content: bytes) -> int:
-        if self._output.tell() + len(content) > self._limit:
-            raise UploadTooLargeError("Workspace export exceeds the configured limit")
-        return self._output.write(content)
-
-    def seek(self, offset: int, whence: int = os.SEEK_SET) -> int:
-        return self._output.seek(offset, whence)
-
-    def tell(self) -> int:
-        return self._output.tell()
-
-    def flush(self) -> None:
-        self._output.flush()
-
-    def seekable(self) -> bool:
-        return True
-
-    def writable(self) -> bool:
-        return True
 
 
 def _safe_export_name(name: str) -> str:

@@ -18,14 +18,21 @@ from ldaca_wordflow.services.analysis_scheduler import ScheduledAnalysis
 from ldaca_wordflow.workers.invocations import PreviewReadyInput
 
 
-class _Executor:
+class _Processes:
     async def reserve(self, _key):
         return None
 
     async def discard_reservation(self, _key):
         return None
 
-    async def execute_reserved(self, _key, _invocation, _progress):
+    async def execute_reserved(
+        self,
+        _key,
+        _function,
+        _kwargs,
+        _progress,
+        **_limits,
+    ):
         return {
             "state": "failed",
             "failure": {
@@ -61,7 +68,7 @@ class _Service:
 async def test_worker_diagnostic_is_persisted_without_publication() -> None:
     runtime = object.__new__(AnalysisExecutionRuntime)
     uninitialized_runtime = cast(Any, runtime)
-    uninitialized_runtime._executor = _Executor()
+    uninitialized_runtime._processes = _Processes()
     uninitialized_runtime._preparer = object()
     runtime._limiter = anyio.CapacityLimiter(1)
     key = AnalysisExecutionKey("user", uuid.uuid4(), uuid.uuid4())
