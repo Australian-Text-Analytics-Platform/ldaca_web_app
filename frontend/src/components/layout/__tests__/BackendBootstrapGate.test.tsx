@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useEffect } from 'react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useDataRoot } from '@/features/bootstrap/DataRootContext';
 import { BackendBootstrapGate } from '../BackendBootstrapGate';
@@ -91,6 +91,7 @@ describe('BackendBootstrapGate', () => {
   });
 
   it('enters the application only for a ready Runtime', async () => {
+    const reloadApplication = vi.fn();
     vi.spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(liveResponse())
       .mockResolvedValueOnce(
@@ -104,16 +105,18 @@ describe('BackendBootstrapGate', () => {
       .mockResolvedValueOnce(readyResponse());
 
     render(
-      <BackendBootstrapGate>
+      <BackendBootstrapGate reloadApplication={reloadApplication}>
         <p>Application ready</p>
       </BackendBootstrapGate>,
     );
 
     expect(await screen.findByText('Application ready')).toBeInTheDocument();
+    expect(reloadApplication).not.toHaveBeenCalled();
   });
 
   it('submits the recommended root with the change token', async () => {
     const user = userEvent.setup();
+    const reloadApplication = vi.fn();
     const fetchMock = vi
       .spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(liveResponse())
@@ -129,14 +132,14 @@ describe('BackendBootstrapGate', () => {
       );
 
     render(
-      <BackendBootstrapGate>
+      <BackendBootstrapGate reloadApplication={reloadApplication}>
         <p>Application ready</p>
       </BackendBootstrapGate>,
     );
     await user.click(await screen.findByRole('button', { name: 'Use recommended location' }));
 
     await waitFor(() => {
-      expect(screen.getByText('Application ready')).toBeInTheDocument();
+      expect(reloadApplication).toHaveBeenCalledOnce();
     });
     expect(fetchMock).toHaveBeenNthCalledWith(
       3,
@@ -151,6 +154,7 @@ describe('BackendBootstrapGate', () => {
 
   it('shows backend validation detail messages when a Data Root is rejected', async () => {
     const user = userEvent.setup();
+    const reloadApplication = vi.fn();
     vi.spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(liveResponse())
       .mockResolvedValueOnce(rootResponse())
@@ -168,7 +172,7 @@ describe('BackendBootstrapGate', () => {
       .mockResolvedValueOnce(rootResponse());
 
     render(
-      <BackendBootstrapGate>
+      <BackendBootstrapGate reloadApplication={reloadApplication}>
         <p>Application ready</p>
       </BackendBootstrapGate>,
     );
@@ -181,10 +185,12 @@ describe('BackendBootstrapGate', () => {
         selector: 'p.text-error',
       }),
     ).toBeInTheDocument();
+    expect(reloadApplication).not.toHaveBeenCalled();
   });
 
   it('prefers the refreshed Data Root error after initialization fails', async () => {
     const user = userEvent.setup();
+    const reloadApplication = vi.fn();
     vi.spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(liveResponse())
       .mockResolvedValueOnce(rootResponse())
@@ -206,7 +212,7 @@ describe('BackendBootstrapGate', () => {
       );
 
     render(
-      <BackendBootstrapGate>
+      <BackendBootstrapGate reloadApplication={reloadApplication}>
         <p>Application ready</p>
       </BackendBootstrapGate>,
     );
@@ -218,6 +224,7 @@ describe('BackendBootstrapGate', () => {
       }),
     ).toBeInTheDocument();
     expect(screen.queryByText('Backend request failed (HTTP 500)')).not.toBeInTheDocument();
+    expect(reloadApplication).not.toHaveBeenCalled();
   });
 
   it('keeps a Python initialization error instead of replacing it with refreshed status', async () => {
@@ -327,9 +334,48 @@ describe('BackendBootstrapGate', () => {
     expect(screen.queryByText('Set up Wordflow')).not.toBeInTheDocument();
   });
 
-  it('remounts application providers when the Runtime generation changes', async () => {
+  it('does not reload for repeated observations of the same Runtime generation', async () => {
+    const user = userEvent.setup();
+    const reloadApplication = vi.fn();
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(liveResponse())
+      .mockResolvedValueOnce(
+        rootResponse({
+          state: 'ready',
+          source: 'config',
+          data_root: '/srv/current',
+          runtime_generation: 1,
+        }),
+      )
+      .mockResolvedValueOnce(readyResponse())
+      .mockResolvedValueOnce(
+        rootResponse({
+          state: 'ready',
+          source: 'config',
+          data_root: '/srv/current',
+          runtime_generation: 1,
+        }),
+      );
+
+    render(
+      <BackendBootstrapGate reloadApplication={reloadApplication}>
+        <GenerationProbe onMount={vi.fn()} />
+      </BackendBootstrapGate>,
+    );
+    await user.click(await screen.findByRole('button', { name: 'Switch root' }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(4);
+    });
+    expect(screen.getByRole('button', { name: 'Switch root' })).toBeInTheDocument();
+    expect(reloadApplication).not.toHaveBeenCalled();
+  });
+
+  it('blocks the old application and reloads once when the Runtime generation changes', async () => {
     const user = userEvent.setup();
     const onMount = vi.fn();
+    const reloadApplication = vi.fn();
     vi.spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(liveResponse())
       .mockResolvedValueOnce(
@@ -352,14 +398,20 @@ describe('BackendBootstrapGate', () => {
       );
 
     render(
-      <BackendBootstrapGate>
+      <BackendBootstrapGate reloadApplication={reloadApplication}>
         <GenerationProbe onMount={onMount} />
       </BackendBootstrapGate>,
     );
     await user.click(await screen.findByRole('button', { name: 'Switch root' }));
 
     await waitFor(() => {
-      expect(onMount).toHaveBeenCalledTimes(2);
+      expect(reloadApplication).toHaveBeenCalledOnce();
     });
+    expect(screen.getByText('Reloading Wordflow')).toBeInTheDocument();
+    expect(
+      screen.getByText('The Data Root changed. Wordflow is reconnecting to the new Runtime.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Switch root' })).not.toBeInTheDocument();
+    expect(onMount).toHaveBeenCalledOnce();
   });
 });

@@ -1,19 +1,23 @@
-import { Fragment, type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
+import BlockingScreen from '@/features/auth/components/BlockingScreen';
 import { DataRootContext, type DataRootResource } from '@/features/bootstrap/DataRootContext';
 import { DataRootSetupForm } from '@/features/bootstrap/DataRootSetupForm';
-import BlockingScreen from '@/features/auth/components/BlockingScreen';
 import { parseApiErrorResponse } from '@/lib/apiError';
 import {
-  resolveBackendConnection,
   type ResolvedBackendConnection,
+  resolveBackendConnection,
 } from '@/lib/backend/backendConnection';
 import { useUIStore } from '@/stores/uiStore';
 
 const RETRY_DELAY_MS = 750;
 const READY_REFRESH_MS = 5_000;
 const BOOTSTRAP_REFRESH_MS = 2_000;
+
+const reloadWordflow = () => {
+  window.location.reload();
+};
 
 function isDataRootResource(value: unknown): value is DataRootResource {
   return (
@@ -27,10 +31,18 @@ function isDataRootResource(value: unknown): value is DataRootResource {
 }
 
 /** Keeps the HTTP control plane mounted while bootstrapping the complete Runtime. */
-export function BackendBootstrapGate({ children }: { children: ReactNode }) {
+export function BackendBootstrapGate({
+  children,
+  reloadApplication = reloadWordflow,
+}: {
+  children: ReactNode;
+  reloadApplication?: () => void;
+}) {
   const [connection, setConnection] = useState<ResolvedBackendConnection | null>(null);
   const [resource, setResource] = useState<DataRootResource | null>(null);
   const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [initialRuntimeGeneration, setInitialRuntimeGeneration] = useState<number | null>(null);
+  const reloadRequested = useRef(false);
   const openFeedback = useUIStore((state) => state.openFeedback);
 
   useEffect(() => {
@@ -79,6 +91,7 @@ export function BackendBootstrapGate({ children }: { children: ReactNode }) {
         }
         if (cancelled) return;
         setConnection(resolved);
+        setInitialRuntimeGeneration((generation) => generation ?? nextResource.runtime_generation);
         setResource(nextResource);
         setConnectionError(null);
         const refreshDelay =
@@ -132,6 +145,7 @@ export function BackendBootstrapGate({ children }: { children: ReactNode }) {
       if (refreshed.ok) {
         const payload: unknown = await refreshed.json();
         if (isDataRootResource(payload)) {
+          setInitialRuntimeGeneration((generation) => generation ?? payload.runtime_generation);
           setResource(payload);
           const resourceMessage =
             typeof payload.error?.message === 'string' ? payload.error.message.trim() : '';
@@ -144,9 +158,21 @@ export function BackendBootstrapGate({ children }: { children: ReactNode }) {
     const payload: unknown = await response.json();
     if (!isDataRootResource(payload))
       throw new Error('Data Root update returned an unexpected response');
+    setInitialRuntimeGeneration((generation) => generation ?? payload.runtime_generation);
     setResource(payload);
     return payload;
   };
+
+  const runtimeGenerationChanged =
+    resource !== null &&
+    initialRuntimeGeneration !== null &&
+    resource.runtime_generation !== initialRuntimeGeneration;
+
+  useEffect(() => {
+    if (!runtimeGenerationChanged || reloadRequested.current) return;
+    reloadRequested.current = true;
+    reloadApplication();
+  }, [reloadApplication, runtimeGenerationChanged]);
 
   if (!connection || !resource) {
     return (
@@ -161,6 +187,16 @@ export function BackendBootstrapGate({ children }: { children: ReactNode }) {
             Send feedback
           </Button>
         }
+      />
+    );
+  }
+
+  if (runtimeGenerationChanged) {
+    return (
+      <BlockingScreen
+        title="Reloading Wordflow"
+        description="The Data Root changed. Wordflow is reconnecting to the new Runtime."
+        status="Reloading…"
       />
     );
   }
@@ -222,9 +258,5 @@ export function BackendBootstrapGate({ children }: { children: ReactNode }) {
   }
 
   const contextValue = { resource, configureDataRoot };
-  return (
-    <DataRootContext.Provider value={contextValue}>
-      <Fragment key={resource.runtime_generation}>{children}</Fragment>
-    </DataRootContext.Provider>
-  );
+  return <DataRootContext.Provider value={contextValue}>{children}</DataRootContext.Provider>;
 }

@@ -204,11 +204,12 @@ window must remain opaque and visually unchanged.
 Verify the packaged application reaches the Workspace after setup, then reload
 the webview repeatedly and confirm each load discovers the current random-port
 backend and passes the bootstrap gate. Switch the Data Root through Settings,
-confirm the backend port and child PID do not change, and verify application
-providers remount for the new `runtime_generation`. Perform the reload check with
-Command-R on macOS and Ctrl-R on Windows. The packaged application must never
-fall back to port `8001`; that port remains only the documented split web
-development default.
+confirm the backend port and child PID do not change, and verify Wordflow reloads
+automatically for the new `runtime_generation`. Immediately import sample data
+and confirm it opens from the new root without a CSRF error. Perform an additional
+reload check with Command-R on macOS and Ctrl-R on Windows. The packaged
+application must never fall back to port `8001`; that port remains only the
+documented split web development default.
 
 Also exercise lifecycle interruption before accepting a desktop build. Close
 the hidden/startup application while Python is still launching and confirm the

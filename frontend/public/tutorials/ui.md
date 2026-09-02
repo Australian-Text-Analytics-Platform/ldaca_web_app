@@ -105,7 +105,7 @@ The Data Root is the filesystem directory where Wordflow stores durable applicat
 
 - On first launch without `DATA_ROOT` or saved configuration, use the setup screen's recommended location or choose another folder.
 - The desktop app opens the operating system's native folder picker. In a browser, enter an absolute path on the server that runs Wordflow.
-- Change an existing single-user Data Root under **Settings → Workspace → Working Directory**. Wordflow does not copy data from the previous root.
+- Change an existing single-user Data Root under **Settings → Workspace → Working Directory**. After a successful change, Wordflow reloads automatically and does not copy data from the previous root.
 - Environment-managed and multi-user deployments show operator guidance instead of allowing a client-side change.
 
 <h2 id="help-ui-appearance">8. Appearance</h2>

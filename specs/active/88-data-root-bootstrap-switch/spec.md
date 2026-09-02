@@ -25,9 +25,10 @@ deployments remain operator-managed.
   request tasks submit shielded transition commands and never own Runtime task
   groups, cancel scopes, or exit stacks.
 - The frontend gates authentication and application providers on liveness,
-  Data Root state, and readiness. A Runtime generation change remounts those
-  providers. Only `unconfigured` and recoverable `configuration_error` states
-  offer Data Root setup; `stopping` is rendered as shutdown progress.
+  Data Root state, and readiness. A Runtime generation change blocks the old
+  application tree and reloads Wordflow so runtime-specific frontend state is
+  reconstructed. Only `unconfigured` and recoverable `configuration_error`
+  states offer Data Root setup; `stopping` is rendered as shutdown progress.
 - Tauri owns only backend supervision and native directory selection. The
   Python child performs the authoritative filesystem probe.
 
