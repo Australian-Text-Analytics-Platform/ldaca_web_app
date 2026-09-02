@@ -167,10 +167,12 @@ Vite produces the static `frontendDist` before Tauri bundles it; an installed
 desktop application requires neither Node.js nor a Vite server.
 
 Desktop packaging treats `frontend/src-tauri/icons/wordflow.icon` as the native
-Icon Composer source. On current macOS toolchains Tauri compiles it into the
-application asset catalog so the system can render its Liquid Glass layers;
-the configured ICNS remains the compatibility fallback. Windows installers and
-browser surfaces use flattened renders of the same composition.
+Icon Composer source and commits its generated `Assets.car` beside it. Routine
+macOS packaging copies that catalog instead of recompiling the Icon Composer
+document, so the system retains its Liquid Glass layers without depending on
+unreliable command-line `actool` behavior. The configured ICNS remains the
+compatibility fallback. Windows installers and browser surfaces use flattened
+renders of the same composition.
 
 Rust owns the complete desktop save-destination boundary. Each user-visible
 download opens a native Save As dialog before Rust starts a backend request or

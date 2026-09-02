@@ -34,6 +34,21 @@ Do not set `PYTHONPATH` manually or create another desktop development runtime.
 `pnpm dev:desktop` and release builds consume the same staged directory through
 their explicit development and packaging profiles.
 
+Build the local Apple Silicon application and DMG from the repository root:
+
+```bash
+pnpm build:desktop:mac
+```
+
+Routine packaging copies `frontend/src-tauri/icons/Assets.car`; it does not
+compile the Icon Composer document. After changing `wordflow.icon`, regenerate
+the catalog explicitly with `pnpm -C frontend compile:desktop:mac-icon` and
+review both source and generated asset changes together.
+
+Local build commands disable updater-archive generation because updater
+signatures require the private key held by GitHub Actions. Release builds keep
+updater generation enabled through the base Tauri configuration.
+
 ## Develop
 
 Start the native development application from the repository root:

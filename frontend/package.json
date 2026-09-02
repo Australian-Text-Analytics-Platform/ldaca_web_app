@@ -85,10 +85,11 @@
     "tauri:build": "tauri build --config src-tauri/tauri.bundle.conf.json",
     "clean": "cd src-tauri && cargo clean",
     "clean:desktop:mac-bundles": "node scripts/clean-desktop-mac-bundles.mjs",
+    "compile:desktop:mac-icon": "node scripts/compile-desktop-mac-icon.mjs",
     "prepare:backend-runtime": "node ../scripts/prepare-backend-runtime.mjs",
     "dev:desktop": "pnpm prepare:backend-runtime && tauri dev --features dev-runtime",
-    "desktop:build:mac": "pnpm clean:desktop:mac-bundles && pnpm prepare:backend-runtime && CI=true pnpm tauri:build --bundles app,dmg --target aarch64-apple-darwin",
-    "desktop:build:windows": "pnpm prepare:backend-runtime && pnpm tauri:build"
+    "build:desktop:mac": "pnpm clean:desktop:mac-bundles && pnpm prepare:backend-runtime && CI=true pnpm tauri:build --config src-tauri/tauri.local-build.conf.json --bundles app,dmg --target aarch64-apple-darwin",
+    "build:desktop:windows": "pnpm prepare:backend-runtime && pnpm tauri:build --config src-tauri/tauri.local-build.conf.json"
   },
   "devDependencies": {
     "@babel/core": "^8.0.1",

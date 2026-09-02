@@ -189,12 +189,15 @@ def test_frontend_desktop_commands_use_the_staged_runtime_contract() -> None:
         "node ../scripts/prepare-backend-runtime.mjs"
     )
     assert scripts["dev:desktop"].startswith("pnpm prepare:backend-runtime")
-    assert scripts["desktop:build:mac"] == (
+    assert scripts["build:desktop:mac"] == (
         "pnpm clean:desktop:mac-bundles && pnpm prepare:backend-runtime && "
-        "CI=true pnpm tauri:build --bundles app,dmg --target aarch64-apple-darwin"
+        "CI=true pnpm tauri:build --config "
+        "src-tauri/tauri.local-build.conf.json --bundles app,dmg "
+        "--target aarch64-apple-darwin"
     )
-    assert scripts["desktop:build:windows"] == (
-        "pnpm prepare:backend-runtime && pnpm tauri:build"
+    assert scripts["build:desktop:windows"] == (
+        "pnpm prepare:backend-runtime && pnpm tauri:build "
+        "--config src-tauri/tauri.local-build.conf.json"
     )
     assert not any(name.startswith("package:backend-runtime") for name in scripts)
 

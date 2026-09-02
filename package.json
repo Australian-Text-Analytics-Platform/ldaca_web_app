@@ -15,8 +15,8 @@
     "docs:links": "node --test scripts/check-markdown-links.test.mjs && node scripts/check-markdown-links.mjs",
     "deploy_frontend_to_backend": "pnpm -C frontend build && node scripts/deploy-frontend-to-backend.mjs",
     "dev:desktop": "pnpm -C frontend dev:desktop",
-    "desktop:build:mac": "pnpm -C frontend desktop:build:mac",
-    "desktop:build:windows": "pnpm -C frontend desktop:build:windows",
+    "build:desktop:mac": "pnpm -C frontend build:desktop:mac",
+    "build:desktop:windows": "pnpm -C frontend build:desktop:windows",
     "prepare:backend-runtime": "pnpm -C frontend prepare:backend-runtime"
   },
   "devDependencies": {

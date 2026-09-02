@@ -48,8 +48,18 @@ describe('desktop configuration contracts', () => {
       'tauri build --config src-tauri/tauri.bundle.conf.json',
     );
     expect(packageJson.scripts['dev:desktop']).toContain('tauri dev --features dev-runtime');
-    expect(packageJson.scripts['desktop:build:mac']).toContain('pnpm clean:desktop:mac-bundles');
-    expect(packageJson.scripts['desktop:build:mac']).toContain('--target aarch64-apple-darwin');
+    expect(packageJson.scripts['build:desktop:mac']).toContain('pnpm clean:desktop:mac-bundles');
+    expect(packageJson.scripts['build:desktop:mac']).toContain('--target aarch64-apple-darwin');
+    expect(packageJson.scripts['build:desktop:mac']).toContain(
+      '--config src-tauri/tauri.local-build.conf.json',
+    );
+    expect(packageJson.scripts['build:desktop:windows']).toContain(
+      '--config src-tauri/tauri.local-build.conf.json',
+    );
+    expect(
+      JSON.parse(read('frontend/src-tauri/tauri.local-build.conf.json')).bundle
+        .createUpdaterArtifacts,
+    ).toBe(false);
   });
 
   it('builds signed updater artifacts and delegates publication to the manual desktop workflow', () => {
@@ -125,6 +135,21 @@ describe('desktop configuration contracts', () => {
     );
     expect(existsSync(resolve(repoRoot, '.github/workflows/check-context-docs.yml'))).toBe(false);
     expect(existsSync(resolve(repoRoot, '.github/workflows/check-docs-drift.yml'))).toBe(false);
+  });
+
+  it('packages the precompiled macOS Liquid Glass icon catalog', () => {
+    const tauri = JSON.parse(read('frontend/src-tauri/tauri.conf.json'));
+    const packageJson = JSON.parse(read('frontend/package.json'));
+    const compiler = read('frontend/scripts/compile-desktop-mac-icon.mjs');
+
+    expect(tauri.bundle.icon).toContain('icons/wordflow.icon');
+    expect(tauri.bundle.icon).toContain('icons/Assets.car');
+    expect(existsSync(resolve(repoRoot, 'frontend/src-tauri/icons/Assets.car'))).toBe(true);
+    expect(packageJson.scripts['compile:desktop:mac-icon']).toBe(
+      'node scripts/compile-desktop-mac-icon.mjs',
+    );
+    expect(compiler).toContain("'actool'");
+    expect(compiler).toMatch(/'--minimum-deployment-target',\s*'26\.0'/);
   });
 
   it('uses Tauri-native page zoom at the platform default scale', () => {
