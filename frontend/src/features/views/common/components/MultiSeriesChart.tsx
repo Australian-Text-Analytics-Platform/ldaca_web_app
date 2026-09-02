@@ -47,6 +47,7 @@ export interface MultiSeriesChartProps {
 }
 
 const SELECTION_DIMENSION = '__wordflow_selected__';
+const NON_FOCUSED_OPACITY = 0.45;
 
 interface TooltipParam {
   value?: Record<string, unknown> | unknown[];
@@ -86,6 +87,7 @@ export const buildMultiSeriesChartOption = ({
   'data' | 'xKey' | 'series' | 'chartType' | 'xAxis' | 'yAxis' | 'tooltip' | 'selection'
 >): EChartsCoreOption => {
   const hasSelection = !!selection && selection.selectedIndices.size > 0;
+  const areaOpacity = hasSelection ? 0.2 : 0.35;
   const usesSelectionVisual = hasSelection && chartType === 'bar';
   const source = usesSelectionVisual
     ? data.map((row, index) => ({
@@ -106,24 +108,34 @@ export const buildMultiSeriesChartOption = ({
         ...common,
         type: 'bar' as const,
         itemStyle: { color: item.color, borderRadius: [6, 6, 0, 0] },
+        blur: { itemStyle: { opacity: NON_FOCUSED_OPACITY } },
       };
     }
     return {
       ...common,
       type: 'line' as const,
       smooth: true,
+      emphasis: { ...common.emphasis, scale: false },
       itemStyle: { color: item.color },
+      blur: {
+        itemStyle: { opacity: NON_FOCUSED_OPACITY },
+        lineStyle: { opacity: NON_FOCUSED_OPACITY },
+        ...(chartType === 'area'
+          ? { areaStyle: { opacity: areaOpacity * NON_FOCUSED_OPACITY } }
+          : {}),
+      },
       ...(hasSelection
         ? {
             showSymbol: true,
-            symbolSize: (_value: unknown, params: { dataIndex?: number }) =>
-              selection.selectedIndices.has(params.dataIndex ?? -1) ? 10 : 6,
+            symbol: (_value: unknown, params: { dataIndex?: number }) =>
+              selection.selectedIndices.has(params.dataIndex ?? -1) ? 'circle' : 'emptyCircle',
+            symbolSize: 6,
           }
         : {}),
       lineStyle: { color: item.color, width: 2 },
       ...(chartType === 'area'
         ? {
-            areaStyle: { color: item.color, opacity: hasSelection ? 0.2 : 0.35 },
+            areaStyle: { color: item.color, opacity: areaOpacity },
             stack: 'wordflow-total',
           }
         : {}),

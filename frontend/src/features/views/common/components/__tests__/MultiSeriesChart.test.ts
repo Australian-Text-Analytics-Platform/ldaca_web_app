@@ -47,6 +47,33 @@ describe('buildMultiSeriesChartOption', () => {
     expect(data[0]).not.toHaveProperty('__wordflow_selected__');
   });
 
+  it('uses native ECharts states to soften focused-series fading', () => {
+    const line = buildMultiSeriesChartOption({ data, xKey: 'period', series });
+    expect((line.series as Record<string, unknown>[])[0]).toMatchObject({
+      emphasis: { focus: 'series', scale: false },
+      blur: {
+        itemStyle: { opacity: 0.45 },
+        lineStyle: { opacity: 0.45 },
+      },
+    });
+
+    const bar = buildMultiSeriesChartOption({ data, xKey: 'period', series, chartType: 'bar' });
+    expect((bar.series as Record<string, unknown>[])[0]).toMatchObject({
+      emphasis: { focus: 'series' },
+      blur: { itemStyle: { opacity: 0.45 } },
+    });
+
+    const area = buildMultiSeriesChartOption({ data, xKey: 'period', series, chartType: 'area' });
+    expect((area.series as Record<string, unknown>[])[0]).toMatchObject({
+      areaStyle: { opacity: 0.35 },
+      blur: {
+        itemStyle: { opacity: 0.45 },
+        lineStyle: { opacity: 0.45 },
+        areaStyle: { opacity: 0.1575 },
+      },
+    });
+  });
+
   it('encodes bar selection opacity while retaining complete dataset indices', () => {
     const option = buildMultiSeriesChartOption({
       data,
@@ -75,6 +102,14 @@ describe('buildMultiSeriesChartOption', () => {
       },
     });
     expect(line.visualMap).toBeUndefined();
+    const lineSeries = (line.series as Record<string, unknown>[])[0];
+    const symbol = lineSeries?.symbol as (
+      value: unknown,
+      params: { dataIndex?: number },
+    ) => string;
+    expect(lineSeries).toMatchObject({ symbolSize: 6 });
+    expect(symbol(undefined, { dataIndex: 0 })).toBe('emptyCircle');
+    expect(symbol(undefined, { dataIndex: 1 })).toBe('circle');
   });
 
   it('accepts native ECharts axis options without compatibility translation', () => {
