@@ -286,9 +286,7 @@ export function ConcordanceDispersionSummary({
       showSymbol: chartMode === 'density-line' || hasSelection,
       lineStyle: { color: item.color, width: 2 },
       areaStyle:
-        chartMode === 'density-area'
-          ? { color: item.color, opacity: areaOpacity }
-          : undefined,
+        chartMode === 'density-area' ? { color: item.color, opacity: areaOpacity } : undefined,
     };
   });
   const chartOption: EChartsCoreOption = {

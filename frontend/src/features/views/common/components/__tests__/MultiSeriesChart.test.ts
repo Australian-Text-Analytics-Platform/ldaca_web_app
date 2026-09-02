@@ -103,10 +103,7 @@ describe('buildMultiSeriesChartOption', () => {
     });
     expect(line.visualMap).toBeUndefined();
     const lineSeries = (line.series as Record<string, unknown>[])[0];
-    const symbol = lineSeries?.symbol as (
-      value: unknown,
-      params: { dataIndex?: number },
-    ) => string;
+    const symbol = lineSeries?.symbol as (value: unknown, params: { dataIndex?: number }) => string;
     expect(lineSeries).toMatchObject({ symbolSize: 6 });
     expect(symbol(undefined, { dataIndex: 0 })).toBe('emptyCircle');
     expect(symbol(undefined, { dataIndex: 1 })).toBe('circle');

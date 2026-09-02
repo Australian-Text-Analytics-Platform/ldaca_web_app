@@ -153,10 +153,7 @@ describe('ConcordanceDispersionSummary', () => {
     );
 
     const lineSeries = optionSeries()[0];
-    const symbol = lineSeries?.symbol as (
-      value: unknown,
-      params: { dataIndex?: number },
-    ) => string;
+    const symbol = lineSeries?.symbol as (value: unknown, params: { dataIndex?: number }) => string;
     expect(lineSeries).toMatchObject({ showSymbol: true, symbolSize: 6 });
     expect(symbol(undefined, { dataIndex: 0 })).toBe('emptyCircle');
     expect(symbol(undefined, { dataIndex: 1 })).toBe('circle');
