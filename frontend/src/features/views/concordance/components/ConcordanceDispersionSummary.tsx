@@ -23,6 +23,7 @@ import {
   type ChartExportLegendItem,
   type ChartImageFormat,
 } from '@/lib/chartExport';
+import { buildEChartsSeriesStates } from '../../common/echartsSeriesStates';
 import { EChartsView } from '../../common/components/EChartsView';
 import { FilterableSeriesControls } from '../../common/components/FilterableSeriesControls';
 import { VIZ_PALETTE } from '../../common/vizPalette';
@@ -241,6 +242,7 @@ export function ConcordanceDispersionSummary({
   );
 
   const hasSelection = !!selection && selection.selectedIndices.size > 0;
+  const areaOpacity = hasSelection ? 0.2 : 0.35;
   const usesGroupedBars = chartMode === 'density-bar' && binCount <= GROUPED_BAR_MAX_BIN_COUNT;
   const usesStackedBars = chartMode === 'density-bar' && !usesGroupedBars;
   const usesSelectionVisual = hasSelection && chartMode === 'density-bar';
@@ -256,11 +258,11 @@ export function ConcordanceDispersionSummary({
       name: item.label ?? item.key,
       encode: { x: 'binCenter', y: item.key, tooltip: [item.key] },
       itemStyle: { color: item.color },
-      emphasis: { focus: 'series' as const },
     };
     if (chartMode === 'density-bar') {
       return {
         ...common,
+        ...buildEChartsSeriesStates({ chartType: 'bar' }),
         type: 'bar' as const,
         stack: usesStackedBars ? 'density' : undefined,
         barGap: usesGroupedBars ? '10%' : '0%',
@@ -273,18 +275,19 @@ export function ConcordanceDispersionSummary({
     }
     return {
       ...common,
+      ...buildEChartsSeriesStates(
+        chartMode === 'density-area'
+          ? { chartType: 'area', areaOpacity, selectedIndices: selection?.selectedIndices }
+          : { chartType: 'line', selectedIndices: selection?.selectedIndices },
+      ),
       type: 'line' as const,
       ...(chartMode === 'cumulative' ? { step: 'middle' as const } : { smooth: true }),
       ...(chartMode === 'density-area' ? { stack: 'density' } : {}),
       showSymbol: chartMode === 'density-line' || hasSelection,
-      symbolSize: (_value: unknown, params: { dataIndex?: number }) => {
-        if (!hasSelection) return chartMode === 'density-line' ? 6 : 0;
-        return selection.selectedIndices.has(params.dataIndex ?? -1) ? 10 : 6;
-      },
       lineStyle: { color: item.color, width: 2 },
       areaStyle:
         chartMode === 'density-area'
-          ? { color: item.color, opacity: hasSelection ? 0.2 : 0.35 }
+          ? { color: item.color, opacity: areaOpacity }
           : undefined,
     };
   });

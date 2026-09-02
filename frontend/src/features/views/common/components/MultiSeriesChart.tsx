@@ -2,6 +2,7 @@ import type { ReactNode, RefObject } from 'react';
 import type { EChartsCoreOption } from 'echarts/core';
 import type { XAxisComponentOption, YAxisComponentOption } from 'echarts/types/dist/option';
 
+import { buildEChartsSeriesStates } from '../echartsSeriesStates';
 import { EChartsView } from './EChartsView';
 
 type MultiSeriesChartType = 'line' | 'bar' | 'area';
@@ -47,7 +48,6 @@ export interface MultiSeriesChartProps {
 }
 
 const SELECTION_DIMENSION = '__wordflow_selected__';
-const NON_FOCUSED_OPACITY = 0.45;
 
 interface TooltipParam {
   value?: Record<string, unknown> | unknown[];
@@ -101,37 +101,25 @@ export const buildMultiSeriesChartOption = ({
       id: item.key,
       name: item.label ?? item.key,
       encode: { x: xKey, y: item.key, tooltip: [item.key] },
-      emphasis: { focus: 'series' as const },
     };
     if (chartType === 'bar') {
       return {
         ...common,
+        ...buildEChartsSeriesStates({ chartType: 'bar' }),
         type: 'bar' as const,
         itemStyle: { color: item.color, borderRadius: [6, 6, 0, 0] },
-        blur: { itemStyle: { opacity: NON_FOCUSED_OPACITY } },
       };
     }
     return {
       ...common,
+      ...buildEChartsSeriesStates(
+        chartType === 'area'
+          ? { chartType, areaOpacity, selectedIndices: selection?.selectedIndices }
+          : { chartType, selectedIndices: selection?.selectedIndices },
+      ),
       type: 'line' as const,
       smooth: true,
-      emphasis: { ...common.emphasis, scale: false },
       itemStyle: { color: item.color },
-      blur: {
-        itemStyle: { opacity: NON_FOCUSED_OPACITY },
-        lineStyle: { opacity: NON_FOCUSED_OPACITY },
-        ...(chartType === 'area'
-          ? { areaStyle: { opacity: areaOpacity * NON_FOCUSED_OPACITY } }
-          : {}),
-      },
-      ...(hasSelection
-        ? {
-            showSymbol: true,
-            symbol: (_value: unknown, params: { dataIndex?: number }) =>
-              selection.selectedIndices.has(params.dataIndex ?? -1) ? 'circle' : 'emptyCircle',
-            symbolSize: 6,
-          }
-        : {}),
       lineStyle: { color: item.color, width: 2 },
       ...(chartType === 'area'
         ? {

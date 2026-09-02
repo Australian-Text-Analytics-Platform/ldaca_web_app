@@ -100,15 +100,66 @@ describe('ConcordanceDispersionSummary', () => {
     const { rerender } = render(
       <ConcordanceDispersionSummary {...props} chartMode="density-line" />,
     );
-    expect(optionSeries()[0]).toMatchObject({ type: 'line', showSymbol: true });
-    expect(optionSeries()[0]).toMatchObject({ smooth: true });
+    expect(optionSeries()[0]).toMatchObject({
+      type: 'line',
+      showSymbol: true,
+      smooth: true,
+      emphasis: { focus: 'series', scale: false },
+      blur: {
+        itemStyle: { opacity: 0.45 },
+        lineStyle: { opacity: 0.45 },
+      },
+    });
 
     rerender(<ConcordanceDispersionSummary {...props} chartMode="density-bar" />);
-    expect(optionSeries()[0]).toMatchObject({ type: 'bar', stack: 'density' });
+    expect(optionSeries()[0]).toMatchObject({
+      type: 'bar',
+      stack: 'density',
+      emphasis: { focus: 'series' },
+      blur: { itemStyle: { opacity: 0.45 } },
+    });
 
     rerender(<ConcordanceDispersionSummary {...props} chartMode="density-area" />);
-    expect(optionSeries()[0]).toMatchObject({ type: 'line', stack: 'density' });
-    expect(optionSeries()[0]?.areaStyle).toBeTruthy();
+    expect(optionSeries()[0]).toMatchObject({
+      type: 'line',
+      stack: 'density',
+      areaStyle: { opacity: 0.35 },
+      emphasis: { focus: 'series', scale: false },
+      blur: {
+        itemStyle: { opacity: 0.45 },
+        lineStyle: { opacity: 0.45 },
+        areaStyle: { opacity: 0.1575 },
+      },
+    });
+  });
+
+  it('renders selected bins as same-size solid points', () => {
+    render(
+      <ConcordanceDispersionSummary
+        rows={baseRows}
+        textColumn="text"
+        binCount={20}
+        splitBySource={false}
+        dataBlockLabel="Corpus"
+        searchWord="alpha"
+        chartMode="density-line"
+        selection={{
+          selectedIndices: new Set([1]),
+          onSelect: vi.fn(),
+          onSelectRange: vi.fn(),
+          onClear: vi.fn(),
+        }}
+      />,
+    );
+
+    const lineSeries = optionSeries()[0];
+    const symbol = lineSeries?.symbol as (
+      value: unknown,
+      params: { dataIndex?: number },
+    ) => string;
+    expect(lineSeries).toMatchObject({ showSymbol: true, symbolSize: 6 });
+    expect(symbol(undefined, { dataIndex: 0 })).toBe('emptyCircle');
+    expect(symbol(undefined, { dataIndex: 1 })).toBe('circle');
   });
 
   it.each([4, 5, 10] as const)(
@@ -269,7 +320,16 @@ describe('ConcordanceDispersionSummary', () => {
       />,
     );
 
-    expect(optionSeries()[0]).toMatchObject({ type: 'line', step: 'middle', showSymbol: false });
+    expect(optionSeries()[0]).toMatchObject({
+      type: 'line',
+      step: 'middle',
+      showSymbol: false,
+      emphasis: { focus: 'series', scale: false },
+      blur: {
+        itemStyle: { opacity: 0.45 },
+        lineStyle: { opacity: 0.45 },
+      },
+    });
     expect(optionSeries()[0]).not.toHaveProperty('smooth');
     expect(optionSource()[0]).toMatchObject({ binCenter: 2.5, 'term:alpha': 1 });
     expect(optionSource()[5]).toMatchObject({
