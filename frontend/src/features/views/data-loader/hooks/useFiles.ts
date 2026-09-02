@@ -100,7 +100,7 @@ export const useFiles = ({ enabled = true }: UseFilesProps = {}) => {
   const handleDownloadFile = async (filename: string) => {
     try {
       const query = new URLSearchParams({ path: filename });
-      await saveBackendDownload(
+      const omissions = await saveBackendDownload(
         `/api/user-files/content?${query.toString()}`,
         filename,
         async () => {
@@ -112,7 +112,7 @@ export const useFiles = ({ enabled = true }: UseFilesProps = {}) => {
           return { blob: data instanceof Blob ? data : new Blob([data]) };
         },
       );
-      return true;
+      return omissions !== null;
     } catch (error) {
       console.error('Failed to download file:', error);
       return false;

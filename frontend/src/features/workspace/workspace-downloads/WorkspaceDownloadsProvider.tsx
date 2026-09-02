@@ -72,6 +72,7 @@ export function WorkspaceDownloadsProvider({ children }: { children: ReactNode }
           };
         },
       );
+      if (omissions === null) return;
       if (omissions.omittedTabCount || omissions.omittedAnalysisCount) {
         toast.warning(omissionMessage(omissions.omittedTabCount, omissions.omittedAnalysisCount), {
           duration: 7000,

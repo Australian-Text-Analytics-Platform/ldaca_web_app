@@ -80,9 +80,9 @@ pub fn run() {
             desktop_updater::open_update_link,
             desktop_updater::get_update_preferences,
             desktop_updater::set_automatic_update_checks,
-            download::download_backend_to_downloads,
-            download::export_data_blocks_to_downloads,
-            download::save_bytes_to_downloads
+            download::save_backend_download,
+            download::save_data_block_export,
+            download::save_generated_bytes
         ])
         .setup(|app| {
             install_application_menu(app.handle())?;

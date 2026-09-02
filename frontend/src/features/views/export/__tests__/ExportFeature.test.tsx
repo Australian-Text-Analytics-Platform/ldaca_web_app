@@ -73,8 +73,11 @@ describe('ExportFeature', () => {
       }),
     });
     mocks.exportWorkspaceArchive.mockResolvedValue({ data: new Blob(['zip']) });
-    mocks.saveBackendDownload.mockResolvedValue(undefined);
-    mocks.saveDataBlockDownload.mockResolvedValue(undefined);
+    mocks.saveBackendDownload.mockResolvedValue({
+      omittedTabCount: 0,
+      omittedAnalysisCount: 0,
+    });
+    mocks.saveDataBlockDownload.mockResolvedValue(true);
   });
 
   it('exports one selected Data Block directly in the chosen format', async () => {
@@ -146,5 +149,30 @@ describe('ExportFeature', () => {
       ),
     );
     expect(mocks.reachContextualHint).toHaveBeenCalledWith('export.workspace-success');
+  });
+
+  it('does not report a cancelled Data Block export as successful', async () => {
+    const user = userEvent.setup();
+    mocks.saveDataBlockDownload.mockResolvedValueOnce(false);
+    render(<ExportFeature />);
+
+    await user.click(screen.getByRole('button', { name: 'Add data block' }));
+    await user.click(screen.getByRole('button', { name: 'Corpus One' }));
+    await user.click(screen.getByRole('button', { name: 'Export 1 Data Block' }));
+
+    await waitFor(() => expect(mocks.saveDataBlockDownload).toHaveBeenCalledTimes(1));
+    expect(mocks.reachContextualHint).not.toHaveBeenCalled();
+    expect(mocks.toast.success).not.toHaveBeenCalled();
+  });
+
+  it('does not report a cancelled Workspace export as successful', async () => {
+    mocks.saveBackendDownload.mockResolvedValueOnce(null);
+    render(<ExportFeature />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Export workspace archive' }));
+
+    await waitFor(() => expect(mocks.saveBackendDownload).toHaveBeenCalledTimes(1));
+    expect(mocks.reachContextualHint).not.toHaveBeenCalled();
+    expect(mocks.toast.success).not.toHaveBeenCalled();
   });
 });

@@ -16,8 +16,8 @@ dev-runtime = []
 
 [dependencies]
 tauri = { version = "2", features = ["macos-private-api"] }
-# Used by the `download_to_downloads` Tauri command to fetch large export
-# bodies from the local backend and stream them to disk. Bypassing the JS
+# Used by native save commands to fetch large export bodies from the local
+# backend and stream them to disk. Bypassing the JS
 # fetch body path avoids WebView2 + IPC reliability issues on Windows for
 # responses larger than 10 MB.
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream"] }

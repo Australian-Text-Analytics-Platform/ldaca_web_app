@@ -43,7 +43,10 @@ describe('useFiles cache policy', () => {
       data: { type: 'directory', path: 'corpus' },
     });
     mocks.deleteFile.mockResolvedValue({ data: { message: 'deleted' } });
-    mocks.saveBackendDownload.mockResolvedValue(undefined);
+    mocks.saveBackendDownload.mockResolvedValue({
+      omittedTabCount: 0,
+      omittedAnalysisCount: 0,
+    });
   });
 
   it('keeps coordinated uploads path-aware and defers refresh until the batch ends', async () => {

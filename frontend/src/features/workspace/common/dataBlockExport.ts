@@ -43,14 +43,14 @@ export const downloadDataBlocks = async ({
   workspaceName: string;
   dataBlocks: DataBlockExportSelection[];
   format: DataBlockExportFormat;
-}): Promise<string> => {
+}): Promise<string | null> => {
   const formatSpec = DATA_BLOCK_EXPORT_FORMATS.find((candidate) => candidate.value === format);
   const fallbackFilename =
     dataBlocks.length > 1
       ? `${safeDownloadStem(workspaceName, workspaceId)}_data_blocks.zip`
       : `${safeDownloadStem(dataBlocks[0]?.name ?? '', dataBlocks[0]?.id ?? 'data-block')}.${formatSpec?.extension ?? format}`;
   let filename = fallbackFilename;
-  await saveDataBlockDownload({
+  const saved = await saveDataBlockDownload({
     workspaceId,
     nodeIds: dataBlocks.map((node) => node.id),
     format,
@@ -66,5 +66,5 @@ export const downloadDataBlocks = async ({
       return { blob: data, filename };
     },
   });
-  return filename;
+  return saved ? filename : null;
 };

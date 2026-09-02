@@ -1,13 +1,13 @@
 /**
  * Unified download helper that emits user-visible toast notifications and,
- * when running inside the Tauri desktop app, writes blobs to the system
- * Downloads folder (because Tauri's webview does not surface a download
- * progress UI like a regular browser does).
+ * when running inside the Tauri desktop app, opens a native Save As dialog
+ * before writing the file.
  *
  * Browser/web: falls back to the standard `<a download>` mechanism so the
  * browser's own download UI handles progress and the destination folder.
  */
 import { toast } from 'sonner';
+import { getCsrfToken } from '@/lib/backend/csrfToken';
 import { isTauri } from '@/lib/isTauri';
 
 export const safeDownloadStem = (value: string, fallback: string): string =>
@@ -71,9 +71,9 @@ interface DataBlockDownload {
 }
 
 type NativeDownloadCommand =
-  | 'download_backend_to_downloads'
-  | 'export_data_blocks_to_downloads'
-  | 'save_bytes_to_downloads';
+  | 'save_backend_download'
+  | 'save_data_block_export'
+  | 'save_generated_bytes';
 
 export interface DownloadOmissions {
   omittedTabCount: number;
@@ -84,17 +84,17 @@ interface NativeBackendDownloadResult extends DownloadOmissions {
   fullPath: string;
 }
 
-const invokeNativeDownload = async (
+const invokeNativeDownload = async <Result>(
   command: NativeDownloadCommand,
   args: Record<string, unknown>,
-): Promise<string> => {
+): Promise<Result> => {
   const { invoke } = await import('@tauri-apps/api/core');
-  return invoke<string>(command, args);
+  return invoke<Result>(command, args);
 };
 
-const showNativeDownloadSuccess = (filename: string, fullPath: string, silent: boolean) => {
+const showNativeDownloadSuccess = (fullPath: string, silent: boolean) => {
   if (silent) return;
-  toast.success(`Saved ${toBasename(filename)} to your Downloads folder`, {
+  toast.success(`Saved ${toBasename(fullPath)}`, {
     description: fullPath,
     action: {
       label: 'Show in folder',
@@ -121,10 +121,12 @@ const saveNativeDownload = async (
   args: Record<string, unknown>,
   filename: string,
   silent: boolean,
-) => {
+): Promise<boolean> => {
   try {
-    const fullPath = await invokeNativeDownload(command, args);
-    showNativeDownloadSuccess(filename, fullPath, silent);
+    const fullPath = await invokeNativeDownload<string | null>(command, args);
+    if (fullPath === null) return false;
+    showNativeDownloadSuccess(fullPath, silent);
+    return true;
   } catch (error) {
     reportDownloadFailure(filename, error, silent);
     throw error;
@@ -137,7 +139,7 @@ export const saveBackendDownload = async (
   filename: string,
   loadBrowserDownload: BrowserDownloadLoader,
   options: SaveBlobOptions = {},
-): Promise<DownloadOmissions> => {
+): Promise<DownloadOmissions | null> => {
   const safeFilename = toBasename(filename);
   if (!isTauri()) {
     const download = await loadBrowserDownload();
@@ -149,11 +151,12 @@ export const saveBackendDownload = async (
   }
   try {
     const { invoke } = await import('@tauri-apps/api/core');
-    const result = await invoke<NativeBackendDownloadResult>('download_backend_to_downloads', {
+    const result = await invoke<NativeBackendDownloadResult | null>('save_backend_download', {
       apiPath,
       filename: safeFilename,
     });
-    showNativeDownloadSuccess(safeFilename, result.fullPath, options.silent ?? false);
+    if (result === null) return null;
+    showNativeDownloadSuccess(result.fullPath, options.silent ?? false);
     return {
       omittedTabCount: result.omittedTabCount,
       omittedAnalysisCount: result.omittedAnalysisCount,
@@ -172,25 +175,30 @@ export const saveDataBlockDownload = async ({
   filename,
   loadBrowserDownload,
   options = {},
-}: DataBlockDownload): Promise<void> => {
+}: DataBlockDownload): Promise<boolean> => {
   const safeFilename = toBasename(filename);
   if (!isTauri()) {
     const download = await loadBrowserDownload();
     browserDownload(download.blob, toBasename(download.filename ?? safeFilename));
-    return;
+    return true;
   }
-  await saveNativeDownload(
-    'export_data_blocks_to_downloads',
-    { workspaceId, nodeIds, format, filename: safeFilename },
+  const csrfToken = getCsrfToken();
+  if (!csrfToken) {
+    const error = new Error('Download authorization is unavailable');
+    reportDownloadFailure(safeFilename, error, options.silent ?? false);
+    throw error;
+  }
+  return saveNativeDownload(
+    'save_data_block_export',
+    { workspaceId, nodeIds, format, filename: safeFilename, csrfToken },
     safeFilename,
     options.silent ?? false,
   );
 };
 
 /**
- * Save a blob, notifying the user where it landed. In Tauri we write the file
- * to the OS Downloads folder and surface a toast (with a "Show in folder"
- * action) because the desktop webview has no built-in download UI. In regular
+ * Save a blob, notifying the user where it landed. In Tauri we prompt for the
+ * destination and surface a toast with a "Show in folder" action. In regular
  * browsers we delegate to the native `<a download>` mechanism, which already
  * shows progress and the destination in the browser chrome — no toast needed.
  */
@@ -202,17 +210,17 @@ export const saveBlob = async (
   blob: Blob,
   filename: string,
   options: SaveBlobOptions = {},
-): Promise<void> => {
+): Promise<boolean> => {
   const { silent = false } = options;
 
   if (!isTauri()) {
     browserDownload(blob, filename);
-    return;
+    return true;
   }
 
   const safeFilename = toBasename(filename);
-  await saveNativeDownload(
-    'save_bytes_to_downloads',
+  return saveNativeDownload(
+    'save_generated_bytes',
     { filename: safeFilename, bytes: new Uint8Array(await blob.arrayBuffer()) },
     safeFilename,
     silent,

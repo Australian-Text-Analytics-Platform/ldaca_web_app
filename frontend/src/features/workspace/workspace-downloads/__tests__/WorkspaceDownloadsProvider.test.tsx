@@ -96,4 +96,20 @@ describe('WorkspaceDownloadsProvider', () => {
     );
     expect(screen.getByText('idle')).toBeInTheDocument();
   });
+
+  it('clears a cancelled download without reporting success', async () => {
+    mocks.saveBackendDownload.mockResolvedValueOnce(null);
+    render(
+      <WorkspaceDownloadsProvider>
+        <DownloadStarter />
+      </WorkspaceDownloadsProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Start download' }));
+
+    expect(await screen.findByText('idle')).toBeInTheDocument();
+    expect(mocks.toast.success).not.toHaveBeenCalled();
+    expect(mocks.toast.warning).not.toHaveBeenCalled();
+    expect(mocks.toast.error).not.toHaveBeenCalled();
+  });
 });

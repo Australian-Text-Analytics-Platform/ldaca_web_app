@@ -46,12 +46,13 @@ export function DataBlockExportDialog({
     if (exporting) return;
     setExporting(true);
     try {
-      await downloadDataBlocks({
+      const filename = await downloadDataBlocks({
         workspaceId,
         workspaceName,
         dataBlocks: [dataBlock],
         format,
       });
+      if (filename === null) return;
       toast.success('Data Block exported');
       onOpenChange(false);
     } catch (error) {

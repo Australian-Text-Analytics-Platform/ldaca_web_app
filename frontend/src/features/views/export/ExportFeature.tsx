@@ -61,12 +61,13 @@ function ExportFeature() {
     if (!currentWorkspaceId || selectedIds.length === 0 || exportingDataBlocks) return;
     setExportingDataBlocks(true);
     try {
-      await downloadDataBlocks({
+      const filename = await downloadDataBlocks({
         workspaceId: currentWorkspaceId,
         workspaceName: currentWorkspace?.name ?? '',
         dataBlocks: nodeInputs.selectedNodes.map((node) => ({ id: node.id, name: node.name })),
         format,
       });
+      if (filename === null) return;
       reachContextualHint(CONTEXTUAL_HINT_IDS.export.dataBlockSuccess);
       toast.success(
         selectedIds.length === 1
@@ -85,7 +86,7 @@ function ExportFeature() {
     setExportingWorkspace(true);
     try {
       const filename = `${safeDownloadStem(currentWorkspace?.name ?? '', currentWorkspaceId)}.zip`;
-      await saveBackendDownload(
+      const omissions = await saveBackendDownload(
         `/api/workspaces/${encodeURIComponent(currentWorkspaceId)}/archive`,
         filename,
         async () => {
@@ -97,6 +98,7 @@ function ExportFeature() {
           return { blob: data };
         },
       );
+      if (omissions === null) return;
       reachContextualHint(CONTEXTUAL_HINT_IDS.export.workspaceSuccess);
       toast.success('Workspace archive exported');
     } catch (error) {

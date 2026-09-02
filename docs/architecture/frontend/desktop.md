@@ -172,28 +172,33 @@ application asset catalog so the system can render its Liquid Glass layers;
 the configured ICNS remains the compatibility fallback. Windows installers and
 browser surfaces use flattened renders of the same composition.
 
-Rust owns the complete desktop Downloads-folder boundary. GET resources accept
-only a relative backend `/api/` path; Data Block exports have a separate typed
-POST command rather than a generic native HTTP proxy. Both reject redirects and
-stream the backend response to a private temporary file. Client-generated
-charts, tables, and archives cross IPC as bytes and use the same native file
-installer. Installation atomically claims the first available safe filename,
-so concurrent desktop instances cannot overwrite each other. The webview has no
-filesystem permission and cannot supply an arbitrary URL, HTTP method, headers,
-or destination path. Browser deployments continue to fetch through the
-generated client and delegate saving to the browser download UI.
+Rust owns the complete desktop save-destination boundary. Each user-visible
+download opens a native Save As dialog before Rust starts a backend request or
+writes a file. GET resources accept only a relative backend `/api/` path; Data
+Block exports have a separate typed POST command rather than a generic native
+HTTP proxy. The POST command adds the process-scoped CSRF token supplied by the
+authenticated webview and the supervised backend's exact origin. Both commands
+reject redirects and stream the backend response to a private temporary file
+beside the selected destination. Client-generated charts, tables, and archives
+cross IPC as bytes and use the same installer. After the complete file is
+flushed and synced, installation atomically replaces the destination confirmed
+by the native dialog. Cancellation performs no backend request or file write.
+The webview has no filesystem permission and cannot supply a destination path,
+arbitrary URL, HTTP method, or headers. Browser deployments continue to fetch
+through the generated client and delegate saving to the browser download UI.
 
 Plugin-specific capabilities grant only the JavaScript commands the webview
 invokes: native folder selection, revealing an already saved file, and, on
-macOS, initializing Liquid Glass in the `main` window. The updater window does
-not receive the Liquid Glass grant. Two additional explicit core grants support
-Tauri's zoom shortcut and macOS title-bar dragging commands; `core:default`
-remains Tauri's standard core set. Rust-side dialogs do not require a webview
-dialog-default grant. Production scripts are restricted to
-`self`; Tauri injects the hashes and nonces required by bundled assets. The
-separate development CSP admits only the fixed loopback Vite WebSocket and
-development script evaluation needed for HMR, so development accommodations
-never ship in the packaged policy.
+macOS, initializing Liquid Glass in the `main` window. Native Save As dialogs
+are opened by Rust commands and do not grant the webview a dialog-save or
+filesystem capability. The updater window does not receive the Liquid Glass
+grant. Two additional explicit core grants support Tauri's zoom shortcut and
+macOS title-bar dragging commands; `core:default` remains Tauri's standard core
+set. Rust-side dialogs do not require a webview dialog-default grant.
+Production scripts are restricted to `self`; Tauri injects the hashes and
+nonces required by bundled assets. The separate development CSP admits only
+the fixed loopback Vite WebSocket and development script evaluation needed for
+HMR, so development accommodations never ship in the packaged policy.
 
 ## Application Updates
 

@@ -208,6 +208,37 @@ describe('CustomNode', () => {
     );
   });
 
+  it('keeps the export dialog open when Save As is cancelled', async () => {
+    mockZoom = 1;
+    const user = userEvent.setup();
+    mocks.downloadDataBlocks.mockResolvedValueOnce(null);
+    const props = {
+      id: 'node-1',
+      type: 'custom',
+      data: nodeData(),
+      selected: false,
+      dragging: false,
+      zIndex: 0,
+      selectable: true,
+      deletable: true,
+      draggable: true,
+      isConnectable: true,
+      positionAbsoluteX: 0,
+      positionAbsoluteY: 0,
+    } satisfies React.ComponentProps<typeof CustomNode>;
+
+    render(<CustomNode {...props} />);
+
+    await user.hover(screen.getByTitle('Corpus'));
+    fireEvent.click(getLatestNodeSettingsButton());
+    await user.click(screen.getByRole('button', { name: 'Export' }));
+    await user.click(screen.getByRole('button', { name: 'Export' }));
+
+    await waitFor(() => expect(mocks.downloadDataBlocks).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole('heading', { name: 'Export “Corpus”' })).toBeInTheDocument();
+    expect(mocks.toast.success).not.toHaveBeenCalled();
+  });
+
   it('uses a toned identity header and a detached selection outline', () => {
     mockZoom = 1;
     const props = {

@@ -222,7 +222,7 @@ describe('desktop configuration contracts', () => {
     expect(backendEnvironment).not.toContain('http://127.0.0.1:${backendPort}/api');
   });
 
-  it('keeps desktop downloads and filesystem ownership behind Rust commands', () => {
+  it('keeps desktop save destinations and filesystem ownership behind Rust commands', () => {
     const capability = JSON.parse(read('frontend/src-tauri/capabilities/default.json'));
     const cargo = read('frontend/src-tauri/Cargo.toml');
     const packageJson = JSON.parse(read('frontend/package.json'));
@@ -230,10 +230,14 @@ describe('desktop configuration contracts', () => {
     const nativeDownloads = read('frontend/src-tauri/src/download.rs');
     const webDownloads = read('frontend/src/lib/download.ts');
 
-    expect(desktopShell).toContain('download::download_backend_to_downloads');
-    expect(desktopShell).toContain('download::export_data_blocks_to_downloads');
-    expect(desktopShell).toContain('download::save_bytes_to_downloads');
+    expect(desktopShell).toContain('download::save_backend_download');
+    expect(desktopShell).toContain('download::save_data_block_export');
+    expect(desktopShell).toContain('download::save_generated_bytes');
+    expect(nativeDownloads).toContain('.blocking_save_file()');
+    expect(nativeDownloads).toContain('.header(reqwest::header::ORIGIN, origin)');
+    expect(nativeDownloads).toContain('.header("X-CSRF-Token", csrf_header)');
     expect(nativeDownloads).not.toContain('method: String');
+    expect(webDownloads).not.toContain('showSaveFilePicker');
     expect(webDownloads).not.toContain('@tauri-apps/plugin-fs');
     expect(packageJson.dependencies).not.toHaveProperty('@tauri-apps/plugin-fs');
     expect(cargo).not.toMatch(/^tauri-plugin-fs\s*=/m);
