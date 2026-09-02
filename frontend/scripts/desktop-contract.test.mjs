@@ -220,7 +220,8 @@ describe('desktop configuration contracts', () => {
     const desktopShell = read('frontend/src-tauri/src/lib.rs');
     const [baseMainWindow] = tauri.app.windows;
 
-    expect(macOS.app.macOSPrivateApi).toBe(true);
+    expect(tauri.app.macOSPrivateApi).toBe(true);
+    expect(macOS.app).not.toHaveProperty('macOSPrivateApi');
     expect(macOS.app.windows).toEqual([{ ...baseMainWindow, transparent: true }]);
     expect(liquidGlassCapability).toMatchObject({
       windows: ['main'],
@@ -228,7 +229,6 @@ describe('desktop configuration contracts', () => {
       permissions: ['liquid-glass:default'],
     });
     expect(updaterCapability.permissions).not.toContain('liquid-glass:default');
-    expect(cargo).toContain('[target.\'cfg(target_os = "macos")\'.dependencies]');
     expect(cargo).toContain('tauri = { version = "2", features = ["macos-private-api"] }');
     expect(cargo).toContain('tauri-plugin-liquid-glass = "=0.1.6"');
     expect(packageJson.dependencies['tauri-plugin-liquid-glass-api']).toBe('0.1.6');
