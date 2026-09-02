@@ -106,7 +106,7 @@ describe('ResponsiveWordCloud', () => {
             rotationRange: [0, 0],
             gridSize: 4,
             drawOutOfBound: false,
-            shrinkToFit: false,
+            shrinkToFit: true,
             layoutAnimation: false,
             silent: false,
             data: [
