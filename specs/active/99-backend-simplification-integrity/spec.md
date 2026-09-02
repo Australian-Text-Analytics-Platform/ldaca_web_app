@@ -28,7 +28,7 @@ One coordinated cutover owns all breaking contracts:
 - native Workspace data schema 1 plus independent schema version 1 for each of
   the six top-level Analysis kinds;
 - portable Workspace archive data format 1 with the same per-kind envelopes;
-- SQLite schema 7;
+- hosted multi-user SQLite schema 7, with no database in single-user mode;
 - User File Import record envelope version 1;
 - UUID and aware-UTC identity/time types throughout the domain;
 - discriminated Tab settings and Analysis Result variants;

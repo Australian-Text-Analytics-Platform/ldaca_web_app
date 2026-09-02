@@ -1,9 +1,10 @@
-"""Runtime-owned users, hashed sessions, and process-scoped desktop CSRF.
+"""Runtime-owned users, hashed hosted sessions, and single-user CSRF.
 
-Used by authentication routes and dependencies. Raw session and CSRF tokens
-exist only at issuance/request boundaries; SQLite stores unique SHA-256 hashes.
-Multiple rows per user are intentional so logging in on one device never
-revokes another device.
+Used by authentication routes and dependencies. Single-user identity is
+process-local and database-free. Hosted raw session and CSRF tokens exist only
+at issuance/request boundaries; SQLite stores unique SHA-256 hashes. Multiple
+rows per hosted user are intentional so logging in on one device never revokes
+another device.
 """
 
 from __future__ import annotations
@@ -89,12 +90,12 @@ class SessionService:
     def __init__(
         self,
         settings: Settings,
-        database: Database,
+        database: Database | None,
         *,
         io_limiter: anyio.CapacityLimiter,
     ) -> None:
         self.settings = settings
-        self.database = database
+        self._database = database
         self._io_limiter = io_limiter
         self._desktop_csrf_token: str | None = None
         self._desktop_principal: SessionPrincipal | None = None
@@ -110,9 +111,16 @@ class SessionService:
         """Provision only the active deployment identity and expire sessions."""
 
         if self._desktop_principal is not None:
-            await self._provision_desktop_user(self._desktop_principal.user)
             await self._provision_user_root(self._desktop_principal.user.id)
         await self.cleanup_expired()
+
+    @property
+    def hosted_database(self) -> Database:
+        """Return the database required by hosted-only identity operations."""
+
+        if self._database is None:
+            raise RuntimeError("Single-user mode has no identity database")
+        return self._database
 
     @property
     def desktop_csrf_token(self) -> str:
@@ -141,7 +149,7 @@ class SessionService:
             return None
         token_hash = _hash_token(session_token)
         now = _iso(_now())
-        async with self.database.connection() as connection:
+        async with self.hosted_database.connection() as connection:
             row = await (
                 await connection.execute(
                     """
@@ -181,7 +189,7 @@ class SessionService:
             return hmac.compare_digest(csrf_token, self._desktop_csrf_token)
         if not session_token:
             return False
-        async with self.database.connection() as connection:
+        async with self.hosted_database.connection() as connection:
             row = await (
                 await connection.execute(
                     """
@@ -216,7 +224,7 @@ class SessionService:
         normalized_picture = picture.strip() if picture and picture.strip() else None
 
         now = _iso(_now())
-        async with self.database.connection() as connection:
+        async with self.hosted_database.connection() as connection:
             await connection.execute("BEGIN IMMEDIATE")
             identity = await (
                 await connection.execute(
@@ -315,7 +323,7 @@ class SessionService:
         session_id = str(uuid.uuid4())
         created_at = _now()
         expires_at = created_at + timedelta(hours=self.settings.session_ttl_hours)
-        async with self.database.connection() as connection:
+        async with self.hosted_database.connection() as connection:
             await connection.execute(
                 """
                 INSERT INTO user_sessions (
@@ -349,7 +357,7 @@ class SessionService:
 
         if not self.settings.multi_user or not session_token:
             return None
-        async with self.database.connection() as connection:
+        async with self.hosted_database.connection() as connection:
             await connection.execute("BEGIN IMMEDIATE")
             row = await (
                 await connection.execute(
@@ -371,39 +379,13 @@ class SessionService:
     async def cleanup_expired(self) -> None:
         """Delete expired/revoked rows during bounded runtime maintenance."""
 
-        async with self.database.connection() as connection:
+        if not self.settings.multi_user:
+            return
+        async with self.hosted_database.connection() as connection:
             await connection.execute(
                 "DELETE FROM user_sessions WHERE expires_at <= ? OR revoked_at IS NOT NULL",
                 (_iso(_now()),),
             )
-            await connection.commit()
-
-    async def _provision_desktop_user(self, user: SessionUser) -> None:
-        """Persist the fixed local principal as one ordinary unlimited user."""
-
-        now = _iso(_now())
-        async with self.database.connection() as connection:
-            await connection.execute("BEGIN IMMEDIATE")
-            try:
-                await connection.execute(
-                    """
-                    INSERT INTO users (
-                        id, email, name, picture, is_active,
-                        created_at, last_login, storage_quota_bytes
-                    ) VALUES (?, ?, ?, ?, 1, ?, ?, NULL)
-                    ON CONFLICT(id) DO UPDATE SET
-                        email = excluded.email,
-                        name = excluded.name,
-                        picture = excluded.picture,
-                        is_active = 1,
-                        last_login = excluded.last_login,
-                        storage_quota_bytes = NULL
-                    """,
-                    (user.id, user.email.lower(), user.name, user.picture, now, now),
-                )
-            except BaseException:
-                await connection.rollback()
-                raise
             await connection.commit()
 
     async def _provision_user_root(self, user_id: str) -> None:

@@ -267,7 +267,7 @@ async def cilogon_login(
     code_verifier = secrets.token_urlsafe(64)
     return_path = _validated_return_to(request, return_to)
     now = datetime.now(UTC)
-    await runtime.database.create_oauth_transaction(
+    await runtime.session_service.hosted_database.create_oauth_transaction(
         state_hash=_token_hash(state_token),
         provider="cilogon",
         code_verifier=code_verifier,
@@ -310,9 +310,11 @@ async def cilogon_callback(
 
     if not state:
         raise AccessDeniedError("CILogon callback state validation failed")
-    transaction = await runtime.database.consume_oauth_transaction(
-        state_hash=_token_hash(state),
-        provider="cilogon",
+    transaction = (
+        await runtime.session_service.hosted_database.consume_oauth_transaction(
+            state_hash=_token_hash(state),
+            provider="cilogon",
+        )
     )
     if transaction is None:
         raise AccessDeniedError("CILogon callback state validation failed")

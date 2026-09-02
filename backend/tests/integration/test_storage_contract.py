@@ -3,54 +3,99 @@
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from functools import partial
 from pathlib import Path
 
+import anyio
 from fastapi.testclient import TestClient
 
 from ldaca_wordflow.infrastructure.storage.layout import deployment_database_path
 from ldaca_wordflow.main import create_app
+from ldaca_wordflow.runtime import Runtime, runtime_context
 from ldaca_wordflow.settings import Settings
 
 
 def _settings(
     tmp_path: Path,
     *,
+    multi_user: bool = False,
     min_free_disk_bytes: int = 0,
     max_user_file_tree_response_bytes: int = 8 * 1024 * 1024,
 ) -> Settings:
     return Settings(
         data_root=tmp_path,
-        multi_user=False,
+        multi_user=multi_user,
         min_free_disk_bytes=min_free_disk_bytes,
         max_user_file_tree_response_bytes=max_user_file_tree_response_bytes,
-        session_cookie_secure=False,
-        cors_allowed_origins=("http://testserver",),
-        trusted_hosts=("testserver",),
+        session_cookie_secure=multi_user,
+        cors_allowed_origins=(
+            ("https://wordflow.example",) if multi_user else ("http://testserver",)
+        ),
+        trusted_hosts=("wordflow.example",) if multi_user else ("testserver",),
+        google_client_id="google-client" if multi_user else "",
     )
 
 
-def _set_quota(settings: Settings, value: int | None) -> None:
+def _set_quota(settings: Settings, user_id: str, value: int | None) -> None:
     with sqlite3.connect(deployment_database_path(settings)) as connection:
         connection.execute(
-            "UPDATE users SET storage_quota_bytes = ? WHERE id = 'root'",
-            (value,),
+            "UPDATE users SET storage_quota_bytes = ? WHERE id = ?",
+            (value, user_id),
         )
 
 
-def test_storage_resource_is_fresh_strict_and_no_store(
+def test_single_user_storage_resource_is_database_free_and_unlimited(
     tmp_path: Path,
-    finite_quota_test_filesystem: None,
 ) -> None:
     settings = _settings(tmp_path)
     app = create_app(settings, serve_frontend=False)
     with TestClient(app, base_url="http://testserver") as client:
-        session = client.get("/api/session").json()
+        response = client.get("/api/storage")
+
+    assert response.status_code == 200
+    assert response.json() == {"policy": "unlimited"}
+    assert "no-store" in response.headers["cache-control"]
+    assert not deployment_database_path(settings).exists()
+
+
+def test_hosted_storage_resource_is_fresh_strict_and_no_store(
+    tmp_path: Path,
+    finite_quota_test_filesystem: None,
+) -> None:
+    settings = _settings(tmp_path, multi_user=True)
+    captured: dict[str, Runtime] = {}
+
+    @asynccontextmanager
+    async def capture_runtime(_settings: Settings) -> AsyncIterator[Runtime]:
+        async with runtime_context(_settings) as runtime:
+            captured["runtime"] = runtime
+            yield runtime
+
+    app = create_app(settings, capture_runtime, serve_frontend=False)
+    with TestClient(app, base_url="https://wordflow.example") as client:
+        runtime = captured["runtime"]
+        user = anyio.run(
+            partial(
+                runtime.session_service.upsert_oidc_user,
+                issuer="https://accounts.google.com",
+                subject="storage-user",
+                email="storage@example.test",
+                name="Storage User",
+                picture=None,
+            )
+        )
+        issued = anyio.run(runtime.session_service.issue, user)
+        client.cookies.set("wordflow_session", issued.session_token)
+
+        _set_quota(settings, user.id, None)
         unlimited = client.get("/api/storage")
         assert unlimited.status_code == 200
         assert unlimited.json() == {"policy": "unlimited"}
         assert "no-store" in unlimited.headers["cache-control"]
 
-        _set_quota(settings, 1_000_000)
+        _set_quota(settings, user.id, 1_000_000)
         finite = client.get("/api/storage")
         assert finite.status_code == 200
         payload = finite.json()
@@ -69,13 +114,13 @@ def test_storage_resource_is_fresh_strict_and_no_store(
             payload["limit_bytes"] - payload["used_bytes"],
         )
 
-        _set_quota(settings, 1)
+        _set_quota(settings, user.id, 1)
         rejected = client.post(
             "/api/user-files/folders",
             json={"name": "blocked", "parent_path": ""},
             headers={
-                "Origin": "http://testserver",
-                "X-CSRF-Token": session["csrf_token"],
+                "Origin": "https://wordflow.example",
+                "X-CSRF-Token": issued.csrf_token,
             },
         )
         assert rejected.status_code == 507

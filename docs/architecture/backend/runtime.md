@@ -51,9 +51,9 @@ task alone enters and exits every `runtime_context`; request tasks await the
 transaction result and never manipulate its exit stack, task group, or cancel
 scope.
 
-`runtime_context` uses `AsyncExitStack`. Runtime startup
-initializes storage and SQLite, creates the task group and
-I/O limiter, verifies hosted filesystem-allocation accounting, constructs
+`runtime_context` uses `AsyncExitStack`. Runtime startup initializes storage,
+initializes SQLite only for hosted multi-user deployments, creates the task group
+and I/O limiter, verifies hosted filesystem-allocation accounting, constructs
 services, reconciles Workspaces, Analyses, User File Imports, response snapshots,
 and transient storage, starts both private schedulers, then starts bounded
 maintenance. A distinct resource stack owns provider clients, Workspace open
@@ -74,7 +74,7 @@ sequenceDiagram
     participant FastAPI
     participant Manager as Runtime manager
     participant Owner as Runtime owner task
-    participant Storage as Storage and database
+    participant Storage as Storage and hosted database
     participant Runtime
     participant Analysis as Analysis execution
     participant Imports as User File Imports

@@ -1,8 +1,9 @@
 """Filesystem-derived per-principal durable storage quota.
 
-Quota assignments are read from SQLite on every operation. Finite usage is a
-fresh scan of owner-attributable durable storage plus process-local
-reservations; no usage ledger, counter, watcher, or policy cache exists.
+Hosted quota assignments are read from SQLite on every operation. Single-user
+storage is unlimited without a database. Finite usage is a fresh scan of
+owner-attributable durable storage plus process-local reservations; no usage
+ledger, counter, watcher, or policy cache exists.
 """
 
 from __future__ import annotations
@@ -35,6 +36,13 @@ T = TypeVar("T")
 
 class StorageQuotaRepository(Protocol):
     async def get_storage_quota_bytes(self, user_id: str) -> int | None: ...
+
+
+class UnlimitedStorageQuotaRepository:
+    """Return the fixed database-free policy for single-user runtimes."""
+
+    async def get_storage_quota_bytes(self, user_id: str) -> None:
+        return None
 
 
 @dataclass(frozen=True, slots=True)
@@ -512,5 +520,6 @@ __all__ = [
     "QuotaStorageStatus",
     "StorageQuotaRepository",
     "StorageStatus",
+    "UnlimitedStorageQuotaRepository",
     "UnlimitedStorageStatus",
 ]

@@ -14,8 +14,8 @@
   remote adapter. This needs the deployment target and separate authorization.
 - [x] Install the pinned spaCy pipeline as a package and remove runtime acquisition.
 - [x] Upgrade direct dependencies and modernize Python 3.14 and FastAPI typing.
-- [x] Land the original native schema 22, archive format 21, SQLite schema 7,
-  and import envelope 1 cutover.
+- [x] Land the original native schema 22, archive format 21, hosted SQLite
+  schema 7, and import envelope 1 cutover.
 - [x] Replace the later monolithic native schema 23 and archive format 22 with
   data schema 1, archive data format 1, and independent Analysis-kind version 1
   envelopes; preserve incompatible native records and omit them portably with
@@ -23,6 +23,8 @@
 - [x] Replace Tab and Result contracts and regenerate frontend consumers.
 - [x] Add unavailable child resources with in-place current-schema isolation.
 - [x] Complete every persistence-integrity boundary and recovery test.
+- [x] Remove SQLite initialization and quota/session use from single-user mode
+  while preserving hosted schema validation and existing Data Root files.
 - [x] Update durable docs and run backend, frontend, docs, and package gates.
 
 ## Acceptance evidence (2026-08-30)

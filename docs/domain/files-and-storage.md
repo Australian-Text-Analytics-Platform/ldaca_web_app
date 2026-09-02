@@ -2,11 +2,12 @@
 
 ## Storage Areas
 
-The Data Root owns `deployment.sqlite3`, one global Workspace catalogue,
-per-user file/import areas, execution-private staging, response snapshots, and
-runtime caches. Analysis lifecycle and Artifacts live inside their Workspace;
-User File Import history lives inside its user's import area. Host paths are
-private and never appear in public resources.
+The Data Root owns one global Workspace catalogue, per-user file/import areas,
+execution-private staging, response snapshots, and runtime caches. Hosted
+multi-user deployments additionally own `deployment.sqlite3`; single-user
+runtimes neither create nor read it. Analysis lifecycle and Artifacts live
+inside their Workspace; User File Import history lives inside its user's import
+area. Host paths are private and never appear in public resources.
 
 A User File is mutable import material. Adding one to a Workspace snapshots it
 into an immutable Workspace-owned source, so later moves or deletion in the
@@ -36,7 +37,7 @@ backend storage model.
 flowchart TB
     ROOT["Data Root"] --> USERS["users/<user-id>"]
     ROOT --> WORKSPACES["workspaces/<workspace-id>"]
-    ROOT --> AUTH["deployment.sqlite3"]
+    ROOT --> AUTH["Hosted only<br/>deployment.sqlite3"]
     ROOT --> SNAPSHOTS["Response and query snapshots"]
     ROOT --> CACHE["Runtime caches"]
 
@@ -95,8 +96,10 @@ flowchart TB
   User File, import, Analysis, and response-snapshot writes. User Preferences
   and single-user Provider Credential writes do not yet use that admission
   boundary.
-- A finite policy is read from SQLite for every status or admitted-write check;
-  `NULL` is unlimited and performs no quota scan or accounting probe.
+- A hosted finite policy is read from SQLite for every status or admitted-write
+  check; `NULL` is unlimited. Single-user mode uses a fixed database-free
+  unlimited policy. Unlimited policies perform no quota scan or accounting
+  probe.
 - Finite quota accounting requires host filesystem allocation metrics. A
   multi-user runtime fails readiness when the host cannot provide them, while
   the unlimited single-user desktop profile never requests that capability.

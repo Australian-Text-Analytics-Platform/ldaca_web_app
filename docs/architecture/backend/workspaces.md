@@ -150,7 +150,7 @@ The deployment layout is:
 
 ```text
 data_root/
-├── deployment.sqlite3
+├── deployment.sqlite3 [hosted multi-user only]
 ├── workspaces/
 │   ├── .staging/
 │   ├── .trash/

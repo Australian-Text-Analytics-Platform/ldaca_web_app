@@ -42,6 +42,7 @@ def test_desktop_session_requires_process_csrf_for_unsafe_loopback(
     tmp_path: Path,
 ) -> None:
     app = create_app(_settings(tmp_path, multi_user=False), serve_frontend=False)
+    database_path = deployment_database_path(_settings(tmp_path, multi_user=False))
     with TestClient(app, base_url="http://testserver") as client:
         session = client.get("/api/session")
         assert session.status_code == 200
@@ -89,14 +90,9 @@ def test_desktop_session_requires_process_csrf_for_unsafe_loopback(
         )
         assert accepted.status_code == 201
 
-    database = sqlite3.connect(
-        deployment_database_path(_settings(tmp_path, multi_user=False))
-    )
-    row = database.execute(
-        "SELECT id, email, name, storage_quota_bytes FROM users"
-    ).fetchone()
-    database.close()
-    assert row == ("root", "root@localhost", "Root User", None)
+    assert not database_path.exists()
+    assert (tmp_path / "users" / "root" / "files").is_dir()
+    assert (tmp_path / "users" / "root" / "imports").is_dir()
 
 
 def test_root_path_cannot_bypass_csrf_and_locations_keep_prefix(
@@ -130,33 +126,45 @@ def test_root_path_cannot_bypass_csrf_and_locations_keep_prefix(
         assert accepted.headers["location"].startswith("/prefix/api/workspaces/")
 
 
-def test_desktop_startup_refreshes_canonical_root_user_as_unlimited(
+def test_single_user_ignores_legacy_database_and_preserves_data(
     tmp_path: Path,
 ) -> None:
     settings = _settings(tmp_path, multi_user=False)
-    app = create_app(settings, serve_frontend=False)
-    with TestClient(app, base_url="http://testserver"):
-        pass
-
-    database = sqlite3.connect(deployment_database_path(settings))
-    database.execute(
-        "UPDATE users SET name = ?, storage_quota_bytes = ? WHERE id = ?",
-        ("Stale Name", 1, "root"),
-    )
-    database.commit()
-    database.close()
+    database_path = deployment_database_path(settings)
+    database_path.write_bytes(b"unsupported legacy database")
+    user_file = tmp_path / "users" / "root" / "files" / "keep.txt"
+    user_file.parent.mkdir(parents=True)
+    user_file.write_text("user data", encoding="utf-8")
+    workspace_file = tmp_path / "workspaces" / "keep.bin"
+    workspace_file.parent.mkdir(parents=True)
+    workspace_file.write_bytes(b"workspace data")
 
     app = create_app(settings, serve_frontend=False)
     with TestClient(app, base_url="http://testserver") as client:
+        assert client.get("/health/ready").status_code == 200
         assert client.get("/api/session").json()["user"]["name"] == "Root User"
+        assert client.get("/api/storage").json() == {"policy": "unlimited"}
 
+    assert database_path.read_bytes() == b"unsupported legacy database"
+    assert user_file.read_text(encoding="utf-8") == "user data"
+    assert workspace_file.read_bytes() == b"workspace data"
+
+
+def test_multi_user_still_rejects_an_unsupported_database(tmp_path: Path) -> None:
+    settings = _settings(tmp_path, multi_user=True)
     database = sqlite3.connect(deployment_database_path(settings))
-    row = database.execute(
-        "SELECT name, storage_quota_bytes FROM users WHERE id = ?",
-        ("root",),
-    ).fetchone()
+    database.execute("PRAGMA user_version = 6")
     database.close()
-    assert row == ("Root User", None)
+
+    app = create_app(settings, serve_frontend=False)
+    with TestClient(app, base_url="https://wordflow.example") as client:
+        resource = client.get("/api/data-root")
+        assert resource.status_code == 200
+        assert resource.json()["state"] == "configuration_error"
+        assert resource.json()["error"]["message"] == (
+            "RuntimeError: Unsupported database schema version"
+        )
+        assert client.get("/health/ready").status_code == 503
 
 
 @pytest.mark.parametrize("frontend_origin", DEV_FRONTEND_ORIGINS)

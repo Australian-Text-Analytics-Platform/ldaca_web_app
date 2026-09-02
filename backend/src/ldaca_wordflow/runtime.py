@@ -8,7 +8,7 @@ Used by:
 - tests that run multiple applications without global state leakage.
 
 Flow:
-- ``runtime_context`` initializes storage and database state, creates the
+- ``runtime_context`` initializes storage and hosted database state, creates the
   runtime-owned AnyIO task group and capacity limiters, and warms executors;
 - FastAPI copies the yielded ``LifespanState`` into each request's state; and
 - shutdown rejects submissions, drains application-owned work, closes
@@ -62,7 +62,7 @@ from .infrastructure.storage.layout import (
 from .infrastructure.storage.durable_fs import mkdir_durable
 from .infrastructure.storage.private_toml import PrivateTomlPersistence
 from .services.storage_admission import StorageAdmissionService
-from .services.quota import QuotaService
+from .services.quota import QuotaService, UnlimitedStorageQuotaRepository
 from .services.response_snapshots import ResponseSnapshotService
 from .infrastructure.storage.user_file_import_store import UserFileImportStore
 from .services.analysis_results import AnalysisResultService
@@ -155,7 +155,6 @@ class Runtime:
 
     settings: Settings
     readiness: RuntimeReadiness
-    database: Database
     task_group: TaskGroup
     io_limiter: anyio.CapacityLimiter
     quota_service: QuotaService
@@ -780,8 +779,8 @@ async def runtime_context(settings: Settings) -> AsyncIterator[Runtime]:
     - the default ``create_app`` lifespan factory.
 
     Flow:
-    1. initialize storage and database state,
-    2. initialize the app-owned database,
+    1. initialize storage state,
+    2. initialize the hosted app-owned database when multi-user mode requires it,
     3. enter the runtime task group and construct capacity limiters,
     4. reconcile retained resources and start private execution plus maintenance,
     5. on shutdown reject submissions, drain services, stop executors, and let
@@ -799,8 +798,14 @@ async def runtime_context(settings: Settings) -> AsyncIterator[Runtime]:
             abandon_on_cancel=False,
             limiter=io_limiter,
         )
-        database = Database(deployment_database_path(settings))
-        await database.initialize()
+        database: Database | None = None
+        quota_repository: Database | UnlimitedStorageQuotaRepository
+        if settings.multi_user:
+            database = Database(deployment_database_path(settings))
+            await database.initialize()
+            quota_repository = database
+        else:
+            quota_repository = UnlimitedStorageQuotaRepository()
 
         task_group = anyio.create_task_group()
         await task_group.__aenter__()
@@ -812,7 +817,7 @@ async def runtime_context(settings: Settings) -> AsyncIterator[Runtime]:
         )
         stack.push_async_callback(task_group_owner.close)
         quota_service = QuotaService(
-            database,
+            quota_repository,
             data_root=settings.get_data_root(),
             user_root=lambda user_id: user_root(settings, user_id),
             workspaces_root=workspaces_root(settings),
@@ -1012,7 +1017,6 @@ async def runtime_context(settings: Settings) -> AsyncIterator[Runtime]:
         runtime = Runtime(
             settings=settings,
             readiness=readiness,
-            database=database,
             task_group=task_group,
             io_limiter=io_limiter,
             quota_service=quota_service,

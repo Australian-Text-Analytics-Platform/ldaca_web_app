@@ -85,7 +85,7 @@ class OAuthService:
         expires_at = info.get("exp")
         if not isinstance(expires_at, int) or isinstance(expires_at, bool):
             raise InvalidInputError("Google identity is missing credential expiry")
-        consumed = await self.sessions.database.consume_google_credential(
+        consumed = await self.sessions.hosted_database.consume_google_credential(
             hashlib.sha256(credential.encode("utf-8")).hexdigest(),
             expires_at,
             datetime.now(UTC).isoformat(),

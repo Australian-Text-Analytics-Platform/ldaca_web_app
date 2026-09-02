@@ -35,16 +35,19 @@ Unknown settings are rejected.
 | `MAX_USER_FILE_IMPORT_RECORD_BYTES` | Strict per-import JSON record limit |
 | `MAX_CONCURRENT_WORKSPACE_IMPORTS` | Archive import concurrency |
 
-The internal layout is fixed rather than configurable:
-`deployment.sqlite3`, `workspaces/`, and `users/` are direct children of the
-Data Root. There is no Workspace-count setting or alternate per-user Workspace
-directory. Explicitly open Workspaces remain open until close, deletion, or
-shutdown; there is no idle or LRU setting. `MAX_OPEN_WORKSPACE_BYTES` applies
-only in hosted multi-user mode, while single-user mode has no process-residency
-cap. Per-principal quota is the nullable `users.storage_quota_bytes`
-policy in `deployment.sqlite3`, not an environment setting. `NULL` means
-unlimited; new hosted users receive the database default of 30 GiB. There are
-no file-count, directory-count, Analysis-count, or queue-count quotas.
+The internal layout is fixed rather than configurable: `workspaces/` and
+`users/` are direct children of every Data Root. Hosted multi-user deployments
+also use `deployment.sqlite3`. Single-user runtimes never create, open,
+validate, or modify that file, including when a legacy copy already exists.
+There is no Workspace-count setting or alternate per-user Workspace directory.
+Explicitly open Workspaces remain open until close, deletion, or shutdown;
+there is no idle or LRU setting. `MAX_OPEN_WORKSPACE_BYTES` applies only in
+hosted multi-user mode, while single-user mode has no process-residency cap.
+Hosted per-principal quota is the nullable `users.storage_quota_bytes` policy
+in `deployment.sqlite3`, not an environment setting. `NULL` means unlimited;
+new hosted users receive the database default of 30 GiB. Single-user storage is
+always unlimited. There are no file-count, directory-count, Analysis-count, or
+queue-count quotas.
 
 When `DATA_ROOT` is absent, Wordflow reads
 `<platform config directory>/au.edu.ldaca.wordflow/settings.json` with
