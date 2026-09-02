@@ -109,7 +109,7 @@ function ResponsiveWordCloudInstance({
       rotationStep: 1,
       gridSize: 4,
       drawOutOfBound: false,
-      shrinkToFit: false,
+      shrinkToFit: true,
       layoutAnimation: false,
       silent: !interactive,
       cursor: interactive ? 'pointer' : 'default',
