@@ -42,6 +42,7 @@ from ..infrastructure.storage.workspace_store import (
     WorkspaceSerializationError,
     WorkspaceSnapshotInfo,
     WorkspaceStore,
+    WorkspaceStoreError,
 )
 from ..infrastructure.storage.workspace_access import write_workspace_owner
 from ..infrastructure.storage.safe_paths import is_link_or_reparse
@@ -54,8 +55,6 @@ from ..shared.errors import (
     WorkspaceConflictError,
     WorkspaceClosingError,
     WorkspaceCorruptError,
-    WorkspaceInUseError,
-    WorkspaceLockUnavailableError,
     WorkspaceNotFoundError,
     WorkspaceNotOpenError,
 )
@@ -107,15 +106,14 @@ from .workspace_coordination import (
 
 T = TypeVar("T")
 logger = logging.getLogger(__name__)
-WorkspaceReconciler = Callable[[Workspace], bool]
 
 
 def _cleanup_abandoned_node_staging(workspace_path: Path) -> None:
     """Remove only the private temp files used for source-node publication.
 
-    Called during workspace discovery. A crash before ``os.replace`` leaves no
-    graph reference to these files, so deleting them is both safe and necessary
-    before the workspace can be used again.
+    Called only after the Workspace has loaded successfully. A crash before
+    ``os.replace`` leaves no graph reference to these files, so deleting them is
+    both safe and necessary before the Workspace is used again.
     """
 
     data_root = workspace_path / "data"
@@ -157,7 +155,7 @@ def _remove_private_entry(path: Path) -> None:
 
 
 def _cleanup_workspace_service_temps(root: Path) -> None:
-    """Discard interrupted staging/trash work and private node temp files."""
+    """Discard only service-private staging and trash work."""
 
     _mkdir_durable(root)
     staging_root = root / ".staging"
@@ -171,22 +169,6 @@ def _cleanup_workspace_service_temps(root: Path) -> None:
             changed = True
         if changed:
             _fsync_directory(private_root)
-
-    for candidate in root.iterdir():
-        if candidate.name.startswith("."):
-            continue
-        try:
-            canonical_id = str(uuid.UUID(candidate.name))
-            metadata = candidate.lstat()
-        except OSError, ValueError:
-            continue
-        if (
-            canonical_id == candidate.name
-            and stat.S_ISDIR(metadata.st_mode)
-            and not is_link_or_reparse(metadata)
-        ):
-            _cleanup_abandoned_node_staging(candidate)
-
 
 class WorkspaceService:
     """Only owner of Workspace open state, mutation, and persistence.
@@ -875,6 +857,7 @@ class WorkspaceService:
                 slot.closing = False
                 resource = self.materialize_record(workspace, revision, "open")
                 state_changed = True
+                await self._cleanup_loaded_workspace(path)
         if state_changed:
             await self._event_publisher.runtime_state(user_id, workspace_id, "open")
         return resource
@@ -1193,77 +1176,27 @@ class WorkspaceService:
         await self._residency.close()
 
     async def reconcile_transient_storage(self) -> None:
-        """Remove archive/delete crash leftovers once, before serving requests."""
+        """Remove global archive/delete crash leftovers before serving requests."""
 
         await self._residency.run_io(
             _cleanup_workspace_service_temps,
             workspaces_root(self.settings),
         )
 
-    async def reconcile_durable_workspaces(
-        self,
-        reconcile: WorkspaceReconciler,
-    ) -> None:
-        """Apply one startup-only domain reconciliation to every valid Workspace.
+    async def _cleanup_loaded_workspace(self, path: Path) -> None:
+        """Best-effort cleanup after one Workspace has loaded successfully."""
 
-        Each Workspace is loaded and committed independently without becoming
-        open. Corrupt or concurrently changed entries are isolated so one
-        owner's data cannot block reconciliation for another owner.
-        """
-
-        paths = await self._residency.run_io(self._catalogue.scan_owned_paths)
-        for owner_id, path in paths:
-            workspace_id = uuid.UUID(path.name)
-            async with self._residency.slot(workspace_id) as slot:
-                if slot.workspace is not None:
-                    raise RuntimeError(
-                        "Durable Workspace reconciliation must run before serving"
-                    )
-                try:
-                    if slot.process_lock is None:
-                        slot.process_lock = await self._residency.acquire_process_lock(workspace_id)
-                except WorkspaceInUseError:
-                    logger.info(
-                        "Skipping startup reconciliation for a Workspace open "
-                        "in another backend workspace_id=%s owner_id=%s",
-                        path.name,
-                        owner_id,
-                    )
-                    continue
-                except WorkspaceLockUnavailableError:
-                    logger.exception(
-                        "Workspace lock unavailable during startup reconciliation "
-                        "workspace_id=%s owner_id=%s",
-                        path.name,
-                        owner_id,
-                    )
-                    continue
-                try:
-                    await self._residency.run_io(self._store.reconcile, path)
-                    workspace, revision, _serialized_bytes = await self._residency.run_io(
-                        self._catalogue.load,
-                        path,
-                    )
-                    if not reconcile(workspace):
-                        continue
-                    await self._residency.run_io(
-                        self._save_sync,
-                        path,
-                        workspace,
-                        revision,
-                    )
-                except (
-                    OSError,
-                    ResourceTooLargeError,
-                    WorkspaceConflictError,
-                    WorkspaceCorruptError,
-                ):
-                    logger.exception(
-                        "Workspace startup reconciliation failed "
-                        "workspace_id=%s owner_id=%s",
-                        path.name,
-                        owner_id,
-                    )
-                finally:
-                    with anyio.CancelScope(shield=True):
-                        await self._residency.clear(slot)
+        try:
+            await self._residency.run_io(self._store.reconcile, path)
+        except (OSError, WorkspaceStoreError):
+            logger.exception(
+                "Workspace post-load reconciliation failed workspace_id=%s",
+                path.name,
+            )
+        try:
+            await self._residency.run_io(_cleanup_abandoned_node_staging, path)
+        except OSError:
+            logger.exception(
+                "Workspace post-load node cleanup failed workspace_id=%s",
+                path.name,
+            )

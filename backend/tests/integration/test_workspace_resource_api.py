@@ -5,6 +5,7 @@ from __future__ import annotations
 from io import BytesIO
 import json
 from pathlib import Path
+import uuid
 import zipfile
 
 from fastapi.testclient import TestClient
@@ -486,6 +487,40 @@ def test_corrupt_workspace_is_catalogued_but_directly_reported_and_deletable(
         )
         assert deleted.status_code == 204
         assert not workspace_path.exists()
+
+
+def test_preexisting_corrupt_workspace_does_not_block_runtime_startup(
+    tmp_path: Path,
+) -> None:
+    workspace_id = uuid.uuid4()
+    workspace_path = tmp_path / "workspaces" / str(workspace_id)
+    workspace_path.mkdir(parents=True)
+    (workspace_path / "access.json").write_text(
+        json.dumps({"owner_id": "root"}),
+        encoding="utf-8",
+    )
+    metadata = b'{"workspace_metadata":{"invalid":true}}'
+    (workspace_path / "workspace.json").write_bytes(metadata)
+
+    with _client(tmp_path) as client:
+        assert client.get("/health/ready").status_code == 200
+        assert client.get("/api/session").status_code == 200
+        assert client.get("/api/workspaces").json() == [
+            {
+                "availability": "unavailable",
+                "id": str(workspace_id),
+                "reason": "corrupt_snapshot",
+                "message": "Workspace data is corrupt.",
+                "name": None,
+                "description": None,
+                "created_at": None,
+                "modified_at": None,
+                "stored_data_schema_version": None,
+                "supported_data_schema_version": None,
+            }
+        ]
+
+    assert (workspace_path / "workspace.json").read_bytes() == metadata
 
 
 def test_incompatible_workspace_lists_metadata_and_supports_archival_download(

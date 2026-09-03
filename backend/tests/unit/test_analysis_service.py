@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -932,7 +933,7 @@ async def test_shutdown_interruption_distinguishes_queued_running_and_user_cance
 
 
 @pytest.mark.anyio
-async def test_startup_reconciliation_fails_closed_workspace_analyses(
+async def test_open_finalization_fails_interrupted_workspace_analyses(
     tmp_path: Path,
 ) -> None:
     workspaces, workspace_id, node_id, first_tab_id = await _opened_workspace_with_tab(
@@ -961,12 +962,12 @@ async def test_startup_reconciliation_fails_closed_workspace_analyses(
         return False
 
     await workspaces.request_close("user", workspace_id, no_active_work)
-    await service.reconcile_interrupted_analyses()
+    before = await workspaces.open_workspace("user", workspace_id)
+    await service.finalize_interrupted_analyses("user", workspace_id)
 
-    assert (
-        await workspaces.get_workspace("user", workspace_id)
-    ).runtime_state == "closed"
-    await workspaces.open_workspace("user", workspace_id)
+    finalized = await workspaces.get_workspace("user", workspace_id)
+    assert finalized.runtime_state == "open"
+    assert finalized.revision == before.revision + 1
     queued_terminal = await service.get("user", workspace_id, queued.id)
     running_terminal = await service.get("user", workspace_id, running.id)
     assert queued_terminal.state is AnalysisState.FAILED
@@ -975,6 +976,41 @@ async def test_startup_reconciliation_fails_closed_workspace_analyses(
     assert running_terminal.error is not None
     assert queued_terminal.error.code == "analysis_interrupted"
     assert running_terminal.error.code == "analysis_interrupted"
+
+
+@pytest.mark.anyio
+async def test_unavailable_analysis_is_preserved_until_explicit_clear(
+    tmp_path: Path,
+) -> None:
+    workspaces, workspace_id, node_id, tab_id = await _opened_workspace_with_tab(
+        tmp_path
+    )
+    service = _analysis_service(tmp_path, workspaces, _ExecutionControl())
+    created = await _submit(service, "user", workspace_id, tab_id, _request(node_id))
+
+    async def no_active_work(_user_id: str, _workspace_id: uuid.UUID) -> bool:
+        return False
+
+    await workspaces.request_close("user", workspace_id, no_active_work)
+    workspace_path = tmp_path / "workspaces" / str(workspace_id)
+    manifest = json.loads((workspace_path / "workspace.json").read_text(encoding="utf-8"))
+    reference = next(item for item in manifest["analyses"] if item["id"] == str(created.id))
+    analysis_path = workspace_path / reference["record_path"]
+    invalid_bytes = b"not valid analysis json"
+    analysis_path.write_bytes(invalid_bytes)
+
+    await workspaces.open_workspace("user", workspace_id)
+    resources = await service.for_tab("user", workspace_id, tab_id)
+
+    assert len(resources) == 1
+    assert resources[0].availability == "unavailable"
+    assert resources[0].reason == "record_invalid"
+    assert analysis_path.read_bytes() == invalid_bytes
+
+    await service.clear_tab("user", workspace_id, tab_id)
+
+    assert await service.for_tab("user", workspace_id, tab_id) == []
+    assert not analysis_path.exists()
 
 
 @pytest.mark.anyio

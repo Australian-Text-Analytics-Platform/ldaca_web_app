@@ -1681,9 +1681,10 @@ class WorkspaceStore:
     def reconcile(self, path: str | Path) -> WorkspaceSnapshotInfo:
         """Remove crash-orphaned generations after validating the commit point.
 
-        Called under ``WorkspaceService``'s per-user mutation gate during
-        discovery. Unreferenced generations and private Analysis storage are
-        removed according to the committed lifecycle records.
+        Called under ``WorkspaceService``'s process lock only after explicit
+        open has loaded the Workspace successfully. Unreferenced generations
+        and private Analysis storage are removed according to the committed
+        lifecycle records.
         """
 
         info = self._inspect_complete(path)

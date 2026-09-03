@@ -3,7 +3,12 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { HttpResponse, http } from 'msw';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { UnavailableUserFileImport, UserFileImport, WorkspaceCatalogueItem } from '@/api';
+import type {
+  UnavailableAnalysis,
+  UnavailableUserFileImport,
+  UserFileImport,
+  WorkspaceCatalogueItem,
+} from '@/api';
 import { useTabAnalysisForest } from '@/features/views/common/hooks/useTabAnalysisForest';
 import { queryKeys } from '@/lib/queryKeys';
 import { useFreshNodesStore } from '@/stores/freshNodesStore';
@@ -288,6 +293,55 @@ describe('useWorkspaceTaskInbox', () => {
       );
     });
     expect(requestedPages).toEqual(['1', '2']);
+  });
+
+  it('clears an unavailable Analysis through its owning Tab', async () => {
+    const unavailable: UnavailableAnalysis = {
+      availability: 'unavailable',
+      id: 'analysis-unavailable',
+      tab_id: 'tab-1',
+      reason: 'record_invalid',
+      analysis_kind: null,
+      stored_schema_version: null,
+      supported_schema_version: null,
+      warning: 'This Analysis is unavailable because its stored record is invalid.',
+    };
+    let clearedPath = '';
+    server.use(
+      http.get('*/api/workspaces/:workspace_id/analyses', () =>
+        HttpResponse.json({
+          items: [unavailable],
+          page: 1,
+          page_size: 500,
+          total_items: 1,
+          total_pages: 1,
+        }),
+      ),
+      http.delete('*/api/workspaces/:workspace_id/tabs/:tab_id/analyses', ({ params }) => {
+        clearedPath = `${String(params.workspace_id)}/${String(params.tab_id)}`;
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+    const view = renderHook(() => useWorkspaceTaskInbox('workspace-1'), { wrapper });
+
+    await waitFor(() =>
+      expect(view.result.current.tasks).toEqual([
+        expect.objectContaining({
+          task_id: unavailable.id,
+          tab_id: unavailable.tab_id,
+          state: 'failed',
+        }),
+      ]),
+    );
+    act(() => {
+      view.result.current.clearUnavailableAnalysis('workspace-1', 'tab-1');
+    });
+
+    await waitFor(() => expect(clearedPath).toBe('workspace-1/tab-1'));
   });
 
   it('shares one paginated Analysis collection with Run All review consumers', async () => {

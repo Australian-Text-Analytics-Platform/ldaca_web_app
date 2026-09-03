@@ -22,6 +22,7 @@ class _Analyses:
         self.active = False
         self.active_workspace_ids: set[uuid.UUID] = set()
         self.cancelled: list[tuple[str, uuid.UUID]] = []
+        self.finalized: list[tuple[str, uuid.UUID]] = []
 
     async def has_workspace_work(self, user_id: str, workspace_id: uuid.UUID) -> bool:
         del user_id
@@ -29,6 +30,13 @@ class _Analyses:
 
     async def cancel_workspace(self, user_id: str, workspace_id: uuid.UUID) -> None:
         self.cancelled.append((user_id, workspace_id))
+
+    async def finalize_interrupted_analyses(
+        self,
+        user_id: str,
+        workspace_id: uuid.UUID,
+    ) -> None:
+        self.finalized.append((user_id, workspace_id))
 
 
 def _workspace_service(
@@ -55,10 +63,21 @@ def _workspace_service(
     )
 
 
+def _lifecycle(
+    workspaces: WorkspaceService,
+    analyses: _Analyses,
+) -> WorkspaceLifecycleService:
+    return WorkspaceLifecycleService(
+        workspaces,
+        cast(Any, analyses),
+        cast(Any, analyses),
+    )
+
+
 async def test_open_makes_target_the_only_open_workspace(tmp_path: Path) -> None:
     workspaces = _workspace_service(tmp_path)
     analyses = _Analyses()
-    lifecycle = WorkspaceLifecycleService(workspaces, cast(Any, analyses))
+    lifecycle = _lifecycle(workspaces, analyses)
     first = await workspaces.create_workspace("owner", "First")
     second = await workspaces.create_workspace("owner", "Second")
     await workspaces.open_workspace("owner", first.id)
@@ -72,6 +91,11 @@ async def test_open_makes_target_the_only_open_workspace(tmp_path: Path) -> None
     assert (await workspaces.get_workspace("owner", second.id)).runtime_state == (
         "open"
     )
+    assert analyses.finalized == [("owner", second.id)]
+
+    await lifecycle.open("owner", second.id)
+
+    assert analyses.finalized == [("owner", second.id)]
 
 
 async def test_workspace_switch_publishes_every_runtime_transition(
@@ -80,7 +104,7 @@ async def test_workspace_switch_publishes_every_runtime_transition(
     events = EventHub()
     workspaces = _workspace_service(tmp_path, events=events)
     analyses = _Analyses()
-    lifecycle = WorkspaceLifecycleService(workspaces, cast(Any, analyses))
+    lifecycle = _lifecycle(workspaces, analyses)
     first = await workspaces.create_workspace("owner", "First")
     second = await workspaces.create_workspace("owner", "Second")
     subscription = await events.subscribe("owner", "session")
@@ -113,7 +137,7 @@ async def test_open_marks_busy_sibling_closing_and_reopening_it_reverses_roles(
 ) -> None:
     workspaces = _workspace_service(tmp_path)
     analyses = _Analyses()
-    lifecycle = WorkspaceLifecycleService(workspaces, cast(Any, analyses))
+    lifecycle = _lifecycle(workspaces, analyses)
     first = await workspaces.create_workspace("owner", "First")
     second = await workspaces.create_workspace("owner", "Second")
     await workspaces.open_workspace("owner", first.id)
@@ -141,7 +165,7 @@ async def test_concurrent_open_requests_never_leave_two_open_workspaces(
 ) -> None:
     workspaces = _workspace_service(tmp_path)
     analyses = _Analyses()
-    lifecycle = WorkspaceLifecycleService(workspaces, cast(Any, analyses))
+    lifecycle = _lifecycle(workspaces, analyses)
     first = await workspaces.create_workspace("owner", "First")
     second = await workspaces.create_workspace("owner", "Second")
 
@@ -160,7 +184,7 @@ async def test_concurrent_open_requests_never_leave_two_open_workspaces(
 async def test_open_lifecycle_is_independent_between_users(tmp_path: Path) -> None:
     workspaces = _workspace_service(tmp_path, multi_user=True)
     analyses = _Analyses()
-    lifecycle = WorkspaceLifecycleService(workspaces, cast(Any, analyses))
+    lifecycle = _lifecycle(workspaces, analyses)
     first_a = await workspaces.create_workspace("alice", "Alice first")
     second_a = await workspaces.create_workspace("alice", "Alice second")
     first_b = await workspaces.create_workspace("bob", "Bob first")
@@ -180,7 +204,7 @@ async def test_open_failure_exposes_sibling_transition_without_fake_rollback(
 ) -> None:
     workspaces = _workspace_service(tmp_path)
     analyses = _Analyses()
-    lifecycle = WorkspaceLifecycleService(workspaces, cast(Any, analyses))
+    lifecycle = _lifecycle(workspaces, analyses)
     first = await workspaces.create_workspace("owner", "First")
     second = await workspaces.create_workspace("owner", "Second")
     await workspaces.open_workspace("owner", first.id)
@@ -213,7 +237,7 @@ async def test_process_lock_conflict_preserves_the_current_workspace(
     external = _workspace_service(tmp_path)
     local = _workspace_service(tmp_path)
     analyses = _Analyses()
-    lifecycle = WorkspaceLifecycleService(local, cast(Any, analyses))
+    lifecycle = _lifecycle(local, analyses)
     current = await local.create_workspace("owner", "Current")
     target = await external.create_workspace("owner", "Target")
     await local.open_workspace("owner", current.id)
@@ -231,7 +255,7 @@ async def test_close_defers_only_while_analysis_execution_is_active(
 ) -> None:
     workspaces = _workspace_service(tmp_path)
     analyses = _Analyses()
-    lifecycle = WorkspaceLifecycleService(workspaces, cast(Any, analyses))
+    lifecycle = _lifecycle(workspaces, analyses)
     workspace = await workspaces.create_workspace("owner", "Close safely")
     await workspaces.open_workspace("owner", workspace.id)
 
@@ -256,7 +280,7 @@ async def test_delete_signals_execution_then_atomically_removes_workspace(
 ) -> None:
     workspaces = _workspace_service(tmp_path)
     analyses = _Analyses()
-    lifecycle = WorkspaceLifecycleService(workspaces, cast(Any, analyses))
+    lifecycle = _lifecycle(workspaces, analyses)
     workspace = await workspaces.create_workspace("owner", "Delete safely")
     await workspaces.open_workspace("owner", workspace.id)
 

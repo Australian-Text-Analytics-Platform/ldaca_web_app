@@ -220,10 +220,15 @@ before recursive cleanup. The sidecar moves with the directory, so an
 interrupted cleanup remains attributable and startup can retry removal without
 inventing a database tombstone.
 
-Startup reconciliation acquires each Workspace lock independently. It skips a
-Workspace currently owned by another backend, reconciles unlocked siblings,
-and releases each temporary lock through its cleanup path. Listing and archive
-reads remain available because they do not claim process ownership.
+Startup clears only the service-private `.staging` and `.trash` roots and never
+enters a UUID Workspace directory. After authentication, catalogue listing
+inspects owner-attributable metadata and returns incompatible, corrupt, or
+over-limit Workspaces as unavailable records without hiding healthy siblings.
+Explicit open acquires one Workspace lock, loads that Workspace, and only then
+performs best-effort orphan cleanup. Valid queued or running Analyses left by a
+previous process are committed as interrupted before the open response returns;
+invalid or unsupported child records remain byte-identical until an explicit
+Clear Results or delete action removes them.
 
 User File and archive behavior is described in
 [Files and Storage](../../domain/files-and-storage.md).

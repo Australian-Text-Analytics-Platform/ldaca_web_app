@@ -946,7 +946,6 @@ async def runtime_context(settings: Settings) -> AsyncIterator[Runtime]:
             analysis_artifacts,
             credentials=provider_credential_store,
         )
-        await analysis_service.reconcile_interrupted_analyses()
         analysis_execution.bind(analysis_service, task_group)
         task_group_owner.register_admission_stopper(analysis_service.stop_accepting)
         task_group_owner.register_execution_shutdown(analysis_execution.close)
@@ -992,6 +991,7 @@ async def runtime_context(settings: Settings) -> AsyncIterator[Runtime]:
         workspace_lifecycle_service = WorkspaceLifecycleService(
             workspace_service,
             analysis_execution,
+            analysis_service,
         )
         analysis_result_service = AnalysisResultService(
             analysis_service,

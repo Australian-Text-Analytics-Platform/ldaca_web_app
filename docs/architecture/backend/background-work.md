@@ -76,10 +76,12 @@ cancel sibling work or another user's resources.
 
 ## Recovery And Shutdown
 
-Runtime queues and handles are never persisted. Startup strictly loads current
-Analysis and User File Import schemas and transitions retained queued/running
-records to their resource-specific interrupted Failure; it never requeues,
-resumes, guesses, or migrates them.
+Runtime queues and handles are never persisted. Startup strictly loads User File
+Import records and transitions retained queued/running imports to interrupted
+Failure. Workspace-contained Analyses are not read at startup. After one
+Workspace loads through explicit open, its valid queued/running Analyses are
+committed as interrupted before the open response returns. Neither path
+requeues, resumes, guesses, migrates, or rewrites unavailable records.
 
 Shutdown changes readiness to `stopping`, closes both submission boundaries,
 and stops both schedulers. Queued resources fail as interrupted. Analysis and
@@ -87,5 +89,6 @@ import process runners terminate concurrently against the same absolute
 `shutdown_grace_seconds` deadline. A success already committed remains
 successful, a previously requested user cancellation follows normal confirmed
 cancellation, and any other confirmed stop becomes interrupted failure. A
-record that cannot commit before shutdown remains non-terminal for the same
-deterministic startup reconciliation.
+record that cannot commit before shutdown remains non-terminal for deterministic
+finalization when its owning resource is next loaded: imports at startup and
+Analyses at explicit Workspace open.

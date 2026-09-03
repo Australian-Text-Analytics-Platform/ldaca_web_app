@@ -25,6 +25,7 @@ interface TaskItemBase {
 interface AnalysisTaskItem extends TaskItemBase {
   resource_type: 'analysis';
   workspace_id: string;
+  tab_id: string;
 }
 
 interface UserFileImportTaskItem extends TaskItemBase {
@@ -62,6 +63,7 @@ export const analysisToTask = (
       task_id: resource.id,
       task_type: resource.request.kind,
       workspace_id: workspaceId,
+      tab_id: resource.tab_id,
       state: toTaskState(resource.state),
       progress: progress?.fraction ?? undefined,
       progress_message: progress?.message ?? undefined,
@@ -78,6 +80,7 @@ export const analysisToTask = (
     task_id: resource.id,
     task_type: 'analysis_unavailable',
     workspace_id: workspaceId,
+    tab_id: resource.tab_id,
     state: 'failed',
     message: resource.warning,
     error: resource.reason,

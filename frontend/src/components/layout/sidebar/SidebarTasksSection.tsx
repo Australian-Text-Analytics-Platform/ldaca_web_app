@@ -37,8 +37,10 @@ interface SidebarTasksSectionProps {
   onReconnect: () => void;
   onStopUserFileImport: (importId: string) => void;
   onClearUserFileImport: (importId: string) => void;
+  onClearUnavailableAnalysis: (workspaceId: string, tabId: string) => void;
   stoppingImportId: string | null;
   clearingImportId: string | null;
+  clearingAnalysisTabId: string | null;
 }
 
 /** Called by: SidebarTasksSection sorting and expanded timestamp formatting. */
@@ -96,8 +98,10 @@ function SidebarTasksSection({
   onReconnect,
   onStopUserFileImport,
   onClearUserFileImport,
+  onClearUnavailableAnalysis,
   stoppingImportId,
   clearingImportId,
+  clearingAnalysisTabId,
 }: SidebarTasksSectionProps) {
   const sortedTasks = Array.isArray(tasks)
     ? tasks.slice().sort((a, b) => {
@@ -171,13 +175,18 @@ function SidebarTasksSection({
             const isUserFileImport = task.resource_type === 'user_file_import';
             const canStop =
               isUserFileImport && (task.state === 'queued' || task.state === 'running');
-            const canClear =
+            const canClearImport =
               isUserFileImport &&
               (task.state === 'successful' ||
                 task.state === 'failed' ||
                 task.state === 'cancelled');
+            const canClearAnalysis =
+              task.resource_type === 'analysis' && task.task_type === 'analysis_unavailable';
+            const canClear = canClearImport || canClearAnalysis;
             const isStopping = stoppingImportId === task.task_id;
-            const isClearing = clearingImportId === task.task_id;
+            const isClearing =
+              clearingImportId === task.task_id ||
+              (task.resource_type === 'analysis' && clearingAnalysisTabId === task.tab_id);
 
             return (
               <div
@@ -281,10 +290,18 @@ function SidebarTasksSection({
                             className="h-7 px-2 text-[11px]"
                             disabled={isStopping || isClearing}
                             onClick={() => {
-                              onClearUserFileImport(task.task_id);
+                              if (task.resource_type === 'analysis') {
+                                onClearUnavailableAnalysis(task.workspace_id, task.tab_id);
+                              } else {
+                                onClearUserFileImport(task.task_id);
+                              }
                             }}
                           >
-                            {isClearing ? 'Clearing...' : 'Clear'}
+                            {isClearing
+                              ? 'Clearing...'
+                              : canClearAnalysis
+                                ? 'Clear results'
+                                : 'Clear'}
                           </Button>
                         ) : null}
                       </div>

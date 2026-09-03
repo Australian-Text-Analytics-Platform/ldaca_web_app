@@ -88,6 +88,7 @@ const analysisTask = (
   task_id: analysis.id,
   task_type: taskType,
   workspace_id: workspaceId,
+  tab_id: analysis.tab_id,
   state: taskState(analysis),
   progress: analysis.progress.fraction ?? undefined,
   progress_message: analysis.progress.message ?? undefined,

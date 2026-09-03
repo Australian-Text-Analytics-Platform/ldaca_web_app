@@ -10,6 +10,7 @@ import uuid
 import anyio
 
 from .analysis_execution import AnalysisExecutionRuntime
+from .analyses import AnalysisService
 from .workspace import WorkspaceRecord, WorkspaceService
 
 
@@ -26,9 +27,11 @@ class WorkspaceLifecycleService:
         self,
         workspaces: WorkspaceService,
         analyses: AnalysisExecutionRuntime,
+        analysis_service: AnalysisService,
     ) -> None:
         self._workspaces = workspaces
         self._analyses = analyses
+        self._analysis_service = analysis_service
         self._gate_registry_lock = anyio.Lock()
         self._user_gates: dict[str, _UserLifecycleGate] = {}
 
@@ -46,7 +49,7 @@ class WorkspaceLifecycleService:
 
         async with self._user_gate(user_id):
             async with self._workspaces.reserve_open(user_id, workspace_id):
-                await self._workspaces.get_workspace(user_id, workspace_id)
+                target = await self._workspaces.get_workspace(user_id, workspace_id)
                 siblings = await self._workspaces.list_workspaces(user_id)
                 for sibling in siblings:
                     if (
@@ -60,7 +63,14 @@ class WorkspaceLifecycleService:
                         sibling.id,
                         self._analyses.has_workspace_work,
                     )
-                return await self._workspaces.open_workspace(user_id, workspace_id)
+                opened = await self._workspaces.open_workspace(user_id, workspace_id)
+                if target.runtime_state == "closed":
+                    await self._analysis_service.finalize_interrupted_analyses(
+                        user_id,
+                        workspace_id,
+                    )
+                    opened = await self._workspaces.open_workspace(user_id, workspace_id)
+                return opened
 
     async def request_close(
         self,

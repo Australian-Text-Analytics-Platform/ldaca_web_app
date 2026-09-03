@@ -13,8 +13,10 @@ const baseProps = {
   onReconnect: vi.fn(),
   onStopUserFileImport: vi.fn(),
   onClearUserFileImport: vi.fn(),
+  onClearUnavailableAnalysis: vi.fn(),
   stoppingImportId: null,
   clearingImportId: null,
+  clearingAnalysisTabId: null,
 };
 
 /** Called by: SidebarTasksSection tests that need compact task fixture rendering. */
@@ -33,6 +35,8 @@ describe('SidebarTasksSection', () => {
             resource_type: 'analysis',
             task_id: 'task-success',
             task_type: 'token_frequencies',
+            workspace_id: 'workspace-1',
+            tab_id: 'tab-1',
             state: 'successful',
             progress: 1,
             finished_at: '2026-01-01T00:00:00Z',
@@ -53,6 +57,8 @@ describe('SidebarTasksSection', () => {
         resource_type: 'analysis',
         task_id: 'task-success',
         task_type: 'topic_modeling',
+        workspace_id: 'workspace-1',
+        tab_id: 'tab-1',
         state: 'successful',
         finished_at: '2026-01-03T00:00:00Z',
       },
@@ -60,6 +66,8 @@ describe('SidebarTasksSection', () => {
         resource_type: 'analysis',
         task_id: 'task-running',
         task_type: 'token_frequencies',
+        workspace_id: 'workspace-1',
+        tab_id: 'tab-1',
         state: 'running',
         started_at: '2026-01-02T00:00:00Z',
       },
@@ -67,6 +75,8 @@ describe('SidebarTasksSection', () => {
         resource_type: 'analysis',
         task_id: 'task-failed',
         task_type: 'concordance',
+        workspace_id: 'workspace-1',
+        tab_id: 'tab-1',
         state: 'failed',
         finished_at: '2026-01-01T00:00:00Z',
       },
@@ -88,6 +98,8 @@ describe('SidebarTasksSection', () => {
         resource_type: 'analysis',
         task_id: 'task-failed',
         task_type: 'topic_modeling',
+        workspace_id: 'workspace-1',
+        tab_id: 'tab-1',
         state: 'failed',
         message: 'Save failed',
         progress_message: 'Queued',
@@ -110,6 +122,8 @@ describe('SidebarTasksSection', () => {
         resource_type: 'analysis',
         task_id: 'task-running',
         task_type: 'token_frequencies',
+        workspace_id: 'workspace-1',
+        tab_id: 'tab-1',
         state: 'running',
         message: 'Running',
         progress_message: 'Tokenizing documents',
@@ -122,7 +136,7 @@ describe('SidebarTasksSection', () => {
     expect(screen.getByText(/tokenizing documents/i)).toBeInTheDocument();
   });
 
-  it('keeps Analysis rows actionless because lifecycle belongs to their Tabs', async () => {
+  it('keeps available Analysis rows actionless because lifecycle belongs to their Tabs', async () => {
     const user = userEvent.setup();
 
     renderTasks([
@@ -130,6 +144,8 @@ describe('SidebarTasksSection', () => {
         resource_type: 'analysis',
         task_id: 'task-running',
         task_type: 'topic_modeling',
+        workspace_id: 'workspace-1',
+        tab_id: 'tab-1',
         state: 'running',
         progress: 0.4,
         created_at: '2026-01-02T00:00:00Z',
@@ -138,6 +154,8 @@ describe('SidebarTasksSection', () => {
         resource_type: 'analysis',
         task_id: 'task-success',
         task_type: 'token_frequencies',
+        workspace_id: 'workspace-1',
+        tab_id: 'tab-1',
         state: 'successful',
         created_at: '2026-01-01T00:00:00Z',
       },
@@ -148,6 +166,34 @@ describe('SidebarTasksSection', () => {
 
     expect(screen.queryByRole('button', { name: /^stop$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^clear$/i })).not.toBeInTheDocument();
+  });
+
+  it('offers Clear results for an unavailable Analysis', async () => {
+    const user = userEvent.setup();
+    const onClearUnavailableAnalysis = vi.fn();
+
+    render(
+      <SidebarTasksSection
+        {...baseProps}
+        onClearUnavailableAnalysis={onClearUnavailableAnalysis}
+        tasks={[
+          {
+            resource_type: 'analysis',
+            task_id: 'analysis-unavailable',
+            task_type: 'analysis_unavailable',
+            workspace_id: 'workspace-1',
+            tab_id: 'tab-1',
+            state: 'failed',
+            message: 'This Analysis is unavailable.',
+          },
+        ]}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: /task: analysis unavailable/i }));
+    await user.click(screen.getByRole('button', { name: /clear results/i }));
+
+    expect(onClearUnavailableAnalysis).toHaveBeenCalledWith('workspace-1', 'tab-1');
   });
 
   it('shows Stop only for active User File Imports and invokes the import action', async () => {

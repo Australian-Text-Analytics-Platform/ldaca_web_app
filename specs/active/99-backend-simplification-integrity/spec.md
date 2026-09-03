@@ -76,7 +76,7 @@ Complete every open boundary recorded in
 File Import publication recovery, admitted private TOML writes, sample digest
 verification, versioned import records, Data Block and Result identity checks,
 semantic SQLite validation, corrupt-import isolation, and startup Workspace
-reconciliation.
+isolation with explicit-open cleanup and interrupted-Analysis finalization.
 
 ## Acceptance
 

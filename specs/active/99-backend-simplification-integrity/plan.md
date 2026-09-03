@@ -10,8 +10,8 @@
 5. Land one schema/API cutover for UUIDs, Tabs, Results, unavailable children,
    import records, and remote Quotation; regenerate and migrate the frontend in
    the same increment.
-6. Complete publication, validation, corruption-isolation, and startup
-   reconciliation boundaries with fault-injection and restart tests.
+6. Complete publication, validation, corruption-isolation, and resource-load
+   finalization boundaries with fault-injection and restart tests.
 7. Update durable documentation and run the complete repository and packaged
    runtime proof set.
 8. Split the monolithic Workspace version into data schema 1 and independently

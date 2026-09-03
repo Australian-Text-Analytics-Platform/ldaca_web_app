@@ -23,7 +23,8 @@
   warning counts.
 - [x] Replace Tab and Result contracts and regenerate frontend consumers.
 - [x] Add unavailable child resources with in-place current-schema isolation.
-- [x] Complete every persistence-integrity boundary and recovery test.
+- [x] Complete every persistence-integrity boundary and recovery test, with
+  Workspace contents deferred until authenticated discovery and explicit open.
 - [x] Remove SQLite initialization and quota/session use from single-user mode
   while preserving hosted schema validation and existing Data Root files.
 - [x] Update durable docs and run backend, frontend, docs, and package gates.

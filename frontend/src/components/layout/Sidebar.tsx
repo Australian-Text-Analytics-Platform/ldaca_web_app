@@ -131,8 +131,10 @@ function Sidebar() {
     reconnect: reconnectTaskStream,
     stopUserFileImport,
     clearUserFileImport,
+    clearUnavailableAnalysis,
     stoppingImportId,
     clearingImportId,
+    clearingAnalysisTabId,
   } = useWorkspaceTaskInbox(currentWorkspaceId);
   const { workspaceGraph } = useWorkspaceData();
   const { selectedNodeIds } = useWorkspaceSelection();
@@ -450,8 +452,10 @@ function Sidebar() {
                                 onReconnect={reconnectTaskStream}
                                 onStopUserFileImport={stopUserFileImport}
                                 onClearUserFileImport={clearUserFileImport}
+                                onClearUnavailableAnalysis={clearUnavailableAnalysis}
                                 stoppingImportId={stoppingImportId}
                                 clearingImportId={clearingImportId}
+                                clearingAnalysisTabId={clearingAnalysisTabId}
                               />
                             )}
                           </div>

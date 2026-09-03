@@ -54,10 +54,12 @@ scope.
 `runtime_context` uses `AsyncExitStack`. Runtime startup initializes storage,
 initializes SQLite only for hosted multi-user deployments, creates the task group
 and I/O limiter, verifies hosted filesystem-allocation accounting, constructs
-services, reconciles Workspaces, Analyses, User File Imports, response snapshots,
-and transient storage, starts both private schedulers, then starts bounded
-maintenance. A distinct resource stack owns provider clients, Workspace open
-state and the event hub. The runtime task-group owner is
+services, reconciles User File Imports, response snapshots, User Files, and
+service-private transient storage, starts both private schedulers, then starts
+bounded maintenance. Startup never enters a UUID Workspace directory; Workspace
+catalogue discovery begins only after authentication, and complete loading is
+reserved for explicit open. A distinct resource stack owns provider clients,
+Workspace open state and the event hub. The runtime task-group owner is
 registered above that stack so no application task can outlive a dependency.
 
 Finite API requests acquire a manager lease and retrieve that pinned Runtime
@@ -90,9 +92,9 @@ sequenceDiagram
     Storage-->>Owner: database, task group, I/O limiter
     Owner->>Storage: verify hosted quota allocation metrics
     Owner->>Runtime: construct services in dependency order
-    Owner->>Analysis: fail interrupted Analyses and start scheduler
+    Owner->>Analysis: start scheduler without reading Workspaces
     Owner->>Imports: fail interrupted imports and start scheduler
-    Owner->>Runtime: reconcile snapshots, User Files, and transient storage
+    Owner->>Runtime: reconcile snapshots, User Files, and global transient storage
     Owner->>Maintenance: start bounded cleanup
     Owner-->>Manager: Runtime ready
     Manager-->>FastAPI: yield typed LifespanState
@@ -110,7 +112,7 @@ sequenceDiagram
     and
         Runtime->>Imports: stop dispatch and terminate import execution
     end
-    Analysis-->>Runtime: terminal commits or startup reconciliation
+    Analysis-->>Runtime: terminal commits or next explicit Workspace open
     Imports-->>Runtime: terminal commits or startup reconciliation
     Owner->>Runtime: cancel and join the runtime task group
     Owner->>Runtime: close Workspace slots, events, and providers
@@ -129,11 +131,12 @@ running process handles terminate concurrently. At the deadline, remaining
 children are killed and async runner scopes are cancelled.
 
 Only confirmed termination is committed during shutdown. If a terminal commit
-cannot complete before exit, the strict non-terminal record remains for startup
-interruption reconciliation; shutdown does not guess its outcome. After
-execution shutdown, the application task group is cancelled and joined, then
-the resource stack unwinds provider clients, Workspace slots, and event
-subscribers in reverse construction order. The same exit stacks
+cannot complete before exit, shutdown does not guess its outcome. A valid queued
+or running Analysis left on disk is finalized as interrupted only after its
+Workspace next loads through explicit open. After execution shutdown, the
+application task group is cancelled and joined, then the resource stack unwinds
+provider clients, Workspace slots, and event subscribers in reverse construction
+order. The same exit stacks
 unwind partial startup. Workspace shutdown does not invent a save because every
 mutation commits before releasing its gate.
 

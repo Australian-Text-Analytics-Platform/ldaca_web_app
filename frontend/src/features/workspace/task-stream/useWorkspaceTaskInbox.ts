@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import type { UserFileImport, UserFileImportPage, WorkspaceCatalogueItem } from '@/api';
 import {
   cancelUserFileImport,
+  clearTabAnalysis,
   deleteUserFileImport,
   getAnalysis,
   getUserFileImport,
@@ -94,8 +95,10 @@ export interface WorkspaceTaskInboxState extends WorkspaceTaskStreamClientState 
   tasks: TaskItem[];
   stopUserFileImport: (importId: string) => void;
   clearUserFileImport: (importId: string) => void;
+  clearUnavailableAnalysis: (workspaceId: string, tabId: string) => void;
   stoppingImportId: string | null;
   clearingImportId: string | null;
+  clearingAnalysisTabId: string | null;
 }
 
 const replaceImportInPages = (
@@ -152,6 +155,23 @@ export const useWorkspaceTaskInbox = (workspaceId: string | null): WorkspaceTask
     },
     onError: (error) => {
       toast.error(error instanceof Error ? error.message : 'Could not clear the file import.');
+    },
+  });
+
+  const clearAnalysisMutation = useMutation({
+    mutationFn: async ({ workspaceId, tabId }: { workspaceId: string; tabId: string }) => {
+      await clearTabAnalysis({
+        path: { workspace_id: workspaceId, tab_id: tabId },
+        throwOnError: true,
+      });
+      return { workspaceId, tabId };
+    },
+    onSuccess: ({ workspaceId }) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceAnalyses(workspaceId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceTabs(workspaceId) });
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : 'Could not clear the analysis.');
     },
   });
 
@@ -304,8 +324,14 @@ export const useWorkspaceTaskInbox = (workspaceId: string | null): WorkspaceTask
     clearUserFileImport: (importId: string) => {
       deleteImportMutation.mutate(importId);
     },
+    clearUnavailableAnalysis: (workspaceId: string, tabId: string) => {
+      clearAnalysisMutation.mutate({ workspaceId, tabId });
+    },
     stoppingImportId: cancelImportMutation.isPending ? cancelImportMutation.variables : null,
     clearingImportId: deleteImportMutation.isPending ? deleteImportMutation.variables : null,
+    clearingAnalysisTabId: clearAnalysisMutation.isPending
+      ? clearAnalysisMutation.variables.tabId
+      : null,
   };
   return resourceError
     ? { ...clientState, ...lifecycleState, tasks, status: 'error', error: resourceError }

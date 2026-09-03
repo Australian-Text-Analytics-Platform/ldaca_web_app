@@ -381,27 +381,6 @@ async def test_delete_rejects_external_owner_then_succeeds_after_close(
 
 
 @pytest.mark.anyio
-async def test_startup_reconciliation_skips_locked_workspace_and_repairs_sibling(
-    tmp_path: Path,
-) -> None:
-    """One live Workspace does not block reconciliation of unlocked siblings."""
-
-    holder = _service(tmp_path)
-    reconciler = _service(tmp_path)
-    locked = await holder.create_workspace("user", "Locked")
-    sibling = await holder.create_workspace("user", "Sibling")
-    await holder.open_workspace("user", locked.id)
-
-    def mark_reconciled(workspace: Workspace) -> bool:
-        workspace.description = "reconciled"
-        return True
-
-    await reconciler.reconcile_durable_workspaces(mark_reconciled)
-
-    assert (await holder.get_workspace("user", locked.id)).description == ""
-    assert (await holder.get_workspace("user", sibling.id)).description == "reconciled"
-
-
 @pytest.mark.anyio
 async def test_concurrent_open_loads_one_aggregate_and_reuses_it(
     tmp_path: Path,
@@ -673,11 +652,16 @@ async def test_failed_publication_restores_plan_and_preexisting_history(
 
 
 @pytest.mark.anyio
-async def test_startup_reconciliation_removes_abandoned_export_generations(
+async def test_startup_cleanup_skips_workspace_files_until_open(
     tmp_path: Path,
 ) -> None:
     service = _service(tmp_path)
     workspace_root = workspaces_root(service.settings)
+    created = await service.create_workspace("user", "Deferred cleanup")
+    workspace_data = workspace_root / str(created.id) / "data"
+    workspace_data.mkdir(exist_ok=True)
+    abandoned_node = workspace_data / ".wordflow-node-abandoned.parquet.tmp"
+    abandoned_node.write_bytes(b"orphan")
     abandoned = (
         workspace_root / ".staging" / ".archive-export-sources" / "workspace-crash"
     )
@@ -687,6 +671,29 @@ async def test_startup_reconciliation_removes_abandoned_export_generations(
     await service.reconcile_transient_storage()
 
     assert not (workspace_root / ".staging" / ".archive-export-sources").exists()
+    assert abandoned_node.is_file()
+
+    await service.open_workspace("user", created.id)
+
+    assert not abandoned_node.exists()
+
+
+@pytest.mark.anyio
+async def test_post_load_cleanup_failure_does_not_block_open(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = _service(tmp_path)
+    created = await service.create_workspace("user", "Cleanup failure")
+
+    def fail_cleanup(_path: Path) -> None:
+        raise OSError("cleanup unavailable")
+
+    monkeypatch.setattr(service._store, "reconcile", fail_cleanup)
+
+    opened = await service.open_workspace("user", created.id)
+
+    assert opened.runtime_state == "open"
 
 
 @pytest.mark.anyio

@@ -1299,19 +1299,27 @@ class AnalysisService:
                 self._detached_root_id(lease, failed),
             )
 
-    async def reconcile_interrupted_analyses(self) -> None:
-        """Fail durable work that lost its private process runner on restart."""
+    async def finalize_interrupted_analyses(
+        self,
+        user_id: str,
+        workspace_id: uuid.UUID,
+    ) -> None:
+        """Fail valid loaded work that has no process runner after restart."""
 
-        def reconcile(workspace: Workspace) -> bool:
+        async with self._workspaces.mutation_context(
+            user_id,
+            workspace_id,
+            internal=True,
+        ) as lease:
             changed = False
             timestamp = self._clock()
-            for record in list(workspace.analyses.values()):
+            for record in list(lease.workspace.analyses.values()):
                 if record.state not in {
                     AnalysisState.QUEUED,
                     AnalysisState.RUNNING,
                 }:
                     continue
-                workspace.replace_analysis(
+                lease.workspace.replace_analysis(
                     record.fail(
                         timestamp,
                         failure=Failure(
@@ -1325,15 +1333,15 @@ class AnalysisService:
 
             detached_roots = [
                 analysis_id
-                for analysis_id, record in workspace.analyses.items()
+                for analysis_id, record in lease.workspace.analyses.items()
                 if record.parent_analysis_id is None
-                and workspace.analysis_tab_id(analysis_id) is None
+                and lease.workspace.analysis_tab_id(analysis_id) is None
             ]
             for root_id in detached_roots:
-                root = workspace.analyses.get(root_id)
+                root = lease.workspace.analyses.get(root_id)
                 if root is None:
                     continue
-                tree = [root, *workspace.analysis_descendants(root_id)]
+                tree = [root, *lease.workspace.analysis_descendants(root_id)]
                 if all(
                     record.state
                     in {
@@ -1343,11 +1351,9 @@ class AnalysisService:
                     }
                     for record in tree
                 ):
-                    workspace.remove_analysis(root_id)
+                    lease.workspace.remove_analysis(root_id)
                     changed = True
-            return changed
-
-        await self._workspaces.reconcile_durable_workspaces(reconcile)
+            lease.commit_requested = changed
 
     def stop_accepting(self) -> None:
         """Reject new submissions before scheduler shutdown begins."""
