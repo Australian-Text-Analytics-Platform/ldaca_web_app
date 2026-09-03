@@ -95,7 +95,8 @@ def test_wordflow_release_workflows_are_manual_only() -> None:
     backend_release = _read(workflows / "pypi-release.yml")
     assert "- pypi" in backend_release
     assert "inputs.publish_target == 'pypi'" in backend_release
-    assert '[[ "$GITHUB_REF" == refs/tags/v* ]]' in backend_release
+    assert "startsWith(github.ref, 'refs/tags/')" not in backend_release
+    assert 'check-versions.mjs --tag "$GITHUB_REF_NAME"' not in backend_release
 
 
 def test_stage_backend_runtime_windows_dll_copy_uses_manifest_python_home() -> None:

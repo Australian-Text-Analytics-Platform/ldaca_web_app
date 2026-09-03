@@ -15,7 +15,7 @@ on:
 
 concurrency:
   group: backend-package-release-${{ github.ref }}
-  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -25,16 +25,6 @@ jobs:
     name: Build release artifact
     runs-on: ubuntu-latest
     steps:
-      - name: Require a version tag for production publication
-        if: inputs.publish_target == 'pypi'
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          [[ "$GITHUB_REF" == refs/tags/v* ]] || {
-            echo "Production PyPI publication requires dispatching a v* tag" >&2
-            exit 1
-          }
-
       - name: Check out repository with source dependencies
         uses: actions/checkout@v7
         with:
@@ -53,9 +43,8 @@ jobs:
           corepack enable
           pnpm install --frozen-lockfile
 
-      - name: Check release tag and shared version
-        if: startsWith(github.ref, 'refs/tags/')
-        run: node scripts/check-versions.mjs --tag "$GITHUB_REF_NAME"
+      - name: Check shared version
+        run: node scripts/check-versions.mjs
 
       - name: Build and stage frontend
         run: pnpm deploy_frontend_to_backend
@@ -119,7 +108,7 @@ jobs:
   publish-pypi:
     name: Publish to PyPI
     needs: build
-    if: inputs.publish_target == 'pypi' && startsWith(github.ref, 'refs/tags/v')
+    if: inputs.publish_target == 'pypi'
     runs-on: ubuntu-latest
     permissions:
       contents: read

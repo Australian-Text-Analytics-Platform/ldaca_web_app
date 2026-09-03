@@ -32,8 +32,8 @@ source overrides.
 
 The generated frontend archive is not tracked. CI and release workflows build
 and stage the SPA before packaging. Backend PyPI and desktop publication are
-independently and manually dispatched; production publication still requires
-an exact root `vX.Y.Z` tag.
+independently and manually dispatched. Backend publication uses the synchronized
+repository version metadata; desktop publication retains its GitHub Release tag.
 
 ## Consequences
 

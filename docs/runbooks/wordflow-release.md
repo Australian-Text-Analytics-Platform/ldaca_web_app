@@ -37,12 +37,11 @@ the monorepo.
 2. Run `pnpm check-versions` and require root CI to pass on the release commit.
 3. Confirm every declared registry dependency is published for all supported
    platforms.
-4. Create and push the exact root tag `v<semver>`.
-5. Manually dispatch `Backend Package Release` at that tag with the `pypi`
-   publish target.
+4. Manually dispatch `Backend Package Release` from the exact release commit
+   with the `pypi` publish target.
 
 ```bash
-gh workflow run pypi-release.yml --ref v<semver> -f publish_target=pypi
+gh workflow run pypi-release.yml --ref main -f publish_target=pypi
 ```
 
 The manually dispatched workflow does not repeat Ruff, Ty, pytest, or frontend
@@ -53,7 +52,8 @@ artifact to PyPI. Any missing registry dependency stops the workflow before
 upload. Do not normally reuse a published package version.
 
 Manual dispatch can build without publication or select TestPyPI. Production
-PyPI publication requires both the `pypi` target and a `vX.Y.Z` tag ref.
+PyPI publication requires the explicit `pypi` target and takes its version from
+the synchronized repository metadata.
 
 PyPI trusted publishing must identify:
 
