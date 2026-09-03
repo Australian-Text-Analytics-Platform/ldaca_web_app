@@ -1,4 +1,9 @@
+import importlib
+from pathlib import Path
 from types import SimpleNamespace
+
+import httpx
+import pytest
 
 from ldaca_wordflow.analysis import quotation_extractor as qe
 from ldaca_wordflow._vendor.gender_gap_tracker.quote_extractor import QuoteExtractor
@@ -38,7 +43,7 @@ def test_extract_quotations_uses_the_model_bound_to_the_vendored_extractor(
     assert result[0][0]["speaker"] == "Alex"
 
 
-def test_load_spacy_model_uses_the_declared_installed_package(monkeypatch):
+def test_load_spacy_model_uses_an_installed_package(monkeypatch, tmp_path):
     calls: list[str] = []
 
     class FakeSpacyModule:
@@ -46,12 +51,183 @@ def test_load_spacy_model_uses_the_declared_installed_package(monkeypatch):
             calls.append(target)
             return SimpleNamespace(name="installed-model")
 
+    monkeypatch.setattr(qe, "_SPACY_MODEL_CACHE_ROOT", tmp_path)
     monkeypatch.setitem(__import__("sys").modules, "spacy", FakeSpacyModule())
 
     model = qe._load_spacy_model()
 
     assert model.name == "installed-model"
     assert calls == ["en_core_web_md"]
+
+
+def test_load_spacy_model_prefers_the_platform_cache(monkeypatch, tmp_path):
+    cached = tmp_path / qe._SPACY_MODEL
+    cached.mkdir()
+    (cached / "config.cfg").write_text("[nlp]\nlang = 'en'\n", encoding="utf-8")
+    calls: list[object] = []
+
+    class FakeSpacyModule:
+        def load(self, target):
+            calls.append(target)
+            return SimpleNamespace(name="cached-model")
+
+    monkeypatch.setattr(qe, "_SPACY_MODEL_CACHE_ROOT", tmp_path)
+    monkeypatch.setitem(__import__("sys").modules, "spacy", FakeSpacyModule())
+
+    model = qe._load_spacy_model()
+
+    assert model.name == "cached-model"
+    assert calls == [cached]
+
+
+def test_load_spacy_model_downloads_only_when_the_package_is_missing(
+    monkeypatch, tmp_path
+):
+    downloaded = tmp_path / "downloaded"
+    downloaded.mkdir()
+    (downloaded / "config.cfg").write_text("[nlp]\nlang = 'en'\n", encoding="utf-8")
+    calls: list[object] = []
+
+    class FakeSpacyModule:
+        def load(self, target):
+            calls.append(target)
+            if target == qe._SPACY_MODEL:
+                raise OSError(
+                    "[E050] Can't find model 'en_core_web_md'. It doesn't seem "
+                    "to be a Python package or a valid path."
+                )
+            return SimpleNamespace(name="downloaded-model")
+
+    monkeypatch.setattr(qe, "_SPACY_MODEL_CACHE_ROOT", tmp_path / "cache")
+    monkeypatch.setattr(qe, "_download_spacy_model", lambda: downloaded)
+    monkeypatch.setitem(__import__("sys").modules, "spacy", FakeSpacyModule())
+
+    model = qe._load_spacy_model()
+
+    assert model.name == "downloaded-model"
+    assert calls == [qe._SPACY_MODEL, downloaded]
+
+
+def test_download_spacy_model_publishes_complete_model_data(monkeypatch, tmp_path):
+    download_module = importlib.import_module("spacy.cli.download")
+    monkeypatch.setattr(qe, "_SPACY_MODEL_CACHE_ROOT", tmp_path / "cache")
+    monkeypatch.setattr(download_module, "get_compatibility", lambda: {})
+    monkeypatch.setattr(download_module, "get_version", lambda _model, _data: "3.8.0")
+    monkeypatch.setattr(
+        download_module,
+        "get_model_filename",
+        lambda _model, _version, sdist: (
+            "en_core_web_md-3.8.0/en_core_web_md-3.8.0.tar.gz"
+            if sdist
+            else "unexpected"
+        ),
+    )
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def raise_for_status(self):
+            return None
+
+        def iter_bytes(self):
+            yield b"archive"
+
+    class FakeArchive:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def extractall(self, destination: Path, *, filter: str):
+            assert filter == "data"
+            model = destination / "package" / "model"
+            (model / "vocab").mkdir(parents=True)
+            (model / "config.cfg").write_text("[nlp]\n", encoding="utf-8")
+            (model / "meta.json").write_text("{}", encoding="utf-8")
+
+    monkeypatch.setattr(qe.httpx, "stream", lambda *_args, **_kwargs: FakeResponse())
+    monkeypatch.setattr(qe.tarfile, "open", lambda *_args, **_kwargs: FakeArchive())
+
+    cached = qe._download_spacy_model()
+
+    assert cached == tmp_path / "cache" / qe._SPACY_MODEL
+    assert (cached / "config.cfg").is_file()
+    assert not any(
+        path.name.startswith(f".{qe._SPACY_MODEL}.") for path in cached.parent.iterdir()
+    )
+
+
+@pytest.mark.parametrize("failure_stage", ["download", "extraction"])
+def test_download_or_extraction_failure_leaves_no_partial_cache(
+    monkeypatch, tmp_path, failure_stage
+):
+    download_module = importlib.import_module("spacy.cli.download")
+    cache_root = tmp_path / "cache"
+    monkeypatch.setattr(qe, "_SPACY_MODEL_CACHE_ROOT", cache_root)
+    monkeypatch.setattr(download_module, "get_compatibility", lambda: {})
+    monkeypatch.setattr(download_module, "get_version", lambda _model, _data: "3.8.0")
+    monkeypatch.setattr(
+        download_module,
+        "get_model_filename",
+        lambda *_args, **_kwargs: "en_core_web_md-3.8.0.tar.gz",
+    )
+
+    class FailedResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def raise_for_status(self):
+            if failure_stage == "download":
+                raise httpx.HTTPError("download failed")
+
+        def iter_bytes(self):
+            yield b"archive"
+
+    class FailedArchive:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def extractall(self, *_args, **_kwargs):
+            raise qe.tarfile.ReadError("extraction failed")
+
+    monkeypatch.setattr(
+        qe.httpx,
+        "stream",
+        lambda *_args, **_kwargs: FailedResponse(),
+    )
+    monkeypatch.setattr(
+        qe.tarfile,
+        "open",
+        lambda *_args, **_kwargs: FailedArchive(),
+    )
+
+    with pytest.raises((httpx.HTTPError, qe.tarfile.ReadError)):
+        qe._download_spacy_model()
+
+    assert list(cache_root.iterdir()) == []
+
+
+def test_concurrent_cache_winner_is_reused(tmp_path):
+    staged = tmp_path / "staged"
+    staged.mkdir()
+    (staged / "config.cfg").write_text("staged", encoding="utf-8")
+    destination = tmp_path / "destination"
+    destination.mkdir()
+    (destination / "config.cfg").write_text("winner", encoding="utf-8")
+
+    assert qe._publish_cached_spacy_model(staged, destination) == destination
+    assert (destination / "config.cfg").read_text(encoding="utf-8") == "winner"
 
 
 def _assert_mapping_roundtrips(original: str) -> None:

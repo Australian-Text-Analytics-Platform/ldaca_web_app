@@ -508,14 +508,6 @@ wheels = [
 ]
 
 [[package]]
-name = "en-core-web-md"
-version = "3.8.0"
-source = { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.8.0/en_core_web_md-3.8.0-py3-none-any.whl" }
-wheels = [
-    { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.8.0/en_core_web_md-3.8.0-py3-none-any.whl", hash = "sha256:5e6329fe3fecedb1d1a02c3ea2172ee0fede6cea6e4aefb6a02d832dba78a310" },
-]
-
-[[package]]
 name = "executing"
 version = "2.2.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1062,7 +1054,6 @@ source = { editable = "." }
 dependencies = [
     { name = "aiosqlite" },
     { name = "anthropic" },
-    { name = "en-core-web-md" },
     { name = "fastapi" },
     { name = "fastexcel" },
     { name = "google-auth", extra = ["requests"] },
@@ -1100,7 +1091,6 @@ dev = [
 requires-dist = [
     { name = "aiosqlite", specifier = ">=0.21.0" },
     { name = "anthropic", specifier = ">=1.2.0,<2" },
-    { name = "en-core-web-md", url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.8.0/en_core_web_md-3.8.0-py3-none-any.whl" },
     { name = "fastapi", specifier = ">=0.141.1,<1" },
     { name = "fastexcel", specifier = ">=0.21.0,<1" },
     { name = "google-auth", extras = ["requests"], specifier = ">=2.57.0,<3" },

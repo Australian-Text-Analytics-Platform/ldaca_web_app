@@ -40,7 +40,6 @@ dependencies = [
     "anthropic>=1.2.0,<2",                      # AsyncAnthropic: server-side Claude annotation calls
     "google-genai>=2.20.0,<3",                  # google-genai aio: server-side Gemini annotation calls
     "spacy>=3.8.16,<3.9",
-    "en-core-web-md @ https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.8.0/en_core_web_md-3.8.0-py3-none-any.whl",
     "rtoml>=0.12.0",
     "uvicorn[standard]>=0.52.4,<1",
 ]
@@ -73,9 +72,6 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.hooks.custom]
 path = "scripts/hatch_build.py"
-
-[tool.hatch.metadata]
-allow-direct-references = true
 
 [dependency-groups]
 dev = [

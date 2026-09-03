@@ -107,6 +107,12 @@ macOS signature verification again after this probe: the shared launcher
 disables Python bytecode writes so the packaged runtime must not mutate the
 sealed application resources.
 
+The local Quotation spaCy model is deliberately not installed into the sealed
+runtime. First use downloads model data into the OS-native
+`au.edu.ldaca.wordflow` application cache and loads it by path, leaving the
+signed application unchanged. An offline first use therefore fails normally
+and can be retried when network access is available.
+
 ## Desktop CI
 
 `.github/workflows/desktop-build.yml` is the single reusable Windows and macOS

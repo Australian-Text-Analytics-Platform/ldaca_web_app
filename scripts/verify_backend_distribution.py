@@ -35,6 +35,8 @@ def verify_distribution(dist_dir: pathlib.Path) -> None:
             name for name in names if name.endswith(".dist-info/METADATA")
         )
         metadata = archive.read(metadata_name).decode("utf-8")
+        if "Requires-Dist: en-core-web-md" in metadata:
+            raise RuntimeError("wheel metadata must not require en-core-web-md")
         for removed in (
             "docworkspace",
             "fastar",

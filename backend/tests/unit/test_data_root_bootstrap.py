@@ -15,6 +15,7 @@ from ldaca_wordflow.data_root_config import (
     DataRootConfigError,
     DataRootConfigStore,
     DataRootPaths,
+    platform_cache_root,
     platform_data_root_paths,
     probe_data_root,
 )
@@ -63,6 +64,7 @@ def test_platform_paths_use_the_wordflow_identifier_and_expected_leaf_names() ->
     assert "au.edu.ldaca.wordflow" in str(paths.config_file)
     assert paths.config_file.name == "settings.json"
     assert paths.suggested_data_root.name == "data"
+    assert "au.edu.ldaca.wordflow" in str(platform_cache_root())
 
 
 def test_config_store_is_versioned_atomic_and_ignores_legacy_backend_json(

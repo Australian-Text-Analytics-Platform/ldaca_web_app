@@ -9,6 +9,14 @@ runtimes neither create nor read it. Analysis lifecycle and Artifacts live
 inside their Workspace; User File Import history lives inside its user's import
 area. Host paths are private and never appear in public resources.
 
+The local Quotation pipeline is the exception to Data Root cache ownership. Its
+spaCy model data downloads on first use into the operating system's disposable
+per-user cache for `au.edu.ldaca.wordflow`, shared by every Data Root used by
+that OS account. On macOS the model directory is
+`~/Library/Caches/au.edu.ldaca.wordflow/spacy/en_core_web_md`. The application
+never installs the model into its Python environment at runtime or consults the
+former `~/.cache/ldaca_wordflow` path.
+
 A User File is mutable import material. Adding one to a Workspace snapshots it
 into an immutable Workspace-owned source, so later moves or deletion in the
 user file area cannot rewrite an existing Source Data Block.
@@ -40,6 +48,7 @@ flowchart TB
     ROOT --> AUTH["Hosted only<br/>deployment.sqlite3"]
     ROOT --> SNAPSHOTS["Response and query snapshots"]
     ROOT --> CACHE["Runtime caches"]
+    PLATFORM_CACHE["OS application cache"] --> SPACY["Quotation spaCy model"]
 
     USERS --> FILES["Mutable User Files"]
     USERS --> IMPORTS["User File Import records and staging"]

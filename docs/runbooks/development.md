@@ -108,7 +108,10 @@ cargo clippy --all-targets --locked -- -D warnings
 cargo metadata --format-version 1 --no-deps
 ```
 
-Some tokenizer and embedding features download model assets on first use.
+Some tokenizer and embedding features download model assets on first use. The
+local Quotation pipeline likewise downloads its compatible spaCy model data to
+the OS-native `au.edu.ldaca.wordflow` application cache; it is not a Python
+package dependency.
 
 ## Change Discipline
 

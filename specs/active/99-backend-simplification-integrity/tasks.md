@@ -12,7 +12,8 @@
   and verify it end to end with Wordflow's remote adapter.
 - [ ] Deploy the strict v2 remote Quotation engine before enabling Wordflow's
   remote adapter. This needs the deployment target and separate authorization.
-- [x] Install the pinned spaCy pipeline as a package and remove runtime acquisition.
+- [x] Keep the spaCy pipeline out of package metadata and acquire model data
+  lazily into the OS-native application cache without modifying signed runtimes.
 - [x] Upgrade direct dependencies and modernize Python 3.14 and FastAPI typing.
 - [x] Land the original native schema 22, archive format 21, hosted SQLite
   schema 7, and import envelope 1 cutover.
@@ -40,9 +41,10 @@
   load in the Data View; the browser reported no framework overlay or console
   warnings/errors.
 - Packaging: the backend wheel and source distribution install in a clean
-  environment; the pinned `en_core_web_md` package loads offline; local
-  Quotation smoke coverage and the staged desktop backend import, startup,
-  health, and shutdown probe pass.
+  environment without an `en_core_web_md` package requirement; first-use model
+  acquisition targets the OS-native application cache. Local Quotation smoke
+  coverage and the staged desktop backend import, startup, health, and shutdown
+  probe pass.
 - Remote Quotation engine: 13 tests plus formatting, Ruff, and `ty` checks for
   service-owned code pass in a clean Python 3.14 environment. The locked
   `en_core_web_md` package loads directly, and a live engine served an ordered

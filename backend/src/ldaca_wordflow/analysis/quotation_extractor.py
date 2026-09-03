@@ -12,25 +12,116 @@ Flow: normalize source text, run the local extractor, preserve source-row
 from __future__ import annotations
 
 import re
+import shutil
+import tarfile
+import tempfile
 from pathlib import Path
 from typing import Any
 
+import httpx
 import polars as pl
 
+from ..data_root_config import platform_cache_root
 from .quotation_core import QUOTATION_GROUP_COLUMN, QUOTATION_GROUP_DTYPE
 
 _ENGLISH_DIR = Path(__file__).resolve().parents[1] / "_vendor" / "gender_gap_tracker"
 _QUOTE_VERBS_PATH = _ENGLISH_DIR / "rules" / "quote_verb_list.txt"
 _SPACY_MODEL = "en_core_web_md"
+_SPACY_MODEL_CACHE_ROOT = platform_cache_root() / "spacy"
 
 _extractor = None
 
 
+def _cached_spacy_model_dir() -> Path:
+    return _SPACY_MODEL_CACHE_ROOT / _SPACY_MODEL
+
+
+def _is_cached_spacy_model(path: Path) -> bool:
+    return (path / "config.cfg").is_file()
+
+
+def _is_missing_spacy_model_error(exc: OSError) -> bool:
+    return "[E050]" in str(exc) and _SPACY_MODEL in str(exc)
+
+
+def _find_spacy_data_dir(root: Path) -> Path:
+    candidates = sorted(
+        path.parent
+        for path in root.rglob("config.cfg")
+        if (path.parent / "meta.json").is_file()
+    )
+    for model_dir in candidates:
+        if (model_dir / "vocab").is_dir() or (model_dir / "tokenizer").is_file():
+            return model_dir
+    raise FileNotFoundError(f"Could not locate extracted spaCy model under {root}")
+
+
+def _publish_cached_spacy_model(staged: Path, destination: Path) -> Path:
+    try:
+        staged.rename(destination)
+    except OSError:
+        if _is_cached_spacy_model(destination):
+            return destination
+        raise
+    return destination
+
+
+def _download_spacy_model() -> Path:
+    """Download compatible model data without modifying the Python environment."""
+
+    from spacy import about
+    from spacy.cli.download import get_compatibility, get_model_filename, get_version
+
+    destination = _cached_spacy_model_dir()
+    if _is_cached_spacy_model(destination):
+        return destination
+
+    version = get_version(_SPACY_MODEL, get_compatibility())
+    archive_name = get_model_filename(_SPACY_MODEL, version, sdist=True)
+    archive_url = f"{about.__download_url__.rstrip('/')}/{archive_name}"
+
+    _SPACY_MODEL_CACHE_ROOT.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(
+        prefix=f".{_SPACY_MODEL}.",
+        dir=_SPACY_MODEL_CACHE_ROOT,
+    ) as temporary_directory:
+        temporary_root = Path(temporary_directory)
+        archive_path = temporary_root / Path(archive_name).name
+        with httpx.stream(
+            "GET",
+            archive_url,
+            follow_redirects=True,
+            timeout=120.0,
+        ) as response:
+            response.raise_for_status()
+            with archive_path.open("wb") as output:
+                for chunk in response.iter_bytes():
+                    output.write(chunk)
+
+        extracted_root = temporary_root / "extracted"
+        extracted_root.mkdir()
+        with tarfile.open(archive_path, "r:gz") as archive:
+            archive.extractall(extracted_root, filter="data")
+
+        staged = temporary_root / "model"
+        shutil.copytree(_find_spacy_data_dir(extracted_root), staged)
+        return _publish_cached_spacy_model(staged, destination)
+
+
 def _load_spacy_model():
-    """Load the locked quotation model as a normal installed spaCy package."""
+    """Load cached or installed model data, downloading it on first use."""
     import spacy
 
-    return spacy.load(_SPACY_MODEL)
+    cached = _cached_spacy_model_dir()
+    if _is_cached_spacy_model(cached):
+        return spacy.load(cached)
+
+    try:
+        return spacy.load(_SPACY_MODEL)
+    except OSError as exc:
+        if not _is_missing_spacy_model_error(exc):
+            raise
+    return spacy.load(_download_spacy_model())
 
 
 def _get_extractor():

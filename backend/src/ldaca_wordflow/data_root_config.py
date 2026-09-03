@@ -1,4 +1,4 @@
-"""Platform-owned persistence and filesystem validation for the Data Root."""
+"""Platform-owned application paths and Data Root filesystem validation."""
 
 from __future__ import annotations
 
@@ -40,6 +40,16 @@ def platform_data_root_paths() -> DataRootPaths:
         config_file=directories.user_config_path / "settings.json",
         suggested_data_root=directories.user_data_path / "data",
     )
+
+
+def platform_cache_root() -> Path:
+    """Resolve the disposable per-user cache through operating-system conventions."""
+
+    return PlatformDirs(
+        APP_IDENTIFIER,
+        appauthor=False,
+        roaming=False,
+    ).user_cache_path
 
 
 class DataRootConfigStore:
@@ -112,6 +122,7 @@ __all__ = [
     "DataRootConfigError",
     "DataRootConfigStore",
     "DataRootPaths",
+    "platform_cache_root",
     "platform_data_root_paths",
     "probe_data_root",
 ]

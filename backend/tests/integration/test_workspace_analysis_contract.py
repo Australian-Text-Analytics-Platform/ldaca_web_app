@@ -32,7 +32,39 @@ def _wait_analysis(
         time.sleep(0.05)
 
 
-def test_quotation_preview_page_is_native_arrow_ipc(tmp_path: Path) -> None:
+def test_quotation_preview_page_is_native_arrow_ipc(
+    tmp_path: Path, monkeypatch
+) -> None:
+    def fake_quotation_groups(input_df: pl.DataFrame, _source_column: str):
+        return input_df.with_columns(
+            pl.Series(
+                "quotation",
+                [
+                    [
+                        {
+                            "speaker": "Alice",
+                            "speaker_start_idx": 0,
+                            "speaker_end_idx": 5,
+                            "quote": "hello",
+                            "quote_start_idx": 11,
+                            "quote_end_idx": 16,
+                            "verb": "said",
+                            "verb_start_idx": 6,
+                            "verb_end_idx": 10,
+                            "quote_type": "direct",
+                            "quote_token_count": 1,
+                            "is_floating_quote": False,
+                            "quote_row_idx": 0,
+                        }
+                    ]
+                ],
+            )
+        )
+
+    monkeypatch.setattr(
+        "ldaca_wordflow.analysis.quotation_core.quotation_groups_via_quote_extractor",
+        fake_quotation_groups,
+    )
     settings = Settings(
         data_root=tmp_path,
         multi_user=False,
