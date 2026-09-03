@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 POLARS_TEXT = REPO_ROOT / "polars-text"
 
@@ -53,7 +52,7 @@ def test_polars_text_maturin_workflows_pin_maturin_and_use_action_sccache() -> N
     ]:
         text = _read(workflow)
         assert "maturin-version: v1.15.0" in text
-        assert "sccache: true" in text
+        assert "sccache: ${{ runner.os != 'Windows' }}" in text
         assert "RUSTC_WRAPPER: sccache" not in text
         assert "mozilla-actions/sccache-action" not in text
         assert "--locked" in text
@@ -84,6 +83,19 @@ def test_desktop_build_uses_one_source_aware_cache_simple_workflow() -> None:
     assert "desktop-windows.yml" not in release
     assert '"${RELEASE_TAG}^{commit}"' in release
     assert '"$checked_out_sha" != "$release_sha"' in release
+
+
+def test_wordflow_release_workflows_are_manual_only() -> None:
+    workflows = REPO_ROOT / ".github" / "workflows"
+    for filename in ["pypi-release.yml", "desktop-release.yml"]:
+        on_block = _read(workflows / filename).split("concurrency:", 1)[0]
+        assert "workflow_dispatch:" in on_block
+        assert "push:" not in on_block
+
+    backend_release = _read(workflows / "pypi-release.yml")
+    assert "- pypi" in backend_release
+    assert "inputs.publish_target == 'pypi'" in backend_release
+    assert '[[ "$GITHUB_REF" == refs/tags/v* ]]' in backend_release
 
 
 def test_stage_backend_runtime_windows_dll_copy_uses_manifest_python_home() -> None:

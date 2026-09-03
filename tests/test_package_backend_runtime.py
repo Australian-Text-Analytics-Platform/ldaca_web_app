@@ -39,7 +39,6 @@ def test_sync_runtime_environment_uses_locked_source_aware_sync(
     def fake_run(cmd, *, cwd=None, capture_output=False, extra_env=None):
         assert capture_output is False
         calls.append((cmd, cwd, extra_env))
-        return None
 
     monkeypatch.setattr(module, "run", fake_run)
 
@@ -51,6 +50,7 @@ def test_sync_runtime_environment_uses_locked_source_aware_sync(
         runtime_python_dir=runtime_python_dir,
         managed_python_dir=managed_python_dir,
         cargo_target_dir=cargo_target_dir,
+        no_sources=False,
     )
 
     assert calls == [
@@ -58,12 +58,12 @@ def test_sync_runtime_environment_uses_locked_source_aware_sync(
             [
                 "uv",
                 "sync",
-                "--locked",
                 "--no-dev",
                 "--no-editable",
                 "--link-mode",
                 "copy",
                 "--managed-python",
+                "--locked",
             ],
             module.BACKEND_PROJECT_ROOT,
             {

@@ -1,19 +1,17 @@
 name: Backend Package Release
 
 on:
-  push:
-    tags:
-      - "v*"
   workflow_dispatch:
     inputs:
       publish_target:
-        description: Optional package index for a manual publish of the selected ref
+        description: Optional package index for the selected ref
         type: choice
         required: true
         default: none
         options:
           - none
           - testpypi
+          - pypi
 
 concurrency:
   group: backend-package-release-${{ github.ref }}
@@ -27,6 +25,16 @@ jobs:
     name: Build release artifact
     runs-on: ubuntu-latest
     steps:
+      - name: Require a version tag for production publication
+        if: inputs.publish_target == 'pypi'
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REF" == refs/tags/v* ]] || {
+            echo "Production PyPI publication requires dispatching a v* tag" >&2
+            exit 1
+          }
+
       - name: Check out repository with source dependencies
         uses: actions/checkout@v7
         with:
@@ -111,7 +119,7 @@ jobs:
   publish-pypi:
     name: Publish to PyPI
     needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: inputs.publish_target == 'pypi' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       contents: read

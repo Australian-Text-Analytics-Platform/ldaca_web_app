@@ -31,9 +31,9 @@ remain submodules. `backend/pyproject.toml` remains the sole authority for uv
 source overrides.
 
 The generated frontend archive is not tracked. CI and release workflows build
-and stage the SPA before packaging. A root `vX.Y.Z` tag triggers only the
-backend PyPI release; desktop publication remains manually dispatched and
-independent.
+and stage the SPA before packaging. Backend PyPI and desktop publication are
+independently and manually dispatched; production publication still requires
+an exact root `vX.Y.Z` tag.
 
 ## Consequences
 
@@ -45,7 +45,7 @@ independent.
 - Standalone backend history remains discoverable at its archived URL rather
   than increasing every Wordflow clone.
 - PyPI trusted publishing must name the root repository and root
-  `release.yml`; the old publisher remains only until the first successful
+  `pypi-release.yml`; the old publisher remains only until the first successful
   root-origin release.
 - A production release fails closed while a declared registry dependency is
   unavailable, even when source-aware CI succeeds from a sibling submodule.

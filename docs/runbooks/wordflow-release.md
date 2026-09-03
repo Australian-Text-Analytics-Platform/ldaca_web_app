@@ -29,7 +29,7 @@ because an unpublished registry dependency is unavailable.
 
 ## Publish the Python Package
 
-The root `release.yml` publishes `ldaca-wordflow`; the backend remains a
+The root `pypi-release.yml` publishes `ldaca-wordflow`; the backend remains a
 separately installable Python distribution even though its source is tracked in
 the monorepo.
 
@@ -38,22 +38,28 @@ the monorepo.
 3. Confirm every declared registry dependency is published for all supported
    platforms.
 4. Create and push the exact root tag `v<semver>`.
+5. Manually dispatch `Backend Package Release` at that tag with the `pypi`
+   publish target.
 
-The tag-triggered workflow does not repeat Ruff, Ty, pytest, or frontend CI.
-It checks tag/version identity, builds and stages the SPA, runs
+```bash
+gh workflow run pypi-release.yml --ref v<semver> -f publish_target=pypi
+```
+
+The manually dispatched workflow does not repeat Ruff, Ty, pytest, or frontend
+CI. It checks tag/version identity, builds and stages the SPA, runs
 `uv build --no-sources`, validates metadata and wheel contents, installs the
 exact wheel with `--no-sources` in a clean environment, and publishes that
 artifact to PyPI. Any missing registry dependency stops the workflow before
 upload. Do not normally reuse a published package version.
 
 Manual dispatch can build without publication or select TestPyPI. Production
-PyPI publication occurs only for a `vX.Y.Z` tag.
+PyPI publication requires both the `pypi` target and a `vX.Y.Z` tag ref.
 
 PyPI trusted publishing must identify:
 
 - owner: `Australian-Text-Analytics-Platform`
 - repository: `ldaca-wordflow`
-- workflow: `release.yml`
+- workflow: `pypi-release.yml`
 - environment: none
 
 Keep the old standalone-repository publisher only until the first successful
